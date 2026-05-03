@@ -19953,6 +19953,8 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "operationalReadinessNextActionKey",
       "operationalReadinessNextOperation",
       "operationalReadinessPrimaryDownloadKey",
+      "operationalReadinessWatchRecordDraftStatus",
+      "operationalReadinessWatchRecordDraftRecordCount",
       "firstUserValidationRuntimeEvidenceStatus",
       "firstUserValidationRuntimeEvidenceReady",
       "runtimeEvidenceActiveSessionCount",
@@ -19984,6 +19986,8 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       item.operationalReadinessNextActionKey,
       item.operationalReadinessNextOperation,
       item.operationalReadinessPrimaryDownloadKey,
+      item.operationalReadinessWatchRecordDraftStatus,
+      item.operationalReadinessWatchRecordDraftRecordCount,
       item.firstUserValidationRuntimeEvidenceStatus,
       item.firstUserValidationRuntimeEvidenceReady,
       item.runtimeEvidenceActiveSessionCount,
@@ -20922,6 +20926,8 @@ function buildLaunchReceiptNextFollowUp(items = []) {
     operationalReadinessNextActionKey: selected.operationalReadinessNextActionKey || null,
     operationalReadinessNextOperation: selected.operationalReadinessNextOperation || null,
     operationalReadinessPrimaryDownloadKey: selected.operationalReadinessPrimaryDownloadKey || null,
+    operationalReadinessWatchRecordDraftStatus: selected.operationalReadinessWatchRecordDraftStatus || null,
+    operationalReadinessWatchRecordDraftRecordCount: selected.operationalReadinessWatchRecordDraftRecordCount ?? null,
     createdAt: selected.createdAt || null
   };
 }
@@ -20946,6 +20952,7 @@ function formatLaunchReceiptNextFollowUp(item = null) {
     downloadFormat ? `format=${downloadFormat}` : "",
     downloadHref ? `href=${downloadHref}` : "",
     item.operationalReadinessStatus ? `readiness=${item.operationalReadinessStatus}` : "",
+    item.operationalReadinessWatchRecordDraftStatus ? `watchRecordDraft=${item.operationalReadinessWatchRecordDraftStatus}` : "",
     item.operationalReadinessNextActionKey ? `readinessAction=${item.operationalReadinessNextActionKey}` : "",
     item.operationalReadinessNextOperation ? `readinessNext=${item.operationalReadinessNextOperation}` : "",
     `handoff=${item.handoffFileName || "-"}`
@@ -20964,6 +20971,8 @@ function buildDeveloperOpsLaunchReceiptDownloadParams(scope = {}, item = null) {
     readinessActionKey: item?.operationalReadinessNextActionKey || "",
     readinessOperation: item?.operationalReadinessNextOperation || "",
     readinessDownloadKey: item?.operationalReadinessPrimaryDownloadKey || "",
+    watchRecordDraftStatus: item?.operationalReadinessWatchRecordDraftStatus || "",
+    watchRecordDraftRecordCount: item?.operationalReadinessWatchRecordDraftRecordCount ?? "",
     routeTitle: item?.title || "",
     routeReason: item?.summary || ""
   });
@@ -24414,6 +24423,14 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         operation: item.operation || null,
         operationToRecord: item.operationToRecord || item.operation || null,
         downloadKey: item.downloadKey || null,
+        operationalReadinessStatus: item.operationalReadinessStatus || null,
+        operationalReadinessLabel: item.operationalReadinessLabel || null,
+        operationalReadinessReady: item.operationalReadinessReady === true,
+        operationalReadinessNextActionKey: item.operationalReadinessNextActionKey || null,
+        operationalReadinessNextOperation: item.operationalReadinessNextOperation || null,
+        operationalReadinessPrimaryDownloadKey: item.operationalReadinessPrimaryDownloadKey || null,
+        operationalReadinessWatchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || null,
+        operationalReadinessWatchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? null,
         handoffFileName: item.handoffFileName || latestReceipt?.handoffFileName || null
       };
       const recommendedDownload = buildDeveloperOpsLaunchReceiptFollowUpDownload(normalizedItem, scope);
@@ -25659,6 +25676,8 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) 
       readinessActionKey: item.operationalReadinessNextActionKey || "",
       readinessOperation: item.operationalReadinessNextOperation || "",
       readinessDownloadKey: item.operationalReadinessPrimaryDownloadKey || "",
+      watchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || "",
+      watchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? "",
       routeTitle: item.title || "Launch receipt follow-up",
       routeReason: item.summary || "Continue the next launch receipt follow-up."
     }
@@ -25686,6 +25705,8 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpAction(item = null) {
     operationalReadinessNextActionKey: item.operationalReadinessNextActionKey || null,
     operationalReadinessNextOperation: item.operationalReadinessNextOperation || null,
     operationalReadinessPrimaryDownloadKey: item.operationalReadinessPrimaryDownloadKey || null,
+    operationalReadinessWatchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || null,
+    operationalReadinessWatchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? null,
     workspaceAction: buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item),
     productCode: item.productCode || null,
     channel: item.channel || null,

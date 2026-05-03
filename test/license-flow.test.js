@@ -15730,10 +15730,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.priority, "review");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.actionKey, latestLaunchReceipt.productionEvidenceNextActionKey);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessWatchRecordDraftStatus, "blocked_until_runway_evidence");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessWatchRecordDraftRecordCount, 5);
     assert.ok(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.key, latestLaunchReceipt.productionEvidenceNextActionKey);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.downloadKey, launchReceiptSnapshot.summary.launchReceiptNextFollowUp.downloadKey);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessWatchRecordDraftStatus, "blocked_until_runway_evidence");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessWatchRecordDraftRecordCount, 5);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.source, "developer-ops-launch-receipt");
     assert.ok(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.key, "launch-mainline");
@@ -15741,8 +15745,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.productCode, "EXPORT_ALPHA");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.channel, "stable");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.watchRecordDraftStatus, "blocked_until_runway_evidence");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.watchRecordDraftRecordCount, 5);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /\/developer\/launch-mainline\?/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /productCode=EXPORT_ALPHA/);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /watchRecordDraftStatus=blocked_until_runway_evidence/);
     assert.match(
       launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href,
       new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
@@ -15753,6 +15760,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.fileName, "developer-ops-launch-receipt-next-follow-up.txt");
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /format=launch-receipt-next-follow-up/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /productCode=EXPORT_ALPHA/);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /watchRecordDraftStatus=blocked_until_runway_evidence/);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.status, "review");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpCount, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.stage, "production_evidence");
@@ -16201,6 +16209,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptFollowUpsCsvDownload.contentDisposition || "", /developer-ops-launch-receipt-follow-ups\.csv/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"stage","priority","title"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /"operationalReadinessWatchRecordDraftStatus","operationalReadinessWatchRecordDraftRecordCount"/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /blocked_until_runway_evidence/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /record_launch_rehearsal_run/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_mainline_operations_handoff/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /\/api\/developer\/launch-mainline\/download\?/);
@@ -16219,6 +16229,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill Status: USED/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
+    assert.match(launchReceiptNextFollowUpDownload.body, /watchRecordDraft=blocked_until_runway_evidence/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Priority: REVIEW/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Stage: production_evidence/);
     assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Action Key: ${latestLaunchReceipt.productionEvidenceNextActionKey}`));

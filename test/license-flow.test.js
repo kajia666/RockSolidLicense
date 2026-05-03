@@ -6942,6 +6942,8 @@ test("developer release package export bundles integration, versions, and notice
         blockingOperationCount: operationalReadiness.blockingOperationCount,
         watchReady: operationalReadiness.watchReady,
         watchCheckInStatus: operationalReadiness.watchCheckInStatus,
+        watchRecordDraftStatus: operationalReadiness.watchRecordDraftStatus,
+        watchRecordDraftRecordCount: operationalReadiness.watchRecordDraftRecordCount,
         stabilizationStatus: operationalReadiness.stabilizationStatus,
         steadyStateStatus: operationalReadiness.steadyStateStatus,
         nextActionKey: operationalReadiness.nextActionKey,
@@ -6968,6 +6970,8 @@ test("developer release package export bundles integration, versions, and notice
         blockingOperationCount: 3,
         watchReady: false,
         watchCheckInStatus: "waiting_for_runway_evidence",
+        watchRecordDraftStatus: "blocked_until_runway_evidence",
+        watchRecordDraftRecordCount: 5,
         stabilizationStatus: stabilizationHandoffPanel.status,
         steadyStateStatus: stabilizationHandoffPanel.steadyStateHandoff?.status || null,
         nextActionKey: "launch_mainline_record_launch_rehearsal_run",
@@ -6981,7 +6985,7 @@ test("developer release package export bundles integration, versions, and notice
           key: "launch_mainline_rehearsal_guide",
           format: "rehearsal-guide"
         },
-        checkCount: 5
+        checkCount: 6
       });
       assert.ok(operationalReadiness.controls?.some((item) =>
         item?.label === "Record Operational Readiness Action"
@@ -6993,6 +6997,7 @@ test("developer release package export bundles integration, versions, and notice
       ));
       assert.match(launchMainline.summaryText, /Operational Readiness:/);
       assert.match(launchMainline.summaryText, /- status: still_needs_evidence \| label=Still Needs Evidence \| ready=false/);
+      assert.match(launchMainline.summaryText, /watchRecordDraft=blocked_until_runway_evidence/);
       assert.ok(launchMainline.mainlineSummary.heroControls.some((item) =>
         item?.label === "Record Next Runway Evidence"
         && item?.setupAction?.operation === "record_launch_rehearsal_run"
@@ -9122,6 +9127,12 @@ test("developer launch mainline action can record a launch rehearsal run and ref
     );
     assert.equal(actionResult.receipt?.mainlineOperationalReadiness?.status, "still_needs_evidence");
     assert.equal(
+      actionResult.receipt?.mainlineOperationalReadiness?.watchRecordDraftStatus,
+      actionResult.launchMainline?.mainlineSummary?.operationalReadiness?.watchRecordDraftStatus
+    );
+    assert.equal(actionResult.receipt?.mainlineOperationalReadiness?.watchRecordDraftStatus, "blocked_until_runway_evidence");
+    assert.equal(actionResult.receipt?.mainlineOperationalReadiness?.watchRecordDraftRecordCount, 5);
+    assert.equal(
       actionResult.receipt?.mainlineOperationalReadiness?.nextActionOperation,
       "record_launch_day_readiness_review"
     );
@@ -9143,6 +9154,7 @@ test("developer launch mainline action can record a launch rehearsal run and ref
     ));
     assert.match(actionResult.receipt?.handoffText || "", /Operational Readiness After Action:/);
     assert.match(actionResult.receipt?.handoffText || "", /- status: still_needs_evidence \| label=Still Needs Evidence \| ready=false/);
+    assert.match(actionResult.receipt?.handoffText || "", /watchRecordDraft=blocked_until_runway_evidence/);
     assert.match(actionResult.receipt?.handoffText || "", /- nextAction: .*operation=record_launch_day_readiness_review/);
     assert.ok(Array.isArray(actionResult.followUp.actions));
     assert.ok(actionResult.followUp.actions.some((item) =>
@@ -15615,6 +15627,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.operationalReadinessStatus, launchOpsAction.receipt.mainlineOperationalReadiness.status);
     assert.equal(latestLaunchReceipt.operationalReadinessLabel, "Still Needs Evidence");
     assert.equal(latestLaunchReceipt.operationalReadinessReady, false);
+    assert.equal(latestLaunchReceipt.operationalReadinessWatchRecordDraftStatus, launchOpsAction.receipt.mainlineOperationalReadiness.watchRecordDraftStatus);
+    assert.equal(latestLaunchReceipt.operationalReadinessWatchRecordDraftRecordCount, 5);
     assert.equal(latestLaunchReceipt.operationalReadinessNextActionKey, "launch_mainline_record_launch_rehearsal_run");
     assert.equal(latestLaunchReceipt.operationalReadinessNextOperation, "record_launch_rehearsal_run");
     assert.equal(latestLaunchReceipt.operationalReadinessPrimaryDownloadKey, "launch_mainline_rehearsal_guide");
@@ -15670,6 +15684,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptReadinessFollowUp.operationToRecord, latestLaunchReceipt.operationalReadinessNextOperation);
     assert.equal(launchReceiptReadinessFollowUp.downloadKey, latestLaunchReceipt.operationalReadinessPrimaryDownloadKey);
     assert.equal(launchReceiptReadinessFollowUp.operationalReadinessStatus, "still_needs_evidence");
+    assert.equal(launchReceiptReadinessFollowUp.operationalReadinessWatchRecordDraftStatus, "blocked_until_runway_evidence");
     assert.match(launchReceiptReadinessFollowUp.summary, /Operational readiness still needs evidence/i);
     const launchReceiptLifecycleFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
       item.operation === "record_post_launch_ops_sweep" && item.stage === "post_launch_lifecycle"
@@ -15683,6 +15698,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptLifecycleFollowUp.summary, /Post-launch lifecycle status/i);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptFollowUps, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
     assert.match(launchReceiptSnapshot.summaryText, /readiness=still_needs_evidence/);
+    assert.match(launchReceiptSnapshot.summaryText, /watchRecordDraft=blocked_until_runway_evidence/);
     assert.match(launchReceiptSnapshot.summaryText, /readinessNext=record_launch_rehearsal_run/);
     assert.ok(launchReceiptSnapshot.summary.launchReceiptAuditBackfill >= 1);
     assert.equal(

@@ -4687,6 +4687,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
       `- blockers: evidence=${Number(mainlineOperationalReadiness.blockingCount || 0)}`
       + ` | operations=${Number(mainlineOperationalReadiness.blockingOperationCount || 0)}`
       + ` | watchCheckIn=${mainlineOperationalReadiness.watchCheckInStatus || "-"}`
+      + ` | watchRecordDraft=${mainlineOperationalReadiness.watchRecordDraftStatus || "-"}`
       + ` | stabilization=${mainlineOperationalReadiness.stabilizationStatus || "-"}`
       + ` | steadyState=${mainlineOperationalReadiness.steadyStateStatus || "-"}`
     );
@@ -6871,6 +6872,8 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           blockingOperationCount: Number(operationalReadiness.blockingOperationCount || 0),
           watchReady: operationalReadiness.watchReady === true,
           watchCheckInStatus: operationalReadiness.watchCheckInStatus || null,
+          watchRecordDraftStatus: operationalReadiness.watchRecordDraftStatus || null,
+          watchRecordDraftRecordCount: operationalReadiness.watchRecordDraftRecordCount ?? null,
           stabilizationStatus: operationalReadiness.stabilizationStatus || null,
           steadyStateStatus: operationalReadiness.steadyStateStatus || null,
           nextActionKey: operationalReadiness.nextActionKey || null,
@@ -16291,6 +16294,14 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ? launchPanel.watchCheckIn
       : null;
     const watchCheckInStatus = watchCheckIn?.status || (watchReady ? "ready_for_check_in" : "waiting_for_runway_evidence");
+    const watchRecordDraft = launchPanel?.watchRecordDraft && typeof launchPanel.watchRecordDraft === "object"
+      ? launchPanel.watchRecordDraft
+      : null;
+    const watchRecordDraftRecords = Array.isArray(watchRecordDraft?.records)
+      ? watchRecordDraft.records
+      : [];
+    const watchRecordDraftStatus = watchRecordDraft?.status || null;
+    const watchRecordDraftRecordCount = watchRecordDraftRecords.length;
     const stabilizationStatus = stabilizationPanel?.status || null;
     const steadyStateHandoff = stabilizationPanel?.steadyStateHandoff && typeof stabilizationPanel.steadyStateHandoff === "object"
       ? stabilizationPanel.steadyStateHandoff
@@ -16401,6 +16412,14 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           : "First-wave ops sweep check-in is still open."
       },
       {
+        key: "watch_record_draft",
+        label: "Watch Record Draft",
+        status: watchRecordDraftStatus || "not_ready",
+        summary: watchRecordDraft
+          ? `${watchRecordDraftRecordCount} watch record draft item${watchRecordDraftRecordCount === 1 ? "" : "s"} are staged for launch-day evidence.`
+          : "Launch-day watch record draft is not available yet."
+      },
+      {
         key: "stabilization_handoff",
         label: "Stabilization Handoff",
         status: stabilizationStatus || "not_ready",
@@ -16457,6 +16476,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       blockingOperationCount: pendingEvidenceOperationCount,
       watchReady,
       watchCheckInStatus,
+      watchRecordDraftStatus,
+      watchRecordDraftRecordCount,
       stabilizationStatus,
       steadyStateStatus,
       nextActionKey,
@@ -16681,6 +16702,7 @@ function appendOperationalReadinessTextLines(lines = [], operationalReadiness = 
     + ` | operations=${Number(operationalReadiness.blockingOperationCount || 0)}`
     + ` | watchReady=${operationalReadiness.watchReady === true}`
     + ` | watchCheckIn=${operationalReadiness.watchCheckInStatus || "-"}`
+    + ` | watchRecordDraft=${operationalReadiness.watchRecordDraftStatus || "-"}`
     + ` | stabilization=${operationalReadiness.stabilizationStatus || "-"}`
     + ` | steadyState=${operationalReadiness.steadyStateStatus || "-"}`
   );
@@ -20076,6 +20098,8 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         operationalReadinessBlockingOperationCount: receipt.operationalReadiness?.blockingOperationCount ?? null,
         operationalReadinessWatchReady: receipt.operationalReadiness?.watchReady === true,
         operationalReadinessWatchCheckInStatus: receipt.operationalReadiness?.watchCheckInStatus || null,
+        operationalReadinessWatchRecordDraftStatus: receipt.operationalReadiness?.watchRecordDraftStatus || null,
+        operationalReadinessWatchRecordDraftRecordCount: receipt.operationalReadiness?.watchRecordDraftRecordCount ?? null,
         operationalReadinessStabilizationStatus: receipt.operationalReadiness?.stabilizationStatus || null,
         operationalReadinessSteadyStateStatus: receipt.operationalReadiness?.steadyStateStatus || null,
         operationalReadinessNextActionKey: receipt.operationalReadiness?.nextActionKey || null,
@@ -20706,6 +20730,8 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       operationalReadinessNextActionKey: receipt.operationalReadinessNextActionKey || null,
       operationalReadinessNextOperation: receipt.operationalReadinessNextOperation || null,
       operationalReadinessPrimaryDownloadKey: receipt.operationalReadinessPrimaryDownloadKey || null,
+      operationalReadinessWatchRecordDraftStatus: receipt.operationalReadinessWatchRecordDraftStatus || null,
+      operationalReadinessWatchRecordDraftRecordCount: receipt.operationalReadinessWatchRecordDraftRecordCount ?? null,
       createdAt: receipt.createdAt || receipt.handoffGeneratedAt || null
     });
   };
@@ -20811,7 +20837,9 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
         summary: `Operational readiness ${receipt.operationalReadinessLabel || receipt.operationalReadinessStatus || "still needs evidence"}; continue with ${receipt.operationalReadinessNextOperation || "the next readiness action"}.`,
         actionKey: receipt.operationalReadinessNextActionKey || null,
         operationToRecord: receipt.operationalReadinessNextOperation || null,
-        downloadKey: receipt.operationalReadinessPrimaryDownloadKey || receipt.firstLaunchDutyPrimaryDownloadKey || receipt.firstLaunchDutyHandoffDownloadKey || null
+        downloadKey: receipt.operationalReadinessPrimaryDownloadKey || receipt.firstLaunchDutyPrimaryDownloadKey || receipt.firstLaunchDutyHandoffDownloadKey || null,
+        operationalReadinessWatchRecordDraftStatus: receipt.operationalReadinessWatchRecordDraftStatus || null,
+        operationalReadinessWatchRecordDraftRecordCount: receipt.operationalReadinessWatchRecordDraftRecordCount ?? null
       });
     }
     if (receipt.postLaunchLifecycleNextActionKey) {
@@ -28645,7 +28673,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.latestLaunchReceipts) && overview.latestLaunchReceipts.length) {
       lines.push("Latest Launch Receipts:");
       for (const item of overview.latestLaunchReceipts) {
-        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | readiness=${item.operationalReadinessStatus || "-"} | readinessNext=${item.operationalReadinessNextOperation || "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | handoff=${item.handoffFileName || "-"}`);
+        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | readiness=${item.operationalReadinessStatus || "-"} | watchRecordDraft=${item.operationalReadinessWatchRecordDraftStatus || "-"} | readinessNext=${item.operationalReadinessNextOperation || "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | handoff=${item.handoffFileName || "-"}`);
         appendDeveloperOpsReceiptVisibilityText(lines, item);
       }
     }
@@ -28673,6 +28701,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | href=${item.downloadHref || recommendedDownload?.href || "-"}`
           + ` | handoff=${item.handoffFileName || "-"}`
           + ` | readiness=${item.operationalReadinessStatus || "-"}`
+          + ` | watchRecordDraft=${item.operationalReadinessWatchRecordDraftStatus || "-"}`
           + ` | readinessAction=${item.operationalReadinessNextActionKey || "-"}`
           + ` | readinessNext=${item.operationalReadinessNextOperation || "-"}`
           + ` | ${item.summary || "-"}`

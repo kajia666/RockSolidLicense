@@ -21720,6 +21720,12 @@ function buildDeveloperOpsStabilizationStatusReceiptPayload({
     : latestReceipt || stabilizationHandoff
       ? "awaiting_stabilization_confirmation"
       : "not_started";
+  const watchRecordDraftStatus = launchDayWatchReceipt?.watchRecordDraftStatus
+    || latestReceipt?.operationalReadinessWatchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = launchDayWatchReceipt?.watchRecordDraftRecordCount
+    ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
+    ?? null;
   return {
     version: "developer-ops-stabilization-status/v1",
     status,
@@ -21732,6 +21738,8 @@ function buildDeveloperOpsStabilizationStatusReceiptPayload({
     latestReceiptOperation: latestReceipt?.operation || stabilizationHandoff?.latestLaunchReceipt?.operation || null,
     latestReceiptHandoffFileName: latestReceipt?.handoffFileName || stabilizationHandoff?.latestLaunchReceipt?.handoffFileName || null,
     launchDayWatchStatus: launchDayWatchReceipt?.status || latestReceipt?.operationalReadinessWatchCheckInStatus || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     launchDayWatchRecorded: launchDayWatchReceipt?.receiptRecorded === true || latestReceipt?.operation === "record_post_launch_ops_sweep",
     postLaunchLifecycleStatus: latestReceipt?.postLaunchLifecycleStatus || stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleStatus || null,
     stabilizationNextOperation: latestReceipt?.postLaunchLifecycleNextOperation || stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleNextOperation || null,
@@ -21782,6 +21790,14 @@ function buildDeveloperOpsOperationalExceptionEntryPayload({
     launchDayWatchStatus: launchDayWatchReceipt?.status || latestReceipt?.operationalReadinessWatchCheckInStatus || null,
     stabilizationStatus: stabilizationStatusReceipt?.status || null
   };
+  const watchRecordDraftStatus = launchDayWatchReceipt?.watchRecordDraftStatus
+    || stabilizationStatusReceipt?.watchRecordDraftStatus
+    || latestReceipt?.operationalReadinessWatchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = launchDayWatchReceipt?.watchRecordDraftRecordCount
+    ?? stabilizationStatusReceipt?.watchRecordDraftRecordCount
+    ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
+    ?? null;
   const blockingFollowUps = currentReceiptFollowUps.filter((item) => !isDeveloperOpsCloseoutReadinessFollowUp(item, followUpContext));
   const launchReceiptNextFollowUpIsCloseout = isDeveloperOpsCloseoutReadinessFollowUp(
     launchReceiptNextFollowUp,
@@ -21850,6 +21866,8 @@ function buildDeveloperOpsOperationalExceptionEntryPayload({
     latestReceiptOperation: latestReceipt?.operation || stabilizationStatusReceipt?.latestReceiptOperation || null,
     latestReceiptAuditLogId: latestReceipt?.auditLogId || null,
     launchDayWatchStatus: launchDayWatchReceipt?.status || latestReceipt?.operationalReadinessWatchCheckInStatus || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     stabilizationStatus: stabilizationStatusReceipt?.status || null,
     confirmationAuditLogId: stabilizationStatusReceipt?.confirmationAuditLogId || null,
     workspaceAction: primaryWorkspaceAction
@@ -22076,6 +22094,14 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
   const blockers = [];
   const operationalExceptionStatus = operationalExceptionCloseout?.status || null;
   const launchDayWatchStatus = launchDayWatchReceipt?.status || null;
+  const watchRecordDraftStatus = launchDayWatchReceipt?.watchRecordDraftStatus
+    || stabilizationStatusReceipt?.watchRecordDraftStatus
+    || latestReceipt?.operationalReadinessWatchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = launchDayWatchReceipt?.watchRecordDraftRecordCount
+    ?? stabilizationStatusReceipt?.watchRecordDraftRecordCount
+    ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
+    ?? null;
   const stabilizationStatus = stabilizationStatusReceipt?.status || null;
   const firstWaveConfirmationStatus = firstWaveConfirmationChain?.status || null;
   const latestOperation = String(latestReceipt?.operation || "").trim().toLowerCase();
@@ -22284,6 +22310,8 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
     blockerKeys: blockers.map((item) => item.key),
     operationalExceptionStatus,
     launchDayWatchStatus,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     stabilizationStatus,
     firstWaveConfirmationStatus,
     recordedAction,
@@ -22339,6 +22367,16 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
   const monitoringReady = closeoutReadinessSummary?.steadyStateReady === true
     && closeoutReadinessSummary?.canClose === true;
   const remainingFollowUpCount = monitoringReady ? 0 : followUps.length;
+  const watchRecordDraftStatus = launchDayWatchReceipt?.watchRecordDraftStatus
+    || closeoutReadinessSummary?.watchRecordDraftStatus
+    || stabilizationStatusReceipt?.watchRecordDraftStatus
+    || latestReceipt?.operationalReadinessWatchRecordDraftStatus
+    || null;
+  const watchRecordDraftRecordCount = launchDayWatchReceipt?.watchRecordDraftRecordCount
+    ?? closeoutReadinessSummary?.watchRecordDraftRecordCount
+    ?? stabilizationStatusReceipt?.watchRecordDraftRecordCount
+    ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
+    ?? null;
   const reviewScope = {
     ...scope,
     productCode: productCode || scope.productCode || "",
@@ -22433,6 +22471,8 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
         || "Review the closeout summary before handing the lane into steady-state operations.",
     closeoutStatus: closeoutReadinessSummary?.status || null,
     launchDayWatchStatus: launchDayWatchReceipt?.status || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
     stabilizationStatus: stabilizationStatusReceipt?.status || null,
     firstWaveStatus: firstWaveConfirmationChain?.status || null,
     followUpCount: remainingFollowUpCount,
@@ -27643,6 +27683,7 @@ function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadines
   lines.push(
     `- operationalException=${closeoutReadinessSummary.operationalExceptionStatus || "-"}`
     + ` | launchDayWatch=${closeoutReadinessSummary.launchDayWatchStatus || "-"}`
+    + ` | watchRecordDraft=${closeoutReadinessSummary.watchRecordDraftStatus || "-"}`
     + ` | stabilization=${closeoutReadinessSummary.stabilizationStatus || "-"}`
     + ` | firstWave=${closeoutReadinessSummary.firstWaveConfirmationStatus || "-"}`
   );
@@ -27688,6 +27729,7 @@ function appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateO
     + ` | monitoringReady=${steadyStateOperationalReview.monitoringReady === true}`
     + ` | closeout=${steadyStateOperationalReview.closeoutStatus || "-"}`
     + ` | launchDayWatch=${steadyStateOperationalReview.launchDayWatchStatus || "-"}`
+    + ` | watchRecordDraft=${steadyStateOperationalReview.watchRecordDraftStatus || "-"}`
     + ` | stabilization=${steadyStateOperationalReview.stabilizationStatus || "-"}`
     + ` | firstWave=${steadyStateOperationalReview.firstWaveStatus || "-"}`
     + ` | followUps=${steadyStateOperationalReview.followUpCount ?? 0}`
@@ -28493,6 +28535,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push(
         `- latestReceipt=${stabilizationStatusReceipt.latestReceiptOperation || "-"}`
         + ` | watch=${stabilizationStatusReceipt.launchDayWatchStatus || "-"}`
+        + ` | watchRecordDraft=${stabilizationStatusReceipt.watchRecordDraftStatus || "-"}`
         + ` | next=${stabilizationStatusReceipt.nextOperation || "-"}`
         + ` | steadyNext=${stabilizationStatusReceipt.steadyStateNextStep || "-"}`
       );
@@ -28516,6 +28559,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       );
       lines.push(
         `- watch=${operationalExceptionEntry.launchDayWatchStatus || "-"}`
+        + ` | watchRecordDraft=${operationalExceptionEntry.watchRecordDraftStatus || "-"}`
         + ` | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"}`
         + ` | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`
       );
@@ -29066,7 +29110,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   if (stabilizationStatusReceipt) {
     lines.push("Stabilization Status Receipt:");
     lines.push(`- Status: ${stabilizationStatusReceipt.status || "-"} | confirmed=${stabilizationStatusReceipt.handoffConfirmed === true} | audit=${stabilizationStatusReceipt.confirmationAuditLogId || "-"}`);
-    lines.push(`- Latest Receipt: ${stabilizationStatusReceipt.latestReceiptOperation || "-"} | watch=${stabilizationStatusReceipt.launchDayWatchStatus || "-"} | postLaunch=${stabilizationStatusReceipt.postLaunchLifecycleStatus || "-"}`);
+    lines.push(`- Latest Receipt: ${stabilizationStatusReceipt.latestReceiptOperation || "-"} | watch=${stabilizationStatusReceipt.launchDayWatchStatus || "-"} | watchRecordDraft=${stabilizationStatusReceipt.watchRecordDraftStatus || "-"} | postLaunch=${stabilizationStatusReceipt.postLaunchLifecycleStatus || "-"}`);
     lines.push(`- Next: action=${stabilizationStatusReceipt.nextActionKey || "-"} | operation=${stabilizationStatusReceipt.nextOperation || "-"} | download=${stabilizationStatusReceipt.downloadKey || "-"}`);
     lines.push(`- Steady State: next=${stabilizationStatusReceipt.steadyStateNextStep || "-"} | stabilizationNext=${stabilizationStatusReceipt.stabilizationNextOperation || "-"} | followUps=${stabilizationStatusReceipt.followUpCount ?? 0}`);
     lines.push(`- Files: readiness=${stabilizationStatusReceipt.operatorHandoffFiles?.readiness || "-"} | handoffIndex=${stabilizationStatusReceipt.operatorHandoffFiles?.handoffIndex || "-"} | nextFollowUp=${stabilizationStatusReceipt.operatorHandoffFiles?.nextFollowUp || "-"} | postLaunchIndex=${stabilizationStatusReceipt.operatorHandoffFiles?.postLaunchIndex || "-"}`);
@@ -29081,7 +29125,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push(`- Next: action=${operationalExceptionEntry.actionKey || "-"} | operation=${operationalExceptionEntry.operation || "-"} | download=${operationalExceptionEntry.downloadKey || "-"}`);
     lines.push(`- Workspace: ${operationalExceptionEntry.workspaceAction?.label || "-"} | href=${operationalExceptionEntry.workspaceAction?.href || "-"}`);
     lines.push(`- Download: ${operationalExceptionEntry.download?.fileName || "-"} | format=${operationalExceptionEntry.download?.format || "-"} | href=${operationalExceptionEntry.download?.href || "-"}`);
-    lines.push(`- Signals: watch=${operationalExceptionEntry.launchDayWatchStatus || "-"} | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"} | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`);
+    lines.push(`- Signals: watch=${operationalExceptionEntry.launchDayWatchStatus || "-"} | watchRecordDraft=${operationalExceptionEntry.watchRecordDraftStatus || "-"} | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"} | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`);
     if (Array.isArray(operationalExceptionEntry.reasons) && operationalExceptionEntry.reasons.length) {
       lines.push("- Reasons:");
       for (const item of operationalExceptionEntry.reasons) {
@@ -30338,6 +30382,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     lines.push(
       `- latestReceipt=${stabilizationStatusReceipt.latestReceiptOperation || "-"}`
       + ` | watch=${stabilizationStatusReceipt.launchDayWatchStatus || "-"}`
+      + ` | watchRecordDraft=${stabilizationStatusReceipt.watchRecordDraftStatus || "-"}`
       + ` | next=${stabilizationStatusReceipt.nextOperation || "-"}`
       + ` | steadyNext=${stabilizationStatusReceipt.steadyStateNextStep || "-"}`
     );
@@ -30359,6 +30404,12 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       `- action=${operationalExceptionEntry.actionKey || "-"}`
       + ` | download=${operationalExceptionEntry.download?.fileName || operationalExceptionEntry.downloadKey || "-"}`
       + ` | workspace=${operationalExceptionEntry.workspaceAction?.label || "-"}@${operationalExceptionEntry.workspaceAction?.autofocus || "-"}`
+    );
+    lines.push(
+      `- watch=${operationalExceptionEntry.launchDayWatchStatus || "-"}`
+      + ` | watchRecordDraft=${operationalExceptionEntry.watchRecordDraftStatus || "-"}`
+      + ` | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"}`
+      + ` | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`
     );
   }
 

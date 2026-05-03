@@ -16480,6 +16480,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       stabilizationStatusReceipt.launchDayWatchStatus,
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.status
     );
+    assert.equal(
+      stabilizationStatusReceipt.watchRecordDraftStatus,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftStatus
+    );
+    assert.equal(
+      stabilizationStatusReceipt.watchRecordDraftRecordCount,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftRecordCount
+    );
     assert.equal(stabilizationStatusReceipt.followUpCount, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.followUpCount);
     assert.equal(
       stabilizationStatusReceipt.nextOperation,
@@ -16500,6 +16508,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(operationalExceptionEntry.operation, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.operationToRecord);
     assert.equal(operationalExceptionEntry.downloadKey, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key);
     assert.equal(operationalExceptionEntry.launchDayWatchStatus, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.status);
+    assert.equal(operationalExceptionEntry.watchRecordDraftStatus, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftStatus);
+    assert.equal(operationalExceptionEntry.watchRecordDraftRecordCount, confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftRecordCount);
     assert.equal(operationalExceptionEntry.stabilizationStatus, stabilizationStatusReceipt.status);
     assert.equal(operationalExceptionEntry.confirmationAuditLogId, stabilizationConfirmation.auditLogId);
     assert.equal(operationalExceptionEntry.workspaceAction.key, "launch-mainline");
@@ -16551,6 +16561,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       closeoutReadinessSummary.launchDayWatchStatus,
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.status
     );
+    assert.equal(
+      closeoutReadinessSummary.watchRecordDraftStatus,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftStatus
+    );
+    assert.equal(
+      closeoutReadinessSummary.watchRecordDraftRecordCount,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftRecordCount
+    );
     assert.equal(closeoutReadinessSummary.stabilizationStatus, stabilizationStatusReceipt.status);
     assert.equal(closeoutReadinessSummary.closeoutReviewReady, false);
     assert.equal(closeoutReadinessSummary.nextAction.key, operationalExceptionCloseout.resolutionAction.key);
@@ -16560,14 +16578,37 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.operationalExceptionCloseout.status,
       "awaiting_resolution"
     );
+    const initialSteadyStateOperationalReview = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.steadyStateOperationalReview;
+    assert.ok(initialSteadyStateOperationalReview);
+    assert.equal(
+      initialSteadyStateOperationalReview.watchRecordDraftStatus,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftStatus
+    );
+    assert.equal(
+      initialSteadyStateOperationalReview.watchRecordDraftRecordCount,
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftRecordCount
+    );
+    const launchDayWatchReceiptStatus = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.status;
+    const launchDayWatchDraftStatus = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchDayWatchReceipt.watchRecordDraftStatus;
+    const watchRecordDraftSignalPattern = new RegExp(
+      `watch=${launchDayWatchReceiptStatus} \\| watchRecordDraft=${launchDayWatchDraftStatus}`
+    );
+    const watchRecordDraftExceptionPattern = new RegExp(
+      `watch=${launchDayWatchReceiptStatus} \\| watchRecordDraft=${launchDayWatchDraftStatus} \\| stabilization=${stabilizationStatusReceipt.status}`
+    );
+    const watchRecordDraftLifecyclePattern = new RegExp(
+      `launchDayWatch=${launchDayWatchReceiptStatus} \\| watchRecordDraft=${launchDayWatchDraftStatus} \\| stabilization=${stabilizationStatusReceipt.status}`
+    );
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${stabilizationConfirmation.auditLogId}`));
     assert.match(confirmedOpsSnapshot.summaryText, /Stabilization Status Receipt:/);
     assert.match(confirmedOpsSnapshot.summaryText, /status=confirmed_with_followups/);
     assert.match(confirmedOpsSnapshot.summaryText, /confirmed=true/);
+    assert.match(confirmedOpsSnapshot.summaryText, watchRecordDraftSignalPattern);
     assert.match(confirmedOpsSnapshot.summaryText, /Operational Exception Entry:/);
     assert.match(confirmedOpsSnapshot.summaryText, /status=open/);
     assert.match(confirmedOpsSnapshot.summaryText, /operation=record_launch_rehearsal_run/);
+    assert.match(confirmedOpsSnapshot.summaryText, watchRecordDraftExceptionPattern);
     assert.match(confirmedOpsSnapshot.summaryText, /Operational Exception Closeout:/);
     assert.match(confirmedOpsSnapshot.summaryText, /status=awaiting_resolution/);
     assert.match(confirmedOpsSnapshot.summaryText, /canClose=false/);
@@ -16575,7 +16616,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(confirmedOpsSnapshot.summaryText, /closeoutReview=record_launch_closeout_review/);
     assert.match(confirmedOpsSnapshot.summaryText, /Closeout Readiness Summary:/);
     assert.match(confirmedOpsSnapshot.summaryText, /closeoutReady=false/);
+    assert.match(confirmedOpsSnapshot.summaryText, watchRecordDraftLifecyclePattern);
     assert.match(confirmedOpsSnapshot.summaryText, /nextAction=operational_exception_resolution/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Operational Review:/);
+    assert.match(confirmedOpsSnapshot.summaryText, watchRecordDraftLifecyclePattern);
 
     const handoffIndexDownload = await getText(
       baseUrl,
@@ -16605,9 +16649,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /Stabilization Status Receipt:/);
     assert.match(handoffIndexDownload.body, /status=confirmed_with_followups/);
     assert.match(handoffIndexDownload.body, /confirmed=true/);
+    assert.match(handoffIndexDownload.body, watchRecordDraftSignalPattern);
     assert.match(handoffIndexDownload.body, /Operational Exception Entry:/);
     assert.match(handoffIndexDownload.body, /status=open/);
     assert.match(handoffIndexDownload.body, /operation=record_launch_rehearsal_run/);
+    assert.match(handoffIndexDownload.body, watchRecordDraftExceptionPattern);
     assert.match(handoffIndexDownload.body, /Operational Exception Closeout:/);
     assert.match(handoffIndexDownload.body, /status=awaiting_resolution/);
     assert.match(handoffIndexDownload.body, /canClose=false/);

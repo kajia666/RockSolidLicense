@@ -17289,6 +17289,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   );
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "-"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "-"}`);
+  lines.push(`- Launch Operations Overview Status: ${opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "-"}`);
   if (stabilizationConfirmation) {
@@ -18019,6 +18020,22 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
     ? payload.opsSnapshot.scope
     : {};
+  const opsDownloadScope = {
+    ...payload.filters,
+    ...opsScope,
+    productCode: opsScope.productCode || payload.filters?.productCode || project.code || "",
+    channel: opsScope.channel || payload.filters?.channel || manifest.channel || "stable"
+  };
+  const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
+    opsDownloadScope,
+    stabilizationConfirmation?.launchOpsOverviewContext
+    || mainlineSummary.stabilizationHandoffPanel?.launchOpsOverviewContext
+    || payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.launchOpsOverviewContext
+  );
+  const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(
+    opsDownloadScope,
+    launchOpsOverviewContext
+  );
   const opsHandoffIndexDownload = createLaunchWorkflowDownloadShortcut(
     "ops_handoff_index",
     "developer-ops-handoff-index.txt",
@@ -18026,19 +18043,11 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     {
       source: "developer-ops",
       format: "handoff-index",
-      params: buildDeveloperOpsRouteReviewBaseDownloadParams({
-        ...payload.filters,
-        ...opsScope,
-        productCode: opsScope.productCode || payload.filters?.productCode || project.code || "",
-        channel: opsScope.channel || payload.filters?.channel || manifest.channel || "stable"
-      })
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(opsDownloadScope)
     }
   );
   const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
-    ...payload.filters,
-    ...opsScope,
-    productCode: opsScope.productCode || payload.filters?.productCode || project.code || "",
-    channel: opsScope.channel || payload.filters?.channel || manifest.channel || "stable"
+    ...opsDownloadScope
   });
   const mainlineRouteParams = compactRouteParams({
     productCode: payload.filters?.productCode || project.code || "",
@@ -18148,6 +18157,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt",
     opsFirstWaveAuditBackfillStatusDownload || {}
   );
+  if (launchOpsOverviewDownload) {
+    pushRoute(
+      "launch-ops-overview-status",
+      "Launch Ops overview status",
+      opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt",
+      launchOpsOverviewDownload
+    );
+  }
   pushRoute(
     "launch-mainline-post-launch-handoff-index",
     "Launch Mainline post-launch handoff index",
@@ -18241,6 +18258,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       stabilizationMainlineDownload
     );
   }
+  if (launchOpsOverviewContext) {
+    lines.push("");
+    lines.push("Launch Ops Overview Context:");
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(`- download=${formatLaunchHandoffDownloadText(launchOpsOverviewDownload, { fileSeparator: " | " })}`);
+  }
 
   lines.push("");
   lines.push("Launch Mainline Recommended Downloads:");
@@ -18315,6 +18338,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     "ops/initial-launch-ops-readiness.txt",
     payload.opsSnapshot ? buildDeveloperOpsInitialLaunchOpsReadinessText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-operations-overview-status.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsOverviewStatusText(payload.opsSnapshot) : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -19555,6 +19583,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
       handoffIndex: "ops/handoff-index.txt",
       initialLaunchOpsReadiness: "ops/initial-launch-ops-readiness.txt",
+      launchOperationsOverviewStatus: "ops/launch-operations-overview-status.txt",
       launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
       firstWaveAuditBackfillStatus: "ops/first-wave-audit-backfill-status.txt",
       stabilizationHandoff: "ops/stabilization-handoff.txt"
@@ -19608,6 +19637,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Stabilization handoff", payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt"],
     ["Recovery drill handoff", payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt"],
     ["Ops handoff index", opsFiles.handoffIndex || "ops/handoff-index.txt"],
+    ["Launch operations overview status", opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"],
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
     ["First-Wave audit backfill status", opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"],
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
@@ -19678,6 +19708,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | format=${opsFirstWaveAuditBackfillStatusDownload.format || "-"}`
     + ` | href=${opsFirstWaveAuditBackfillStatusDownload.href || "-"}`
   );
+  lines.push(`- Launch Operations Overview Status: ${opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"}`);
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"}`);
   if (stabilizationConfirmation) {
     const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(stabilizationConfirmation.launchOpsOverviewContext);
@@ -30348,6 +30379,21 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
   const traceability = readiness.traceability || {};
   const latestLaunchReceipt = traceability.latestLaunchReceipt || {};
   const launchMainlineFiles = traceability.launchMainlineFiles || {};
+  const overviewStatusScope = {
+    ...scope,
+    productCode: scope.productCode || latestLaunchReceipt.productCode || "",
+    channel: scope.channel || latestLaunchReceipt.channel || "stable"
+  };
+  const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
+    overviewStatusScope,
+    traceability.stabilizationHandoffConfirmation?.launchOpsOverviewContext
+    || readiness.stabilizationHandoff?.confirmation?.launchOpsOverviewContext
+    || readiness.launchOperationsOverviewStatus?.launchOpsOverviewContext
+  );
+  const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(
+    overviewStatusScope,
+    launchOpsOverviewContext
+  );
   const routeParams = compactRouteParams({
     productCode: scope.productCode || latestLaunchReceipt.productCode || "",
     channel: scope.channel || latestLaunchReceipt.channel || "stable",
@@ -30406,6 +30452,12 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       )
     ]
   ];
+  if (launchOpsOverviewDownload) {
+    downloads.push([
+      "launch-ops-overview-status",
+      launchOpsOverviewDownload
+    ]);
+  }
   const lines = [
     "RockSolid Developer Ops Launch Mainline Handoff Routes",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -30419,6 +30471,12 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
   );
   for (const [key, download] of downloads) {
     lines.push(`- ${key}: ${formatLaunchHandoffDownloadText(download, { fileSeparator: " | " })}`);
+  }
+  if (launchOpsOverviewContext) {
+    lines.push("");
+    lines.push("Launch Ops Overview Context:");
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(`- download=${formatLaunchHandoffDownloadText(launchOpsOverviewDownload, { fileSeparator: " | " })}`);
   }
   lines.push("");
   lines.push("Operator Order:");

@@ -16841,6 +16841,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       opsLaunchMainlineRouteMapDownload.body,
       /launch-mainline-post-launch-handoff-index.*\/api\/developer\/launch-mainline\/download\?.*format=post-launch-handoff-index/
     );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-ops-overview-status: .*developer-ops-launch-operations-overview-status\.txt.*href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-overview-status.*format=launch-operations-overview-status/
+    );
 
     const launchMainlineHandoffRoutesDownload = await getText(
       baseUrl,
@@ -16865,6 +16869,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Status: USED/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /launch-ops-overview-status: .*developer-ops-launch-operations-overview-status\.txt.*format=launch-operations-overview-status.*href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-overview-status/
+    );
 
     const launchMainlinePostLaunchIndexDownload = await getText(
       baseUrl,
@@ -16894,6 +16902,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchMainlinePostLaunchIndexDownload.body.includes(latestLaunchReceipt.handoffFileName));
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
@@ -16959,6 +16968,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchMainlineTraceabilityChecksums.body, /ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilityChecksums.body, /ops\/launch-receipt-next-follow-up\.txt/);
+    assert.match(launchMainlineTraceabilityChecksums.body, /ops\/launch-operations-overview-status\.txt/);
     assert.match(launchMainlineTraceabilityChecksums.body, /ops\/stabilization-handoff\.txt/);
     assert.match(launchMainlineTraceabilityChecksums.body, /handoff-download-routes\.txt/);
 
@@ -17001,6 +17011,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchMainlineTraceabilityZipText, /ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(launchMainlineTraceabilityZipText, /format=launch-receipt-next-follow-up/);
+    assert.match(launchMainlineTraceabilityZipText, /ops\/launch-operations-overview-status\.txt/);
+    assert.match(launchMainlineTraceabilityZipText, /RockSolid Developer Ops Launch Operations Overview Status/);
+    assert.match(launchMainlineTraceabilityZipText, /context=launch_ops_overview_status/);
+    assert.match(launchMainlineTraceabilityZipText, /downloadFormat=launch-operations-overview-status/);
     assert.match(launchMainlineTraceabilityZipText, /post-launch-lifecycle-primary/);
     assert.match(
       launchMainlineTraceabilityZipText,
@@ -17070,6 +17084,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.opsFiles.launchReceiptNextFollowUp,
       "ops/launch-receipt-next-follow-up.txt"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.opsFiles.launchOperationsOverviewStatus,
+      "ops/launch-operations-overview-status.txt"
     );
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.opsFiles.stabilizationHandoff,
@@ -17359,6 +17377,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchMainlineTraceabilitySummaryDownload.body.includes(latestLaunchReceipt.handoffFileName));
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,

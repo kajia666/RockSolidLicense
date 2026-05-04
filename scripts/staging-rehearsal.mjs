@@ -3976,7 +3976,8 @@ function renderReceiptVisibilitySummaries(downloads) {
   return [
     `- Launch Review summary: \`${downloads.launchReviewSummary}\``,
     `- Launch Smoke Kit summary: \`${downloads.launchSmokeSummary}\``,
-    `- Launch Ops Overview Status: \`${downloads.launchOpsOverviewStatus}\``
+    `- Launch Ops Overview Status: \`${downloads.launchOpsOverviewStatus}\``,
+    "- Launch Ops Overview Status verifies receipt visibility, productionSignoffPacket, and launchDayWatchEntry for cutover."
   ].join("\n");
 }
 
@@ -3989,7 +3990,9 @@ function renderLaunchRouteMapGate(command) {
     `- Dry run: \`${command.dryRunCommand}\``,
     `- Writes data: ${command.willModifyData ? "yes" : "no"}`,
     `- Runs full suite: ${command.willRunFullSuite ? "yes" : "no"}`,
-    `- Purpose: ${command.purpose}`
+    `- Purpose: ${command.purpose}`,
+    "- Launch Mainline route map must surface Launch Ops Overview Evidence before live-write smoke.",
+    "- Verify productionSignoffPacket and launchDayWatchEntry in the route-map gate output."
   ].join("\n");
 }
 

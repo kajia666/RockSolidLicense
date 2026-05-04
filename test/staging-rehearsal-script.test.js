@@ -1508,10 +1508,13 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /npm\.cmd run launch:route-map-gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate -- --dry-run --json/);
     assert.match(handoff, /first-batch runtime evidence/);
+    assert.match(handoff, /Launch Mainline route map must surface Launch Ops Overview Evidence before live-write smoke/);
+    assert.match(handoff, /Verify productionSignoffPacket and launchDayWatchEntry in the route-map gate output/);
     assert.match(handoff, /## Receipt Visibility Summary Downloads/);
     assert.match(handoff, /Launch Review summary: `https:\/\/staging\.example\.com\/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`/);
     assert.match(handoff, /Launch Smoke Kit summary: `https:\/\/staging\.example\.com\/api\/developer\/launch-smoke-kit\/download\?productCode=PILOT_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`/);
     assert.match(handoff, /Launch Ops Overview Status: `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=launch-operations-overview-status&limit=20`/);
+    assert.match(handoff, /Launch Ops Overview Status verifies receipt visibility, productionSignoffPacket, and launchDayWatchEntry for cutover/);
     assert.match(handoff, /\/api\/developer\/launch-mainline\/action/);
     assert.match(handoff, /record_launch_rehearsal_run/);
     assert.match(handoff, /Record Launch Stabilization Review/);

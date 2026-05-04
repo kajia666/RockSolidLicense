@@ -24138,6 +24138,16 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     ?? steadyStateHandoffBrief?.watchRecordDraftRecordCount
     ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
     ?? null;
+  const productionSignoffPacket = steadyStateDutyBoard?.productionSignoffPacket
+    || steadyStateDutyActionLinks?.productionSignoffPacket
+    || steadyStateHandoffBrief?.productionSignoffPacket
+    || steadyStateOperationalReview?.productionSignoffPacket
+    || null;
+  const launchDayWatchEntry = steadyStateDutyBoard?.launchDayWatchEntry
+    || steadyStateDutyActionLinks?.launchDayWatchEntry
+    || steadyStateHandoffBrief?.launchDayWatchEntry
+    || steadyStateOperationalReview?.launchDayWatchEntry
+    || null;
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
     steadyStateDutyBoard?.launchOpsOverviewContext
     || steadyStateHandoffBrief?.launchOpsOverviewContext
@@ -24174,6 +24184,8 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     dutyActionLinksStatus: steadyStateDutyActionLinks?.status || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    productionSignoffPacket,
+    launchDayWatchEntry,
     latestSteadyStateDutyPlanReceipt: latestSteadyStateDutyPlanReceiptPayload,
     receiptVisibilitySummary,
     operatorSummary: chain.complete === true
@@ -24244,6 +24256,16 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     ?? steadyStateDutyBoard?.watchRecordDraftRecordCount
     ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
     ?? null;
+  const productionSignoffPacket = handoffSummary.productionSignoffPacket
+    || steadyStateDutyBoard?.productionSignoffPacket
+    || steadyStateDutyActionLinks?.productionSignoffPacket
+    || steadyStateOperationalReview?.productionSignoffPacket
+    || null;
+  const launchDayWatchEntry = handoffSummary.launchDayWatchEntry
+    || steadyStateDutyBoard?.launchDayWatchEntry
+    || steadyStateDutyActionLinks?.launchDayWatchEntry
+    || steadyStateOperationalReview?.launchDayWatchEntry
+    || null;
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
     handoffSummary.launchOpsOverviewContext
     || steadyStateDutyBoard?.launchOpsOverviewContext
@@ -24294,6 +24316,17 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       summary: `${steadyStateDutyActionLinks?.actionCount ?? 0} duty action link${Number(steadyStateDutyActionLinks?.actionCount ?? 0) === 1 ? "" : "s"} are mapped for the operator.`,
       fileName: steadyStateDutyActionLinks?.actionLinksDownload?.fileName || null,
       href: steadyStateDutyActionLinks?.actionLinksDownload?.href || null
+    },
+    {
+      key: "production_signoff_packet",
+      label: "Keep production sign-off packet attached",
+      status: productionSignoffPacket ? "ready" : "missing",
+      ready: Boolean(productionSignoffPacket),
+      summary: launchDayWatchEntry
+        ? `Use ${launchDayWatchEntry} after this packet is reviewed.`
+        : "Keep production sign-off packet attached before launch-day watch.",
+      fileName: productionSignoffPacket || null,
+      href: null
     },
     {
       key: "launch_operations_daily_brief_download",
@@ -24353,6 +24386,8 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     dutyActionCount: steadyStateDutyActionLinks?.actionCount ?? steadyStateDutyBoard?.quickActions?.length ?? 0,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    productionSignoffPacket,
+    launchDayWatchEntry,
     launchOpsOverviewContext,
     briefDownload,
     supportingDownloads,
@@ -24420,6 +24455,18 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     ?? steadyStateDutyBoard?.watchRecordDraftRecordCount
     ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
     ?? null;
+  const productionSignoffPacket = dailyBrief.productionSignoffPacket
+    || launchOperationsHandoffSummary?.productionSignoffPacket
+    || steadyStateDutyBoard?.productionSignoffPacket
+    || steadyStateDutyActionLinks?.productionSignoffPacket
+    || steadyStateOperationalReview?.productionSignoffPacket
+    || null;
+  const launchDayWatchEntry = dailyBrief.launchDayWatchEntry
+    || launchOperationsHandoffSummary?.launchDayWatchEntry
+    || steadyStateDutyBoard?.launchDayWatchEntry
+    || steadyStateDutyActionLinks?.launchDayWatchEntry
+    || steadyStateOperationalReview?.launchDayWatchEntry
+    || null;
   const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
     planScope,
     dailyBrief.launchOpsOverviewContext
@@ -24474,6 +24521,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       launchOpsOverviewDownloadHref: launchOpsOverviewContext?.downloadHref || launchOpsOverviewDownload?.href || "",
       watchRecordDraftStatus: watchRecordDraftStatus || "",
       watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
+      productionSignoffPacket: productionSignoffPacket || "",
+      launchDayWatchEntry: launchDayWatchEntry || "",
       note: `launch_operations_shift_action:${key || "shift_action"}`
     };
     return {
@@ -24494,7 +24543,9 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || "",
         launchOpsOverviewDownloadFormat: launchOpsOverviewContext?.downloadFormat || launchOpsOverviewDownload?.format || "",
         watchRecordDraftStatus: watchRecordDraftStatus || "",
-        watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? ""
+        watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
+        productionSignoffPacket: productionSignoffPacket || "",
+        launchDayWatchEntry: launchDayWatchEntry || ""
       }),
       confirmationLabel: label || key || "Confirm shift action",
       operatorHint: confirmation || summary || "Complete this shift action and record the result in the operator note.",
@@ -24697,6 +24748,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     dutyActionCount: steadyStateDutyActionLinks?.actionCount ?? dailyBrief.dutyActionCount ?? 0,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    productionSignoffPacket,
+    launchDayWatchEntry,
     launchOpsOverviewContext,
     nextReviewAction: dailyBrief.nextReviewAction || null,
     primaryAction: operatorActions[0] || null,
@@ -28752,6 +28805,10 @@ function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = 
     + ` | records=${summary.watchRecordDraftRecordCount ?? "-"}`
   );
   lines.push(
+    `- productionSignoffPacket=${summary.productionSignoffPacket || "-"}`
+    + ` | launchDayWatchEntry=${summary.launchDayWatchEntry || "-"}`
+  );
+  lines.push(
     `- handoffDownload=${summary.handoffDownload?.fileName || "-"}`
     + ` | format=${summary.handoffDownload?.format || "-"}`
     + ` | href=${summary.handoffDownload?.href || "-"}`
@@ -28806,6 +28863,10 @@ function appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, brief = null, 
     + ` | dutyActionLinks=${brief.dutyActionLinksStatus || "-"}`
     + ` | actions=${brief.dutyActionCount ?? 0}`
   );
+  lines.push(
+    `- productionSignoffPacket=${brief.productionSignoffPacket || "-"}`
+    + ` | launchDayWatchEntry=${brief.launchDayWatchEntry || "-"}`
+  );
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(brief.launchOpsOverviewContext);
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
@@ -28855,6 +28916,10 @@ function appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, plan = nu
     + ` | dutyBoard=${plan.dutyBoardStatus || "-"}`
     + ` | dutyActionLinks=${plan.dutyActionLinksStatus || "-"}`
     + ` | nextReview=${plan.nextReviewAction?.key || "-"}`
+  );
+  lines.push(
+    `- productionSignoffPacket=${plan.productionSignoffPacket || "-"}`
+    + ` | launchDayWatchEntry=${plan.launchDayWatchEntry || "-"}`
   );
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(plan.launchOpsOverviewContext);
   if (launchOpsOverviewContext) {
@@ -30572,10 +30637,15 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
     `Status: ${String(handoffSummary?.status || "unknown").toUpperCase()}`,
     `Operator Summary: ${handoffSummary?.operatorSummary || "-"}`,
     `Watch Record Draft: watchRecordDraft=${handoffSummary?.watchRecordDraftStatus || "-"} | records=${handoffSummary?.watchRecordDraftRecordCount ?? "-"}`,
+    `Production Signoff: productionSignoffPacket=${handoffSummary?.productionSignoffPacket || "-"} | launchDayWatchEntry=${handoffSummary?.launchDayWatchEntry || "-"}`,
     ""
   ];
   if (launchOpsOverviewContext) {
     lines.push("Launch Operations Handoff Summary:");
+    lines.push(
+      `- productionSignoffPacket=${handoffSummary?.productionSignoffPacket || "-"}`
+      + ` | launchDayWatchEntry=${handoffSummary?.launchDayWatchEntry || "-"}`
+    );
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(
       `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
@@ -30720,6 +30790,10 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
     `- watchRecordDraft=${dailyBrief?.watchRecordDraftStatus || "-"}`
     + ` | records=${dailyBrief?.watchRecordDraftRecordCount ?? "-"}`
   );
+  lines.push(
+    `- productionSignoffPacket=${dailyBrief?.productionSignoffPacket || "-"}`
+    + ` | launchDayWatchEntry=${dailyBrief?.launchDayWatchEntry || "-"}`
+  );
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(
@@ -30863,6 +30937,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     `- watchRecordDraft=${actionPlan?.watchRecordDraftStatus || "-"}`
     + ` | records=${actionPlan?.watchRecordDraftRecordCount ?? "-"}`
   );
+  lines.push(
+    `- productionSignoffPacket=${actionPlan?.productionSignoffPacket || "-"}`
+    + ` | launchDayWatchEntry=${actionPlan?.launchDayWatchEntry || "-"}`
+  );
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(
@@ -30927,6 +31005,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | action=${payload.action || "-"}`
         + ` | intent=${payload.intent || "-"}`
         + ` | launchOpsOverviewContext=${payload.launchOpsOverviewContextKind || "-"}`
+        + ` | productionSignoffPacket=${payload.productionSignoffPacket || "-"}`
+        + ` | launchDayWatchEntry=${payload.launchDayWatchEntry || "-"}`
       );
       lines.push(`  - note=${payload.note || "-"} | hint=${receiptPlan.operatorHint || "-"}`);
     }

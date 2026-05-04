@@ -17909,11 +17909,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /steady_state_duty_plan_receipt=recorded/);
+    const expectedProductionSignoffPacket = "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json";
+    const expectedLaunchDayWatchEntry = "enter_after_production_signoff";
     const launchOperationsHandoffSummary = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsHandoffSummary;
     assert.ok(launchOperationsHandoffSummary);
     assert.equal(launchOperationsHandoffSummary.version, "developer-ops-launch-operations-handoff-summary/v1");
     assert.equal(launchOperationsHandoffSummary.productCode, "EXPORT_CLOSEOUT_READY");
     assert.equal(launchOperationsHandoffSummary.channel, "stable");
+    assert.equal(launchOperationsHandoffSummary.productionSignoffPacket, expectedProductionSignoffPacket);
+    assert.equal(launchOperationsHandoffSummary.launchDayWatchEntry, expectedLaunchDayWatchEntry);
     assert.equal(launchOperationsHandoffSummary.status, launchOperationsEvidenceChain.complete ? "ready" : "review");
     assert.equal(launchOperationsHandoffSummary.evidenceChainStatus, launchOperationsEvidenceChain.status);
     assert.equal(launchOperationsHandoffSummary.evidenceCompletedStageCount, launchOperationsEvidenceChain.completedStageCount);
@@ -17941,6 +17945,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(
       steadyStateDutyReceiptSnapshot.summaryText,
       new RegExp(`nextReview=${launchOperationsEvidenceChain.nextReviewAction.key}`)
@@ -17961,6 +17967,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsHandoffDownload.body, /Launch Operations Handoff Summary:[\s\S]*context=launch_ops_overview_status/);
     assert.match(launchOperationsHandoffDownload.body, /Launch Operations Handoff Summary:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(launchOperationsHandoffDownload.body, /Launch Operations Handoff Summary:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsHandoffDownload.body, /Launch Operations Handoff Summary:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchOperationsHandoffDownload.body, /Next Review:/);
     assert.match(launchOperationsHandoffDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
 
@@ -17969,6 +17977,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsDailyBrief.version, "developer-ops-launch-operations-daily-brief/v1");
     assert.equal(launchOperationsDailyBrief.productCode, "EXPORT_CLOSEOUT_READY");
     assert.equal(launchOperationsDailyBrief.channel, "stable");
+    assert.equal(launchOperationsDailyBrief.productionSignoffPacket, expectedProductionSignoffPacket);
+    assert.equal(launchOperationsDailyBrief.launchDayWatchEntry, expectedLaunchDayWatchEntry);
     assert.equal(launchOperationsDailyBrief.status, launchOperationsHandoffSummary.status);
     assert.equal(launchOperationsDailyBrief.handoffSummaryStatus, launchOperationsHandoffSummary.status);
     assert.equal(launchOperationsDailyBrief.evidenceChainStatus, launchOperationsEvidenceChain.status);
@@ -17987,10 +17997,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.ok(Array.isArray(launchOperationsDailyBrief.dailyChecklist));
     assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => item.key === "launch_operations_handoff_summary"));
+    assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => (
+      item.key === "production_signoff_packet"
+      && item.fileName === expectedProductionSignoffPacket
+      && item.ready === true
+    )));
     assert.match(launchOperationsDailyBrief.briefDownload.href, /format=launch-operations-daily-brief/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(
       steadyStateDutyReceiptSnapshot.summaryText,
       new RegExp(`dailyBrief=.*nextReview=${launchOperationsDailyBrief.nextReviewAction.key}`)
@@ -18007,6 +18024,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:[\s\S]*context=launch_ops_overview_status/);
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:/);
     assert.match(launchOperationsDailyBriefDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsDailyBriefDownload.body, /recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
@@ -18020,6 +18039,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsShiftActionPlan.version, "developer-ops-launch-operations-shift-action-plan/v1");
     assert.equal(launchOperationsShiftActionPlan.productCode, "EXPORT_CLOSEOUT_READY");
     assert.equal(launchOperationsShiftActionPlan.channel, "stable");
+    assert.equal(launchOperationsShiftActionPlan.productionSignoffPacket, expectedProductionSignoffPacket);
+    assert.equal(launchOperationsShiftActionPlan.launchDayWatchEntry, expectedLaunchDayWatchEntry);
     assert.equal(launchOperationsShiftActionPlan.status, launchOperationsDailyBrief.status);
     assert.equal(launchOperationsShiftActionPlan.dailyBriefStatus, launchOperationsDailyBrief.status);
     assert.equal(launchOperationsShiftActionPlan.actionCount, launchOperationsShiftActionPlan.operatorActions.length);
@@ -18057,6 +18078,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       Number(launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.watchRecordDraftRecordCount),
       Number(steadyStateWatchRecordDraftRecordCount)
     );
+    assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.prefill.productionSignoffPacket, expectedProductionSignoffPacket);
+    assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.prefill.launchDayWatchEntry, expectedLaunchDayWatchEntry);
+    assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.productionSignoffPacket, expectedProductionSignoffPacket);
+    assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.launchDayWatchEntry, expectedLaunchDayWatchEntry);
     assert.ok(launchOperationsShiftActionPlan.operatorActions.every((item) => item.executionPlan?.receiptPlan?.payload?.note));
     assert.match(launchOperationsShiftActionPlan.actionPlanDownload.href, /format=launch-operations-shift-action-plan/);
     assert.ok(launchOperationsShiftActionPlan.operatorActions.some((item) => item.key === "open_steady_state_duty_board"));
@@ -18072,6 +18097,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(
       steadyStateDutyReceiptSnapshot.summaryText,
       new RegExp(`shiftPlan=.*primary=${launchOperationsShiftActionPlan.primaryAction.key}`)
@@ -18088,6 +18115,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.body, /Primary Action:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Summary:[\s\S]*context=launch_ops_overview_status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Summary:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Summary:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Summary:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsShiftActionPlanDownload.body, /visibleIn=\d+/);
@@ -18098,6 +18127,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.body, /Execution Plans:[\s\S]*format=launch-operations-overview-status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewContext=launch_ops_overview_status/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /\/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);

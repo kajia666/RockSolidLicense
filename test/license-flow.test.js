@@ -6702,6 +6702,7 @@ test("developer release package export bundles integration, versions, and notice
         summary: launchMainline.mainlineSummary.launchDayWatchPanel?.summary,
         launchDayWatchReady: launchMainline.mainlineSummary.launchDayWatchPanel?.launchDayWatchReady,
         watchEntry: launchMainline.mainlineSummary.launchDayWatchPanel?.watchEntry,
+        productionSignoffPacket: launchMainline.mainlineSummary.launchDayWatchPanel?.productionSignoffPacket,
         pendingEvidenceCount: launchMainline.mainlineSummary.launchDayWatchPanel?.pendingEvidenceCount,
         pendingEvidenceOperationCount: launchMainline.mainlineSummary.launchDayWatchPanel?.pendingEvidenceOperationCount,
         nextActionKey: launchMainline.mainlineSummary.launchDayWatchPanel?.nextActionKey,
@@ -6770,6 +6771,7 @@ test("developer release package export bundles integration, versions, and notice
         summary: "Record the remaining runway evidence before entering launch-day watch on production sign-off.",
         launchDayWatchReady: false,
         watchEntry: "enter_after_production_signoff",
+        productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json",
         pendingEvidenceCount: 6,
         pendingEvidenceOperationCount: 3,
         nextActionKey: "launch_mainline_record_launch_rehearsal_run",
@@ -7089,6 +7091,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Launch-Day Watch Panel:/);
       assert.match(launchMainline.summaryText, /- status: blocked_by_runway_evidence/);
       assert.match(launchMainline.summaryText, /- ready: false \| watchEntry=enter_after_production_signoff \| pendingEvidence=6 \| pendingEvidenceOperations=3/);
+      assert.match(launchMainline.summaryText, /- productionSignoffPacket: artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchMainline.summaryText, /- nextAction: launch_mainline_record_launch_rehearsal_run \| operation=record_launch_rehearsal_run/);
       assert.match(launchMainline.summaryText, /- watchCheckIn: status=waiting_for_runway_evidence \| action=launch_mainline_record_post_launch_ops_sweep \| operation=record_post_launch_ops_sweep \| evidence=post_launch_ops_sweep \| recordedAt=-/);
       assert.match(launchMainline.summaryText, /- watchReceiptDownload: Launch receipt next follow-up/);
@@ -17711,6 +17714,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateDutyBoard.queueTotal, steadyStateExceptionDigest.queueSummary.total);
     assert.equal(steadyStateDutyBoard.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(steadyStateDutyBoard.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
+    assert.equal(
+      steadyStateDutyBoard.productionSignoffPacket,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+    );
+    assert.equal(steadyStateDutyBoard.launchDayWatchEntry, "enter_after_production_signoff");
     assert.equal(steadyStateDutyBoard.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
     assert.equal(steadyStateDutyBoard.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     assert.ok(
@@ -17723,6 +17731,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(steadyStateSnapshot.summaryText, /readyForDuty=true/);
 
     const steadyStateDutyBoardDownload = await getText(
@@ -17738,6 +17748,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyBoardDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:[\s\S]*format=launch-operations-overview-status/);
@@ -17750,6 +17762,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateDutyActionLinks.actionCount, steadyStateDutyBoard.quickActions.length);
     assert.equal(steadyStateDutyActionLinks.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(steadyStateDutyActionLinks.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
+    assert.equal(
+      steadyStateDutyActionLinks.productionSignoffPacket,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+    );
+    assert.equal(steadyStateDutyActionLinks.launchDayWatchEntry, "enter_after_production_signoff");
     assert.match(steadyStateDutyActionLinks.actionLinksDownload.href, /format=steady-state-duty-action-links/);
     assert.ok(steadyStateDutyActionLinks.workspaceLinks.some((item) => /\/developer\/ops/.test(item.href || "")));
     assert.ok(steadyStateDutyActionLinks.downloadLinks.some((item) => item.format === "steady-state-duty-board"));
@@ -17761,6 +17778,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
       item.executionPlan?.prefill?.watchRecordDraftStatus === steadyStateWatchRecordDraftStatus
       && Number(item.executionPlan?.prefill?.watchRecordDraftRecordCount) === Number(steadyStateWatchRecordDraftRecordCount)
+      && item.executionPlan?.prefill?.productionSignoffPacket === "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+      && item.executionPlan?.prefill?.launchDayWatchEntry === "enter_after_production_signoff"
     )));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
       item.intent === "open_workspace"
@@ -17794,6 +17813,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /Download Links:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Control Links:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Control Intents:/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(steadyStateDutyActionLinksDownload.body, /intent=open_workspace/);
     assert.match(steadyStateDutyActionLinksDownload.body, /Execution Plans:/);
     assert.match(steadyStateDutyActionLinksDownload.body, /kind=workspace/);

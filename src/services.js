@@ -14704,6 +14704,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         status: stagingArchiveNextOperations?.status || stagingArchiveLaunchRunway?.currentGate || "unknown",
         currentGate: stagingArchiveLaunchRunway?.currentGate || stagingArchiveNextOperations?.status || "unknown",
         launchDayWatchEntry: stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff",
+        productionSignoffPacket: stagingArchiveNextOperations?.productionSignoffPacket || null,
         sequence: Array.isArray(stagingArchiveLaunchRunway?.sequence) && stagingArchiveLaunchRunway.sequence.length
           ? stagingArchiveLaunchRunway.sequence
           : ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"],
@@ -15076,6 +15077,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         const launchReceiptNextFollowUp = opsSnapshot?.summary?.launchReceiptNextFollowUp && typeof opsSnapshot.summary.launchReceiptNextFollowUp === "object"
           ? opsSnapshot.summary.launchReceiptNextFollowUp
           : null;
+        const productionSignoffPacket = launchRunway?.productionSignoffPacket
+          || stagingArchiveNextOperations?.productionSignoffPacket
+          || null;
         const watchReceiptDownload = buildDeveloperOpsLaunchReceiptNextFollowUpDownload(params, launchReceiptNextFollowUp);
         const watchCheckInAction = {
           key: "launch_mainline_record_post_launch_ops_sweep",
@@ -15243,6 +15247,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             : "Record the remaining runway evidence before entering launch-day watch on production sign-off.",
           launchDayWatchReady,
           watchEntry: launchRunway?.launchDayWatchEntry || launchRunway?.heroStatus?.launchDayWatchEntry || "enter_after_production_signoff",
+          productionSignoffPacket,
           pendingEvidenceCount,
           pendingEvidenceOperationCount,
           nextActionKey: launchDayWatchReady ? null : (launchRunwayNextEvidenceAction?.actionKey || launchRunwayNextEvidenceAction?.setupAction?.key || null),
@@ -17097,6 +17102,9 @@ function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = nu
     + ` | pendingEvidence=${Number(launchDayWatchPanel.pendingEvidenceCount || 0)}`
     + ` | pendingEvidenceOperations=${Number(launchDayWatchPanel.pendingEvidenceOperationCount || 0)}`
   );
+  if (launchDayWatchPanel.productionSignoffPacket) {
+    lines.push(`- productionSignoffPacket: ${launchDayWatchPanel.productionSignoffPacket}`);
+  }
   if (launchDayWatchPanel.nextActionKey || launchDayWatchPanel.nextActionOperation) {
     lines.push(`- nextAction: ${launchDayWatchPanel.nextActionKey || "-"} | operation=${launchDayWatchPanel.nextActionOperation || "-"}`);
   }
@@ -23156,7 +23164,8 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
   steadyStateOperationalReview = null,
   steadyStateExceptionDigest = null,
   steadyStateHandoffBrief = null,
-  closeoutReadinessSummary = null
+  closeoutReadinessSummary = null,
+  stagingLaunchDutyArchive = null
 } = {}) {
   if (!steadyStateOperationalReview && !steadyStateExceptionDigest && !steadyStateHandoffBrief) {
     return null;
@@ -23199,6 +23208,15 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     || latestReceipt?.launchOpsOverviewContext
   );
   const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(boardScope, launchOpsOverviewContext);
+  const productionSignoffPacket = steadyStateHandoffBrief?.productionSignoffPacket
+    || steadyStateOperationalReview?.productionSignoffPacket
+    || closeoutReadinessSummary?.productionSignoffPacket
+    || stagingLaunchDutyArchive?.files?.productionSignoffPacket
+    || null;
+  const launchDayWatchEntry = steadyStateHandoffBrief?.launchDayWatchEntry
+    || steadyStateOperationalReview?.launchDayWatchEntry
+    || closeoutReadinessSummary?.launchDayWatchEntry
+    || (productionSignoffPacket ? "enter_after_production_signoff" : null);
   const boardDownload = productCode ? buildDeveloperOpsSteadyStateDutyBoardDownload(boardScope) : null;
   const workspaceAction = steadyStateHandoffBrief?.workspaceAction
     || steadyStateExceptionDigest?.workspaceAction
@@ -23278,6 +23296,16 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     source: "download",
     summary: "Attach the current exception digest for queue context."
   });
+  if (productionSignoffPacket) {
+    pushQuickAction({
+      key: "review_production_signoff_packet",
+      label: "Review Production Sign-off Packet",
+      priority: "primary",
+      href: productionSignoffPacket,
+      source: "artifact_path",
+      summary: "Keep the production sign-off packet attached before entering or transferring steady-state duty."
+    });
+  }
   const handoffAssets = [];
   const seenAssets = new Set();
   for (const item of [
@@ -23316,6 +23344,8 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     closeoutStatus: closeoutReadinessSummary?.status || steadyStateHandoffBrief?.closeoutStatus || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    productionSignoffPacket,
+    launchDayWatchEntry,
     launchOpsOverviewContext,
     latestReceipt: latestReceipt
       ? {
@@ -23356,6 +23386,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
   const actionLinksDownload = productCode ? buildDeveloperOpsSteadyStateDutyActionLinksDownload(linkScope) : null;
   const watchRecordDraftStatus = steadyStateDutyBoard.watchRecordDraftStatus || null;
   const watchRecordDraftRecordCount = steadyStateDutyBoard.watchRecordDraftRecordCount ?? null;
+  const productionSignoffPacket = steadyStateDutyBoard.productionSignoffPacket || null;
+  const launchDayWatchEntry = steadyStateDutyBoard.launchDayWatchEntry || null;
   const quickActions = Array.isArray(steadyStateDutyBoard.quickActions)
     ? steadyStateDutyBoard.quickActions
     : [];
@@ -23454,6 +23486,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     const basePrefill = compactRouteParams({
       productCode,
       channel,
+      productionSignoffPacket: productionSignoffPacket || "",
+      launchDayWatchEntry: launchDayWatchEntry || "",
       watchRecordDraftStatus: watchRecordDraftStatus || "",
       watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
       ...hrefParams
@@ -23546,6 +23580,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     channel,
     status: steadyStateDutyBoard.status || "pending",
     readyForDuty: steadyStateDutyBoard.readyForDuty === true,
+    productionSignoffPacket: steadyStateDutyBoard.productionSignoffPacket || null,
+    launchDayWatchEntry: steadyStateDutyBoard.launchDayWatchEntry || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
     actionCount: quickActions.length,
@@ -25206,7 +25242,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateOperationalReview,
     steadyStateExceptionDigest,
     steadyStateHandoffBrief,
-    closeoutReadinessSummary
+    closeoutReadinessSummary,
+    stagingLaunchDutyArchive
   });
   const steadyStateDutyActionLinks = buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     scope,
@@ -28495,6 +28532,12 @@ function appendDeveloperOpsSteadyStateDutyBoardLines(lines, board = null, {
     `- workspace=${board.workspaceAction?.label || "-"}`
     + ` | href=${board.workspaceAction?.href || "-"}`
   );
+  if (board.productionSignoffPacket || board.launchDayWatchEntry) {
+    lines.push(
+      `- productionSignoffPacket=${board.productionSignoffPacket || "-"}`
+      + ` | launchDayWatchEntry=${board.launchDayWatchEntry || "-"}`
+    );
+  }
   lines.push(
     `- boardDownload=${board.boardDownload?.fileName || "-"}`
     + ` | format=${board.boardDownload?.format || "-"}`
@@ -28560,6 +28603,12 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
     + ` | format=${actionLinks.actionLinksDownload?.format || "-"}`
     + ` | href=${actionLinks.actionLinksDownload?.href || "-"}`
   );
+  if (actionLinks.productionSignoffPacket || actionLinks.launchDayWatchEntry) {
+    lines.push(
+      `- productionSignoffPacket=${actionLinks.productionSignoffPacket || "-"}`
+      + ` | launchDayWatchEntry=${actionLinks.launchDayWatchEntry || "-"}`
+    );
+  }
   if (actionLinks.primaryAction) {
     lines.push(
       `- primaryAction=${actionLinks.primaryAction.label || actionLinks.primaryAction.key || "-"}`

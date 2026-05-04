@@ -18175,6 +18175,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:/);
 
+    const launchOperationsHandoffIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=handoff-index",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsHandoffIndexDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchOperationsHandoffIndexDownload.body, /RockSolid Developer Ops Launch Handoff Index/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*receipt=visible/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*recovery=\/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

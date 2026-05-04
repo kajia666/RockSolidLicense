@@ -10627,6 +10627,35 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceNextFollowUpAction?.workspaceAction?.href || "", /\/developer\/ops/);
     assert.match(runtimeEvidenceNextFollowUpAction?.workspaceAction?.href || "", /autofocus=sessions/);
 
+    const runtimeEvidenceFirstWaveRecommendations = await getJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations?productCode=FIRSTBATCH&channel=stable&limit=40",
+      ownerSession.token
+    );
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.status, "evidence_recorded");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.remainingCount, 0);
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.nextAction.key, "runtime_evidence_review");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.nextAction.stage, "runtime_evidence_review");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.nextAction.ownerRole, "ops");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.runtimeEvidence.status, "evidence_recorded");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.runtimeEvidence.ready, true);
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.runtimeEvidence.activeSessionCount, 1);
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.runtimeEvidence.heartbeatSeenCount, 1);
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.key, "ops_first_wave_runtime_evidence");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.format, "first-wave-runtime-evidence");
+    assert.match(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.href || "", /\/api\/developer\/ops\/export\/download\?.*format=first-wave-runtime-evidence/i);
+
+    const runtimeEvidenceFirstWaveSummary = await getText(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTBATCH&channel=stable&format=summary&limit=40",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /First User Validation Handoff:/);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /status=evidence_recorded \| actions=4 \| remaining=0/);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /next=runtime_evidence_review \| stage=runtime_evidence_review \| owner=ops/);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /runtimeEvidence=evidence_recorded \| ready=true \| activeSessions=1 \| heartbeatSeen=1/);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /download=ops_first_wave_runtime_evidence[\s\S]*format=first-wave-runtime-evidence/i);
+
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,
       "/api/developer/launch-mainline?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",

@@ -25145,6 +25145,15 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         operationalReadinessPrimaryDownloadKey: item.operationalReadinessPrimaryDownloadKey || null,
         operationalReadinessWatchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || null,
         operationalReadinessWatchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? null,
+        firstUserValidationStatus: item.firstUserValidationStatus || null,
+        firstUserValidationActionCount: item.firstUserValidationActionCount ?? null,
+        firstUserValidationRemainingCount: item.firstUserValidationRemainingCount ?? null,
+        firstUserValidationNextStage: item.firstUserValidationNextStage || null,
+        firstUserValidationNextOwnerRole: item.firstUserValidationNextOwnerRole || null,
+        firstUserValidationRuntimeEvidenceStatus: item.firstUserValidationRuntimeEvidenceStatus || null,
+        firstUserValidationRuntimeEvidenceReady: item.firstUserValidationRuntimeEvidenceReady === true,
+        runtimeEvidenceActiveSessionCount: item.runtimeEvidenceActiveSessionCount ?? null,
+        runtimeEvidenceHeartbeatSeenCount: item.runtimeEvidenceHeartbeatSeenCount ?? null,
         launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(item.launchOpsOverviewContext || latestReceipt?.launchOpsOverviewContext),
         handoffFileName: item.handoffFileName || latestReceipt?.handoffFileName || null
       };
@@ -25865,6 +25874,15 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         downloadFormat: item?.downloadFormat || recommendedDownload?.format || null,
         downloadSource: item?.downloadSource || recommendedDownload?.source || null,
         recommendedDownload,
+        firstUserValidationStatus: item?.firstUserValidationStatus || null,
+        firstUserValidationActionCount: item?.firstUserValidationActionCount ?? null,
+        firstUserValidationRemainingCount: item?.firstUserValidationRemainingCount ?? null,
+        firstUserValidationNextStage: item?.firstUserValidationNextStage || null,
+        firstUserValidationNextOwnerRole: item?.firstUserValidationNextOwnerRole || null,
+        firstUserValidationRuntimeEvidenceStatus: item?.firstUserValidationRuntimeEvidenceStatus || null,
+        firstUserValidationRuntimeEvidenceReady: item?.firstUserValidationRuntimeEvidenceReady === true,
+        runtimeEvidenceActiveSessionCount: item?.runtimeEvidenceActiveSessionCount ?? null,
+        runtimeEvidenceHeartbeatSeenCount: item?.runtimeEvidenceHeartbeatSeenCount ?? null,
         handoffFileName: item?.handoffFileName || null
       };
     })
@@ -25970,19 +25988,27 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     : null;
   const firstUserValidationHandoff = firstUserValidationAction
     ? {
-        status: latestLaunchReceipt?.firstLaunchDutyFirstUserValidationStatus || "pending_validation",
+        status: firstUserValidationAction.firstUserValidationStatus || latestLaunchReceipt?.firstLaunchDutyFirstUserValidationStatus || "pending_validation",
         stage: firstUserValidationAction.stage,
         priority: firstUserValidationAction.priority || "secondary",
         title: firstUserValidationAction.title || "Run first-user validation",
         summary: firstUserValidationAction.summary || "",
-        actionCount: Number(latestLaunchReceipt?.firstLaunchDutyFirstUserValidationActionCount ?? 0),
-        remainingCount: Number(latestLaunchReceipt?.firstLaunchDutyFirstUserValidationRemainingCount ?? 0),
+        actionCount: Number(firstUserValidationAction.firstUserValidationActionCount ?? latestLaunchReceipt?.firstLaunchDutyFirstUserValidationActionCount ?? 0),
+        remainingCount: Number(firstUserValidationAction.firstUserValidationRemainingCount ?? latestLaunchReceipt?.firstLaunchDutyFirstUserValidationRemainingCount ?? 0),
         nextAction: {
           key: firstUserValidationAction.actionKey || latestLaunchReceipt?.firstLaunchDutyFirstUserValidationNextActionKey || null,
-          stage: latestLaunchReceipt?.firstLaunchDutyFirstUserValidationNextStage || null,
-          ownerRole: latestLaunchReceipt?.firstLaunchDutyFirstUserValidationNextOwnerRole || null,
+          stage: firstUserValidationAction.firstUserValidationNextStage || latestLaunchReceipt?.firstLaunchDutyFirstUserValidationNextStage || null,
+          ownerRole: firstUserValidationAction.firstUserValidationNextOwnerRole || latestLaunchReceipt?.firstLaunchDutyFirstUserValidationNextOwnerRole || null,
           operation: firstUserValidationAction.operation || latestLaunchReceipt?.firstLaunchDutyFirstUserValidationProductionNextOperation || null
         },
+        runtimeEvidence: firstUserValidationAction.firstUserValidationRuntimeEvidenceStatus
+          ? {
+              status: firstUserValidationAction.firstUserValidationRuntimeEvidenceStatus,
+              ready: firstUserValidationAction.firstUserValidationRuntimeEvidenceReady === true,
+              activeSessionCount: firstUserValidationAction.runtimeEvidenceActiveSessionCount ?? null,
+              heartbeatSeenCount: firstUserValidationAction.runtimeEvidenceHeartbeatSeenCount ?? null
+            }
+          : null,
         primaryDownload: firstUserValidationDownload
       }
     : null;
@@ -26275,6 +26301,14 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
       `- next=${firstUserValidationHandoff.nextAction?.key || "-"} | stage=${firstUserValidationHandoff.nextAction?.stage || "-"} | owner=${firstUserValidationHandoff.nextAction?.ownerRole || "-"} | operation=${firstUserValidationHandoff.nextAction?.operation || "-"}`,
       `- download=${firstUserValidationHandoff.primaryDownload?.key || "-"} | file=${firstUserValidationHandoff.primaryDownload?.fileName || "-"} | href=${firstUserValidationHandoff.primaryDownload?.href || "-"}`
     );
+    if (firstUserValidationHandoff.runtimeEvidence) {
+      lines.push(
+        `- runtimeEvidence=${firstUserValidationHandoff.runtimeEvidence.status || "-"}`
+        + ` | ready=${firstUserValidationHandoff.runtimeEvidence.ready === true}`
+        + ` | activeSessions=${firstUserValidationHandoff.runtimeEvidence.activeSessionCount ?? 0}`
+        + ` | heartbeatSeen=${firstUserValidationHandoff.runtimeEvidence.heartbeatSeenCount ?? 0}`
+      );
+    }
     if (firstUserValidationHandoff.summary) {
       lines.push(`- summary=${firstUserValidationHandoff.summary}`);
     }

@@ -16517,6 +16517,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(stabilizationConfirmation.confirmedBy.username, "ops.export.operator");
     assert.equal(stabilizationConfirmation.traceability.opsFiles.stabilizationHandoff, "stabilization-handoff.txt");
     assert.equal(stabilizationConfirmation.traceability.launchMainlineFiles.stabilizationHandoff, "ops/stabilization-handoff.txt");
+    assert.equal(stabilizationConfirmation.traceability.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(stabilizationConfirmation.traceability.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     assert.ok(stabilizationConfirmation.traceability.opsDownloads?.stabilizationHandoff);
     assert.ok(stabilizationConfirmation.traceability.launchMainlineDownloads?.stabilizationHandoff);
     assert.match(
@@ -16545,6 +16547,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         && item.entity_type === "developer_ops_stabilization_handoff"
         && item.metadata?.decision === "confirmed"
         && item.metadata?.handoffFileName === "developer-ops-stabilization-handoff.txt"
+        && item.metadata?.launchOpsOverviewContext?.kind === "launch_ops_overview_status"
         && /format=stabilization-handoff/.test(item.metadata?.opsDownloads?.stabilizationHandoff?.href || "")
     ));
 
@@ -16564,6 +16567,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(stabilizationConfirmationEvidence.decision, "confirmed");
     assert.equal(stabilizationConfirmationEvidence.handoffFileName, "developer-ops-stabilization-handoff.txt");
     assert.equal(stabilizationConfirmationEvidence.confirmedBy.username, "ops.export.operator");
+    assert.equal(stabilizationConfirmationEvidence.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(stabilizationConfirmationEvidence.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     assert.ok(stabilizationConfirmationEvidence.opsDownloads?.stabilizationHandoff);
     assert.ok(stabilizationConfirmationEvidence.launchMainlineDownloads?.stabilizationHandoff);
     assert.equal(
@@ -17083,6 +17088,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "ops.export.operator"
     );
     assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.stabilizationHandoffConfirmation.launchOpsOverviewContext?.kind,
+      "launch_ops_overview_status"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.stabilizationHandoffConfirmation.launchOpsOverviewContext?.downloadFormat,
+      "launch-operations-overview-status"
+    );
+    assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.operationToRecord,
       latestLaunchReceipt.productionEvidenceNextOperation
     );
@@ -17107,6 +17120,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmationStatus: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationStatus,
       confirmationAuditLogId: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationAuditLogId,
       confirmationBy: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.confirmationBy,
+      launchOpsOverviewContextKind: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.launchOpsOverviewContext?.kind,
       steadyStateHandoff: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel?.steadyStateHandoff
         ? {
             status: launchMainlineTraceability.mainlineSummary.stabilizationHandoffPanel.steadyStateHandoff.status,
@@ -17160,6 +17174,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmationStatus: "confirmed",
       confirmationAuditLogId: stabilizationConfirmation.auditLogId,
       confirmationBy: "ops.export.operator",
+      launchOpsOverviewContextKind: "launch_ops_overview_status",
       steadyStateHandoff: {
         status: "ready_for_steady_state",
         nextStep: "monitor_steady_state_ops",
@@ -17245,6 +17260,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceability.summaryText, /Operational Readiness:/);
     assert.match(launchMainlineTraceability.summaryText, /steadyState=ready_for_steady_state/);
     assert.match(launchMainlineTraceability.summaryText, /Stabilization Handoff Panel:/);
+    assert.match(launchMainlineTraceability.summaryText, /Stabilization Handoff Panel:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(launchMainlineTraceability.summaryText, /Stabilization Handoff Panel:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(
       launchMainlineTraceability.summaryText,
       new RegExp(`- confirmation: confirmed \\| audit=${stabilizationConfirmation.auditLogId}`)
@@ -17337,6 +17354,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Audit Backfill Status: USED/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Post-Launch Handoff Traceability:[\s\S]*Stabilization Confirmation:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Stabilization Handoff Panel:[\s\S]*context=launch_ops_overview_status/);
     assert.ok(launchMainlineTraceabilitySummaryDownload.body.includes(latestLaunchReceipt.handoffFileName));
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
@@ -20781,6 +20800,7 @@ test("developer launch mainline page is served from the dedicated route", async 
     assert.match(html, /renderLaunchDayWatchPanel/);
     assert.match(html, /renderStabilizationHandoffPanel/);
     assert.match(html, /data-mainline-operational-readiness-status/);
+    assert.match(html, /data-mainline-stabilization-launch-ops-overview-context/);
     assert.match(html, /Operational Readiness/);
     assert.match(html, /Ready to Operate/);
     assert.match(html, /Still Needs Evidence/);

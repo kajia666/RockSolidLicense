@@ -1552,6 +1552,12 @@
         const checklist = Array.isArray(panel.checklist) ? panel.checklist : [];
         const steadyStateHandoff = panel.steadyStateHandoff && typeof panel.steadyStateHandoff === "object" ? panel.steadyStateHandoff : null;
         const steadyStateChecklist = Array.isArray(steadyStateHandoff?.checklist) ? steadyStateHandoff.checklist : [];
+        const launchOpsOverviewContext = panel.launchOpsOverviewContext && typeof panel.launchOpsOverviewContext === "object"
+          ? panel.launchOpsOverviewContext
+          : null;
+        const launchOpsOverviewDownload = launchOpsOverviewContext?.overviewDownload && typeof launchOpsOverviewContext.overviewDownload === "object"
+          ? launchOpsOverviewContext.overviewDownload
+          : {};
         const tags = [
           panel.status ? { label: "status", value: panel.status, strong: panel.status === "confirmed" } : null,
           panel.confirmationStatus ? { label: "confirmation", value: panel.confirmationStatus, strong: panel.confirmationStatus === "confirmed" } : null,
@@ -1599,6 +1605,19 @@
             </div>
           `
           : "";
+        const launchOpsOverviewMarkup = launchOpsOverviewContext
+          ? `
+            <div class="hint" data-mainline-stabilization-launch-ops-overview-context="${esc(launchOpsOverviewContext.kind || "launch_ops_overview_status")}">
+              Launch Ops Overview Context:
+              context=${esc(launchOpsOverviewContext.kind || "launch_ops_overview_status")}
+              | status=${esc(launchOpsOverviewContext.status || "-")}
+              | receipt=${esc(launchOpsOverviewContext.receiptVisibilityStatus || "-")}
+              | watchRecordDraft=${esc(launchOpsOverviewContext.watchRecordDraftStatus || "-")}
+              | downloadFormat=${esc(launchOpsOverviewContext.downloadFormat || launchOpsOverviewDownload.format || "-")}
+              | href=${esc(launchOpsOverviewContext.downloadHref || launchOpsOverviewDownload.href || "-")}
+            </div>
+          `
+          : "";
         const checklistMarkup = checklist.length
           ? `
             <div class="hint">
@@ -1617,6 +1636,7 @@
             ${confirmationMarkup}
             ${lifecycleMarkup}
             ${nextActionMarkup}
+            ${launchOpsOverviewMarkup}
             ${steadyStateMarkup}
             ${downloadsMarkup}
             ${checklistMarkup}

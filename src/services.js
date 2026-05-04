@@ -15315,6 +15315,13 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         const confirmation = stabilizationHandoff?.confirmation && typeof stabilizationHandoff.confirmation === "object"
           ? stabilizationHandoff.confirmation
           : null;
+        const stabilizationLaunchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
+          params,
+          confirmation?.launchOpsOverviewContext
+          || stabilizationHandoff?.launchOpsOverviewContext
+          || initialLaunchOpsReadiness?.launchOpsOverviewContext
+          || initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.launchOpsOverviewContext
+        );
         const nextAction = [
           stabilizationHandoff?.nextAction && typeof stabilizationHandoff.nextAction === "object"
             ? stabilizationHandoff.nextAction
@@ -15449,6 +15456,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           confirmationStatus: confirmation?.status || null,
           confirmationAuditLogId: confirmation?.auditLogId || null,
           confirmationBy: confirmation?.confirmedBy?.username || null,
+          launchOpsOverviewContext: stabilizationLaunchOpsOverviewContext,
           steadyStateHandoff,
           primaryWorkspaceAction,
           primaryDownload: stabilizationHandoffDownload || null,
@@ -17197,6 +17205,16 @@ function appendStabilizationHandoffPanelTextLines(lines = [], stabilizationHando
     + ` | audit=${stabilizationHandoffPanel.confirmationAuditLogId || "-"}`
     + ` | by=${stabilizationHandoffPanel.confirmationBy || "-"}`
   );
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(stabilizationHandoffPanel.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   const steadyStateHandoff = stabilizationHandoffPanel.steadyStateHandoff && typeof stabilizationHandoffPanel.steadyStateHandoff === "object"
     ? stabilizationHandoffPanel.steadyStateHandoff
     : null;
@@ -17274,11 +17292,13 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "-"}`);
   if (stabilizationConfirmation) {
+    const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(stabilizationConfirmation.launchOpsOverviewContext);
     lines.push(
       `- Stabilization Confirmation: ${stabilizationConfirmation.status || "-"}`
       + ` | audit=${stabilizationConfirmation.auditLogId || "-"}`
       + ` | decision=${stabilizationConfirmation.decision || "-"}`
       + ` | by=${stabilizationConfirmation.confirmedBy?.username || "-"}`
+      + (launchOpsOverviewContext ? ` | ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}` : "")
     );
   }
   appendInitialLaunchContractTraceabilityTextLines(lines, initialLaunchContract, opsFiles);
@@ -19660,6 +19680,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   );
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"}`);
   if (stabilizationConfirmation) {
+    const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(stabilizationConfirmation.launchOpsOverviewContext);
     lines.push(
       `- Stabilization Confirmation: ${stabilizationConfirmation.status || "-"}`
       + ` | audit=${stabilizationConfirmation.auditLogId || "-"}`
@@ -19667,6 +19688,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | by=${stabilizationConfirmation.confirmedBy?.username || "-"}`
       + ` | opsHref=${stabilizationConfirmation.opsDownloads?.stabilizationHandoff?.href || "-"}`
       + ` | mainlineHref=${stabilizationConfirmation.launchMainlineDownloads?.stabilizationHandoff?.href || "-"}`
+      + (launchOpsOverviewContext ? ` | ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}` : "")
     );
   }
   if (firstWaveHandoffConfirmation) {
@@ -20454,6 +20476,10 @@ function buildStabilizationHandoffConfirmationPayload(item = null) {
         username: metadata.actorUsername || null,
         role: metadata.actorRole || null
       };
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    item.launchOpsOverviewContext
+    || metadata.launchOpsOverviewContext
+  );
   return {
     auditLogId: item.auditLogId || item.id || null,
     eventType: item.eventType || "developer.ops.stabilization-handoff.confirm",
@@ -20471,6 +20497,8 @@ function buildStabilizationHandoffConfirmationPayload(item = null) {
     launchMainlineFiles: item.launchMainlineFiles || metadata.launchMainlineFiles || null,
     opsDownloads: item.opsDownloads || metadata.opsDownloads || null,
     launchMainlineDownloads: item.launchMainlineDownloads || metadata.launchMainlineDownloads || null,
+    launchOpsOverviewContext,
+    launchOpsOverviewDownload: buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
     createdAt: item.createdAt || null
   };
 }
@@ -29277,7 +29305,14 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push(`- postLaunchIndex=${launchMainlineFiles.postLaunchHandoffIndex || "-"} | routeMap=${launchMainlineFiles.handoffDownloadRoutes || "-"} | checksums=${launchMainlineFiles.checksums || "-"} | zip=${launchMainlineFiles.zip || "-"}`);
       const confirmation = traceability.stabilizationHandoffConfirmation || null;
       if (confirmation) {
-        lines.push(`- stabilizationConfirmation=${confirmation.status || "-"} | audit=${confirmation.auditLogId || "-"} | decision=${confirmation.decision || "-"} | by=${confirmation.confirmedBy?.username || "-"}`);
+        const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(confirmation.launchOpsOverviewContext);
+        lines.push(
+          `- stabilizationConfirmation=${confirmation.status || "-"}`
+          + ` | audit=${confirmation.auditLogId || "-"}`
+          + ` | decision=${confirmation.decision || "-"}`
+          + ` | by=${confirmation.confirmedBy?.username || "-"}`
+          + (launchOpsOverviewContext ? ` | ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}` : "")
+        );
       }
       const firstWaveConfirmation = traceability.firstWaveHandoffConfirmation || null;
       if (firstWaveConfirmation) {
@@ -44602,6 +44637,20 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         "stabilization-handoff",
         traceabilityParams
       );
+      const latestLaunchReceipt = buildSnapshotLatestLaunchReceipts(
+        queryAuditLogRows(db, {
+          productCodes: [product.code],
+          limit: 100
+        }).items,
+        5,
+        channel
+      )[0] || null;
+      const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
+        traceabilityParams,
+        body.launchOpsOverviewContext
+        || latestLaunchReceipt?.launchOpsOverviewContext
+      );
+      const launchOpsOverviewDownload = buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext);
       const traceability = {
         eventType: "developer.ops.stabilization-handoff.confirm",
         entityType: "developer_ops_stabilization_handoff",
@@ -44625,7 +44674,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         },
         launchMainlineDownloads: {
           stabilizationHandoff: launchMainlineStabilizationHandoffDownload
-        }
+        },
+        launchOpsOverviewContext,
+        launchOpsOverviewDownload
       };
       const confirmedBy = {
         actorType: session.actor_scope === "member" ? "developer_member" : "developer",
@@ -44651,7 +44702,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           opsFiles: traceability.opsFiles,
           launchMainlineFiles: traceability.launchMainlineFiles,
           opsDownloads: traceability.opsDownloads,
-          launchMainlineDownloads: traceability.launchMainlineDownloads
+          launchMainlineDownloads: traceability.launchMainlineDownloads,
+          launchOpsOverviewContext: traceability.launchOpsOverviewContext,
+          launchOpsOverviewDownload: traceability.launchOpsOverviewDownload
         }
       );
 

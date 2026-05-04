@@ -4333,6 +4333,26 @@ function buildLaunchOpsOverviewContextDownload(context = null) {
   };
 }
 
+function buildScopedLaunchOpsOverviewContextDownload(scope = {}, context = null) {
+  const contextDownload = buildLaunchOpsOverviewContextDownload(context);
+  const scopedDownload = scope?.productCode
+    ? buildDeveloperOpsLaunchOperationsOverviewStatusDownload(scope)
+    : null;
+  if (!contextDownload && !scopedDownload) {
+    return null;
+  }
+  return {
+    ...(scopedDownload || {}),
+    ...(contextDownload || {}),
+    key: contextDownload?.key || scopedDownload?.key || null,
+    label: contextDownload?.label || scopedDownload?.label || "Launch Ops Overview Status",
+    fileName: contextDownload?.fileName || scopedDownload?.fileName || null,
+    format: contextDownload?.format || scopedDownload?.format || null,
+    href: contextDownload?.href || scopedDownload?.href || null,
+    source: contextDownload?.source || scopedDownload?.source || "developer-ops"
+  };
+}
+
 function normalizeLaunchOpsOverviewContext(context = null) {
   const normalized = normalizeLaunchWorkflowActionContext(context);
   if (!normalized) {
@@ -23097,6 +23117,13 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     ?? closeoutReadinessSummary?.watchRecordDraftRecordCount
     ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
     ?? null;
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    steadyStateHandoffBrief?.launchOpsOverviewContext
+    || steadyStateOperationalReview?.launchOpsOverviewContext
+    || closeoutReadinessSummary?.launchOpsOverviewContext
+    || latestReceipt?.launchOpsOverviewContext
+  );
+  const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(boardScope, launchOpsOverviewContext);
   const boardDownload = productCode ? buildDeveloperOpsSteadyStateDutyBoardDownload(boardScope) : null;
   const workspaceAction = steadyStateHandoffBrief?.workspaceAction
     || steadyStateExceptionDigest?.workspaceAction
@@ -23180,6 +23207,7 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
   const seenAssets = new Set();
   for (const item of [
     boardDownload,
+    launchOpsOverviewDownload,
     steadyStateHandoffBrief?.handoffDownload || null,
     steadyStateOperationalReview?.reviewDownload || null,
     steadyStateExceptionDigest?.digestDownload || null
@@ -23213,6 +23241,7 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     closeoutStatus: closeoutReadinessSummary?.status || steadyStateHandoffBrief?.closeoutStatus || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    launchOpsOverviewContext,
     latestReceipt: latestReceipt
       ? {
           operation: latestReceipt.operation || null,
@@ -23996,8 +24025,15 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     ?? steadyStateHandoffBrief?.watchRecordDraftRecordCount
     ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
     ?? null;
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    steadyStateDutyBoard?.launchOpsOverviewContext
+    || steadyStateHandoffBrief?.launchOpsOverviewContext
+    || steadyStateOperationalReview?.launchOpsOverviewContext
+  );
+  const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(handoffScope, launchOpsOverviewContext);
   const supportingDownloads = [
     handoffDownload,
+    launchOpsOverviewDownload,
     steadyStateHandoffBrief?.handoffDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
     steadyStateDutyActionLinks?.actionLinksDownload || null,
@@ -24018,6 +24054,7 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     handoffChecklist,
     handoffDownload,
     supportingDownloads,
+    launchOpsOverviewContext,
     steadyStateStatus: steadyStateOperationalReview?.status || null,
     exceptionDigestStatus: steadyStateExceptionDigest?.status || null,
     dutyBoardStatus: steadyStateDutyBoard?.status || null,
@@ -24094,6 +24131,12 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     ?? steadyStateDutyBoard?.watchRecordDraftRecordCount
     ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
     ?? null;
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    handoffSummary.launchOpsOverviewContext
+    || steadyStateDutyBoard?.launchOpsOverviewContext
+    || steadyStateOperationalReview?.launchOpsOverviewContext
+  );
+  const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(briefScope, launchOpsOverviewContext);
   const dailyChecklist = [
     {
       key: "launch_operations_evidence_chain",
@@ -24153,6 +24196,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
   const seenDownloads = new Set();
   for (const item of [
     briefDownload,
+    launchOpsOverviewDownload,
     handoffSummary.handoffDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
     steadyStateDutyActionLinks?.actionLinksDownload || null,
@@ -24196,6 +24240,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     dutyActionCount: steadyStateDutyActionLinks?.actionCount ?? steadyStateDutyBoard?.quickActions?.length ?? 0,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    launchOpsOverviewContext,
     briefDownload,
     supportingDownloads,
     dailyChecklist,
@@ -28339,6 +28384,16 @@ function appendDeveloperOpsSteadyStateDutyBoardLines(lines, board = null, {
     + ` | format=${board.boardDownload?.format || "-"}`
     + ` | href=${board.boardDownload?.href || "-"}`
   );
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(board.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   const quickActions = Array.isArray(board.quickActions) ? board.quickActions : [];
   if (quickActions.length) {
     lines.push("- quickActions:");
@@ -28536,6 +28591,16 @@ function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = 
     + ` | format=${summary.handoffDownload?.format || "-"}`
     + ` | href=${summary.handoffDownload?.href || "-"}`
   );
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(summary.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary.receiptVisibilitySummary);
   const checklist = Array.isArray(summary.handoffChecklist) ? summary.handoffChecklist : [];
   if (checklist.length) {
@@ -28576,6 +28641,16 @@ function appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, brief = null, 
     + ` | dutyActionLinks=${brief.dutyActionLinksStatus || "-"}`
     + ` | actions=${brief.dutyActionCount ?? 0}`
   );
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(brief.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, brief.receiptVisibilitySummary);
   const checklist = Array.isArray(brief.dailyChecklist) ? brief.dailyChecklist : [];
   if (checklist.length) {
@@ -30267,6 +30342,7 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   const supportingDownloads = Array.isArray(handoffSummary?.supportingDownloads)
     ? handoffSummary.supportingDownloads
     : [];
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(handoffSummary?.launchOpsOverviewContext);
   const lines = [
     "RockSolid Developer Ops Launch Operations Handoff Summary",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -30277,6 +30353,17 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
     `Watch Record Draft: watchRecordDraft=${handoffSummary?.watchRecordDraftStatus || "-"} | records=${handoffSummary?.watchRecordDraftRecordCount ?? "-"}`,
     ""
   ];
+  if (launchOpsOverviewContext) {
+    lines.push("Launch Operations Handoff Summary:");
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildScopedLaunchOpsOverviewContextDownload(scope, launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+    lines.push("");
+  }
   if (chain) {
     lines.push("Evidence Chain:");
     lines.push(
@@ -30383,6 +30470,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   const supportingDownloads = Array.isArray(dailyBrief?.supportingDownloads)
     ? dailyBrief.supportingDownloads
     : [];
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(dailyBrief?.launchOpsOverviewContext);
   const lines = [
     "RockSolid Developer Ops Launch Operations Daily Brief",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -30411,6 +30499,15 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
     `- watchRecordDraft=${dailyBrief?.watchRecordDraftStatus || "-"}`
     + ` | records=${dailyBrief?.watchRecordDraftRecordCount ?? "-"}`
   );
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildScopedLaunchOpsOverviewContextDownload(scope, launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   lines.push("");
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, dailyBrief?.receiptVisibilitySummary);
   lines.push("");

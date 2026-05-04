@@ -4871,6 +4871,9 @@
           ? launchOperationsHandoffSummary.supportingDownloads
           : [];
         const receiptVisibilitySummary = launchOperationsHandoffSummary.receiptVisibilitySummary || null;
+        const launchOpsOverviewContext = launchOperationsHandoffSummary.launchOpsOverviewContext && typeof launchOperationsHandoffSummary.launchOpsOverviewContext === "object"
+          ? launchOperationsHandoffSummary.launchOpsOverviewContext
+          : null;
         const details = [
           `evidence=${esc(launchOperationsHandoffSummary.evidenceChainStatus || "-")}`,
           `completed=${esc(launchOperationsHandoffSummary.evidenceCompletedStageCount ?? 0)}/${esc(launchOperationsHandoffSummary.evidenceRequiredStageCount ?? 0)}`,
@@ -4880,7 +4883,7 @@
         ].join(" | ");
         const download = launchOperationsHandoffSummary.handoffDownload || {};
         return `
-          <div class="snapshot-recap launch-operations-handoff-summary" data-launch-operations-handoff-summary="latest">
+          <div class="snapshot-recap launch-operations-handoff-summary" data-launch-operations-handoff-summary="latest" data-launch-operations-handoff-launch-ops-overview-context="${esc(launchOpsOverviewContext?.kind || "-")}">
             <div class="snapshot-recap-head">
               <strong>Launch Operations Handoff Summary</strong>
               <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
@@ -4888,6 +4891,7 @@
             <div class="hint">${esc(launchOperationsHandoffSummary.operatorSummary || "Launch operations handoff summary is available.")}</div>
             <div class="snapshot-focus-meta">${details}</div>
             <div class="snapshot-focus-meta">download=${esc(download.fileName || "-")} | format=${esc(download.format || "-")} | href=${esc(download.href || "-")}</div>
+            ${renderLaunchOpsOverviewContext(launchOpsOverviewContext)}
             ${receiptVisibilitySummary ? `<div class="snapshot-focus-meta"><strong>Receipt Visibility Summary</strong> ${esc(receiptVisibilitySummary.status || "-")} | audit=${esc(receiptVisibilitySummary.auditLogId || "-")} | stage=${esc(receiptVisibilitySummary.stageKey || "-")} | visibleIn=${esc(receiptVisibilitySummary.visibleInCount ?? 0)} | recovery=${esc(receiptVisibilitySummary.failureRecovery?.method || "-")} ${esc(receiptVisibilitySummary.failureRecovery?.route || "-")}</div>` : ""}
             ${checklist.length ? `<ul class="snapshot-list">${checklist.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.status || "-")} | audit=${esc(item.auditLogId || "-")} | action=${esc(item.action || "-")} | file=${esc(item.fileName || "-")}</li>`).join("")}</ul>` : ""}
             ${supportingDownloads.length ? `<div class="audit-meta">${supportingDownloads.slice(0, 5).map((item) => renderTag(item.fileName || item.key || "-")).join("")}</div>` : ""}
@@ -4909,6 +4913,9 @@
           ? launchOperationsDailyBrief.supportingDownloads
           : [];
         const receiptVisibilitySummary = launchOperationsDailyBrief.receiptVisibilitySummary || null;
+        const launchOpsOverviewContext = launchOperationsDailyBrief.launchOpsOverviewContext && typeof launchOperationsDailyBrief.launchOpsOverviewContext === "object"
+          ? launchOperationsDailyBrief.launchOpsOverviewContext
+          : null;
         const details = [
           `handoff=${esc(launchOperationsDailyBrief.handoffSummaryStatus || "-")}`,
           `evidence=${esc(launchOperationsDailyBrief.evidenceChainStatus || "-")}`,
@@ -4919,7 +4926,7 @@
         ].join(" | ");
         const download = launchOperationsDailyBrief.briefDownload || {};
         return `
-          <div class="snapshot-recap launch-operations-daily-brief" data-launch-operations-daily-brief="latest">
+          <div class="snapshot-recap launch-operations-daily-brief" data-launch-operations-daily-brief="latest" data-launch-operations-daily-launch-ops-overview-context="${esc(launchOpsOverviewContext?.kind || "-")}">
             <div class="snapshot-recap-head">
               <strong>Launch Operations Daily Brief</strong>
               <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
@@ -4927,6 +4934,7 @@
             <div class="hint">${esc(launchOperationsDailyBrief.operatorSummary || "Launch operations daily brief is available for shift handoff.")}</div>
             <div class="snapshot-focus-meta">${details}</div>
             <div class="snapshot-focus-meta">download=${esc(download.fileName || "-")} | format=${esc(download.format || "-")} | href=${esc(download.href || "-")}</div>
+            ${renderLaunchOpsOverviewContext(launchOpsOverviewContext)}
             ${receiptVisibilitySummary ? `<div class="snapshot-focus-meta"><strong>Receipt Visibility Summary</strong> ${esc(receiptVisibilitySummary.status || "-")} | audit=${esc(receiptVisibilitySummary.auditLogId || "-")} | recovery=${esc(receiptVisibilitySummary.failureRecovery?.method || "-")} ${esc(receiptVisibilitySummary.failureRecovery?.route || "-")}</div>` : ""}
             ${checklist.length ? `<ul class="snapshot-list">${checklist.map((item) => `<li><strong>${esc(item.label || item.key || "-")}</strong> ${esc(item.status || "-")} | ready=${item.ready === true ? "yes" : "no"} | file=${esc(item.fileName || "-")}</li>`).join("")}</ul>` : ""}
             ${supportingDownloads.length ? `<div class="audit-meta">${supportingDownloads.slice(0, 5).map((item) => renderTag(item.fileName || item.key || "-")).join("")}</div>` : ""}
@@ -5419,6 +5427,9 @@
         ].join(" | ");
         const quickActions = Array.isArray(board.quickActions) ? board.quickActions : [];
         const handoffAssets = Array.isArray(board.handoffAssets) ? board.handoffAssets : [];
+        const launchOpsOverviewContext = board.launchOpsOverviewContext && typeof board.launchOpsOverviewContext === "object"
+          ? board.launchOpsOverviewContext
+          : null;
         const latestReceipt = board.latestReceipt && typeof board.latestReceipt === "object" ? board.latestReceipt : null;
         const receiptDetails = latestReceipt
           ? [
@@ -5429,13 +5440,14 @@
             ].join(" | ")
           : "";
         return `
-          <div class="snapshot-recap steady-state-duty-board" data-steady-state-duty-board="${esc(status)}">
+          <div class="snapshot-recap steady-state-duty-board" data-steady-state-duty-board="${esc(status)}" data-steady-state-duty-launch-ops-overview-context="${esc(launchOpsOverviewContext?.kind || "-")}">
             <div class="snapshot-recap-head">
               <strong>Steady-State Duty Board</strong>
               <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
             </div>
             <div class="hint">${esc(board.summary || "Active steady-state duty board for the first operating lane.")}</div>
             <div class="hint">${details}</div>
+            ${renderLaunchOpsOverviewContext(launchOpsOverviewContext)}
             <div class="snapshot-recap">
               <strong>Board Download</strong>
               <div class="hint">file=${esc(board.boardDownload?.fileName || "-")} | format=${esc(board.boardDownload?.format || "-")} | href=${esc(board.boardDownload?.href || "-")}</div>

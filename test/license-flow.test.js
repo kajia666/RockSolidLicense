@@ -17667,11 +17667,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(steadyStateDutyBoard.queueTotal, steadyStateExceptionDigest.queueSummary.total);
     assert.equal(steadyStateDutyBoard.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(steadyStateDutyBoard.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
+    assert.equal(steadyStateDutyBoard.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(steadyStateDutyBoard.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
+    assert.ok(
+      steadyStateDutyBoard.handoffAssets.some((item) => item.format === "launch-operations-overview-status")
+    );
     assert.match(steadyStateDutyBoard.boardDownload.href, /format=steady-state-duty-board/);
     assert.match(steadyStateDutyBoard.handoffBriefDownload.href, /format=steady-state-handoff-brief/);
     assert.ok(Array.isArray(steadyStateDutyBoard.quickActions));
     assert.ok(steadyStateDutyBoard.quickActions.length >= 1);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(steadyStateSnapshot.summaryText, /readyForDuty=true/);
 
     const steadyStateDutyBoardDownload = await getText(
@@ -17685,8 +17692,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyBoardDownload.body, /Project Code: EXPORT_CLOSEOUT_READY/);
     assert.match(steadyStateDutyBoardDownload.body, /Ready For Duty: yes/);
     assert.match(steadyStateDutyBoardDownload.body, steadyStateWatchRecordDraftPattern);
+    assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:/);
+    assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:[\s\S]*format=launch-operations-overview-status/);
 
     const steadyStateDutyActionLinks = steadyStateSnapshot.summary.initialLaunchOpsReadiness.steadyStateDutyActionLinks;
     assert.ok(steadyStateDutyActionLinks);
@@ -17852,6 +17862,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchOperationsHandoffSummary.receiptVisibilitySummary.visibleInCount >= 5);
     assert.equal(launchOperationsHandoffSummary.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(launchOperationsHandoffSummary.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
+    assert.equal(launchOperationsHandoffSummary.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(launchOperationsHandoffSummary.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
+    assert.ok(
+      launchOperationsHandoffSummary.supportingDownloads.some((item) => item.format === "launch-operations-overview-status")
+    );
     assert.ok(Array.isArray(launchOperationsHandoffSummary.handoffChecklist));
     assert.ok(launchOperationsHandoffSummary.handoffChecklist.some((item) => (
       item.key === "steady_state_duty_plan_receipt"
@@ -17859,6 +17874,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     )));
     assert.match(launchOperationsHandoffSummary.handoffDownload.href, /format=launch-operations-handoff-summary/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(
       steadyStateDutyReceiptSnapshot.summaryText,
       new RegExp(`nextReview=${launchOperationsEvidenceChain.nextReviewAction.key}`)
@@ -17877,7 +17894,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:/);
     assert.match(launchOperationsHandoffDownload.body, /receiptVisibilitySummary=visible/);
     assert.match(launchOperationsHandoffDownload.body, steadyStateWatchRecordDraftPattern);
+    assert.match(launchOperationsHandoffDownload.body, /Launch Operations Handoff Summary:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(launchOperationsHandoffDownload.body, /Launch Operations Handoff Summary:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(launchOperationsHandoffDownload.body, /Next Review:/);
+    assert.match(launchOperationsHandoffDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
 
     const launchOperationsDailyBrief = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsDailyBrief;
     assert.ok(launchOperationsDailyBrief);
@@ -17895,10 +17915,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsDailyBrief.receiptVisibilitySummary.failureRecovery.method, "POST");
     assert.equal(launchOperationsDailyBrief.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(launchOperationsDailyBrief.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
+    assert.equal(launchOperationsDailyBrief.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(launchOperationsDailyBrief.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
+    assert.ok(
+      launchOperationsDailyBrief.supportingDownloads.some((item) => item.format === "launch-operations-overview-status")
+    );
     assert.ok(Array.isArray(launchOperationsDailyBrief.dailyChecklist));
     assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => item.key === "launch_operations_handoff_summary"));
     assert.match(launchOperationsDailyBrief.briefDownload.href, /format=launch-operations-daily-brief/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Daily Brief:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(
       steadyStateDutyReceiptSnapshot.summaryText,
       new RegExp(`dailyBrief=.*nextReview=${launchOperationsDailyBrief.nextReviewAction.key}`)
@@ -17913,12 +17940,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsDailyBriefDownload.contentDisposition || "", /developer-ops-launch-operations-daily-brief\.txt/);
     assert.match(launchOperationsDailyBriefDownload.body, /RockSolid Developer Ops Launch Operations Daily Brief/);
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Daily Brief:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:/);
     assert.match(launchOperationsDailyBriefDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsDailyBriefDownload.body, /recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsDailyBriefDownload.body, /Next Review:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Checklist:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
 
     const launchOperationsShiftActionPlan = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsShiftActionPlan;
     assert.ok(launchOperationsShiftActionPlan);
@@ -21971,6 +22001,10 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /Steady-State Handoff Brief/);
     assert.match(html, /data-steady-state-handoff-brief/);
     assert.match(html, /data-steady-state-handoff-launch-ops-overview-context/);
+    assert.match(html, /renderSteadyStateDutyBoard/);
+    assert.match(html, /Steady-State Duty Board/);
+    assert.match(html, /data-steady-state-duty-board/);
+    assert.match(html, /data-steady-state-duty-launch-ops-overview-context/);
     assert.match(html, /Steady-State Duty Action Links/);
     assert.match(html, /Execution Plans/);
     assert.match(html, /data-steady-state-duty-plan-action/);
@@ -21984,11 +22018,13 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /launchOperationsHandoffSummary/);
     assert.match(html, /renderLaunchOperationsHandoffSummary/);
     assert.match(html, /Launch Operations Handoff Summary/);
+    assert.match(html, /data-launch-operations-handoff-launch-ops-overview-context/);
     assert.match(html, /download-export-launch-operations-handoff-btn/);
     assert.match(html, /launch-operations-handoff-summary/);
     assert.match(html, /launchOperationsDailyBrief/);
     assert.match(html, /renderLaunchOperationsDailyBrief/);
     assert.match(html, /Launch Operations Daily Brief/);
+    assert.match(html, /data-launch-operations-daily-launch-ops-overview-context/);
     assert.match(html, /download-export-launch-operations-daily-brief-btn/);
     assert.match(html, /launch-operations-daily-brief/);
     assert.match(html, /launchOperationsShiftActionPlan/);

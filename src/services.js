@@ -4369,6 +4369,22 @@ function normalizeLaunchOpsOverviewContext(context = null) {
   };
 }
 
+function buildScopedLaunchOpsOverviewContext(scope = {}, context = null) {
+  const normalized = normalizeLaunchOpsOverviewContext(context);
+  if (!normalized) {
+    return null;
+  }
+  const overviewDownload = buildScopedLaunchOpsOverviewContextDownload(scope, normalized);
+  return normalizeLaunchOpsOverviewContext({
+    ...normalized,
+    downloadKey: overviewDownload?.key || normalized.downloadKey || null,
+    downloadFileName: overviewDownload?.fileName || normalized.downloadFileName || null,
+    downloadFormat: overviewDownload?.format || normalized.downloadFormat || null,
+    downloadHref: overviewDownload?.href || normalized.downloadHref || null,
+    overviewDownload: overviewDownload || normalized.overviewDownload || null
+  });
+}
+
 function buildLaunchOpsOverviewActionContext({
   overviewStatus = null,
   overviewDownload = null,
@@ -24307,6 +24323,14 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     ?? steadyStateDutyBoard?.watchRecordDraftRecordCount
     ?? steadyStateOperationalReview?.watchRecordDraftRecordCount
     ?? null;
+  const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
+    planScope,
+    dailyBrief.launchOpsOverviewContext
+    || launchOperationsHandoffSummary?.launchOpsOverviewContext
+    || steadyStateDutyBoard?.launchOpsOverviewContext
+    || steadyStateOperationalReview?.launchOpsOverviewContext
+  );
+  const launchOpsOverviewDownload = buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext);
   const operatorActions = [];
   const buildShiftExecutionPlan = ({
     key = "",
@@ -24347,6 +24371,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       format: format || "",
       focusKind: source || kind,
       focusReason: summary || label || key || "",
+      launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || "",
+      launchOpsOverviewStatus: launchOpsOverviewContext?.status || "",
+      launchOpsOverviewDownloadFormat: launchOpsOverviewContext?.downloadFormat || launchOpsOverviewDownload?.format || "",
+      launchOpsOverviewDownloadHref: launchOpsOverviewContext?.downloadHref || launchOpsOverviewDownload?.href || "",
       watchRecordDraftStatus: watchRecordDraftStatus || "",
       watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
       note: `launch_operations_shift_action:${key || "shift_action"}`
@@ -24366,6 +24394,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         actionLabel: label,
         actionSource: source,
         actionStatus: status,
+        launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || "",
+        launchOpsOverviewDownloadFormat: launchOpsOverviewContext?.downloadFormat || launchOpsOverviewDownload?.format || "",
         watchRecordDraftStatus: watchRecordDraftStatus || "",
         watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? ""
       }),
@@ -24443,6 +24473,21 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     summary: "Start the shift from the single operator-facing launch operations daily brief.",
     confirmation: "Attach the daily brief to the shift note before starting live watch."
   });
+  if (launchOpsOverviewDownload) {
+    pushOperatorAction({
+      key: "open_launch_operations_overview_status",
+      label: "Open Launch Operations Overview Status",
+      priority: "primary",
+      kind: "download",
+      status: launchOpsOverviewDownload.href ? "ready" : "pending",
+      href: launchOpsOverviewDownload.href || "",
+      fileName: launchOpsOverviewDownload.fileName || "",
+      format: launchOpsOverviewDownload.format || "",
+      source: "launch_ops_overview_status",
+      summary: "Open the current launch operations overview status before executing the shift action sequence.",
+      confirmation: "Confirm the overview status context matches this shift packet before recording receipts."
+    });
+  }
   pushOperatorAction({
     key: "open_steady_state_duty_board",
     label: "Open Steady-State Duty Board",
@@ -24514,6 +24559,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
   const seenDownloads = new Set();
   for (const item of [
     actionPlanDownload,
+    launchOpsOverviewDownload,
     dailyBrief.briefDownload || null,
     launchOperationsHandoffSummary?.handoffDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
@@ -24554,6 +24600,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     dutyActionCount: steadyStateDutyActionLinks?.actionCount ?? dailyBrief.dutyActionCount ?? 0,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    launchOpsOverviewContext,
     nextReviewAction: dailyBrief.nextReviewAction || null,
     primaryAction: operatorActions[0] || null,
     actionCount: operatorActions.length,
@@ -24625,6 +24672,12 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     ?? dailyBrief?.watchRecordDraftRecordCount
     ?? handoffSummary?.watchRecordDraftRecordCount
     ?? null;
+  const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
+    overviewScope,
+    shiftPlan?.launchOpsOverviewContext
+    || dailyBrief?.launchOpsOverviewContext
+    || handoffSummary?.launchOpsOverviewContext
+  );
   const overviewDownload = productCode ? buildDeveloperOpsLaunchOperationsOverviewStatusDownload(overviewScope) : null;
   const panels = [
     {
@@ -24690,6 +24743,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     shiftActionPlanStatus: shiftPlan?.status || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    launchOpsOverviewContext,
     receiptVisibilityStatus: receiptVisibilitySummary?.status || "pending",
     receiptVisibilitySummary,
     canRecoverReceipt: Boolean(receiptVisibilitySummary?.failureRecovery?.route),
@@ -28691,6 +28745,16 @@ function appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, plan = nu
     + ` | dutyActionLinks=${plan.dutyActionLinksStatus || "-"}`
     + ` | nextReview=${plan.nextReviewAction?.key || "-"}`
   );
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(plan.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, plan.receiptVisibilitySummary);
   const actions = Array.isArray(plan.operatorActions) ? plan.operatorActions : [];
   if (actions.length) {
@@ -28728,6 +28792,16 @@ function appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, overview =
     + ` | recovery=${overview.canRecoverReceipt === true ? overview.recoveryRoute || "-" : "-"}`
     + ` | download=${overview.overviewDownload?.fileName || "-"}`
   );
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(overview.launchOpsOverviewContext);
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   const panels = Array.isArray(overview.panels) ? overview.panels : [];
   if (panels.length) {
     lines.push("- panels:");
@@ -30603,6 +30677,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   });
   const actions = Array.isArray(actionPlan?.operatorActions) ? actionPlan.operatorActions : [];
   const supportingDownloads = Array.isArray(actionPlan?.supportingDownloads) ? actionPlan.supportingDownloads : [];
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(actionPlan?.launchOpsOverviewContext);
   const lines = [
     "RockSolid Developer Ops Launch Operations Shift Action Plan",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -30641,6 +30716,15 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     `- watchRecordDraft=${actionPlan?.watchRecordDraftStatus || "-"}`
     + ` | records=${actionPlan?.watchRecordDraftRecordCount ?? "-"}`
   );
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildScopedLaunchOpsOverviewContextDownload(scope, launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   lines.push("");
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, actionPlan?.receiptVisibilitySummary);
   lines.push("");
@@ -30673,6 +30757,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | mode=${plan.mode || "-"}`
         + ` | status=${plan.status || "-"}`
         + ` | method=${plan.method || "-"}`
+        + ` | format=${plan.format || "-"}`
         + ` | file=${plan.fileName || "-"}`
         + ` | href=${plan.href || "-"}`
       );
@@ -30694,6 +30779,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | route=${receiptPlan.route || "-"}`
         + ` | action=${payload.action || "-"}`
         + ` | intent=${payload.intent || "-"}`
+        + ` | launchOpsOverviewContext=${payload.launchOpsOverviewContextKind || "-"}`
       );
       lines.push(`  - note=${payload.note || "-"} | hint=${receiptPlan.operatorHint || "-"}`);
     }
@@ -30737,6 +30823,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null
   });
   const panels = Array.isArray(overview?.panels) ? overview.panels : [];
+  const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(overview?.launchOpsOverviewContext);
   const lines = [
     "RockSolid Developer Ops Launch Operations Overview Status",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -30762,6 +30849,15 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     + ` | shiftPlan=${overview?.shiftActionPlanStatus || "-"}`
     + ` | next=${overview?.nextAction?.key || "-"}`
   );
+  if (launchOpsOverviewContext) {
+    lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
+    lines.push(
+      `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
+        buildScopedLaunchOpsOverviewContextDownload(scope, launchOpsOverviewContext),
+        { fileSeparator: " | " }
+      )}`
+    );
+  }
   lines.push("");
   lines.push("Receipt Recovery:");
   lines.push(

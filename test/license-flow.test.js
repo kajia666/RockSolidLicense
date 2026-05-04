@@ -17965,6 +17965,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsShiftActionPlan.receiptVisibilitySummary.handoffEvidence.stageKey, "steady_state_duty_plan_receipt");
     assert.equal(launchOperationsShiftActionPlan.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(launchOperationsShiftActionPlan.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
+    assert.equal(launchOperationsShiftActionPlan.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(launchOperationsShiftActionPlan.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
+    assert.ok(
+      launchOperationsShiftActionPlan.supportingDownloads.some((item) => item.format === "launch-operations-overview-status")
+    );
     assert.equal(launchOperationsShiftActionPlan.executionPlanCount, launchOperationsShiftActionPlan.operatorActions.length);
     assert.ok(launchOperationsShiftActionPlan.readyExecutionPlanCount >= 3);
     assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.status, "ready");
@@ -17991,8 +17996,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlan.actionPlanDownload.href, /format=launch-operations-shift-action-plan/);
     assert.ok(launchOperationsShiftActionPlan.operatorActions.some((item) => item.key === "open_steady_state_duty_board"));
     assert.ok(launchOperationsShiftActionPlan.operatorActions.some((item) => item.key === "open_steady_state_duty_action_links"));
+    const launchOperationsOverviewStatusAction = launchOperationsShiftActionPlan.operatorActions.find((item) => item.key === "open_launch_operations_overview_status");
+    assert.ok(launchOperationsOverviewStatusAction);
+    assert.equal(launchOperationsOverviewStatusAction.executionPlan.status, "ready");
+    assert.equal(launchOperationsOverviewStatusAction.executionPlan.mode, "download");
+    assert.match(launchOperationsOverviewStatusAction.executionPlan.href, /format=launch-operations-overview-status/);
+    assert.equal(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewContextKind, "launch_ops_overview_status");
+    assert.equal(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewDownloadFormat, "launch-operations-overview-status");
     assert.ok(launchOperationsShiftActionPlan.operatorActions.every((item) => item.executionPlan?.operatorHint));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(
       steadyStateDutyReceiptSnapshot.summaryText,
       new RegExp(`shiftPlan=.*primary=${launchOperationsShiftActionPlan.primaryAction.key}`)
@@ -18007,15 +18021,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.contentDisposition || "", /developer-ops-launch-operations-shift-action-plan\.txt/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /RockSolid Developer Ops Launch Operations Shift Action Plan/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Primary Action:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Summary:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Summary:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsShiftActionPlanDownload.body, /visibleIn=\d+/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Actions:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Shift Actions:[\s\S]*open_launch_operations_overview_status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Execution Plans:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /mode=download/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Execution Plans:[\s\S]*format=launch-operations-overview-status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewContext=launch_ops_overview_status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /\/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
 
     const launchOperationsOverviewStatus = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOverviewStatus;
     assert.ok(launchOperationsOverviewStatus);
@@ -18029,10 +18049,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOverviewStatus.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(launchOperationsOverviewStatus.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
     assert.equal(launchOperationsOverviewStatus.nextAction.key, launchOperationsShiftActionPlan.primaryAction.key);
+    assert.equal(launchOperationsOverviewStatus.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(launchOperationsOverviewStatus.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     assert.ok(launchOperationsOverviewStatus.panels.some((item) => item.key === "launch_operations_shift_action_plan"));
     assert.match(launchOperationsOverviewStatus.overviewDownload.href, /format=launch-operations-overview-status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /overviewStatus=.*receipt=visible/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*downloadFormat=launch-operations-overview-status/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -18043,6 +18067,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOverviewStatusDownload.contentDisposition || "", /developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchOperationsOverviewStatusDownload.body, /RockSolid Developer Ops Launch Operations Overview Status/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(launchOperationsOverviewStatusDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:/);
@@ -22030,11 +22056,13 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /launchOperationsShiftActionPlan/);
     assert.match(html, /renderLaunchOperationsShiftActionPlan/);
     assert.match(html, /Launch Operations Shift Action Plan/);
+    assert.match(html, /data-launch-operations-shift-launch-ops-overview-context/);
     assert.match(html, /download-export-launch-operations-shift-action-plan-btn/);
     assert.match(html, /launch-operations-shift-action-plan/);
     assert.match(html, /launchOperationsOverviewStatus/);
     assert.match(html, /renderLaunchOperationsOverviewStatus/);
     assert.match(html, /Launch Operations Overview Status/);
+    assert.match(html, /data-launch-operations-overview-launch-ops-overview-context/);
     assert.match(html, /download-export-launch-operations-overview-status-btn/);
     assert.match(html, /launch-operations-overview-status/);
     assert.match(html, /receiptVisibilitySummary/);

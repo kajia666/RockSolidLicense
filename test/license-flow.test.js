@@ -16876,6 +16876,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineHandoffRoutesDownload.body,
       /launch-ops-overview-status: .*developer-ops-launch-operations-overview-status\.txt.*format=launch-operations-overview-status.*href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-overview-status/
     );
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Ops Overview Evidence:/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Ops Overview Evidence:[\s\S]*receipt=pending/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Ops Overview Evidence:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Ops Overview Evidence:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
 
     const launchMainlinePostLaunchIndexDownload = await getText(
       baseUrl,
@@ -16906,6 +16910,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status:[\s\S]*receipt=pending/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
@@ -17018,6 +17025,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilityZipText, /RockSolid Developer Ops Launch Operations Overview Status/);
     assert.match(launchMainlineTraceabilityZipText, /context=launch_ops_overview_status/);
     assert.match(launchMainlineTraceabilityZipText, /downloadFormat=launch-operations-overview-status/);
+    assert.match(launchMainlineTraceabilityZipText, /Launch Ops Overview Evidence:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchMainlineTraceabilityZipText, /Launch Ops Overview Evidence:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchMainlineTraceabilityZipText, /post-launch-lifecycle-primary/);
     assert.match(
       launchMainlineTraceabilityZipText,

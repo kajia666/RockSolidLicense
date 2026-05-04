@@ -109,6 +109,7 @@ test("launch smoke script runs the first-wave operations preflight", () => {
   assert.equal(output.handoff.downloads.firstWaveChecksums.route, "/api/developer/ops/first-wave/recommendations/download?productCode=SMOKE_ALPHA&channel=stable&limit=20&format=checksums");
   assert.equal(output.handoff.downloads.opsHandoffIndex.route, "/api/developer/ops/export/download?productCode=SMOKE_ALPHA&format=handoff-index&limit=20");
   assert.equal(output.handoff.downloads.launchOpsOverviewStatus.route, "/api/developer/ops/export/download?productCode=SMOKE_ALPHA&format=launch-operations-overview-status&limit=20");
+  assert.equal(output.handoff.downloads.launchMainlineRouteMap.route, "/api/developer/launch-mainline/download?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=handoff-download-routes");
   assert.equal(output.handoff.downloads.launchReviewSummary.route, "/api/developer/launch-review/download?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary");
   assert.equal(output.handoff.downloads.launchSmokeSummary.route, "/api/developer/launch-smoke-kit/download?productCode=SMOKE_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary");
   assert.deepEqual(
@@ -121,9 +122,15 @@ test("launch smoke script runs the first-wave operations preflight", () => {
       "verify_first_wave_confirmation",
       "download_ops_handoff_index",
       "continue_developer_ops_watch",
+      "verify_mainline_route_map_overview_evidence",
       "open_launch_mainline_evidence"
     ]
   );
+  const mainlineRouteMapCheck = output.handoff.operatorChecklist.find((item) => item.key === "verify_mainline_route_map_overview_evidence");
+  assert.match(mainlineRouteMapCheck.label, /Launch Ops Overview Evidence/);
+  assert.match(mainlineRouteMapCheck.label, /productionSignoffPacket/);
+  assert.match(mainlineRouteMapCheck.label, /launchDayWatchEntry/);
+  assert.equal(mainlineRouteMapCheck.route, output.handoff.downloads.launchMainlineRouteMap.route);
 
   const checkNames = output.checks.map((item) => item.name);
   assert.deepEqual(checkNames, [
@@ -266,11 +273,13 @@ test("launch smoke script can run the first-wave preflight against an existing A
     assert.equal(output.handoff.reviewWorkspaces.launchMainline.href, `${baseUrl}/developer/launch-mainline?productCode=LIVE_SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave`);
     assert.equal(output.handoff.downloads.opsHandoffIndex.href, `${baseUrl}/api/developer/ops/export/download?productCode=LIVE_SMOKE_ALPHA&format=handoff-index&limit=20`);
     assert.equal(output.handoff.downloads.launchOpsOverviewStatus.href, `${baseUrl}/api/developer/ops/export/download?productCode=LIVE_SMOKE_ALPHA&format=launch-operations-overview-status&limit=20`);
+    assert.equal(output.handoff.downloads.launchMainlineRouteMap.href, `${baseUrl}/api/developer/launch-mainline/download?productCode=LIVE_SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=handoff-download-routes`);
     assert.equal(output.handoff.downloads.launchReviewSummary.href, `${baseUrl}/api/developer/launch-review/download?productCode=LIVE_SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`);
     assert.equal(output.handoff.downloads.launchSmokeSummary.href, `${baseUrl}/api/developer/launch-smoke-kit/download?productCode=LIVE_SMOKE_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`);
     assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_review_receipt_visibility"));
     assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_smoke_receipt_visibility"));
     assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_ops_overview_status"));
+    assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_mainline_route_map_overview_evidence"));
     assert.ok(output.checks.every((item) => item.status === "pass"));
   } finally {
     await app.close();

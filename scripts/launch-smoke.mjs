@@ -287,6 +287,16 @@ function buildLaunchDutyHandoff({
       limit: options.limit
     })
   );
+  const launchMainlineRouteMap = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/api/developer/launch-mainline/download", {
+      productCode: options.productCode,
+      channel: options.channel,
+      source: "launch-smoke",
+      handoff: "first-wave",
+      format: "handoff-download-routes"
+    })
+  );
   const launchReviewSummary = buildHandoffLink(
     handoffBaseUrl,
     buildRoute("/api/developer/launch-review/download", {
@@ -364,6 +374,12 @@ function buildLaunchDutyHandoff({
         fileName: launchOperationsOverviewStatusDownload.fileName || "developer-ops-launch-operations-overview-status.txt",
         ...launchOpsOverviewStatus
       },
+      launchMainlineRouteMap: {
+        key: "launch-mainline-route-map",
+        label: "Launch Mainline route map with Launch Ops Overview Evidence",
+        fileName: "handoff-download-routes.txt",
+        ...launchMainlineRouteMap
+      },
       launchReviewSummary: {
         key: "launch-review-summary",
         label: "Launch Review receipt visibility summary",
@@ -439,6 +455,14 @@ function buildLaunchDutyHandoff({
         status: "next",
         route: developerOps.route,
         href: developerOps.href
+      },
+      {
+        key: "verify_mainline_route_map_overview_evidence",
+        label: "Download Launch Mainline route map and verify Launch Ops Overview Evidence includes productionSignoffPacket and launchDayWatchEntry before live handoff.",
+        status: "next",
+        route: launchMainlineRouteMap.route,
+        href: launchMainlineRouteMap.href,
+        fileName: "handoff-download-routes.txt"
       },
       {
         key: "open_launch_mainline_evidence",
@@ -881,6 +905,7 @@ function writeResult(result, json) {
       console.log(`- Verify Launch Ops overview: ${result.handoff.downloads.launchOpsOverviewStatus.href || result.handoff.downloads.launchOpsOverviewStatus.route}`);
       console.log(`- Download Ops handoff index: ${result.handoff.downloads.opsHandoffIndex.href || result.handoff.downloads.opsHandoffIndex.route}`);
       console.log(`- Continue Developer Ops watch: ${result.handoff.reviewWorkspaces.developerOps.href || result.handoff.reviewWorkspaces.developerOps.route}`);
+      console.log(`- Verify Mainline route map overview evidence: ${result.handoff.downloads.launchMainlineRouteMap.href || result.handoff.downloads.launchMainlineRouteMap.route}`);
       console.log(`- Open Launch Mainline evidence: ${result.handoff.reviewWorkspaces.launchMainline.href || result.handoff.reviewWorkspaces.launchMainline.route}`);
     }
     return;

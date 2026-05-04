@@ -10644,6 +10644,12 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.key, "ops_first_wave_runtime_evidence");
     assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.format, "first-wave-runtime-evidence");
     assert.match(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.href || "", /\/api\/developer\/ops\/export\/download\?.*format=first-wave-runtime-evidence/i);
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.status, "hold");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.nextAction.key, "production_operations_walkthrough_recent");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.nextAction.operation, "record_operations_walkthrough");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.primaryDownload.key, "launch_mainline_operations_handoff");
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.primaryDownload.format, "operations-handoff");
+    assert.match(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.primaryDownload.href || "", /\/api\/developer\/launch-mainline\/download\?.*format=operations-handoff/i);
 
     const runtimeEvidenceFirstWaveSummary = await getText(
       baseUrl,
@@ -10655,6 +10661,9 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceFirstWaveSummary.body, /next=runtime_evidence_review \| stage=runtime_evidence_review \| owner=ops/);
     assert.match(runtimeEvidenceFirstWaveSummary.body, /runtimeEvidence=evidence_recorded \| ready=true \| activeSessions=1 \| heartbeatSeen=1/);
     assert.match(runtimeEvidenceFirstWaveSummary.body, /download=ops_first_wave_runtime_evidence[\s\S]*format=first-wave-runtime-evidence/i);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /Post Launch Lifecycle Handoff:/);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /status=hold \| next=production_operations_walkthrough_recent \| operation=record_operations_walkthrough/);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /download=launch_mainline_operations_handoff[\s\S]*format=operations-handoff/i);
 
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,

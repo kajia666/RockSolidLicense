@@ -26012,6 +26012,25 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         primaryDownload: firstUserValidationDownload
       }
     : null;
+  const postLaunchLifecycleHandoff = latestLaunchReceipt?.postLaunchLifecycleStatus
+    ? {
+        status: latestLaunchReceipt.postLaunchLifecycleStatus,
+        nextAction: {
+          key: latestLaunchReceipt.postLaunchLifecycleNextActionKey || null,
+          operation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null
+        },
+        primaryDownload: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref
+          ? {
+              key: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
+              label: "Post-launch lifecycle handoff",
+              source: "developer-launch-mainline",
+              format: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
+              fileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
+              href: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref || null
+            }
+          : null
+      }
+    : null;
   const firstRoundOpsPayload = {
     status: firstRoundStatus,
     actionCount: firstRoundActions.length,
@@ -26040,7 +26059,12 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
           firstLaunchInventoryCreatedCardCount: latestLaunchReceipt.firstLaunchInventoryCreatedCardCount ?? null,
           firstLaunchDutyHandoffDownloadKey: latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey || null,
           postLaunchLifecycleStatus: latestLaunchReceipt.postLaunchLifecycleStatus || null,
-          postLaunchLifecycleNextOperation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null
+          postLaunchLifecycleNextActionKey: latestLaunchReceipt.postLaunchLifecycleNextActionKey || null,
+          postLaunchLifecycleNextOperation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null,
+          postLaunchLifecyclePrimaryDownloadKey: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
+          postLaunchLifecyclePrimaryDownloadFormat: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
+          postLaunchLifecyclePrimaryDownloadFileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
+          postLaunchLifecyclePrimaryDownloadHref: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref || null
         }
       : null,
     initialLaunchOpsReadinessStatus: readiness.status || null,
@@ -26098,6 +26122,7 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     },
     deliveryHandoff,
     firstUserValidationHandoff,
+    postLaunchLifecycleHandoff,
     firstRoundOps: firstRoundOpsPayload,
     launchReadinessBridge,
     traceability: traceabilityPayload,
@@ -26245,6 +26270,7 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
   const firstCards = payload.firstCards || {};
   const deliveryHandoff = payload.deliveryHandoff || {};
   const firstUserValidationHandoff = payload.firstUserValidationHandoff || {};
+  const postLaunchLifecycleHandoff = payload.postLaunchLifecycleHandoff || {};
   const firstRoundOps = payload.firstRoundOps || {};
   const launchReadinessBridge = payload.launchReadinessBridge || {};
   const traceability = payload.traceability || {};
@@ -26312,6 +26338,14 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
     if (firstUserValidationHandoff.summary) {
       lines.push(`- summary=${firstUserValidationHandoff.summary}`);
     }
+  }
+  if (payload.postLaunchLifecycleHandoff && typeof payload.postLaunchLifecycleHandoff === "object") {
+    lines.push(
+      "",
+      "Post Launch Lifecycle Handoff:",
+      `- status=${postLaunchLifecycleHandoff.status || "-"} | next=${postLaunchLifecycleHandoff.nextAction?.key || "-"} | operation=${postLaunchLifecycleHandoff.nextAction?.operation || "-"}`,
+      `- download=${postLaunchLifecycleHandoff.primaryDownload?.key || "-"} | file=${postLaunchLifecycleHandoff.primaryDownload?.fileName || "-"} | format=${postLaunchLifecycleHandoff.primaryDownload?.format || "-"} | href=${postLaunchLifecycleHandoff.primaryDownload?.href || "-"}`
+    );
   }
 
   lines.push(

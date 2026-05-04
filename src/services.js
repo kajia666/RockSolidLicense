@@ -25912,6 +25912,41 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
       : inventoryStatus;
   const primaryFirstRoundAction = firstRoundActions.find((item) => item.stage !== "first_launch_delivery")
     || fallbackFirstRoundAction;
+  const deliveryHandoffAction = firstRoundActions.find((item) => item.stage === "first_launch_delivery") || null;
+  const deliveryHandoffUsageStatus = deliveryHandoffAction?.deliveryExportUsageStatus
+    || latestLaunchReceipt?.firstLaunchDutyDeliveryExportUsageStatus
+    || "unused";
+  const deliveryHandoffHref = deliveryHandoffAction
+    ? buildLaunchWorkflowDownloadHref("developer-cards", "csv", {
+        productCode,
+        usageStatus: deliveryHandoffUsageStatus
+      })
+    : null;
+  const deliveryHandoffDownload = deliveryHandoffAction?.downloadKey || deliveryHandoffAction?.downloadHref
+    ? {
+        key: deliveryHandoffAction.downloadKey || deliveryHandoffAction.recommendedDownload?.key || null,
+        label: deliveryHandoffAction.title || deliveryHandoffAction.recommendedDownload?.label || "Deliver first-launch card export",
+        source: deliveryHandoffAction.downloadSource || deliveryHandoffAction.recommendedDownload?.source || "developer-cards",
+        format: "csv",
+        fileName: deliveryHandoffAction.downloadFileName || "developer-cards-first-launch-unused.csv",
+        href: deliveryHandoffHref || deliveryHandoffAction.downloadHref || null
+      }
+    : deliveryHandoffAction?.recommendedDownload && typeof deliveryHandoffAction.recommendedDownload === "object"
+      ? deliveryHandoffAction.recommendedDownload
+      : null;
+  const deliveryHandoff = deliveryHandoffAction
+    ? {
+        status: deliveryHandoffDownload?.href ? "ready" : "review",
+        stage: deliveryHandoffAction.stage,
+        priority: deliveryHandoffAction.priority || "secondary",
+        title: deliveryHandoffAction.title || "Deliver first-launch card export",
+        summary: deliveryHandoffAction.summary || "",
+        cardCount: Number(deliveryHandoffAction.deliveryExportCardCount ?? latestLaunchReceipt?.firstLaunchDutyDeliveryExportCardCount ?? 0),
+        usageStatus: deliveryHandoffUsageStatus,
+        primaryDownload: deliveryHandoffDownload,
+        downloads: deliveryHandoffDownload ? [deliveryHandoffDownload] : []
+      }
+    : null;
   const firstRoundOpsPayload = {
     status: firstRoundStatus,
     actionCount: firstRoundActions.length,
@@ -25996,6 +26031,7 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         status: item.status
       }))
     },
+    deliveryHandoff,
     firstRoundOps: firstRoundOpsPayload,
     launchReadinessBridge,
     traceability: traceabilityPayload,
@@ -26141,6 +26177,7 @@ function buildDeveloperOpsFirstWaveRecommendationsBaseName(payload = {}) {
 function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
   const inventory = payload.inventory || {};
   const firstCards = payload.firstCards || {};
+  const deliveryHandoff = payload.deliveryHandoff || {};
   const firstRoundOps = payload.firstRoundOps || {};
   const launchReadinessBridge = payload.launchReadinessBridge || {};
   const traceability = payload.traceability || {};
@@ -26177,6 +26214,17 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
   const batches = Array.isArray(firstCards.batches) ? firstCards.batches : [];
   for (const batch of batches) {
     lines.push(`- batch=${batch.mode || batch.key || "-"} | status=${batch.status || "-"} | prefix=${batch.prefix || "-"} | fresh=${batch.freshCount ?? 0}/${batch.targetCount ?? 0}`);
+  }
+  if (payload.deliveryHandoff && typeof payload.deliveryHandoff === "object") {
+    lines.push(
+      "",
+      "First Card Delivery Handoff:",
+      `- status=${deliveryHandoff.status || "-"} | cards=${deliveryHandoff.cardCount ?? 0} | usageStatus=${deliveryHandoff.usageStatus || "-"} | stage=${deliveryHandoff.stage || "-"}`,
+      `- download=${deliveryHandoff.primaryDownload?.key || "-"} | file=${deliveryHandoff.primaryDownload?.fileName || "-"} | href=${deliveryHandoff.primaryDownload?.href || "-"}`
+    );
+    if (deliveryHandoff.summary) {
+      lines.push(`- summary=${deliveryHandoff.summary}`);
+    }
   }
 
   lines.push(

@@ -14771,6 +14771,12 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(firstLaunchHandoffAction.downloadHref, /productCode=FIRSTWAVE/);
     assert.ok(afterSetup.firstRoundOps.primaryAction.downloadHref);
     assert.equal(afterSetup.firstRoundOps.primaryAction.recommendedDownload.href, afterSetup.firstRoundOps.primaryAction.downloadHref);
+    assert.equal(afterSetup.deliveryHandoff.status, "ready");
+    assert.equal(afterSetup.deliveryHandoff.stage, "first_launch_delivery");
+    assert.equal(afterSetup.deliveryHandoff.cardCount, 150);
+    assert.equal(afterSetup.deliveryHandoff.usageStatus, "unused");
+    assert.equal(afterSetup.deliveryHandoff.primaryDownload.key, "developer_cards_first_launch_csv");
+    assert.match(afterSetup.deliveryHandoff.primaryDownload.href, /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
     assert.equal(afterSetup.traceability.latestLaunchReceipt.operation, "first_batch_setup");
     assert.equal(afterSetup.traceability.latestLaunchReceipt.firstLaunchInventoryCreatedCardCount, 150);
     assert.ok(afterSetup.traceability.opsSnapshotFileName);
@@ -14821,6 +14827,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(handoffDownload.body, /Project Code: FIRSTWAVE/);
     assert.match(handoffDownload.body, /Inventory Recommendation:/);
     assert.match(handoffDownload.body, /First Card Issuance:/);
+    assert.match(handoffDownload.body, /First Card Delivery Handoff:/);
+    assert.match(handoffDownload.body, /status=ready \| cards=150 \| usageStatus=unused/);
+    assert.match(handoffDownload.body, /download=developer_cards_first_launch_csv[\s\S]*usageStatus=unused[\s\S]*format=csv/i);
     assert.match(handoffDownload.body, /First Round Ops Actions:/);
     assert.match(handoffDownload.body, /Launch Readiness Bridge:/);
     assert.match(handoffDownload.body, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);

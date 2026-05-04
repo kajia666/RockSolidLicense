@@ -16087,6 +16087,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchOperatorActionReceiptEvidence.nextOperation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(initialLaunchOperatorActionReceiptEvidence.nextDownloadFileName, latestLaunchReceipt.initialLaunchOperatorNextDownloadFileName);
     assert.equal(initialLaunchOperatorActionReceiptEvidence.nextDownloadHref, latestLaunchReceipt.initialLaunchOperatorNextDownloadHref);
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.launchOpsOverviewContext?.watchRecordDraftStatus, "blocked_until_runway_evidence");
+    assert.equal(initialLaunchOperatorActionReceiptEvidence.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     const initialLaunchStabilizationHandoff = launchReceiptSnapshot.summary.initialLaunchOpsReadiness.stabilizationHandoff;
     assert.ok(initialLaunchStabilizationHandoff);
     assert.equal(initialLaunchStabilizationHandoff.version, "initial-launch-stabilization-handoff/v1");
@@ -16097,6 +16100,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchStabilizationHandoff.latestLaunchReceipt.postLaunchLifecycleStatus, latestLaunchReceipt.postLaunchLifecycleStatus);
     assert.equal(initialLaunchStabilizationHandoff.latestOperatorActionReceipt.operation, "record_post_launch_ops_sweep");
     assert.equal(initialLaunchStabilizationHandoff.latestOperatorActionReceipt.auditLogId, latestLaunchReceipt.auditLogId);
+    assert.equal(initialLaunchStabilizationHandoff.latestOperatorActionReceipt.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
     assert.equal(initialLaunchStabilizationHandoff.nextAction.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(initialLaunchStabilizationHandoff.nextAction.downloadFileName, "launch-mainline-stabilization-handoff.txt");
     assert.match(initialLaunchStabilizationHandoff.nextAction.downloadHref, /\/api\/developer\/launch-mainline\/download\?/);
@@ -16193,6 +16197,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Action Receipts:/);
     assert.match(launchReceiptSnapshot.summaryText, /source=developer_ops_audit_log/);
     assert.match(launchReceiptSnapshot.summaryText, /operation=record_post_launch_ops_sweep/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Action Receipts:[\s\S]*context=launch_ops_overview_status/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Operator Action Receipts:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Stabilization Handoff:/);
     assert.match(launchReceiptSnapshot.summaryText, /version=initial-launch-stabilization-handoff\/v1/);
     assert.match(launchReceiptSnapshot.summaryText, /latestOperator=record_post_launch_ops_sweep/);
@@ -21951,6 +21957,7 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /renderOperatorActionReceipts/);
     assert.match(html, /Initial Launch Operator Action Receipts/);
     assert.match(html, /operator-action-receipt/);
+    assert.match(html, /data-operator-action-launch-ops-overview-context/);
     assert.match(html, /operatorActionReceipts/);
     assert.match(html, /latestOperatorActionReceipt/);
     assert.match(html, /renderStabilizationHandoff/);

@@ -23851,6 +23851,7 @@ function buildDeveloperOpsInitialLaunchOperatorActionReceipts(latestLaunchReceip
     if (!hasOperatorEvidence) {
       continue;
     }
+    const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(item.launchOpsOverviewContext);
     receipts.push({
       source: "developer_ops_audit_log",
       auditLogId: item.auditLogId || null,
@@ -23873,6 +23874,7 @@ function buildDeveloperOpsInitialLaunchOperatorActionReceipts(latestLaunchReceip
       nextDownloadHref: item.initialLaunchOperatorNextDownloadHref || null,
       workspaceKey: item.initialLaunchOperatorWorkspaceKey || null,
       workspaceAutofocus: item.initialLaunchOperatorWorkspaceAutofocus || null,
+      launchOpsOverviewContext,
       handoffFileName: item.handoffFileName || null,
       handoffGeneratedAt: item.handoffGeneratedAt || null,
       createdAt: item.createdAt || item.handoffGeneratedAt || null
@@ -24831,7 +24833,8 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
           operation: latestOperatorActionReceipt.operation || null,
           decision: latestOperatorActionReceipt.decision || null,
           nextOperation: latestOperatorActionReceipt.nextOperation || null,
-          nextDownloadFileName: latestOperatorActionReceipt.nextDownloadFileName || null
+          nextDownloadFileName: latestOperatorActionReceipt.nextDownloadFileName || null,
+          launchOpsOverviewContext: latestOperatorActionReceipt.launchOpsOverviewContext || null
         }
       : null,
     confirmation,
@@ -28967,6 +28970,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("");
       lines.push("Initial Launch Operator Action Receipts:");
       for (const item of initialLaunchOpsReadiness.operatorActionReceipts) {
+        const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(item.launchOpsOverviewContext);
         lines.push(
           `- source=${item.source || "-"}`
           + ` | audit=${item.auditLogId || "-"}`
@@ -28976,6 +28980,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | next=${item.nextOperation || "-"}`
           + ` | download=${item.nextDownloadFileName || item.nextDownloadKey || "-"}`
           + ` | href=${item.nextDownloadHref || "-"}`
+          + (launchOpsOverviewContext ? ` | ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}` : "")
         );
       }
     }

@@ -5014,6 +5014,9 @@
             <div class="hint">Backend evidence captured from launch-mainline action audit logs for launch duty handoff and first-wave operations review.</div>
             <div class="snapshot-focus-list">
               ${entries.map((item) => {
+                const launchOpsOverviewContext = item.launchOpsOverviewContext && typeof item.launchOpsOverviewContext === "object"
+                  ? item.launchOpsOverviewContext
+                  : null;
                 const tags = [
                   item.source ? renderTag(item.source) : "",
                   item.decision ? renderTag(`decision:${String(item.decision).toUpperCase()}`, true) : "",
@@ -5028,10 +5031,11 @@
                   `at=${esc(formatTime(item.createdAt || item.handoffGeneratedAt))}`
                 ].join(" | ");
                 return `
-                  <div class="snapshot-focus-item">
+                  <div class="snapshot-focus-item" data-operator-action-launch-ops-overview-context="${esc(launchOpsOverviewContext?.kind || "-")}">
                     <div class="snapshot-focus-head"><strong>${esc(item.operationLabel || item.operation || "Operator action receipt")}</strong></div>
                     <div class="audit-meta">${tags || renderTag("operator-action-receipt")}</div>
                     <div class="snapshot-focus-meta">${details}</div>
+                    ${renderLaunchOpsOverviewContext(launchOpsOverviewContext)}
                   </div>
                 `;
               }).join("")}

@@ -18144,6 +18144,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOverviewStatus.recoveryRoute, "/api/developer/ops/steady-state-duty-plan/receipt");
     assert.equal(launchOperationsOverviewStatus.watchRecordDraftStatus, steadyStateWatchRecordDraftStatus);
     assert.equal(launchOperationsOverviewStatus.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
+    assert.equal(launchOperationsOverviewStatus.productionSignoffPacket, expectedProductionSignoffPacket);
+    assert.equal(launchOperationsOverviewStatus.launchDayWatchEntry, expectedLaunchDayWatchEntry);
     assert.equal(launchOperationsOverviewStatus.nextAction.key, launchOperationsShiftActionPlan.primaryAction.key);
     assert.equal(launchOperationsOverviewStatus.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
     assert.equal(launchOperationsOverviewStatus.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
@@ -18153,6 +18155,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /overviewStatus=.*receipt=visible/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -18165,6 +18169,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*context=launch_ops_overview_status/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*downloadFormat=launch-operations-overview-status/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchOperationsOverviewStatusDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:/);

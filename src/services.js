@@ -24822,6 +24822,14 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     ?? dailyBrief?.watchRecordDraftRecordCount
     ?? handoffSummary?.watchRecordDraftRecordCount
     ?? null;
+  const productionSignoffPacket = shiftPlan?.productionSignoffPacket
+    || dailyBrief?.productionSignoffPacket
+    || handoffSummary?.productionSignoffPacket
+    || null;
+  const launchDayWatchEntry = shiftPlan?.launchDayWatchEntry
+    || dailyBrief?.launchDayWatchEntry
+    || handoffSummary?.launchDayWatchEntry
+    || null;
   const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
     overviewScope,
     shiftPlan?.launchOpsOverviewContext
@@ -24893,6 +24901,8 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     shiftActionPlanStatus: shiftPlan?.status || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    productionSignoffPacket,
+    launchDayWatchEntry,
     launchOpsOverviewContext,
     receiptVisibilityStatus: receiptVisibilitySummary?.status || "pending",
     receiptVisibilitySummary,
@@ -24903,7 +24913,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     panels,
     readyPanelCount,
     panelCount: panels.length,
-    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, next=${nextAction?.key || "-"}.`
+    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, signoff=${productionSignoffPacket || "-"}, watchEntry=${launchDayWatchEntry || "-"}, next=${nextAction?.key || "-"}.`
   };
 }
 
@@ -28968,6 +28978,10 @@ function appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, overview =
     + ` | recovery=${overview.canRecoverReceipt === true ? overview.recoveryRoute || "-" : "-"}`
     + ` | download=${overview.overviewDownload?.fileName || "-"}`
   );
+  lines.push(
+    `- productionSignoffPacket=${overview.productionSignoffPacket || "-"}`
+    + ` | launchDayWatchEntry=${overview.launchDayWatchEntry || "-"}`
+  );
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(overview.launchOpsOverviewContext);
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
@@ -31075,6 +31089,10 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     + ` | dailyBrief=${overview?.dailyBriefStatus || "-"}`
     + ` | shiftPlan=${overview?.shiftActionPlanStatus || "-"}`
     + ` | next=${overview?.nextAction?.key || "-"}`
+  );
+  lines.push(
+    `- productionSignoffPacket=${overview?.productionSignoffPacket || "-"}`
+    + ` | launchDayWatchEntry=${overview?.launchDayWatchEntry || "-"}`
   );
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);

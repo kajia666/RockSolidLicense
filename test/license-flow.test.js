@@ -14777,6 +14777,14 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(afterSetup.deliveryHandoff.usageStatus, "unused");
     assert.equal(afterSetup.deliveryHandoff.primaryDownload.key, "developer_cards_first_launch_csv");
     assert.match(afterSetup.deliveryHandoff.primaryDownload.href, /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
+    assert.equal(afterSetup.firstUserValidationHandoff.status, "pending_validation");
+    assert.equal(afterSetup.firstUserValidationHandoff.actionCount, 4);
+    assert.equal(afterSetup.firstUserValidationHandoff.remainingCount, 4);
+    assert.equal(afterSetup.firstUserValidationHandoff.nextAction.key, "card_redemption_watch");
+    assert.equal(afterSetup.firstUserValidationHandoff.nextAction.stage, "first_sale_watch");
+    assert.equal(afterSetup.firstUserValidationHandoff.nextAction.ownerRole, "support");
+    assert.equal(afterSetup.firstUserValidationHandoff.primaryDownload.key, "launch_mainline_first_launch_handoff");
+    assert.match(afterSetup.firstUserValidationHandoff.primaryDownload.href, /\/api\/developer\/launch-mainline\/download\?.*format=first-launch-handoff/i);
     assert.equal(afterSetup.traceability.latestLaunchReceipt.operation, "first_batch_setup");
     assert.equal(afterSetup.traceability.latestLaunchReceipt.firstLaunchInventoryCreatedCardCount, 150);
     assert.ok(afterSetup.traceability.opsSnapshotFileName);
@@ -14830,6 +14838,10 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(handoffDownload.body, /First Card Delivery Handoff:/);
     assert.match(handoffDownload.body, /status=ready \| cards=150 \| usageStatus=unused/);
     assert.match(handoffDownload.body, /download=developer_cards_first_launch_csv[\s\S]*usageStatus=unused[\s\S]*format=csv/i);
+    assert.match(handoffDownload.body, /First User Validation Handoff:/);
+    assert.match(handoffDownload.body, /status=pending_validation \| actions=4 \| remaining=4/);
+    assert.match(handoffDownload.body, /next=card_redemption_watch \| stage=first_sale_watch \| owner=support/);
+    assert.match(handoffDownload.body, /download=launch_mainline_first_launch_handoff[\s\S]*format=first-launch-handoff/i);
     assert.match(handoffDownload.body, /First Round Ops Actions:/);
     assert.match(handoffDownload.body, /Launch Readiness Bridge:/);
     assert.match(handoffDownload.body, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);

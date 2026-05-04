@@ -25947,6 +25947,45 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         downloads: deliveryHandoffDownload ? [deliveryHandoffDownload] : []
       }
     : null;
+  const firstUserValidationAction = firstRoundActions.find((item) => item.stage === "first_user_validation") || null;
+  const firstUserValidationDownloadKey = firstUserValidationAction?.downloadKey
+    || latestLaunchReceipt?.firstLaunchDutyHandoffDownloadKey
+    || null;
+  const firstUserValidationDownloadSource = inferLaunchWorkflowDownloadSource(firstUserValidationDownloadKey, firstUserValidationAction?.downloadSource);
+  const firstUserValidationDownloadFormat = firstUserValidationAction?.downloadFormat
+    || inferRouteDownloadFormat(firstUserValidationDownloadKey);
+  const firstUserValidationDownload = firstUserValidationAction && firstUserValidationDownloadKey
+    ? {
+        key: firstUserValidationDownloadKey,
+        label: firstUserValidationAction.title || "Run first-user validation",
+        source: firstUserValidationDownloadSource || null,
+        format: firstUserValidationDownloadFormat || null,
+        fileName: firstUserValidationAction.downloadFileName || "launch-mainline-first-launch-handoff.txt",
+        href: firstUserValidationAction.downloadHref
+          || buildLaunchWorkflowDownloadHref(firstUserValidationDownloadSource, firstUserValidationDownloadFormat, {
+            productCode,
+            channel
+          })
+      }
+    : null;
+  const firstUserValidationHandoff = firstUserValidationAction
+    ? {
+        status: latestLaunchReceipt?.firstLaunchDutyFirstUserValidationStatus || "pending_validation",
+        stage: firstUserValidationAction.stage,
+        priority: firstUserValidationAction.priority || "secondary",
+        title: firstUserValidationAction.title || "Run first-user validation",
+        summary: firstUserValidationAction.summary || "",
+        actionCount: Number(latestLaunchReceipt?.firstLaunchDutyFirstUserValidationActionCount ?? 0),
+        remainingCount: Number(latestLaunchReceipt?.firstLaunchDutyFirstUserValidationRemainingCount ?? 0),
+        nextAction: {
+          key: firstUserValidationAction.actionKey || latestLaunchReceipt?.firstLaunchDutyFirstUserValidationNextActionKey || null,
+          stage: latestLaunchReceipt?.firstLaunchDutyFirstUserValidationNextStage || null,
+          ownerRole: latestLaunchReceipt?.firstLaunchDutyFirstUserValidationNextOwnerRole || null,
+          operation: firstUserValidationAction.operation || latestLaunchReceipt?.firstLaunchDutyFirstUserValidationProductionNextOperation || null
+        },
+        primaryDownload: firstUserValidationDownload
+      }
+    : null;
   const firstRoundOpsPayload = {
     status: firstRoundStatus,
     actionCount: firstRoundActions.length,
@@ -26032,6 +26071,7 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
       }))
     },
     deliveryHandoff,
+    firstUserValidationHandoff,
     firstRoundOps: firstRoundOpsPayload,
     launchReadinessBridge,
     traceability: traceabilityPayload,
@@ -26178,6 +26218,7 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
   const inventory = payload.inventory || {};
   const firstCards = payload.firstCards || {};
   const deliveryHandoff = payload.deliveryHandoff || {};
+  const firstUserValidationHandoff = payload.firstUserValidationHandoff || {};
   const firstRoundOps = payload.firstRoundOps || {};
   const launchReadinessBridge = payload.launchReadinessBridge || {};
   const traceability = payload.traceability || {};
@@ -26224,6 +26265,18 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
     );
     if (deliveryHandoff.summary) {
       lines.push(`- summary=${deliveryHandoff.summary}`);
+    }
+  }
+  if (payload.firstUserValidationHandoff && typeof payload.firstUserValidationHandoff === "object") {
+    lines.push(
+      "",
+      "First User Validation Handoff:",
+      `- status=${firstUserValidationHandoff.status || "-"} | actions=${firstUserValidationHandoff.actionCount ?? 0} | remaining=${firstUserValidationHandoff.remainingCount ?? 0}`,
+      `- next=${firstUserValidationHandoff.nextAction?.key || "-"} | stage=${firstUserValidationHandoff.nextAction?.stage || "-"} | owner=${firstUserValidationHandoff.nextAction?.ownerRole || "-"} | operation=${firstUserValidationHandoff.nextAction?.operation || "-"}`,
+      `- download=${firstUserValidationHandoff.primaryDownload?.key || "-"} | file=${firstUserValidationHandoff.primaryDownload?.fileName || "-"} | href=${firstUserValidationHandoff.primaryDownload?.href || "-"}`
+    );
+    if (firstUserValidationHandoff.summary) {
+      lines.push(`- summary=${firstUserValidationHandoff.summary}`);
     }
   }
 

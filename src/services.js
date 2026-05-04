@@ -4609,6 +4609,18 @@ function buildLaunchMainlineActionReceiptVisibility({
     "post-launch-sweep-handoff",
     mainlineRouteParams
   );
+  const closeoutHandoff = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline closeout handoff",
+    payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt",
+    "closeout-handoff",
+    mainlineRouteParams
+  );
+  const stabilizationHandoff = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stabilization handoff",
+    payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
+    "stabilization-handoff",
+    mainlineRouteParams
+  );
   const postLaunchHandoffIndex = createLaunchMainlineDownloadShortcut(
     "Launch Mainline post-launch handoff index",
     payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
@@ -4645,6 +4657,8 @@ function buildLaunchMainlineActionReceiptVisibility({
       developerOpsSummary,
       launchReceiptNextFollowUp,
       postLaunchSweepHandoff,
+      closeoutHandoff,
+      stabilizationHandoff,
       postLaunchHandoffIndex,
       handoffDownloadRoutes
     },
@@ -4670,6 +4684,20 @@ function buildLaunchMainlineActionReceiptVisibility({
         summary: "Verify the first-wave ops sweep handoff reflects the newly recorded receipt.",
         workspaceAction: launchMainlineWorkspace,
         recommendedDownload: postLaunchSweepHandoff
+      },
+      {
+        key: "closeout_handoff",
+        label: "Reopen closeout handoff",
+        summary: "Use the closeout handoff to finish launch-day review and first-wave operations sweep checks.",
+        workspaceAction: launchMainlineWorkspace,
+        recommendedDownload: closeoutHandoff
+      },
+      {
+        key: "stabilization_handoff",
+        label: "Reopen stabilization handoff",
+        summary: "Use the stabilization handoff when handing the lane from launch watch to steady-state operations.",
+        workspaceAction: launchMainlineWorkspace,
+        recommendedDownload: stabilizationHandoff
       },
       {
         key: "post_launch_handoff_index",
@@ -26012,9 +26040,34 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         primaryDownload: firstUserValidationDownload
       }
     : null;
+  const normalizePostLaunchLifecycleDownload = (download = null) => {
+    if (!download || typeof download !== "object") {
+      return null;
+    }
+    return {
+      key: download.key || null,
+      label: download.label || null,
+      source: download.source || "developer-launch-mainline",
+      format: download.format || null,
+      fileName: download.fileName || null,
+      href: download.href || null
+    };
+  };
+  const closeoutLifecycleHandoffDownload = normalizePostLaunchLifecycleDownload(
+    opsSnapshot?.mainlineHandoff?.downloads?.closeoutHandoff
+  );
+  const stabilizationLifecycleHandoffDownload = normalizePostLaunchLifecycleDownload(
+    opsSnapshot?.mainlineHandoff?.downloads?.stabilizationHandoff
+  );
   const postLaunchLifecycleHandoff = latestLaunchReceipt?.postLaunchLifecycleStatus
     ? {
         status: latestLaunchReceipt.postLaunchLifecycleStatus,
+        phaseState: {
+          totalCount: Number(latestLaunchReceipt.postLaunchLifecyclePhaseCount ?? 0),
+          readyCount: Number(latestLaunchReceipt.postLaunchLifecycleReadyCount ?? 0),
+          holdCount: Number(latestLaunchReceipt.postLaunchLifecycleHoldCount ?? 0),
+          reviewCount: Number(latestLaunchReceipt.postLaunchLifecycleReviewCount ?? 0)
+        },
         nextAction: {
           key: latestLaunchReceipt.postLaunchLifecycleNextActionKey || null,
           operation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null
@@ -26028,7 +26081,11 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
               fileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
               href: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref || null
             }
-          : null
+          : null,
+        handoffDownloads: {
+          closeout: closeoutLifecycleHandoffDownload,
+          stabilization: stabilizationLifecycleHandoffDownload
+        }
       }
     : null;
   const firstRoundOpsPayload = {
@@ -26059,6 +26116,10 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
           firstLaunchInventoryCreatedCardCount: latestLaunchReceipt.firstLaunchInventoryCreatedCardCount ?? null,
           firstLaunchDutyHandoffDownloadKey: latestLaunchReceipt.firstLaunchDutyHandoffDownloadKey || null,
           postLaunchLifecycleStatus: latestLaunchReceipt.postLaunchLifecycleStatus || null,
+          postLaunchLifecyclePhaseCount: latestLaunchReceipt.postLaunchLifecyclePhaseCount ?? null,
+          postLaunchLifecycleReadyCount: latestLaunchReceipt.postLaunchLifecycleReadyCount ?? null,
+          postLaunchLifecycleHoldCount: latestLaunchReceipt.postLaunchLifecycleHoldCount ?? null,
+          postLaunchLifecycleReviewCount: latestLaunchReceipt.postLaunchLifecycleReviewCount ?? null,
           postLaunchLifecycleNextActionKey: latestLaunchReceipt.postLaunchLifecycleNextActionKey || null,
           postLaunchLifecycleNextOperation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null,
           postLaunchLifecyclePrimaryDownloadKey: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
@@ -26346,6 +26407,36 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
       `- status=${postLaunchLifecycleHandoff.status || "-"} | next=${postLaunchLifecycleHandoff.nextAction?.key || "-"} | operation=${postLaunchLifecycleHandoff.nextAction?.operation || "-"}`,
       `- download=${postLaunchLifecycleHandoff.primaryDownload?.key || "-"} | file=${postLaunchLifecycleHandoff.primaryDownload?.fileName || "-"} | format=${postLaunchLifecycleHandoff.primaryDownload?.format || "-"} | href=${postLaunchLifecycleHandoff.primaryDownload?.href || "-"}`
     );
+    const phaseState = postLaunchLifecycleHandoff.phaseState && typeof postLaunchLifecycleHandoff.phaseState === "object"
+      ? postLaunchLifecycleHandoff.phaseState
+      : null;
+    if (phaseState) {
+      lines.push(
+        `- phaseState=ready=${phaseState.readyCount ?? 0}`
+        + ` | hold=${phaseState.holdCount ?? 0}`
+        + ` | review=${phaseState.reviewCount ?? 0}`
+        + ` | total=${phaseState.totalCount ?? 0}`
+      );
+    }
+    const lifecycleHandoffDownloads = postLaunchLifecycleHandoff.handoffDownloads && typeof postLaunchLifecycleHandoff.handoffDownloads === "object"
+      ? postLaunchLifecycleHandoff.handoffDownloads
+      : {};
+    if (lifecycleHandoffDownloads.closeout) {
+      lines.push(
+        `- closeout=${lifecycleHandoffDownloads.closeout.key || "-"}`
+        + ` | file=${lifecycleHandoffDownloads.closeout.fileName || "-"}`
+        + ` | format=${lifecycleHandoffDownloads.closeout.format || "-"}`
+        + ` | href=${lifecycleHandoffDownloads.closeout.href || "-"}`
+      );
+    }
+    if (lifecycleHandoffDownloads.stabilization) {
+      lines.push(
+        `- stabilization=${lifecycleHandoffDownloads.stabilization.key || "-"}`
+        + ` | file=${lifecycleHandoffDownloads.stabilization.fileName || "-"}`
+        + ` | format=${lifecycleHandoffDownloads.stabilization.format || "-"}`
+        + ` | href=${lifecycleHandoffDownloads.stabilization.href || "-"}`
+      );
+    }
   }
 
   lines.push(
@@ -32383,6 +32474,12 @@ function buildDeveloperOpsMainlineHandoff(scope = {}) {
       "First launch handoff",
       "launch-mainline-first-launch-handoff.txt",
       "first-launch-handoff",
+      params
+    ),
+    closeoutHandoff: createLaunchMainlineDownloadShortcut(
+      "Closeout handoff",
+      "launch-mainline-closeout-handoff.txt",
+      "closeout-handoff",
       params
     ),
     stabilizationHandoff: createLaunchMainlineDownloadShortcut(

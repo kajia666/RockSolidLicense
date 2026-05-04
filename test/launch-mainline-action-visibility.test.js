@@ -151,6 +151,12 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(visibility?.downloads?.postLaunchSweepHandoff?.href || "", /^\/api\/developer\/launch-mainline\/download\?/);
     assert.match(visibility?.downloads?.postLaunchSweepHandoff?.href || "", /format=post-launch-sweep-handoff/);
 
+    assert.equal(visibility?.downloads?.closeoutHandoff?.format, "closeout-handoff");
+    assert.match(visibility?.downloads?.closeoutHandoff?.href || "", /format=closeout-handoff/);
+
+    assert.equal(visibility?.downloads?.stabilizationHandoff?.format, "stabilization-handoff");
+    assert.match(visibility?.downloads?.stabilizationHandoff?.href || "", /format=stabilization-handoff/);
+
     assert.equal(visibility?.downloads?.postLaunchHandoffIndex?.format, "post-launch-handoff-index");
     assert.match(visibility?.downloads?.postLaunchHandoffIndex?.href || "", /format=post-launch-handoff-index/);
 
@@ -163,6 +169,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         "developer_ops_summary",
         "launch_receipt_next_follow_up",
         "post_launch_sweep_handoff",
+        "closeout_handoff",
+        "stabilization_handoff",
         "post_launch_handoff_index",
         "handoff_download_routes"
       ]
@@ -200,6 +208,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         "receipt_visibility_developer_ops_summary",
         "receipt_visibility_launch_receipt_next_follow_up",
         "receipt_visibility_post_launch_sweep_handoff",
+        "receipt_visibility_closeout_handoff",
+        "receipt_visibility_stabilization_handoff",
         "receipt_visibility_post_launch_handoff_index",
         "receipt_visibility_handoff_download_routes"
       ]
@@ -224,6 +234,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         { kind: "download", workspace: null, download: "ops_summary" },
         { kind: "download", workspace: null, download: "ops_launch_receipt_next_follow_up" },
         { kind: "download", workspace: null, download: "launch_mainline_post_launch_sweep_handoff" },
+        { kind: "download", workspace: null, download: "launch_mainline_closeout_handoff" },
+        { kind: "download", workspace: null, download: "launch_mainline_stabilization_handoff" },
         { kind: "download", workspace: null, download: "launch_mainline_post_launch_handoff_index" },
         { kind: "download", workspace: null, download: "launch_mainline_handoff_download_routes" }
       ]
@@ -261,6 +273,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         "ops_summary",
         "ops_launch_receipt_next_follow_up",
         "launch_mainline_post_launch_sweep_handoff",
+        "launch_mainline_closeout_handoff",
+        "launch_mainline_stabilization_handoff",
         "launch_mainline_post_launch_handoff_index",
         "launch_mainline_handoff_download_routes"
       ]
@@ -268,6 +282,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(latestReceipt?.receiptVisibility?.downloads?.developerOpsSummary?.href || "", /format=summary/);
     assert.match(latestReceipt?.receiptVisibility?.downloads?.launchReceiptNextFollowUp?.href || "", /format=launch-receipt-next-follow-up/);
     assert.match(latestReceipt?.receiptVisibility?.downloads?.postLaunchSweepHandoff?.href || "", /format=post-launch-sweep-handoff/);
+    assert.match(latestReceipt?.receiptVisibility?.downloads?.closeoutHandoff?.href || "", /format=closeout-handoff/);
+    assert.match(latestReceipt?.receiptVisibility?.downloads?.stabilizationHandoff?.href || "", /format=stabilization-handoff/);
     assert.match(latestReceipt?.receiptVisibility?.downloads?.postLaunchHandoffIndex?.href || "", /format=post-launch-handoff-index/);
     assert.match(latestReceipt?.receiptVisibility?.downloads?.handoffDownloadRoutes?.href || "", /format=handoff-download-routes/);
     assert.equal(latestReceipt?.receiptVisibility?.stagingResultBackfill?.status, "awaiting_staging_result_backfill");
@@ -298,6 +314,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         { key: "developer_ops_summary", workspaceKey: "ops", downloadKey: "ops_summary" },
         { key: "launch_receipt_next_follow_up", workspaceKey: "ops", downloadKey: "ops_launch_receipt_next_follow_up" },
         { key: "post_launch_sweep_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_sweep_handoff" },
+        { key: "closeout_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_closeout_handoff" },
+        { key: "stabilization_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_stabilization_handoff" },
         { key: "post_launch_handoff_index", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_handoff_index" },
         { key: "handoff_download_routes", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_handoff_download_routes" }
       ]
@@ -305,6 +323,8 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(opsExport.summaryText || "", /Receipt Visibility:/);
     assert.match(opsExport.summaryText || "", /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(opsExport.summaryText || "", /post-launch-sweep-handoff/);
+    assert.match(opsExport.summaryText || "", /closeout-handoff/);
+    assert.match(opsExport.summaryText || "", /stabilization-handoff/);
     assert.match(opsExport.summaryText || "", /post-launch-handoff-index/);
     assert.match(opsExport.summaryText || "", /handoff-download-routes/);
     assert.match(opsExport.summaryText || "", /Staging Result Backfill:/);

@@ -295,6 +295,27 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     output.operatorExecutionPlan.requiredCloseoutKeys,
     output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key)
   );
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.mode, "closeout-backfill-focus");
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.status, "awaiting_closeout_backfill");
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.closeoutReviewStatus, "not_loaded");
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.missingFieldCount, 7);
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget.key, "route_map_gate_result");
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget.sourceStep, "run_route_map_gate");
+  assert.equal(
+    output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget.artifactPath,
+    "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt"
+  );
+  assert.equal(
+    output.operatorExecutionPlan.closeoutBackfillFocus.paths.filledCloseoutInputFile,
+    "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+  );
+  assert.equal(
+    output.operatorExecutionPlan.closeoutBackfillFocus.reloadCommand,
+    "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+  );
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.fullTestWindow.canRun, false);
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.fullTestWindow.command, "npm.cmd test");
+  assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.productionSignoff.canSignoff, false);
   assert.equal(output.operatorExecutionPlan.fullTestWindow.command, "npm.cmd test");
   assert.equal(output.operatorExecutionPlan.productionSignoff.requiredDecision, "ready-for-production-signoff");
   assert.deepEqual(output.fullTestWindowReadiness, {
@@ -1914,6 +1935,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Operator go-live action plan: status=blocked_until_real_staging_inputs, remaining=8/);
     assert.match(handoff, /Operator current go-live action: staging_profile \(phase=real_staging_inputs, kind=load_profile\)/);
     assert.match(handoff, /Operator phase real_staging_inputs: ready=1, blocked=3/);
+    assert.match(handoff, /Closeout backfill focus: awaiting_closeout_backfill \(missing=7, current=route_map_gate_result\)/);
+    assert.match(handoff, /Closeout reload command: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`/);
+    assert.match(handoff, /Current closeout artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
     assert.match(handoff, /review_generated_bundle/);
     assert.match(handoff, /backfill_closeout_template/);
     assert.match(handoff, /production_signoff_review/);
@@ -2137,6 +2161,15 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.operatorExecutionPlan.realStagingInputClosure.blockedCheckCount, 4);
     assert.equal(template.operatorExecutionPlan.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
     assert.equal(template.operatorExecutionPlan.goLiveOperatorActionPlan.remainingActionCount, 8);
+    assert.equal(template.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget.key, "route_map_gate_result");
+    assert.equal(
+      template.operatorExecutionPlan.closeoutBackfillFocus.paths.filledCloseoutInputFile,
+      "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+    );
+    assert.equal(
+      template.operatorExecutionPlan.closeoutBackfillFocus.reloadCommand,
+      "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+    );
     assert.equal(
       template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,
       "written"
@@ -2275,6 +2308,10 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
       ]
     );
     assert.equal(output.operatorExecutionPlan.readinessSummary.canRunFullTestWindow, true);
+    assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.status, "ready_for_full_test_window");
+    assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.missingFieldCount, 0);
+    assert.deepEqual(output.operatorExecutionPlan.closeoutBackfillFocus.missingBackfillKeys, []);
+    assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget, null);
     assert.equal(output.fullTestWindowReadiness.status, "ready");
     assert.equal(output.fullTestWindowReadiness.canRun, true);
     assert.deepEqual(output.fullTestWindowReadiness.missingCloseoutKeys, []);

@@ -2554,6 +2554,104 @@ function buildProductionSignoffReadiness(result) {
   };
 }
 
+function findKeyedItem(items, key) {
+  return Array.isArray(items) ? items.find((item) => item?.key === key) || null : null;
+}
+
+function keyedPath(items, key) {
+  return findKeyedItem(items, key)?.path || null;
+}
+
+function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
+  const closeout = result.stagingAcceptanceCloseout || {};
+  const runbook = result.stagingExecutionRunbook || {};
+  const finalPacket = result.finalRehearsalPacket || {};
+  const closeoutReview = result.closeoutInput?.backfillReview
+    || buildCloseoutInputBackfillReview(null, closeout);
+  const fullTestWindow = result.fullTestWindowReadiness || buildFullTestWindowReadiness(result);
+  const productionSignoff = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
+  const runbookTargets = Array.isArray(runbook.closeoutBackfillTargets) ? runbook.closeoutBackfillTargets : [];
+  const targetByKey = new Map(runbookTargets.filter((item) => item?.key).map((item) => [item.key, item]));
+  const hasMissingFields = Array.isArray(closeoutReview.missingFields);
+  const missingFields = hasMissingFields ? closeoutReview.missingFields : [];
+  const missingBackfillKeys = hasMissingFields
+    ? missingFields.map((item) => item.key).filter(Boolean)
+    : runbookTargets.map((item) => item.key).filter(Boolean);
+  const currentKey = missingBackfillKeys[0] || null;
+  const currentField = missingFields.find((item) => item?.key === currentKey) || null;
+  const currentTarget = currentKey ? targetByKey.get(currentKey) || currentField || null : null;
+  const bindingFiles = result.stagingEnvironmentBinding?.recommendedOutputFiles || [];
+  const finalFiles = finalPacket.localFiles || [];
+  const filledCloseoutInputFile = keyedPath(finalFiles, "filled_closeout_input")
+    || keyedPath(bindingFiles, "filled_closeout_input");
+  const filledCloseoutDraftFile = keyedPath(outputFiles, "filled_closeout_draft")
+    || keyedPath(finalFiles, "filled_closeout_draft")
+    || keyedPath(bindingFiles, "filled_closeout_draft")
+    || result.filledCloseoutInputDraft?.saveAs
+    || null;
+  const closeoutTemplateFile = keyedPath(outputFiles, "closeout_file")
+    || keyedPath(finalFiles, "closeout_file")
+    || keyedPath(bindingFiles, "closeout_file")
+    || null;
+  const closeoutReloadPacketFile = keyedPath(outputFiles, "closeout_reload_packet")
+    || keyedPath(finalFiles, "closeout_reload_packet")
+    || keyedPath(bindingFiles, "closeout_reload_packet")
+    || null;
+  const reloadStep = findKeyedItem(runbook.commandSequence, "reload_closeout_input");
+  const reloadCommand = finalPacket.commands?.closeoutReload
+    || reloadStep?.command
+    || result.stagingProfileOperatorPreflight?.commands?.closeoutReload
+    || result.filledCloseoutInputExample?.reloadCommand
+    || result.closeoutBackfillGuide?.closeoutInputReload?.command
+    || null;
+  const status = fullTestWindow.canRun === true
+    ? (productionSignoff.canSignoff === true ? "ready_for_production_signoff" : "ready_for_full_test_window")
+    : (result.closeoutInput?.status === "loaded" ? "reload_needs_backfill" : "awaiting_closeout_backfill");
+  const currentBackfillTarget = currentTarget ? {
+    key: currentTarget.key,
+    sourceStep: currentTarget.sourceStep || currentField?.sourceStep || CLOSEOUT_SOURCE_STEPS[currentKey] || "operator_backfill",
+    artifactPath: currentTarget.artifactPath || currentField?.artifactPath || null,
+    receiptOperations: currentTarget.receiptOperations || currentField?.receiptOperations || [],
+    expectedEvidence: currentTarget.expectedEvidence || currentField?.expectedEvidence || null,
+    operatorNote: currentTarget.operatorNote || null,
+    nextAction: `Backfill ${currentTarget.key} into ${filledCloseoutInputFile || "filled-closeout-input.json"}, then reload closeout input.`
+  } : null;
+  return {
+    mode: "closeout-backfill-focus",
+    status,
+    willModifyData: false,
+    closeoutReviewStatus: closeoutReview.status || "not_loaded",
+    missingFieldCount: closeoutReview.missingFieldCount ?? missingBackfillKeys.length,
+    missingBackfillKeys,
+    currentBackfillTarget,
+    paths: {
+      closeoutTemplateFile,
+      filledCloseoutDraftFile,
+      filledCloseoutInputFile,
+      closeoutReloadPacketFile
+    },
+    reloadCommand,
+    fullTestWindow: {
+      status: fullTestWindow.status || "blocked",
+      canRun: fullTestWindow.canRun === true,
+      command: fullTestWindow.command || "npm.cmd test",
+      missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
+      nextAction: fullTestWindow.nextAction || null
+    },
+    productionSignoff: {
+      status: productionSignoff.status || "blocked",
+      canSignoff: productionSignoff.canSignoff === true,
+      requiredDecision: productionSignoff.requiredDecision || null,
+      missingSignoffKeys: productionSignoff.missingSignoffKeys || [],
+      missingReceiptVisibilityKeys: productionSignoff.missingReceiptVisibilityKeys || [],
+      nextAction: productionSignoff.nextAction || null
+    },
+    nextAction: fullTestWindow.canRun === true
+      ? "Run the reserved full test window, then backfill production sign-off evidence."
+      : "Backfill the current closeout target, save filled-closeout-input.json, and reload it before the full test window."
+  };
+}
+
 function buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch = false, routes = {} } = {}) {
   const archiveRoot = result.stagingAcceptanceCloseout?.artifactReceiptLedger?.archiveRoot || path.posix.join(
     "artifacts",
@@ -3890,6 +3988,7 @@ function buildStagingOperatorExecutionPlan(result) {
     readinessGaps,
     realStagingInputClosure,
     goLiveOperatorActionPlan,
+    closeoutBackfillFocus: buildCloseoutBackfillFocus(result, { outputFiles }),
     orderedSteps: [
       {
         key: "review_generated_bundle",
@@ -4796,6 +4895,18 @@ function renderOperatorExecutionPlan(plan) {
     for (const phase of goLiveActionPlan.phaseSummary) {
       lines.push(`  - Operator phase ${phase.phase || "-"}: ready=${phase.readyCount ?? 0}, blocked=${phase.blockedCount ?? 0}`);
     }
+  }
+  if (plan.closeoutBackfillFocus) {
+    const focus = plan.closeoutBackfillFocus;
+    const current = focus.currentBackfillTarget || {};
+    lines.push(`- Closeout backfill focus: ${focus.status || "-"} (missing=${focus.missingFieldCount ?? "-"}, current=${current.key || "-"})`);
+    lines.push(`- Closeout reload command: \`${focus.reloadCommand || "-"}\``);
+    lines.push(`- Current closeout source step: ${current.sourceStep || "-"}`);
+    lines.push(`- Current closeout artifact: ${current.artifactPath || "-"}`);
+    lines.push(`- Filled closeout input: ${focus.paths?.filledCloseoutInputFile || "-"}`);
+    lines.push(`- Full test focus: ${focus.fullTestWindow?.status || "-"} (canRun=${focus.fullTestWindow?.canRun ? "yes" : "no"}, command=${focus.fullTestWindow?.command || "-"})`);
+    lines.push(`- Production sign-off focus: ${focus.productionSignoff?.status || "-"} (canSignoff=${focus.productionSignoff?.canSignoff ? "yes" : "no"})`);
+    lines.push(`- Closeout focus next action: ${focus.nextAction || "-"}`);
   }
   if (Array.isArray(realClosure.checks) && realClosure.checks.length) {
     lines.push("- Operator real staging input checks:");

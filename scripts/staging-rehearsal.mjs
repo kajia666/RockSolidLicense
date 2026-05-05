@@ -3799,6 +3799,7 @@ function buildStagingOperatorExecutionPlan(result) {
   const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
     ? result.evidenceActionPlan.items.map((item) => item.operation).filter(Boolean)
     : [];
+  const goLiveOperatorActionPlan = result.finalRehearsalPacket?.goLiveOperatorActionPlan || null;
   const outputFiles = [
     {
       key: "handoff_file",
@@ -3886,6 +3887,7 @@ function buildStagingOperatorExecutionPlan(result) {
       nextAction: "Resolve readinessGaps in order before live-write smoke, full test window, or production sign-off."
     },
     readinessGaps,
+    goLiveOperatorActionPlan,
     orderedSteps: [
       {
         key: "review_generated_bundle",
@@ -4769,6 +4771,7 @@ function renderOperatorExecutionPlan(plan) {
   if (!plan) {
     return "- Not available";
   }
+  const goLiveActionPlan = plan.goLiveOperatorActionPlan || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Writes data: ${plan.willModifyData ? "yes" : "no"}`,
@@ -4780,8 +4783,16 @@ function renderOperatorExecutionPlan(plan) {
     `- Production sign-off decision: ${plan.productionSignoff?.requiredDecision || "-"}`,
     `- Readiness status: ${plan.readinessSummary?.status || "-"}`,
     `- Readiness gap count: ${plan.readinessSummary?.gapCount ?? "-"}`,
+    `- Operator go-live action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
+    `- Operator current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Next action: ${plan.nextAction || "-"}`
   ];
+  if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
+    lines.push("- Operator go-live phases:");
+    for (const phase of goLiveActionPlan.phaseSummary) {
+      lines.push(`  - Operator phase ${phase.phase || "-"}: ready=${phase.readyCount ?? 0}, blocked=${phase.blockedCount ?? 0}`);
+    }
+  }
   if (Array.isArray(plan.outputFiles) && plan.outputFiles.length) {
     lines.push("- Output files:");
     for (const file of plan.outputFiles) {

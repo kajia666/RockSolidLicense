@@ -234,6 +234,17 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.operatorExecutionPlan.status, "ready_for_staging_execution");
   assert.equal(output.operatorExecutionPlan.willModifyData, false);
   assert.equal(output.operatorExecutionPlan.trigger, "no-write-rehearsal-gates-passed");
+  assert.equal(output.operatorExecutionPlan.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
+  assert.equal(output.operatorExecutionPlan.goLiveOperatorActionPlan.remainingActionCount, 8);
+  assert.deepEqual(
+    output.operatorExecutionPlan.goLiveOperatorActionPlan.phaseSummary.map((item) => [item.phase, item.readyCount, item.blockedCount]),
+    [
+      ["real_staging_inputs", 1, 3],
+      ["full_test_window_entry", 0, 2],
+      ["production_signoff", 0, 1],
+      ["launch_watch_and_stabilization", 0, 2]
+    ]
+  );
   assert.deepEqual(
     output.operatorExecutionPlan.outputFiles.map((item) => [item.key, item.status]),
     [
@@ -1884,6 +1895,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /blocked_until_full_test_window/);
     assert.match(handoff, /ready-for-production-signoff/);
     assert.match(handoff, /## Operator Execution Plan/);
+    assert.match(handoff, /Operator go-live action plan: status=blocked_until_real_staging_inputs, remaining=8/);
+    assert.match(handoff, /Operator current go-live action: staging_profile \(phase=real_staging_inputs, kind=load_profile\)/);
+    assert.match(handoff, /Operator phase real_staging_inputs: ready=1, blocked=3/);
     assert.match(handoff, /review_generated_bundle/);
     assert.match(handoff, /backfill_closeout_template/);
     assert.match(handoff, /production_signoff_review/);
@@ -2103,6 +2117,8 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.finalRehearsalPacket.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
     assert.equal(template.finalRehearsalPacket.goLiveOperatorActionPlan.actions.find((item) => item.key === "production_signoff").phase, "production_signoff");
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
+    assert.equal(template.operatorExecutionPlan.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
+    assert.equal(template.operatorExecutionPlan.goLiveOperatorActionPlan.remainingActionCount, 8);
     assert.equal(
       template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,
       "written"

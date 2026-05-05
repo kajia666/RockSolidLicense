@@ -316,6 +316,32 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.fullTestWindow.canRun, false);
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.fullTestWindow.command, "npm.cmd test");
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.productionSignoff.canSignoff, false);
+  assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.mode, "launch-duty-packet-focus");
+  assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.key, "closeout_reload_packet");
+  assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.status, "awaiting_closeout_backfill");
+  assert.equal(
+    output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.path,
+    "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json"
+  );
+  assert.equal(
+    output.operatorExecutionPlan.launchDutyPacketFocus.archiveIndexPath,
+    "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json"
+  );
+  assert.deepEqual(
+    output.operatorExecutionPlan.launchDutyPacketFocus.packetSequence.map((item) => [item.key, item.status]),
+    [
+      ["run_record_index", "awaiting_evidence_backfill"],
+      ["artifact_manifest", "awaiting_artifact_generation"],
+      ["backup_restore_packet", "awaiting_backup_restore_drill"],
+      ["closeout_reload_packet", "awaiting_closeout_backfill"],
+      ["readiness_review_packet", "blocked_until_closeout_reload"],
+      ["production_signoff_packet", "blocked_until_closeout_reload"]
+    ]
+  );
+  assert.equal(
+    output.operatorExecutionPlan.launchDutyPacketFocus.commands.closeoutReload,
+    "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+  );
   assert.equal(output.operatorExecutionPlan.fullTestWindow.command, "npm.cmd test");
   assert.equal(output.operatorExecutionPlan.productionSignoff.requiredDecision, "ready-for-production-signoff");
   assert.deepEqual(output.fullTestWindowReadiness, {
@@ -1938,6 +1964,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Closeout backfill focus: awaiting_closeout_backfill \(missing=7, current=route_map_gate_result\)/);
     assert.match(handoff, /Closeout reload command: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`/);
     assert.match(handoff, /Current closeout artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
+    assert.match(handoff, /Launch-duty packet focus: closeout_reload_packet \(awaiting_closeout_backfill\)/);
+    assert.match(handoff, /Launch-duty current packet path: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-reload-packet\.json/);
+    assert.match(handoff, /Launch-duty packet sequence: run_record_index -> artifact_manifest -> backup_restore_packet -> closeout_reload_packet -> readiness_review_packet -> production_signoff_packet/);
     assert.match(handoff, /review_generated_bundle/);
     assert.match(handoff, /backfill_closeout_template/);
     assert.match(handoff, /production_signoff_review/);
@@ -2170,6 +2199,15 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       template.operatorExecutionPlan.closeoutBackfillFocus.reloadCommand,
       "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
     );
+    assert.equal(template.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.key, "closeout_reload_packet");
+    assert.equal(
+      template.operatorExecutionPlan.launchDutyPacketFocus.archiveIndexPath,
+      "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json"
+    );
+    assert.equal(
+      template.operatorExecutionPlan.launchDutyPacketFocus.packetSequence.find((item) => item.key === "readiness_review_packet").path,
+      "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json"
+    );
     assert.equal(
       template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,
       "written"
@@ -2312,6 +2350,8 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.missingFieldCount, 0);
     assert.deepEqual(output.operatorExecutionPlan.closeoutBackfillFocus.missingBackfillKeys, []);
     assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget, null);
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.key, "readiness_review_packet");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.status, "ready_for_full_test_window");
     assert.equal(output.fullTestWindowReadiness.status, "ready");
     assert.equal(output.fullTestWindowReadiness.canRun, true);
     assert.deepEqual(output.fullTestWindowReadiness.missingCloseoutKeys, []);

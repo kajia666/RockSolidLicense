@@ -2652,6 +2652,63 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
   };
 }
 
+function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {}) {
+  const archiveIndex = result.stagingLaunchDutyArchiveIndex || buildStagingLaunchDutyArchiveIndex(result);
+  const packetSequence = Array.isArray(archiveIndex.packets) ? archiveIndex.packets : [];
+  const focus = closeoutBackfillFocus || buildCloseoutBackfillFocus(result);
+  let currentPacketKey = "closeout_reload_packet";
+  if (focus.fullTestWindow?.canRun === true && focus.productionSignoff?.canSignoff !== true) {
+    currentPacketKey = "readiness_review_packet";
+  } else if (focus.productionSignoff?.canSignoff === true && result.launchDayWatchPlan?.canStartCutoverWatch !== true) {
+    currentPacketKey = "production_signoff_packet";
+  } else if (result.launchDayWatchPlan?.canStartCutoverWatch === true) {
+    currentPacketKey = "launch_duty_archive_index";
+  }
+  const packetNextActions = new Map([
+    ["run_record_index", result.stagingRehearsalRunRecordIndex?.nextAction],
+    ["artifact_manifest", result.stagingArtifactManifest?.nextAction],
+    ["backup_restore_packet", result.stagingBackupRestoreDrillPacket?.nextAction],
+    ["closeout_reload_packet", result.stagingCloseoutReloadPacket?.nextAction || focus.nextAction],
+    ["readiness_review_packet", result.stagingReadinessReviewPacket?.nextAction],
+    ["production_signoff_packet", result.stagingProductionSignoffPacket?.nextAction],
+    ["launch_duty_archive_index", archiveIndex.nextAction]
+  ]);
+  const archivePacket = {
+    key: "launch_duty_archive_index",
+    status: archiveIndex.status || "not_available",
+    path: archiveIndex.indexFile || null
+  };
+  const currentPacket = currentPacketKey === "launch_duty_archive_index"
+    ? archivePacket
+    : findKeyedItem(packetSequence, currentPacketKey) || { key: currentPacketKey, status: "not_available", path: null };
+  const enrichedCurrentPacket = {
+    ...currentPacket,
+    nextAction: packetNextActions.get(currentPacketKey) || archiveIndex.nextAction || focus.nextAction || null
+  };
+  return {
+    mode: "launch-duty-packet-focus",
+    status: enrichedCurrentPacket.status || "not_available",
+    willModifyData: false,
+    archiveRoot: archiveIndex.archiveRoot || null,
+    archiveIndexPath: archiveIndex.indexFile || null,
+    currentPacket: enrichedCurrentPacket,
+    packetSequence,
+    controlPaths: {
+      runRecordIndex: keyedPath(packetSequence, "run_record_index"),
+      closeoutReloadPacket: keyedPath(packetSequence, "closeout_reload_packet"),
+      readinessReviewPacket: keyedPath(packetSequence, "readiness_review_packet"),
+      productionSignoffPacket: keyedPath(packetSequence, "production_signoff_packet"),
+      launchDutyArchiveIndex: archiveIndex.indexFile || null
+    },
+    commands: {
+      stagingDryRun: archiveIndex.commands?.stagingDryRun || null,
+      closeoutReload: archiveIndex.commands?.closeoutReload || focus.reloadCommand || null,
+      fullTestWindow: archiveIndex.commands?.fullTestWindow || focus.fullTestWindow?.command || "npm.cmd test"
+    },
+    nextAction: enrichedCurrentPacket.nextAction || null
+  };
+}
+
 function buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch = false, routes = {} } = {}) {
   const archiveRoot = result.stagingAcceptanceCloseout?.artifactReceiptLedger?.archiveRoot || path.posix.join(
     "artifacts",
@@ -3972,6 +4029,8 @@ function buildStagingOperatorExecutionPlan(result) {
     }
   ];
   const readinessGaps = buildOperatorReadinessGaps(result, { closeout, outputFiles });
+  const closeoutBackfillFocus = buildCloseoutBackfillFocus(result, { outputFiles });
+  const launchDutyPacketFocus = buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus });
   return {
     status: "ready_for_staging_execution",
     willModifyData: false,
@@ -3988,7 +4047,8 @@ function buildStagingOperatorExecutionPlan(result) {
     readinessGaps,
     realStagingInputClosure,
     goLiveOperatorActionPlan,
-    closeoutBackfillFocus: buildCloseoutBackfillFocus(result, { outputFiles }),
+    closeoutBackfillFocus,
+    launchDutyPacketFocus,
     orderedSteps: [
       {
         key: "review_generated_bundle",
@@ -4907,6 +4967,16 @@ function renderOperatorExecutionPlan(plan) {
     lines.push(`- Full test focus: ${focus.fullTestWindow?.status || "-"} (canRun=${focus.fullTestWindow?.canRun ? "yes" : "no"}, command=${focus.fullTestWindow?.command || "-"})`);
     lines.push(`- Production sign-off focus: ${focus.productionSignoff?.status || "-"} (canSignoff=${focus.productionSignoff?.canSignoff ? "yes" : "no"})`);
     lines.push(`- Closeout focus next action: ${focus.nextAction || "-"}`);
+  }
+  if (plan.launchDutyPacketFocus) {
+    const focus = plan.launchDutyPacketFocus;
+    const current = focus.currentPacket || {};
+    const packetKeys = (focus.packetSequence || []).map((item) => item.key).filter(Boolean);
+    lines.push(`- Launch-duty packet focus: ${current.key || "-"} (${current.status || "-"})`);
+    lines.push(`- Launch-duty current packet path: ${current.path || "-"}`);
+    lines.push(`- Launch-duty archive index: ${focus.archiveIndexPath || "-"}`);
+    lines.push(`- Launch-duty packet sequence: ${packetKeys.join(" -> ")}`);
+    lines.push(`- Launch-duty packet next action: ${focus.nextAction || "-"}`);
   }
   if (Array.isArray(realClosure.checks) && realClosure.checks.length) {
     lines.push("- Operator real staging input checks:");

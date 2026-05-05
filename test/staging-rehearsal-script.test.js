@@ -937,21 +937,21 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
   );
   assert.deepEqual(
-    output.finalRehearsalPacket.localFiles.map((item) => [item.key, item.path]),
+    output.finalRehearsalPacket.localFiles.map((item) => [item.key, item.path, item.status]),
     [
-      ["handoff_file", null],
-      ["closeout_file", null],
-      ["run_record_index", null],
-      ["artifact_manifest", null],
-      ["backup_restore_packet", null],
-      ["closeout_reload_packet", null],
-      ["readiness_review_packet", null],
-      ["production_signoff_packet", null],
-      ["launch_duty_archive_index", null],
-      ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"],
-      ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json"],
-      ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json"],
-      ["artifact_archive_root", "artifacts/staging/PILOT_ALPHA/stable"]
+      ["handoff_file", "artifacts/staging/PILOT_ALPHA/stable/staging-rehearsal-handoff.md", "recommended_default"],
+      ["closeout_file", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json", "recommended_default"],
+      ["run_record_index", "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json", "recommended_default"],
+      ["artifact_manifest", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json", "recommended_default"],
+      ["backup_restore_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-backup-restore-drill-packet.json", "recommended_default"],
+      ["closeout_reload_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json", "recommended_default"],
+      ["readiness_review_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json", "recommended_default"],
+      ["production_signoff_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json", "recommended_default"],
+      ["launch_duty_archive_index", "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json", "recommended_default"],
+      ["filled_closeout_input", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json", "operator_create"],
+      ["filled_closeout_draft", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json", "example_only"],
+      ["filled_closeout_input_example", "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.example.json", "example_only"],
+      ["artifact_archive_root", "artifacts/staging/PILOT_ALPHA/stable", "operator_archive"]
     ]
   );
   assert.deepEqual(
@@ -1653,6 +1653,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Review status: not_loaded/);
     assert.match(handoff, /## Final Rehearsal Packet/);
     assert.match(handoff, /Packet status: ready_for_operator_rehearsal/);
+    assert.match(handoff, /Local files:/);
+    assert.match(handoff, /run_record_index: recommended_default -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json/);
+    assert.match(handoff, /production_signoff_packet: recommended_default -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(handoff, /launch_duty_archive_index: recommended_default -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Filled closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(handoff, /Closeout review: not_loaded \(missing=7, safeForFullTest=no\)/);
     assert.match(handoff, /Ordered packet steps: generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, run_live_write_smoke, record_launch_mainline_evidence, backfill_filled_closeout_input, reload_closeout_input, run_full_test_window, production_signoff_review, launch_day_watch, stabilization_handoff/);

@@ -2890,12 +2890,21 @@ function buildLaunchRehearsalBundle(result) {
 function buildFinalRehearsalPacket(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
+  const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
   const filledExample = result.filledCloseoutInputExample || buildFilledCloseoutInputExample({
     ...result,
     stagingRunRecordTemplate: runTemplate
   });
   const archiveRoot = runTemplate.archiveRoot || "artifacts/staging/product/stable";
   const filledCloseoutInputPath = path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const finalLocalFile = (key, outputFile = null, fallbackPath = null, fallbackStatus = "not_requested") => {
+    const bindingFile = bindingFiles.get(key) || {};
+    return {
+      key,
+      path: outputFile?.path || bindingFile.path || fallbackPath || null,
+      status: outputFile ? fileOutputStatus(outputFile) : bindingFile.status || fallbackStatus
+    };
+  };
   const sourceReadiness = runTemplate.sourceReadiness || {
     fullTestWindow: result.fullTestWindowReadiness?.status || "not_available",
     productionSignoff: result.productionSignoffReadiness?.status || "not_available",
@@ -2992,71 +3001,24 @@ function buildFinalRehearsalPacket(result) {
       fullTestWindow: closeout.fullTestWindowEntry?.command || "npm.cmd test"
     },
     localFiles: [
-      {
-        key: "handoff_file",
-        path: result.handoffFile?.path || null,
-        status: fileOutputStatus(result.handoffFile)
-      },
-      {
-        key: "closeout_file",
-        path: result.closeoutFile?.path || null,
-        status: fileOutputStatus(result.closeoutFile)
-      },
-      {
-        key: "run_record_index",
-        path: result.runRecordFile?.path || null,
-        status: fileOutputStatus(result.runRecordFile)
-      },
-      {
-        key: "artifact_manifest",
-        path: result.artifactManifestFile?.path || null,
-        status: fileOutputStatus(result.artifactManifestFile)
-      },
-      {
-        key: "backup_restore_packet",
-        path: result.backupRestorePacketFile?.path || null,
-        status: fileOutputStatus(result.backupRestorePacketFile)
-      },
-      {
-        key: "closeout_reload_packet",
-        path: result.closeoutReloadPacketFile?.path || null,
-        status: fileOutputStatus(result.closeoutReloadPacketFile)
-      },
-      {
-        key: "readiness_review_packet",
-        path: result.readinessReviewPacketFile?.path || null,
-        status: fileOutputStatus(result.readinessReviewPacketFile)
-      },
-      {
-        key: "production_signoff_packet",
-        path: result.productionSignoffPacketFile?.path || null,
-        status: fileOutputStatus(result.productionSignoffPacketFile)
-      },
-      {
-        key: "launch_duty_archive_index",
-        path: result.launchDutyArchiveIndexFile?.path || null,
-        status: fileOutputStatus(result.launchDutyArchiveIndexFile)
-      },
-      {
-        key: "filled_closeout_input",
-        path: filledCloseoutInputPath,
-        status: "operator_copy_from_example"
-      },
-      {
-        key: "filled_closeout_draft",
-        path: result.filledCloseoutDraftFile?.path || result.filledCloseoutInputDraft?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.draft.json"),
-        status: result.filledCloseoutDraftFile ? fileOutputStatus(result.filledCloseoutDraftFile) : "example_only"
-      },
-      {
-        key: "filled_closeout_input_example",
-        path: filledExample.saveAs || null,
-        status: "example_only"
-      },
-      {
-        key: "artifact_archive_root",
-        path: archiveRoot,
-        status: "operator_archive"
-      }
+      finalLocalFile("handoff_file", result.handoffFile),
+      finalLocalFile("closeout_file", result.closeoutFile),
+      finalLocalFile("run_record_index", result.runRecordFile),
+      finalLocalFile("artifact_manifest", result.artifactManifestFile),
+      finalLocalFile("backup_restore_packet", result.backupRestorePacketFile),
+      finalLocalFile("closeout_reload_packet", result.closeoutReloadPacketFile),
+      finalLocalFile("readiness_review_packet", result.readinessReviewPacketFile),
+      finalLocalFile("production_signoff_packet", result.productionSignoffPacketFile),
+      finalLocalFile("launch_duty_archive_index", result.launchDutyArchiveIndexFile),
+      finalLocalFile("filled_closeout_input", null, filledCloseoutInputPath, "operator_copy_from_example"),
+      finalLocalFile(
+        "filled_closeout_draft",
+        result.filledCloseoutDraftFile,
+        result.filledCloseoutInputDraft?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.draft.json"),
+        "example_only"
+      ),
+      finalLocalFile("filled_closeout_input_example", null, filledExample.saveAs || null, "example_only"),
+      finalLocalFile("artifact_archive_root", null, archiveRoot, "operator_archive")
     ],
     orderedSteps,
     nextAction: readyForLaunchDayWatch
@@ -4870,7 +4832,7 @@ function renderFinalRehearsalPacket(packet) {
   }
   const fileByKey = new Map((packet.localFiles || []).map((item) => [item.key, item]));
   const review = packet.closeoutInputReview || {};
-  return [
+  const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
     `- Environment binding status: ${packet.environmentBindingStatus || "-"}`,
@@ -4891,7 +4853,14 @@ function renderFinalRehearsalPacket(packet) {
     `- Closeout review: ${review.status || "-"} (missing=${review.missingFieldCount ?? 0}, safeForFullTest=${review.safeToEnterFullTestWindow ? "yes" : "no"})`,
     `- Ordered packet steps: ${(packet.orderedSteps || []).map((item) => item.key).join(", ") || "-"}`,
     `- Next action: ${packet.nextAction || "-"}`
-  ].join("\n");
+  ];
+  if (Array.isArray(packet.localFiles) && packet.localFiles.length) {
+    lines.push("- Local files:");
+    for (const file of packet.localFiles) {
+      lines.push(`  - ${file.key || "-"}: ${file.status || "-"} -> ${file.path || "-"}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 function renderProductionSignoffConditions(signoff) {

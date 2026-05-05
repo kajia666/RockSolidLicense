@@ -4418,6 +4418,15 @@ function buildLaunchOpsOverviewActionContext({
     : readiness?.firstWaveLifecycle && typeof readiness.firstWaveLifecycle === "object"
       ? readiness.firstWaveLifecycle
       : null;
+  const productionSignoffPacket = overview?.productionSignoffPacket
+    || readiness?.productionSignoffPacket
+    || watchPanel?.productionSignoffPacket
+    || null;
+  const launchDayWatchEntry = overview?.launchDayWatchEntry
+    || readiness?.launchDayWatchEntry
+    || watchPanel?.launchDayWatchEntry
+    || watchPanel?.watchEntry
+    || null;
   return normalizeLaunchOpsOverviewContext({
     version: "launch-ops-overview-action-context/v1",
     kind: "launch_ops_overview_status",
@@ -4426,6 +4435,8 @@ function buildLaunchOpsOverviewActionContext({
     receiptVisibilityStatus: overview?.receiptVisibilityStatus || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    productionSignoffPacket,
+    launchDayWatchEntry,
     nextActionKey: overview?.nextAction?.key || readiness?.nextActionKey || watchPanel?.nextActionKey || null,
     nextActionOperation: readiness?.nextActionOperation || watchPanel?.nextActionOperation || null,
     firstWaveLifecycleStatus: overview?.firstWaveLifecycleStatus || readiness?.firstWaveLifecycleStatus || firstWaveLifecycle?.status || null,
@@ -4457,6 +4468,10 @@ function formatLaunchWorkflowActionContextText(context = null) {
       `next=${context.nextActionKey || context.nextActionOperation || "-"}`,
       `downloadFormat=${context.downloadFormat || context.overviewDownload?.format || "-"}`
     ];
+    if (context.productionSignoffPacket || context.launchDayWatchEntry) {
+      segments.push(`productionSignoffPacket=${context.productionSignoffPacket || "-"}`);
+      segments.push(`launchDayWatchEntry=${context.launchDayWatchEntry || "-"}`);
+    }
     if (context.firstWaveLifecycleStatus
       || context.firstWaveLifecycleNextOperation
       || context.firstWaveLifecyclePrimaryDownloadKey) {

@@ -6377,6 +6377,14 @@ test("developer release package export bundles integration, versions, and notice
         launchReviewOpsOverviewAction.context.watchRecordDraftRecordCount,
         launchReview.reviewSummary.launchOperationsOverviewStatus?.watchRecordDraftRecordCount ?? null
       );
+      assert.equal(
+        launchReviewOpsOverviewAction.context.productionSignoffPacket,
+        launchReview.reviewSummary.launchOperationsOverviewStatus?.productionSignoffPacket || null
+      );
+      assert.equal(
+        launchReviewOpsOverviewAction.context.launchDayWatchEntry,
+        launchReview.reviewSummary.launchOperationsOverviewStatus?.launchDayWatchEntry || null
+      );
       assert.equal(launchReviewOpsOverviewAction.context.downloadFormat, "launch-operations-overview-status");
       assert.ok(launchReview.reviewSummary.actionPlan.some((item) =>
         item.key === "launch_review_launch_ops_overview"
@@ -6394,6 +6402,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReview.summaryText, /overviewStatus=.*receipt=/);
       assert.match(launchReview.summaryText, /format=launch-operations-overview-status/);
       assert.match(launchReview.summaryText, /context=launch_ops_overview_status .*watchRecordDraft=/);
+      assert.match(launchReview.summaryText, /context=launch_ops_overview_status .*productionSignoffPacket=artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+      assert.match(launchReview.summaryText, /context=launch_ops_overview_status .*launchDayWatchEntry=enter_after_production_signoff/);
       assert.match(launchReview.summaryText, /Launch Review Recommended Downloads:/);
 
       const launchReviewSummaryDownload = await getText(
@@ -6424,6 +6434,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /download=launch_review_post_launch_sweep_handoff \| href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
       assert.match(launchReviewSummaryDownload.body, /control: Download Review Summary \| download=.*href=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
       assert.match(launchReviewSummaryDownload.body, /context=launch_ops_overview_status .*downloadFormat=launch-operations-overview-status/);
+      assert.match(launchReviewSummaryDownload.body, /context=launch_ops_overview_status .*productionSignoffPacket=artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+      assert.match(launchReviewSummaryDownload.body, /context=launch_ops_overview_status .*launchDayWatchEntry=enter_after_production_signoff/);
       assert.match(launchReviewSummaryDownload.body, /source=launch-smoke/);
       assert.match(launchReviewSummaryDownload.body, /handoff=first-wave/);
 

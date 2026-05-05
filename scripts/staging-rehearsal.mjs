@@ -1138,6 +1138,66 @@ function buildStagingBackupRestoreDrillPacket(result) {
   };
 }
 
+function buildPostSignoffActionChecklist(result, overrides = {}) {
+  const existingTargets = result.stagingLaunchDutyArchiveIndex?.signoffTargets
+    || result.stagingProductionSignoffPacket?.postSignoffTargets;
+  if (Array.isArray(existingTargets) && existingTargets.length) {
+    return existingTargets.map((item) => ({
+      key: item.key || null,
+      status: item.status || "not_available",
+      path: item.path || null
+    }));
+  }
+
+  const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
+  const productionSignoff = result.productionSignoffReadiness || {};
+  const launchDayWatch = result.launchDayWatchPlan || {};
+  const watchRecordByKey = new Map((launchDayWatch.watchRecordDraft?.records || []).map((item) => [item.key, item]));
+  const archiveRoot = overrides.archiveRoot
+    || result.stagingReadinessReviewPacket?.archiveRoot
+    || result.stagingRehearsalRunRecordIndex?.archiveRoot
+    || result.finalRehearsalPacket?.archiveRoot
+    || result.stagingRunRecordTemplate?.archiveRoot
+    || "artifacts/staging/product/stable";
+  const productionSignoffPacketPath = overrides.productionSignoffPacketPath
+    || result.productionSignoffPacketFile?.path
+    || bindingFiles.get("production_signoff_packet")?.path
+    || path.posix.join(archiveRoot, "staging-production-signoff-packet.json");
+  const launchDutyArchiveIndexPath = overrides.launchDutyArchiveIndexPath
+    || result.launchDutyArchiveIndexFile?.path
+    || bindingFiles.get("launch_duty_archive_index")?.path
+    || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
+  const canSignoff = productionSignoff.canSignoff === true;
+  const canStartCutoverWatch = launchDayWatch.canStartCutoverWatch === true;
+  return [
+    {
+      key: "production_signoff_packet",
+      status: canSignoff ? "archive_before_cutover" : "blocked_until_signoff_ready",
+      path: productionSignoffPacketPath
+    },
+    {
+      key: "launch_day_watch_summary",
+      status: canStartCutoverWatch ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
+      path: watchRecordByKey.get("launch_day_watch_summary")?.artifactPath || path.posix.join(archiveRoot, "launch-day-watch-summary.md")
+    },
+    {
+      key: "receipt_visibility_snapshot",
+      status: canStartCutoverWatch ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
+      path: watchRecordByKey.get("receipt_visibility_snapshot")?.artifactPath || path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt")
+    },
+    {
+      key: "launch_duty_archive_index",
+      status: canSignoff ? "archive_with_signoff" : "blocked_until_signoff_ready",
+      path: launchDutyArchiveIndexPath
+    },
+    {
+      key: "stabilization_owner_handoff",
+      status: canStartCutoverWatch ? "prepare_after_cutover_watch" : "blocked_until_signoff_ready",
+      path: watchRecordByKey.get("stabilization_owner_handoff")?.artifactPath || path.posix.join(archiveRoot, "stabilization-owner-handoff.md")
+    }
+  ];
+}
+
 function buildStagingProductionSignoffPacket(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
@@ -1161,7 +1221,6 @@ function buildStagingProductionSignoffPacket(result) {
     || runRecordIndex.closeoutProgress?.reloadCommand
     || productionSignoff.reloadCommand
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
-  const watchRecordByKey = new Map((launchDayWatch.watchRecordDraft?.records || []).map((item) => [item.key, item]));
   const launchDutyArchiveIndexPath = result.launchDutyArchiveIndexFile?.path
     || bindingFiles.get("launch_duty_archive_index")?.path
     || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
@@ -1251,33 +1310,11 @@ function buildStagingProductionSignoffPacket(result) {
       launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
       launchOpsOverviewStatus: launchDayWatch.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
     },
-    postSignoffTargets: [
-      {
-        key: "production_signoff_packet",
-        status: canSignoff ? "archive_before_cutover" : "blocked_until_signoff_ready",
-        path: packetFile
-      },
-      {
-        key: "launch_day_watch_summary",
-        status: launchDayWatch.canStartCutoverWatch === true ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
-        path: watchRecordByKey.get("launch_day_watch_summary")?.artifactPath || path.posix.join(archiveRoot, "launch-day-watch-summary.md")
-      },
-      {
-        key: "receipt_visibility_snapshot",
-        status: launchDayWatch.canStartCutoverWatch === true ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
-        path: watchRecordByKey.get("receipt_visibility_snapshot")?.artifactPath || path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt")
-      },
-      {
-        key: "launch_duty_archive_index",
-        status: canSignoff ? "archive_with_signoff" : "blocked_until_signoff_ready",
-        path: launchDutyArchiveIndexPath
-      },
-      {
-        key: "stabilization_owner_handoff",
-        status: launchDayWatch.canStartCutoverWatch === true ? "prepare_after_cutover_watch" : "blocked_until_signoff_ready",
-        path: watchRecordByKey.get("stabilization_owner_handoff")?.artifactPath || path.posix.join(archiveRoot, "stabilization-owner-handoff.md")
-      }
-    ],
+    postSignoffTargets: buildPostSignoffActionChecklist(result, {
+      archiveRoot,
+      productionSignoffPacketPath: packetFile,
+      launchDutyArchiveIndexPath
+    }),
     commands: {
       closeoutReload,
       fullTestWindow: fullTestWindow.command || readinessReviewPacket.commands?.fullTestWindow || "npm.cmd test"
@@ -3068,6 +3105,7 @@ function buildFinalRehearsalPacket(result) {
       finalLocalFile("filled_closeout_input_example", null, filledExample.saveAs || null, "example_only"),
       finalLocalFile("artifact_archive_root", null, archiveRoot, "operator_archive")
     ],
+    postSignoffActionChecklist: buildPostSignoffActionChecklist(result, { archiveRoot }),
     orderedSteps,
     nextAction: readyForLaunchDayWatch
       ? "Start launch-day watch and stabilization handoff with the packet artifacts open."
@@ -3450,6 +3488,9 @@ function buildStagingOperatorExecutionPlan(result) {
     closeoutInput: result.closeoutInput || null,
     artifactArchiveRoot: closeout.artifactReceiptLedger?.archiveRoot || null,
     evidenceOperations,
+    postSignoffActionChecklist: buildPostSignoffActionChecklist(result, {
+      archiveRoot: closeout.artifactReceiptLedger?.archiveRoot || result.stagingLaunchDutyArchiveIndex?.archiveRoot
+    }),
     fullTestWindow: closeout.fullTestWindowEntry || null,
     productionSignoff: closeout.productionSignoffConditions || null,
     nextAction: "Run the ordered steps in sequence, then backfill closeout with redacted statuses, receipt IDs, and artifact paths before starting the full test window."
@@ -4195,6 +4236,16 @@ function renderStagingOperatorChecklist(checklist = []) {
     .join("\n");
 }
 
+function appendPostSignoffActionChecklist(lines, checklist) {
+  if (!Array.isArray(checklist) || checklist.length === 0) {
+    return;
+  }
+  lines.push("- Post-signoff action checklist:");
+  for (const item of checklist) {
+    lines.push(`  - ${item.key || "-"}: ${item.status || "-"} -> ${item.path || "-"}`);
+  }
+}
+
 function renderOperatorExecutionPlan(plan) {
   if (!plan) {
     return "- Not available";
@@ -4244,6 +4295,7 @@ function renderOperatorExecutionPlan(plan) {
       lines.push(`    - nextAction: ${gap.nextAction || "-"}`);
     }
   }
+  appendPostSignoffActionChecklist(lines, plan.postSignoffActionChecklist);
   if (Array.isArray(plan.orderedSteps) && plan.orderedSteps.length) {
     lines.push("- Ordered steps:");
     for (const step of plan.orderedSteps) {
@@ -4957,6 +5009,7 @@ function renderFinalRehearsalPacket(packet) {
       lines.push(`  - ${file.key || "-"}: ${file.status || "-"} -> ${file.path || "-"}`);
     }
   }
+  appendPostSignoffActionChecklist(lines, packet.postSignoffActionChecklist);
   return lines.join("\n");
 }
 

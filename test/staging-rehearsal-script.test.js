@@ -998,6 +998,16 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       "stabilization_handoff"
     ]
   );
+  assert.deepEqual(
+    output.finalRehearsalPacket.postSignoffActionChecklist.map((item) => [item.key, item.status, item.path]),
+    [
+      ["production_signoff_packet", "blocked_until_signoff_ready", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"],
+      ["launch_day_watch_summary", "blocked_until_signoff_ready", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+      ["receipt_visibility_snapshot", "blocked_until_signoff_ready", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt"],
+      ["launch_duty_archive_index", "blocked_until_signoff_ready", "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json"],
+      ["stabilization_owner_handoff", "blocked_until_signoff_ready", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+    ]
+  );
   assert.equal(output.finalRehearsalPacket.nextAction, "Generate handoff and closeout files, run the ordered rehearsal steps, then reload the filled closeout input before the full test window.");
   assert.deepEqual(output.operatorExecutionPlan.readinessSummary, {
     status: "needs_operator_input",
@@ -1007,6 +1017,16 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     canSignoffProduction: false,
     nextAction: "Resolve readinessGaps in order before live-write smoke, full test window, or production sign-off."
   });
+  assert.deepEqual(
+    output.operatorExecutionPlan.postSignoffActionChecklist.map((item) => [item.key, item.status]),
+    [
+      ["production_signoff_packet", "blocked_until_signoff_ready"],
+      ["launch_day_watch_summary", "blocked_until_signoff_ready"],
+      ["receipt_visibility_snapshot", "blocked_until_signoff_ready"],
+      ["launch_duty_archive_index", "blocked_until_signoff_ready"],
+      ["stabilization_owner_handoff", "blocked_until_signoff_ready"]
+    ]
+  );
   assert.deepEqual(
     output.operatorExecutionPlan.readinessGaps.map((item) => item.key),
     [
@@ -1702,6 +1722,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Filled closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(handoff, /Closeout review: not_loaded \(missing=7, safeForFullTest=no\)/);
     assert.match(handoff, /Ordered packet steps: generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, run_live_write_smoke, record_launch_mainline_evidence, backfill_filled_closeout_input, reload_closeout_input, run_full_test_window, production_signoff_review, launch_day_watch, stabilization_handoff/);
+    assert.match(handoff, /Post-signoff action checklist:/);
+    assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /## Artifact \/ Receipt Ledger/);
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);
@@ -2469,6 +2492,26 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       launchDayWatch: "ready",
       stabilizationHandoff: "ready"
     });
+    assert.deepEqual(
+      output.finalRehearsalPacket.postSignoffActionChecklist.map((item) => [item.key, item.status]),
+      [
+        ["production_signoff_packet", "archive_before_cutover"],
+        ["launch_day_watch_summary", "record_during_cutover_watch"],
+        ["receipt_visibility_snapshot", "record_during_cutover_watch"],
+        ["launch_duty_archive_index", "archive_with_signoff"],
+        ["stabilization_owner_handoff", "prepare_after_cutover_watch"]
+      ]
+    );
+    assert.deepEqual(
+      output.operatorExecutionPlan.postSignoffActionChecklist.map((item) => [item.key, item.status]),
+      [
+        ["production_signoff_packet", "archive_before_cutover"],
+        ["launch_day_watch_summary", "record_during_cutover_watch"],
+        ["receipt_visibility_snapshot", "record_during_cutover_watch"],
+        ["launch_duty_archive_index", "archive_with_signoff"],
+        ["stabilization_owner_handoff", "prepare_after_cutover_watch"]
+      ]
+    );
     assert.equal(output.stagingRehearsalRunRecordIndex.status, "ready_for_launch_day_watch");
     assert.deepEqual(output.stagingRehearsalRunRecordIndex.signoffProgress.missingSignoffKeys, []);
     assert.deepEqual(output.stagingRehearsalRunRecordIndex.signoffProgress.missingReceiptVisibilityKeys, []);

@@ -1871,6 +1871,7 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       stabilizationHandoff: stabilizationHandoff.status || "not_available",
       finalPacket: finalPacket.status || "not_available"
     },
+    goLiveOperatorActionPlan: finalPacket.goLiveOperatorActionPlan || null,
     packets: [
       {
         key: "run_record_index",
@@ -5313,6 +5314,7 @@ function renderStagingLaunchDutyArchiveIndex(index) {
   const statuses = index.sourceStatuses || {};
   const routes = index.receiptVisibilityRoutes || {};
   const stabilization = index.stabilizationHandoff || {};
+  const goLiveActionPlan = index.goLiveOperatorActionPlan || {};
   const lines = [
     `- Index status: ${index.status || "-"}`,
     `- Writes data by itself: ${index.willModifyData ? "yes" : "no"}`,
@@ -5320,6 +5322,8 @@ function renderStagingLaunchDutyArchiveIndex(index) {
     `- Launch-duty archive index: ${index.indexFile || "-"}`,
     `- Launch day watch status: ${statuses.launchDayWatch || "-"}`,
     `- Stabilization handoff status: ${statuses.stabilizationHandoff || "-"}`,
+    `- Archive go-live action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
+    `- Archive current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
@@ -5331,6 +5335,12 @@ function renderStagingLaunchDutyArchiveIndex(index) {
   ];
   for (const packet of index.packets || []) {
     lines.push(`  - ${packet.key || "-"}: ${packet.status || "-"} -> ${packet.path || "-"}`);
+  }
+  if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
+    lines.push("- Archive go-live phases:");
+    for (const phase of goLiveActionPlan.phaseSummary) {
+      lines.push(`  - ${phase.phase || "-"}: ready=${phase.readyCount ?? 0}, blocked=${phase.blockedCount ?? 0}`);
+    }
   }
   if (Array.isArray(index.signoffTargets) && index.signoffTargets.length) {
     lines.push("- Launch-duty signoff targets:");

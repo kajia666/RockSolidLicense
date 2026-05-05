@@ -666,6 +666,17 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     stabilizationHandoff: "blocked",
     finalPacket: "ready_for_operator_rehearsal"
   });
+  assert.equal(output.stagingLaunchDutyArchiveIndex.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
+  assert.equal(output.stagingLaunchDutyArchiveIndex.goLiveOperatorActionPlan.remainingActionCount, 8);
+  assert.deepEqual(
+    output.stagingLaunchDutyArchiveIndex.goLiveOperatorActionPlan.phaseSummary.map((item) => [item.phase, item.readyCount, item.blockedCount]),
+    [
+      ["real_staging_inputs", 1, 3],
+      ["full_test_window_entry", 0, 2],
+      ["production_signoff", 0, 1],
+      ["launch_watch_and_stabilization", 0, 2]
+    ]
+  );
   assert.deepEqual(
     output.stagingLaunchDutyArchiveIndex.packets.map((item) => [item.key, item.status, item.path]),
     [
@@ -1790,6 +1801,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Launch-duty archive index: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Launch day watch status: blocked/);
     assert.match(handoff, /Stabilization handoff status: blocked/);
+    assert.match(handoff, /Archive go-live action plan: status=blocked_until_real_staging_inputs, remaining=8/);
+    assert.match(handoff, /Archive current go-live action: staging_profile \(phase=real_staging_inputs, kind=load_profile\)/);
+    assert.match(handoff, /real_staging_inputs: ready=1, blocked=3/);
     assert.match(handoff, /Launch Ops overview status: https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=launch-operations-overview-status&limit=20/);
     assert.match(handoff, /launch_day_watch_summary: blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
     assert.match(handoff, /Launch-duty signoff targets:/);

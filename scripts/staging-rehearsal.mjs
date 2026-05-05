@@ -662,6 +662,11 @@ function buildStagingRehearsalExecutionSummary(result) {
       canRunLiveWriteSmoke: profilePreflight.canRunLiveWriteSmoke === true,
       canRecordEvidence: profilePreflight.canRecordEvidence === true,
       canEnterFullTestWindow: closeoutReview.safeToEnterFullTestWindow === true,
+      launchReadinessClosure: buildLaunchReadinessClosure(result, {
+        status,
+        profilePreflight,
+        closeoutReview
+      }),
       launchDutyFocus: buildLaunchDutyOperatorFocus(result, { status, finalPacket })
     },
     blockingReasons,
@@ -1231,6 +1236,71 @@ function buildLaunchDutyOperatorFocus(result, { status = null, finalPacket = nul
     blockedWatchArtifactCount,
     firstPostSignoffAction: checklist[0]?.key || null,
     nextAction
+  };
+}
+
+function buildLaunchReadinessClosure(result, { status = null, profilePreflight = {}, closeoutReview = {} } = {}) {
+  if (status === "ready_for_launch_day_watch") {
+    return {
+      status: "ready_for_launch_day_watch",
+      remainingBlockerCount: 0,
+      remainingBlockers: [],
+      nextAction: "Start launch-day watch and stabilization handoff from the final rehearsal packet."
+    };
+  }
+
+  const remainingBlockers = [];
+  const addBlocker = (key, nextAction, extra = {}) => {
+    remainingBlockers.push({
+      key,
+      status: "blocked",
+      nextAction,
+      ...extra
+    });
+  };
+
+  if (status === "ready_for_full_test_window") {
+    if (result.productionSignoffReadiness?.canSignoff !== true) {
+      addBlocker("production_signoff_not_ready", "Run the full test window, backfill production sign-off evidence, then reload closeout input.");
+    }
+    if (result.launchDayWatchPlan?.canStartCutoverWatch !== true) {
+      addBlocker("launch_day_watch_not_ready", "Complete production sign-off before starting launch-day watch.");
+    }
+    if (result.stabilizationHandoffPlan?.canStartStabilizationHandoff !== true) {
+      addBlocker("stabilization_handoff_not_ready", "Prepare stabilization handoff after cutover watch starts.");
+    }
+    return {
+      status: "awaiting_production_signoff",
+      remainingBlockerCount: remainingBlockers.length,
+      remainingBlockers,
+      nextAction: "Run the full test window and backfill production sign-off before launch-day watch."
+    };
+  }
+
+  if (profilePreflight.status === "profile_not_loaded") {
+    addBlocker("profile_not_loaded", "Load a secret-free staging profile before the real rehearsal.");
+  }
+  if (Array.isArray(profilePreflight.missingSecretEnv) && profilePreflight.missingSecretEnv.length) {
+    addBlocker("missing_secret_env", "Set missing secret environment variables before evidence recording.", {
+      missing: profilePreflight.missingSecretEnv
+    });
+  }
+  if (closeoutReview.safeToEnterFullTestWindow !== true) {
+    addBlocker("closeout_input_not_ready", "Backfill and reload the filled closeout input before the full test window.", {
+      missingFieldCount: closeoutReview.missingFieldCount ?? 0
+    });
+  }
+  if (result.productionSignoffReadiness?.canSignoff !== true) {
+    addBlocker("production_signoff_not_ready", "Run full test and backfill production sign-off evidence.");
+  }
+  if (result.launchDayWatchPlan?.canStartCutoverWatch !== true) {
+    addBlocker("launch_day_watch_not_ready", "Complete production sign-off before starting launch-day watch.");
+  }
+  return {
+    status: "blocked_until_real_staging_inputs",
+    remainingBlockerCount: remainingBlockers.length,
+    remainingBlockers,
+    nextAction: "Set missing secret env, reload filled closeout input, then continue toward production sign-off."
   };
 }
 
@@ -4180,6 +4250,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     return "- Not available";
   }
   const focus = summary.operatorFocus || {};
+  const closure = focus.launchReadinessClosure || {};
   const launchDutyFocus = focus.launchDutyFocus || {};
   const statuses = summary.sourceStatuses || {};
   const lines = [
@@ -4192,7 +4263,9 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Can run live-write smoke: ${focus.canRunLiveWriteSmoke ? "yes" : "no"}`,
     `- Can record evidence: ${focus.canRecordEvidence ? "yes" : "no"}`,
     `- Can enter full test window: ${focus.canEnterFullTestWindow ? "yes" : "no"}`,
+    `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
+    `- Launch closure next action: ${closure.nextAction || "-"}`,
     `- Launch duty next action: ${launchDutyFocus.nextAction || "-"}`,
     `- Ordered next actions: ${(summary.orderedNextActions || []).join(", ") || "-"}`,
     `- Staging dry run: \`${summary.commands?.stagingDryRun || "-"}\``,

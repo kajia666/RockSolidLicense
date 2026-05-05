@@ -1360,6 +1360,15 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canRunDryRun, true);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canRunLiveWriteSmoke, true);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canRecordEvidence, false);
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.status, "blocked_until_real_staging_inputs");
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.remainingBlockers.slice(0, 3).map((item) => item.key),
+      ["missing_secret_env", "closeout_input_not_ready", "production_signoff_not_ready"]
+    );
+    assert.equal(
+      output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.nextAction,
+      "Set missing secret env, reload filled closeout input, then continue toward production sign-off."
+    );
     assert.deepEqual(
       output.stagingRehearsalExecutionSummary.blockingReasons.map((item) => [item.key, item.status]),
       [
@@ -1582,6 +1591,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Profile preflight status: profile_not_loaded/);
     assert.match(handoff, /## Staging Rehearsal Execution Summary/);
     assert.match(handoff, /Execution summary status: profile_not_loaded/);
+    assert.match(handoff, /Launch closure status: blocked_until_real_staging_inputs \(remainingBlockers=5\)/);
     assert.match(handoff, /Launch duty focus: blocked_until_signoff_ready \(postSignoffBlocked=5, watchPending=0\)/);
     assert.match(handoff, /Launch duty next action: Complete production sign-off before starting launch-day watch\./);
     assert.match(handoff, /## Launch Route Map Targeted Gate/);
@@ -2100,6 +2110,11 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.stagingRehearsalExecutionSummary.status, "ready_for_full_test_window");
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.closeoutMissingFieldCount, 0);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canEnterFullTestWindow, true);
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.remainingBlockers.map((item) => item.key),
+      ["production_signoff_not_ready", "launch_day_watch_not_ready", "stabilization_handoff_not_ready"]
+    );
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.status, "awaiting_production_signoff");
     assert.deepEqual(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyFocus, {
       status: "blocked_until_signoff_backfill",
       postSignoffActionCount: 5,
@@ -2515,6 +2530,12 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       blockedWatchArtifactCount: 0,
       firstPostSignoffAction: "production_signoff_packet",
       nextAction: "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."
+    });
+    assert.deepEqual(output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure, {
+      status: "ready_for_launch_day_watch",
+      remainingBlockerCount: 0,
+      remainingBlockers: [],
+      nextAction: "Start launch-day watch and stabilization handoff from the final rehearsal packet."
     });
     assert.deepEqual(
       output.finalRehearsalPacket.postSignoffActionChecklist.map((item) => [item.key, item.status]),

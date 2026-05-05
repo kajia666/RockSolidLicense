@@ -3404,6 +3404,15 @@ function buildFinalRehearsalPacket(result) {
     && sourceReadiness.stabilizationHandoff === "ready";
   const closeoutInputReview = result.stagingExecutionRunbook?.closeoutInputReview
     || summarizeCloseoutInputReview(result.closeoutInput?.backfillReview, closeout);
+  const profilePreflight = result.stagingProfileOperatorPreflight || buildStagingProfileOperatorPreflight(result);
+  const realStagingInputClosure = buildRealStagingInputClosure({
+    profilePreflight,
+    closeoutReview: closeoutInputReview
+  });
+  const goLiveProgress = buildGoLiveProgress({
+    ...result,
+    stagingProfileOperatorPreflight: profilePreflight
+  }, { realStagingInputClosure });
   const orderedSteps = [
     {
       key: "generate_rehearsal_outputs",
@@ -3480,6 +3489,9 @@ function buildFinalRehearsalPacket(result) {
     archiveRoot,
     sourceReadiness,
     closeoutInputReview,
+    goLiveStatus: goLiveProgress.status,
+    goLiveCurrentBlocker: goLiveProgress.currentBlocker,
+    goLiveActionQueue: goLiveProgress.operatorActionQueue,
     commands: {
       stagingRehearsalDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
       routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
@@ -5407,6 +5419,7 @@ function renderFinalRehearsalPacket(packet) {
   }
   const fileByKey = new Map((packet.localFiles || []).map((item) => [item.key, item]));
   const review = packet.closeoutInputReview || {};
+  const goLiveActionQueue = Array.isArray(packet.goLiveActionQueue) ? packet.goLiveActionQueue : [];
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
@@ -5427,8 +5440,16 @@ function renderFinalRehearsalPacket(packet) {
     `- Source readiness: fullTestWindow=${packet.sourceReadiness?.fullTestWindow || "-"}, productionSignoff=${packet.sourceReadiness?.productionSignoff || "-"}, launchDayWatch=${packet.sourceReadiness?.launchDayWatch || "-"}, stabilizationHandoff=${packet.sourceReadiness?.stabilizationHandoff || "-"}`,
     `- Closeout review: ${review.status || "-"} (missing=${review.missingFieldCount ?? 0}, safeForFullTest=${review.safeToEnterFullTestWindow ? "yes" : "no"})`,
     `- Ordered packet steps: ${(packet.orderedSteps || []).map((item) => item.key).join(", ") || "-"}`,
+    `- Final packet go-live current blocker: ${packet.goLiveCurrentBlocker?.key || "-"}`,
     `- Next action: ${packet.nextAction || "-"}`
   ];
+  if (goLiveActionQueue.length) {
+    lines.push("- Final packet go-live action queue:");
+    for (const item of goLiveActionQueue) {
+      const action = item.operatorAction || {};
+      lines.push(`  - ${item.key || "-"}: ${action.kind || "-"} (command=${action.command || "-"}, env=${(action.envKeys || []).join(", ") || "-"}, artifact=${action.artifactPath || "-"})`);
+    }
+  }
   if (Array.isArray(packet.localFiles) && packet.localFiles.length) {
     lines.push("- Local files:");
     for (const file of packet.localFiles) {

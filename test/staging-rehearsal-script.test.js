@@ -1008,6 +1008,16 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["stabilization_owner_handoff", "blocked_until_signoff_ready", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
     ]
   );
+  assert.equal(output.finalRehearsalPacket.goLiveCurrentBlocker.key, "staging_profile");
+  assert.deepEqual(
+    output.finalRehearsalPacket.goLiveActionQueue.slice(0, 4).map((item) => [item.key, item.operatorAction.kind]),
+    [
+      ["staging_profile", "load_profile"],
+      ["required_secret_env", "set_env"],
+      ["artifact_output_paths", "provide_artifact_paths"],
+      ["filled_closeout_input", "create_file"]
+    ]
+  );
   assert.equal(output.finalRehearsalPacket.nextAction, "Generate handoff and closeout files, run the ordered rehearsal steps, then reload the filled closeout input before the full test window.");
   assert.deepEqual(output.operatorExecutionPlan.readinessSummary, {
     status: "needs_operator_input",
@@ -1815,6 +1825,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Filled closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(handoff, /Closeout review: not_loaded \(missing=7, safeForFullTest=no\)/);
     assert.match(handoff, /Ordered packet steps: generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, run_live_write_smoke, record_launch_mainline_evidence, backfill_filled_closeout_input, reload_closeout_input, run_full_test_window, production_signoff_review, launch_day_watch, stabilization_handoff/);
+    assert.match(handoff, /Final packet go-live current blocker: staging_profile/);
+    assert.match(handoff, /Final packet go-live action queue:/);
+    assert.match(handoff, /staging_profile: load_profile \(command=npm\.cmd run staging:rehearsal -- --profile-file <staging-profile\.json>/);
     assert.match(handoff, /Post-signoff action checklist:/);
     assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
@@ -2044,6 +2057,8 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
       template.finalRehearsalPacket.orderedSteps.slice(-3).map((item) => item.key),
       ["production_signoff_review", "launch_day_watch", "stabilization_handoff"]
     );
+    assert.equal(template.finalRehearsalPacket.goLiveCurrentBlocker.key, "staging_profile");
+    assert.equal(template.finalRehearsalPacket.goLiveActionQueue.find((item) => item.key === "filled_closeout_input").operatorAction.kind, "create_file");
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
     assert.equal(
       template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,

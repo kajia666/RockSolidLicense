@@ -1161,6 +1161,10 @@ function buildStagingProductionSignoffPacket(result) {
     || runRecordIndex.closeoutProgress?.reloadCommand
     || productionSignoff.reloadCommand
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
+  const watchRecordByKey = new Map((launchDayWatch.watchRecordDraft?.records || []).map((item) => [item.key, item]));
+  const launchDutyArchiveIndexPath = result.launchDutyArchiveIndexFile?.path
+    || bindingFiles.get("launch_duty_archive_index")?.path
+    || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
   const canRunFullTestWindow = fullTestWindow.canRun === true;
   const canSignoff = productionSignoff.canSignoff === true;
   let status = "blocked_until_closeout_reload";
@@ -1247,6 +1251,33 @@ function buildStagingProductionSignoffPacket(result) {
       launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
       launchOpsOverviewStatus: launchDayWatch.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
     },
+    postSignoffTargets: [
+      {
+        key: "production_signoff_packet",
+        status: canSignoff ? "archive_before_cutover" : "blocked_until_signoff_ready",
+        path: packetFile
+      },
+      {
+        key: "launch_day_watch_summary",
+        status: launchDayWatch.canStartCutoverWatch === true ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
+        path: watchRecordByKey.get("launch_day_watch_summary")?.artifactPath || path.posix.join(archiveRoot, "launch-day-watch-summary.md")
+      },
+      {
+        key: "receipt_visibility_snapshot",
+        status: launchDayWatch.canStartCutoverWatch === true ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
+        path: watchRecordByKey.get("receipt_visibility_snapshot")?.artifactPath || path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt")
+      },
+      {
+        key: "launch_duty_archive_index",
+        status: canSignoff ? "archive_with_signoff" : "blocked_until_signoff_ready",
+        path: launchDutyArchiveIndexPath
+      },
+      {
+        key: "stabilization_owner_handoff",
+        status: launchDayWatch.canStartCutoverWatch === true ? "prepare_after_cutover_watch" : "blocked_until_signoff_ready",
+        path: watchRecordByKey.get("stabilization_owner_handoff")?.artifactPath || path.posix.join(archiveRoot, "stabilization-owner-handoff.md")
+      }
+    ],
     commands: {
       closeoutReload,
       fullTestWindow: fullTestWindow.command || readinessReviewPacket.commands?.fullTestWindow || "npm.cmd test"
@@ -4523,6 +4554,12 @@ function renderStagingProductionSignoffPacket(packet) {
     lines.push("- Operator steps:");
     for (const step of packet.operatorSteps) {
       lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+    }
+  }
+  if (Array.isArray(packet.postSignoffTargets) && packet.postSignoffTargets.length) {
+    lines.push("- Post-signoff targets:");
+    for (const target of packet.postSignoffTargets) {
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
     }
   }
   return lines.join("\n");

@@ -814,6 +814,12 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
   }));
   const readyCheckCount = checks.filter((item) => item.status === "ready").length;
   const blockedQueue = checks.filter((item) => item.status !== "ready");
+  const operatorActionQueue = blockedQueue.map((item) => ({
+    key: item.key,
+    status: item.status,
+    nextAction: item.nextAction,
+    operatorAction: item.operatorAction
+  }));
   const blockedCheckCount = checks.length - readyCheckCount;
   const realInputsReady = realStagingInputClosure.status === "ready_for_real_staging_inputs";
   let status = "ready_for_controlled_pilot_launch";
@@ -847,6 +853,7 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
     scriptReadinessPercent: checks.length ? Math.round((readyCheckCount / checks.length) * 100) : 0,
     checks,
     blockedQueue,
+    operatorActionQueue,
     currentBlocker: blockedQueue[0] || null,
     nextAction
   };
@@ -4573,6 +4580,13 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Next action: ${summary.nextAction || "-"}`
   ];
   if (Array.isArray(summary.blockingReasons) && summary.blockingReasons.length) {
+    if (Array.isArray(goLiveProgress.operatorActionQueue) && goLiveProgress.operatorActionQueue.length) {
+      lines.push("- Go-live action queue:");
+      for (const item of goLiveProgress.operatorActionQueue) {
+        const itemAction = item.operatorAction || {};
+        lines.push(`  - ${item.key || "-"}: ${itemAction.kind || "-"} (command=${itemAction.command || "-"}, env=${(itemAction.envKeys || []).join(", ") || "-"}, artifact=${itemAction.artifactPath || "-"})`);
+      }
+    }
     lines.push("- Blocking reasons:");
     for (const reason of summary.blockingReasons) {
       lines.push(`  - ${reason.key || "-"}: ${reason.status || "-"}`);

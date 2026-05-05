@@ -1410,6 +1410,17 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(goLiveProgress.blockedQueue.find((item) => item.key === "filled_closeout_input").operatorAction.command, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
     assert.equal(goLiveProgress.blockedQueue.find((item) => item.key === "full_test_window").operatorAction.command, "npm.cmd test");
     assert.equal(goLiveProgress.blockedQueue.find((item) => item.key === "production_signoff").operatorAction.artifactPath, productionSignoffPacketFile);
+    assert.deepEqual(
+      goLiveProgress.operatorActionQueue.map((item) => [item.key, item.operatorAction.kind]),
+      [
+        ["required_secret_env", "set_env"],
+        ["filled_closeout_input", "create_file"],
+        ["full_test_window", "run_command"],
+        ["production_signoff", "backfill_artifact"],
+        ["launch_day_watch", "record_artifact"],
+        ["stabilization_handoff", "record_handoff"]
+      ]
+    );
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.status, "blocked_until_real_staging_inputs");
     assert.deepEqual(
       output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.remainingBlockers.slice(0, 3).map((item) => item.key),
@@ -1656,6 +1667,10 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Go-live current blocker: staging_profile/);
     assert.match(handoff, /Go-live current action: load_profile \(command=npm\.cmd run staging:rehearsal -- --profile-file <staging-profile\.json>.*env=-, artifact=-\)/);
     assert.match(handoff, /Go-live blocked queue: staging_profile -> required_secret_env -> artifact_output_paths -> filled_closeout_input -> full_test_window -> production_signoff -> launch_day_watch -> stabilization_handoff/);
+    assert.match(handoff, /Go-live action queue:/);
+    assert.match(handoff, /staging_profile: load_profile \(command=npm\.cmd run staging:rehearsal -- --profile-file <staging-profile\.json>/);
+    assert.match(handoff, /required_secret_env: set_env \(command=-, env=RSL_DEVELOPER_BEARER_TOKEN, artifact=-\)/);
+    assert.match(handoff, /filled_closeout_input: create_file \(command=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json, env=-, artifact=artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json\)/);
     assert.match(handoff, /Launch closure status: blocked_until_real_staging_inputs \(remainingBlockers=5\)/);
     assert.match(handoff, /Launch closure next plan: load_staging_profile -> set_missing_secret_env -> backfill_and_reload_closeout_input -> run_full_test_window -> backfill_production_signoff -> start_launch_day_watch/);
     assert.match(handoff, /Launch duty focus: blocked_until_signoff_ready \(postSignoffBlocked=5, watchPending=0\)/);

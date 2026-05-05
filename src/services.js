@@ -32237,6 +32237,11 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   );
   const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
     || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
+  const launchOperationsOverviewStatus = readiness.launchOperationsOverviewStatus || null;
+  const launchOperationsOverviewRecoveryPayload = launchOperationsOverviewStatus?.receiptVisibilitySummary?.failureRecovery?.payload
+    && typeof launchOperationsOverviewStatus.receiptVisibilitySummary.failureRecovery.payload === "object"
+    ? launchOperationsOverviewStatus.receiptVisibilitySummary.failureRecovery.payload
+    : {};
   const includedFiles = [
     payload.fileName || "developer-ops.json",
     payload.summaryFileName || "developer-ops-summary.txt",
@@ -32290,8 +32295,16 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Launch Operations Handoff Summary: ${String(readiness.launchOperationsHandoffSummary?.status || "-").toUpperCase()} | evidence=${readiness.launchOperationsHandoffSummary?.evidenceChainStatus || "-"} | file=${readiness.launchOperationsHandoffSummary?.handoffDownload?.fileName || "-"}`,
     `Launch Operations Daily Brief: ${String(readiness.launchOperationsDailyBrief?.status || "-").toUpperCase()} | nextReview=${readiness.launchOperationsDailyBrief?.nextReviewAction?.key || "-"} | file=${readiness.launchOperationsDailyBrief?.briefDownload?.fileName || "-"}`,
     `Launch Operations Shift Action Plan: ${String(readiness.launchOperationsShiftActionPlan?.status || "-").toUpperCase()} | primary=${readiness.launchOperationsShiftActionPlan?.primaryAction?.key || "-"} | file=${readiness.launchOperationsShiftActionPlan?.actionPlanDownload?.fileName || "-"}`,
-    `Launch Operations Overview Status: ${String(readiness.launchOperationsOverviewStatus?.status || "-").toUpperCase()} | receipt=${readiness.launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"} | panels=${readiness.launchOperationsOverviewStatus?.readyPanelCount ?? 0}/${readiness.launchOperationsOverviewStatus?.panelCount ?? 0} | recovery=${readiness.launchOperationsOverviewStatus?.recoveryRoute || "-"} | file=${readiness.launchOperationsOverviewStatus?.overviewDownload?.fileName || "-"}`,
-    `Launch Operations Overview Signoff: productionSignoffPacket=${readiness.launchOperationsOverviewStatus?.productionSignoffPacket || "-"} | launchDayWatchEntry=${readiness.launchOperationsOverviewStatus?.launchDayWatchEntry || "-"}`,
+    `Launch Operations Overview Status: ${String(launchOperationsOverviewStatus?.status || "-").toUpperCase()}`
+      + ` | receipt=${launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}`
+      + ` | panels=${launchOperationsOverviewStatus?.readyPanelCount ?? 0}/${launchOperationsOverviewStatus?.panelCount ?? 0}`
+      + ` | recovery=${launchOperationsOverviewStatus?.recoveryRoute || "-"}`
+      + ` | file=${launchOperationsOverviewStatus?.overviewDownload?.fileName || "-"}`
+      + ` | downloadKey=${launchOperationsOverviewStatus?.overviewDownload?.key || "-"}`
+      + ` | href=${launchOperationsOverviewStatus?.overviewDownload?.href || "-"}`
+      + ` | recoveryDownloadKey=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadKey || "-"}`
+      + ` | recoveryDownloadHref=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadHref || "-"}`,
+    `Launch Operations Overview Signoff: productionSignoffPacket=${launchOperationsOverviewStatus?.productionSignoffPacket || "-"} | launchDayWatchEntry=${launchOperationsOverviewStatus?.launchDayWatchEntry || "-"}`,
     ""
   ];
 

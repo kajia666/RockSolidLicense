@@ -18683,6 +18683,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*receipt=visible/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*recovery=\/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status: [^\n]*downloadKey=ops_launch_operations_overview_status/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status: [^\n]*href=[^\n]*format=launch-operations-overview-status/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status: [^\n]*recoveryDownloadKey=ops_launch_operations_overview_status/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status: [^\n]*recoveryDownloadHref=[^\n]*format=launch-operations-overview-status/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
 

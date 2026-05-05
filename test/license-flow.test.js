@@ -16654,6 +16654,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.csv.auditLogs, new RegExp(latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat));
     assert.match(launchReceiptSnapshot.csv.auditLogs, /launchReceiptPostLaunchPrimaryDownloadFileName/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, new RegExp(latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName));
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /"launchReceiptLaunchOpsOverviewContext","launchReceiptLaunchOpsOverviewStatus","launchReceiptLaunchOpsOverviewWatchRecordDraftStatus","launchReceiptLaunchOpsOverviewDownloadFormat"/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /"launchReceiptLaunchOpsOverviewProductionSignoffPacket","launchReceiptLaunchOpsOverviewLaunchDayWatchEntry"/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /"launchReceiptLaunchOpsOverviewFirstWaveLifecycleStatus","launchReceiptLaunchOpsOverviewFirstWaveLifecycleNextOperation","launchReceiptLaunchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey"/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /launch_ops_overview_status/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /launch-operations-overview-status/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /enter_after_production_signoff/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /record_post_launch_ops_sweep/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /rocksolid-launch-mainline-receipt-EXPORT_ALPHA-stable-record_post_launch_ops_sweep/i);
 

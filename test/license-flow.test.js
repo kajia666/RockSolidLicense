@@ -16058,6 +16058,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.receiptVisibilityStatus, expectedLaunchOpsOverviewContext.receiptVisibilityStatus);
     assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.watchRecordDraftStatus, expectedLaunchOpsOverviewContext.watchRecordDraftStatus);
     assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.watchRecordDraftRecordCount, expectedLaunchOpsOverviewContext.watchRecordDraftRecordCount);
+    assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.productionSignoffPacket, expectedLaunchOpsOverviewContext.productionSignoffPacket);
+    assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.launchDayWatchEntry, expectedLaunchOpsOverviewContext.launchDayWatchEntry);
     assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     assert.equal(latestLaunchReceipt.operationalReadinessStatus, launchOpsAction.receipt.mainlineOperationalReadiness.status);
     assert.equal(latestLaunchReceipt.operationalReadinessLabel, "Still Needs Evidence");
@@ -16109,6 +16111,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptEvidenceFollowUp.handoffFileName, latestLaunchReceipt.handoffFileName);
     assert.equal(launchReceiptEvidenceFollowUp.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
     assert.equal(launchReceiptEvidenceFollowUp.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
+    assert.equal(launchReceiptEvidenceFollowUp.launchOpsOverviewContext?.productionSignoffPacket, expectedLaunchOpsOverviewContext.productionSignoffPacket);
+    assert.equal(launchReceiptEvidenceFollowUp.launchOpsOverviewContext?.launchDayWatchEntry, expectedLaunchOpsOverviewContext.launchDayWatchEntry);
     assert.equal(launchReceiptEvidenceFollowUp.operationalReadinessStatus, "still_needs_evidence");
     assert.equal(launchReceiptEvidenceFollowUp.operationalReadinessNextOperation, "record_launch_rehearsal_run");
     assert.match(launchReceiptEvidenceFollowUp.summary, /production evidence checks remain/i);
@@ -16628,8 +16632,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"stage","priority","title"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewStatus","launchOpsOverviewWatchRecordDraftStatus","launchOpsOverviewDownloadFormat"/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewProductionSignoffPacket","launchOpsOverviewLaunchDayWatchEntry"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch_ops_overview_status/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch-operations-overview-status/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /enter_after_production_signoff/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /record_launch_rehearsal_run/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch_mainline_operations_handoff/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /\/api\/developer\/launch-mainline\/download\?/);
@@ -16671,9 +16678,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"stage","priority","title"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewStatus","launchOpsOverviewWatchRecordDraftStatus","launchOpsOverviewDownloadFormat"/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewProductionSignoffPacket","launchOpsOverviewLaunchDayWatchEntry"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"operationalReadinessWatchRecordDraftStatus","operationalReadinessWatchRecordDraftRecordCount"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_ops_overview_status/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch-operations-overview-status/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /enter_after_production_signoff/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /blocked_until_runway_evidence/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /record_launch_rehearsal_run/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_mainline_operations_handoff/);

@@ -3799,6 +3799,7 @@ function buildStagingOperatorExecutionPlan(result) {
   const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
     ? result.evidenceActionPlan.items.map((item) => item.operation).filter(Boolean)
     : [];
+  const realStagingInputClosure = result.stagingRehearsalExecutionSummary?.operatorFocus?.realStagingInputClosure || null;
   const goLiveOperatorActionPlan = result.finalRehearsalPacket?.goLiveOperatorActionPlan || null;
   const outputFiles = [
     {
@@ -3887,6 +3888,7 @@ function buildStagingOperatorExecutionPlan(result) {
       nextAction: "Resolve readinessGaps in order before live-write smoke, full test window, or production sign-off."
     },
     readinessGaps,
+    realStagingInputClosure,
     goLiveOperatorActionPlan,
     orderedSteps: [
       {
@@ -4771,6 +4773,7 @@ function renderOperatorExecutionPlan(plan) {
   if (!plan) {
     return "- Not available";
   }
+  const realClosure = plan.realStagingInputClosure || {};
   const goLiveActionPlan = plan.goLiveOperatorActionPlan || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
@@ -4783,6 +4786,7 @@ function renderOperatorExecutionPlan(plan) {
     `- Production sign-off decision: ${plan.productionSignoff?.requiredDecision || "-"}`,
     `- Readiness status: ${plan.readinessSummary?.status || "-"}`,
     `- Readiness gap count: ${plan.readinessSummary?.gapCount ?? "-"}`,
+    `- Operator real staging input closure: ${realClosure.status || "-"} (ready=${realClosure.readyCheckCount ?? "-"}, blocked=${realClosure.blockedCheckCount ?? "-"})`,
     `- Operator go-live action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
     `- Operator current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Next action: ${plan.nextAction || "-"}`
@@ -4791,6 +4795,19 @@ function renderOperatorExecutionPlan(plan) {
     lines.push("- Operator go-live phases:");
     for (const phase of goLiveActionPlan.phaseSummary) {
       lines.push(`  - Operator phase ${phase.phase || "-"}: ready=${phase.readyCount ?? 0}, blocked=${phase.blockedCount ?? 0}`);
+    }
+  }
+  if (Array.isArray(realClosure.checks) && realClosure.checks.length) {
+    lines.push("- Operator real staging input checks:");
+    for (const check of realClosure.checks) {
+      lines.push(`  - Operator real input ${check.key || "-"}: ${check.status || "-"}`);
+      if (Array.isArray(check.missing) && check.missing.length) {
+        lines.push(`    - missing: ${check.missing.join(", ")}`);
+      }
+      if (check.path) {
+        lines.push(`    - path: ${check.path}`);
+      }
+      lines.push(`    - nextAction: ${check.nextAction || "-"}`);
     }
   }
   if (Array.isArray(plan.outputFiles) && plan.outputFiles.length) {

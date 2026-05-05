@@ -234,6 +234,19 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.operatorExecutionPlan.status, "ready_for_staging_execution");
   assert.equal(output.operatorExecutionPlan.willModifyData, false);
   assert.equal(output.operatorExecutionPlan.trigger, "no-write-rehearsal-gates-passed");
+  assert.equal(output.operatorExecutionPlan.realStagingInputClosure.status, "blocked_until_profile_and_paths");
+  assert.equal(output.operatorExecutionPlan.realStagingInputClosure.readyCheckCount, 1);
+  assert.equal(output.operatorExecutionPlan.realStagingInputClosure.blockedCheckCount, 4);
+  assert.deepEqual(
+    output.operatorExecutionPlan.realStagingInputClosure.checks.map((item) => [item.key, item.status]),
+    [
+      ["staging_profile", "missing"],
+      ["required_secret_env", "missing"],
+      ["artifact_output_paths", "missing"],
+      ["artifact_archive_root", "ready"],
+      ["filled_closeout_input", "not_loaded"]
+    ]
+  );
   assert.equal(output.operatorExecutionPlan.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
   assert.equal(output.operatorExecutionPlan.goLiveOperatorActionPlan.remainingActionCount, 8);
   assert.deepEqual(
@@ -1895,6 +1908,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /blocked_until_full_test_window/);
     assert.match(handoff, /ready-for-production-signoff/);
     assert.match(handoff, /## Operator Execution Plan/);
+    assert.match(handoff, /Operator real staging input closure: blocked_until_profile_and_paths \(ready=1, blocked=4\)/);
+    assert.match(handoff, /Operator real input staging_profile: missing/);
+    assert.match(handoff, /Operator real input artifact_archive_root: ready/);
     assert.match(handoff, /Operator go-live action plan: status=blocked_until_real_staging_inputs, remaining=8/);
     assert.match(handoff, /Operator current go-live action: staging_profile \(phase=real_staging_inputs, kind=load_profile\)/);
     assert.match(handoff, /Operator phase real_staging_inputs: ready=1, blocked=3/);
@@ -2117,6 +2133,8 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     assert.equal(template.finalRehearsalPacket.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
     assert.equal(template.finalRehearsalPacket.goLiveOperatorActionPlan.actions.find((item) => item.key === "production_signoff").phase, "production_signoff");
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
+    assert.equal(template.operatorExecutionPlan.realStagingInputClosure.status, "blocked_until_profile_and_paths");
+    assert.equal(template.operatorExecutionPlan.realStagingInputClosure.blockedCheckCount, 4);
     assert.equal(template.operatorExecutionPlan.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
     assert.equal(template.operatorExecutionPlan.goLiveOperatorActionPlan.remainingActionCount, 8);
     assert.equal(

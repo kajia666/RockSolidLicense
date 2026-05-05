@@ -1240,16 +1240,40 @@ function buildLaunchDutyOperatorFocus(result, { status = null, finalPacket = nul
 }
 
 function buildLaunchReadinessClosure(result, { status = null, profilePreflight = {}, closeoutReview = {} } = {}) {
+  const planStep = (key, stepStatus, nextAction) => ({
+    key,
+    status: stepStatus,
+    nextAction
+  });
+  const readyLaunchDayPlan = [
+    planStep(
+      "start_launch_day_watch",
+      "operator_watch",
+      "Open Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status during cutover."
+    ),
+    planStep(
+      "record_watch_artifacts",
+      "operator_record",
+      "Record launch-day watch summary, receipt visibility snapshot, incident log, and rollback signal review."
+    ),
+    planStep(
+      "prepare_stabilization_handoff",
+      "operator_handoff",
+      "Hand off stabilization owner records and first-wave closeout evidence."
+    )
+  ];
   if (status === "ready_for_launch_day_watch") {
     return {
       status: "ready_for_launch_day_watch",
       remainingBlockerCount: 0,
       remainingBlockers: [],
+      nextPlan: readyLaunchDayPlan,
       nextAction: "Start launch-day watch and stabilization handoff from the final rehearsal packet."
     };
   }
 
   const remainingBlockers = [];
+  const nextPlan = [];
   const addBlocker = (key, nextAction, extra = {}) => {
     remainingBlockers.push({
       key,
@@ -1260,6 +1284,12 @@ function buildLaunchReadinessClosure(result, { status = null, profilePreflight =
   };
 
   if (status === "ready_for_full_test_window") {
+    nextPlan.push(
+      planStep("run_full_test_window", "operator_execute", "Run the reserved full repository test window."),
+      planStep("backfill_production_signoff", "operator_backfill", "Backfill production sign-off evidence and receipt visibility, then reload closeout input."),
+      planStep("start_launch_day_watch", "blocked_until_signoff_ready", "Start launch-day watch after production sign-off is ready."),
+      planStep("prepare_stabilization_handoff", "blocked_until_cutover_watch", "Prepare stabilization handoff after cutover watch starts.")
+    );
     if (result.productionSignoffReadiness?.canSignoff !== true) {
       addBlocker("production_signoff_not_ready", "Run the full test window, backfill production sign-off evidence, then reload closeout input.");
     }
@@ -1273,33 +1303,43 @@ function buildLaunchReadinessClosure(result, { status = null, profilePreflight =
       status: "awaiting_production_signoff",
       remainingBlockerCount: remainingBlockers.length,
       remainingBlockers,
+      nextPlan,
       nextAction: "Run the full test window and backfill production sign-off before launch-day watch."
     };
   }
 
   if (profilePreflight.status === "profile_not_loaded") {
     addBlocker("profile_not_loaded", "Load a secret-free staging profile before the real rehearsal.");
+    nextPlan.push(planStep("load_staging_profile", "operator_prepare", "Load a secret-free staging profile before the real rehearsal."));
   }
   if (Array.isArray(profilePreflight.missingSecretEnv) && profilePreflight.missingSecretEnv.length) {
     addBlocker("missing_secret_env", "Set missing secret environment variables before evidence recording.", {
       missing: profilePreflight.missingSecretEnv
     });
+    nextPlan.push(planStep("set_missing_secret_env", "operator_prepare", "Set missing secret environment variables before evidence recording."));
   }
   if (closeoutReview.safeToEnterFullTestWindow !== true) {
     addBlocker("closeout_input_not_ready", "Backfill and reload the filled closeout input before the full test window.", {
       missingFieldCount: closeoutReview.missingFieldCount ?? 0
     });
+    nextPlan.push(planStep("backfill_and_reload_closeout_input", "operator_backfill", "Backfill and reload filled closeout input before the full test window."));
   }
   if (result.productionSignoffReadiness?.canSignoff !== true) {
     addBlocker("production_signoff_not_ready", "Run full test and backfill production sign-off evidence.");
+    nextPlan.push(
+      planStep("run_full_test_window", "operator_execute", "Run the full repository test suite in the reserved test window."),
+      planStep("backfill_production_signoff", "operator_backfill", "Backfill production sign-off evidence and receipt visibility.")
+    );
   }
   if (result.launchDayWatchPlan?.canStartCutoverWatch !== true) {
     addBlocker("launch_day_watch_not_ready", "Complete production sign-off before starting launch-day watch.");
+    nextPlan.push(planStep("start_launch_day_watch", "blocked_until_signoff_ready", "Start launch-day watch after production sign-off is ready."));
   }
   return {
     status: "blocked_until_real_staging_inputs",
     remainingBlockerCount: remainingBlockers.length,
     remainingBlockers,
+    nextPlan,
     nextAction: "Set missing secret env, reload filled closeout input, then continue toward production sign-off."
   };
 }
@@ -4265,6 +4305,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Can enter full test window: ${focus.canEnterFullTestWindow ? "yes" : "no"}`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
+    `- Launch closure next plan: ${(closure.nextPlan || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
     `- Launch closure next action: ${closure.nextAction || "-"}`,
     `- Launch duty next action: ${launchDutyFocus.nextAction || "-"}`,
     `- Ordered next actions: ${(summary.orderedNextActions || []).join(", ") || "-"}`,

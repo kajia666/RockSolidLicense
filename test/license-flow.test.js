@@ -15118,6 +15118,44 @@ test("developer first-wave recommendations summarize launch inventory, card issu
         ["first_round_ops", "review", true]
       ]
     );
+    const firstWaveLifecycleLinePattern = new RegExp(
+      `firstWaveLifecycle=${afterSetup.postLaunchLifecycleHandoff.status}`
+      + `.*operation=${afterSetup.postLaunchLifecycleHandoff.nextAction.operation}`
+      + `.*primaryDownload=${afterSetup.postLaunchLifecycleHandoff.primaryDownload.key}`
+    );
+    const firstWaveSteadyStateOperationalReview = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.steadyStateOperationalReview;
+    assert.ok(firstWaveSteadyStateOperationalReview);
+    assert.equal(firstWaveSteadyStateOperationalReview.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      firstWaveSteadyStateOperationalReview.firstWaveLifecycle?.nextOperation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
+    assert.equal(
+      firstWaveSteadyStateOperationalReview.firstWaveLifecycle?.primaryDownloadKey,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+    );
+    assert.equal(
+      firstWaveSteadyStateOperationalReview.firstWaveLifecycle?.closeoutReadinessStatus,
+      afterSetup.postLaunchLifecycleHandoff.closeoutReadiness.status
+    );
+    assert.equal(
+      firstWaveSteadyStateOperationalReview.firstWaveLifecycle?.handoff?.primaryDownload?.format,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.format
+    );
+    const firstWaveSteadyStateHandoffBrief = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.steadyStateHandoffBrief;
+    assert.ok(firstWaveSteadyStateHandoffBrief);
+    assert.equal(firstWaveSteadyStateHandoffBrief.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      firstWaveSteadyStateHandoffBrief.firstWaveLifecycle?.nextOperation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
+    const firstWaveSteadyStateDutyBoard = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.steadyStateDutyBoard;
+    assert.ok(firstWaveSteadyStateDutyBoard);
+    assert.equal(firstWaveSteadyStateDutyBoard.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      firstWaveSteadyStateDutyBoard.firstWaveLifecycle?.primaryDownloadKey,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+    );
     assert.equal(
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.firstWaveHandoffConfirmation.auditLogId,
       handoffConfirmation.auditLogId
@@ -15143,6 +15181,11 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(confirmedOpsSnapshot.summaryText, /segments=3\/3/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Confirmation Chain:[\s\S]*postLaunchLifecycle=hold/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Confirmation Chain:[\s\S]*operation=record_operations_walkthrough/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Operational Review:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*operation=record_operations_walkthrough/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Handoff Brief:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*firstWaveLifecycle=hold/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Status: USED/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Source: first-wave-audit-backfill/);
@@ -15311,6 +15354,33 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(firstWaveHandoffIndex.body, /First-Wave Confirmation Chain:[\s\S]*postLaunchLifecycle=hold/);
     assert.match(firstWaveHandoffIndex.body, /developer-ops-first-wave-recommendations-firstwave-stable\.txt/);
     assert.match(firstWaveHandoffIndex.body, /first-wave-audit-backfill-status\.txt.*format=first-wave-audit-backfill-status/);
+
+    const firstWaveSteadyStateOperationalReviewDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=steady-state-operational-review&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveSteadyStateOperationalReviewDownload.body, /RockSolid Developer Ops Steady-State Operational Review/);
+    assert.match(firstWaveSteadyStateOperationalReviewDownload.body, /Review Signals:/);
+    assert.match(firstWaveSteadyStateOperationalReviewDownload.body, firstWaveLifecycleLinePattern);
+
+    const firstWaveSteadyStateHandoffBriefDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=steady-state-handoff-brief&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveSteadyStateHandoffBriefDownload.body, /RockSolid Developer Ops Steady-State Handoff Brief/);
+    assert.match(firstWaveSteadyStateHandoffBriefDownload.body, /Handoff Signals:/);
+    assert.match(firstWaveSteadyStateHandoffBriefDownload.body, firstWaveLifecycleLinePattern);
+
+    const firstWaveSteadyStateDutyBoardDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=steady-state-duty-board&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveSteadyStateDutyBoardDownload.body, /RockSolid Developer Ops Steady-State Duty Board/);
+    assert.match(firstWaveSteadyStateDutyBoardDownload.body, /Duty Signals:/);
+    assert.match(firstWaveSteadyStateDutyBoardDownload.body, firstWaveLifecycleLinePattern);
 
     const firstWaveAuditBackfillStatusDownload = await getText(
       baseUrl,

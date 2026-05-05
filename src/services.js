@@ -22872,6 +22872,67 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
   };
 }
 
+function buildDeveloperOpsFirstWaveLifecycleSummaryPayload(firstWaveConfirmationChain = null) {
+  if (!firstWaveConfirmationChain || typeof firstWaveConfirmationChain !== "object") {
+    return null;
+  }
+  const handoff = firstWaveConfirmationChain.postLaunchLifecycleHandoff
+    && typeof firstWaveConfirmationChain.postLaunchLifecycleHandoff === "object"
+    ? firstWaveConfirmationChain.postLaunchLifecycleHandoff
+    : null;
+  const nextAction = handoff?.nextAction && typeof handoff.nextAction === "object"
+    ? handoff.nextAction
+    : {};
+  const primaryDownload = handoff?.primaryDownload && typeof handoff.primaryDownload === "object"
+    ? handoff.primaryDownload
+    : {};
+  const closeoutReadiness = handoff?.closeoutReadiness && typeof handoff.closeoutReadiness === "object"
+    ? handoff.closeoutReadiness
+    : {};
+  const stabilizationConfirmation = handoff?.stabilizationConfirmation
+    && typeof handoff.stabilizationConfirmation === "object"
+    ? handoff.stabilizationConfirmation
+    : {};
+  const status = firstWaveConfirmationChain.postLaunchLifecycleStatus || handoff?.status || null;
+  const nextActionKey = firstWaveConfirmationChain.postLaunchLifecycleNextActionKey || nextAction.key || null;
+  const nextOperation = firstWaveConfirmationChain.postLaunchLifecycleNextOperation || nextAction.operation || null;
+  const primaryDownloadKey = firstWaveConfirmationChain.postLaunchLifecyclePrimaryDownloadKey || primaryDownload.key || null;
+  const closeoutReadinessStatus = firstWaveConfirmationChain.postLaunchLifecycleCloseoutReadinessStatus
+    || closeoutReadiness.status
+    || null;
+  const stabilizationConfirmationStatus = firstWaveConfirmationChain.postLaunchLifecycleStabilizationConfirmationStatus
+    || stabilizationConfirmation.status
+    || null;
+  const stabilizationConfirmationAuditLogId = firstWaveConfirmationChain.postLaunchLifecycleStabilizationConfirmationAuditLogId
+    || stabilizationConfirmation.auditLogId
+    || null;
+  if (
+    !status
+    && !nextActionKey
+    && !nextOperation
+    && !primaryDownloadKey
+    && !closeoutReadinessStatus
+    && !stabilizationConfirmationStatus
+    && !handoff
+  ) {
+    return null;
+  }
+  return {
+    version: "developer-ops-first-wave-lifecycle-summary/v1",
+    status,
+    nextActionKey,
+    nextOperation,
+    primaryDownloadKey,
+    primaryDownloadFormat: primaryDownload.format || null,
+    primaryDownloadFileName: primaryDownload.fileName || null,
+    primaryDownloadHref: primaryDownload.href || null,
+    closeoutReadinessStatus,
+    stabilizationConfirmationStatus,
+    stabilizationConfirmationAuditLogId,
+    handoff
+  };
+}
+
 function buildDeveloperOpsSteadyStateOperationalReviewPayload({
   scope = {},
   latestReceipt = null,
@@ -22921,6 +22982,7 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
     || stabilizationStatusReceipt?.launchOpsOverviewContext
     || firstWaveConfirmationChain?.launchOpsOverviewContext
   );
+  const firstWaveLifecycle = buildDeveloperOpsFirstWaveLifecycleSummaryPayload(firstWaveConfirmationChain);
   const reviewScope = {
     ...scope,
     productCode: productCode || scope.productCode || "",
@@ -22942,6 +23004,7 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
   const seenSupportingDownloads = new Set();
   for (const download of [
     closeoutReadinessSummary?.nextAction?.recommendedDownload || null,
+    firstWaveLifecycle?.handoff?.primaryDownload || null,
     launchOpsOverviewContext?.overviewDownload || null,
     productCode ? buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(reviewScope) : null,
     remainingFollowUpCount > 0 ? buildDeveloperOpsLaunchReceiptNextFollowUpDownload(reviewScope, followUps[0]) : null,
@@ -23020,6 +23083,11 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
     watchRecordDraftRecordCount,
     stabilizationStatus: stabilizationStatusReceipt?.status || null,
     firstWaveStatus: firstWaveConfirmationChain?.status || null,
+    firstWaveLifecycle,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     followUpCount: remainingFollowUpCount,
     launchOpsOverviewContext,
     blockers: Array.isArray(closeoutReadinessSummary?.blockers)
@@ -23219,6 +23287,7 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
     || stabilizationHandoff?.launchOpsOverviewContext
     || latestReceipt?.launchOpsOverviewContext
   );
+  const firstWaveLifecycle = steadyStateOperationalReview?.firstWaveLifecycle || null;
   const handoffDownload = productCode ? buildDeveloperOpsSteadyStateHandoffBriefDownload(briefScope) : null;
   const workspaceAction = steadyStateExceptionDigest?.workspaceAction
     || steadyStateOperationalReview?.workspaceAction
@@ -23264,6 +23333,7 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
   appendDownload(downloadSet, seenDownloads, steadyStateExceptionDigest?.digestDownload || null, "exception_digest");
   appendDownload(downloadSet, seenDownloads, closeoutReadinessSummary?.nextAction?.recommendedDownload || null, "stabilization_handoff");
   appendDownload(downloadSet, seenDownloads, stabilizationHandoff?.nextAction?.recommendedDownload || null, "stabilization_next_action");
+  appendDownload(downloadSet, seenDownloads, firstWaveLifecycle?.handoff?.primaryDownload || null, "first_wave_lifecycle_primary");
   appendDownload(downloadSet, seenDownloads, launchOpsOverviewContext?.overviewDownload || null, "launch_ops_overview_status");
   const operatorActions = [];
   const appendAction = (value = "") => {
@@ -23297,6 +23367,11 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
     launchOpsOverviewContext,
+    firstWaveLifecycle,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     recordedAction: closeoutReadinessSummary?.recordedAction || null,
     latestReceipt: latestReceipt
       ? {
@@ -23368,6 +23443,9 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     || closeoutReadinessSummary?.launchOpsOverviewContext
     || latestReceipt?.launchOpsOverviewContext
   );
+  const firstWaveLifecycle = steadyStateHandoffBrief?.firstWaveLifecycle
+    || steadyStateOperationalReview?.firstWaveLifecycle
+    || null;
   const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(boardScope, launchOpsOverviewContext);
   const productionSignoffPacket = steadyStateHandoffBrief?.productionSignoffPacket
     || steadyStateOperationalReview?.productionSignoffPacket
@@ -23428,6 +23506,16 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     source: "workspace",
     summary: "Open the scoped Developer Ops view for live steady-state monitoring."
   });
+  if (firstWaveLifecycle?.nextOperation) {
+    pushQuickAction({
+      key: "review_first_wave_lifecycle",
+      label: "Review First-Wave Lifecycle",
+      priority: firstWaveLifecycle.status === "hold" ? "primary" : "secondary",
+      href: workspaceAction?.href || "",
+      source: "first_wave_lifecycle",
+      summary: `First-wave lifecycle is ${firstWaveLifecycle.status || "unknown"}; next operation is ${firstWaveLifecycle.nextOperation}.`
+    });
+  }
   const signals = Array.isArray(steadyStateExceptionDigest?.signals)
     ? steadyStateExceptionDigest.signals
     : [];
@@ -23471,6 +23559,7 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
   const seenAssets = new Set();
   for (const item of [
     boardDownload,
+    firstWaveLifecycle?.handoff?.primaryDownload || null,
     launchOpsOverviewDownload,
     steadyStateHandoffBrief?.handoffDownload || null,
     steadyStateOperationalReview?.reviewDownload || null,
@@ -23508,6 +23597,11 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     productionSignoffPacket,
     launchDayWatchEntry,
     launchOpsOverviewContext,
+    firstWaveLifecycle,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     latestReceipt: latestReceipt
       ? {
           operation: latestReceipt.operation || null,
@@ -29019,6 +29113,19 @@ function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadines
   }
 }
 
+function formatDeveloperOpsFirstWaveLifecycleSummaryText(firstWaveLifecycle = null) {
+  if (!firstWaveLifecycle || typeof firstWaveLifecycle !== "object") {
+    return "";
+  }
+  return `firstWaveLifecycle=${firstWaveLifecycle.status || "-"}`
+    + ` | next=${firstWaveLifecycle.nextActionKey || "-"}`
+    + ` | operation=${firstWaveLifecycle.nextOperation || "-"}`
+    + ` | primaryDownload=${firstWaveLifecycle.primaryDownloadKey || "-"}`
+    + ` | closeout=${firstWaveLifecycle.closeoutReadinessStatus || "-"}`
+    + ` | stabilization=${firstWaveLifecycle.stabilizationConfirmationStatus || "-"}`
+    + ` | stabilizationAudit=${firstWaveLifecycle.stabilizationConfirmationAuditLogId || "-"}`;
+}
+
 function appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateOperationalReview = null, {
   title = "Steady-State Operational Review:"
 } = {}) {
@@ -29036,6 +29143,12 @@ function appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateO
     + ` | firstWave=${steadyStateOperationalReview.firstWaveStatus || "-"}`
     + ` | followUps=${steadyStateOperationalReview.followUpCount ?? 0}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(
+    steadyStateOperationalReview.firstWaveLifecycle
+  );
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   lines.push(`- headline=${steadyStateOperationalReview.headline || "-"} | summary=${steadyStateOperationalReview.summary || "-"}`);
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(steadyStateOperationalReview.launchOpsOverviewContext);
   if (launchOpsOverviewContext) {
@@ -29182,6 +29295,10 @@ function appendDeveloperOpsSteadyStateHandoffBriefLines(lines, brief = null, {
     + ` | workspace=${brief.workspaceAction?.label || "-"}`
     + ` | href=${brief.workspaceAction?.href || "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(brief.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   lines.push(
     `- handoffDownload=${brief.handoffDownload?.fileName || "-"}`
     + ` | format=${brief.handoffDownload?.format || "-"}`
@@ -29245,6 +29362,10 @@ function appendDeveloperOpsSteadyStateDutyBoardLines(lines, board = null, {
     + ` | watchRecordDraft=${board.watchRecordDraftStatus || "-"}`
     + ` | records=${board.watchRecordDraftRecordCount ?? "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(board.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   lines.push(
     `- workspace=${board.workspaceAction?.label || "-"}`
     + ` | href=${board.workspaceAction?.href || "-"}`

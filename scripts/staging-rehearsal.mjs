@@ -662,6 +662,7 @@ function buildStagingRehearsalExecutionSummary(result) {
       canRunLiveWriteSmoke: profilePreflight.canRunLiveWriteSmoke === true,
       canRecordEvidence: profilePreflight.canRecordEvidence === true,
       canEnterFullTestWindow: closeoutReview.safeToEnterFullTestWindow === true,
+      realStagingInputClosure: buildRealStagingInputClosure({ profilePreflight, closeoutReview }),
       launchReadinessClosure: buildLaunchReadinessClosure(result, {
         status,
         profilePreflight,
@@ -680,6 +681,86 @@ function buildStagingRehearsalExecutionSummary(result) {
       fullTestWindow: result.fullTestWindowReadiness?.command || closeout.fullTestWindowEntry?.command || "npm.cmd test"
     },
     nextAction: blockingReasons[0]?.nextAction || "Start launch-day watch and stabilization handoff from the final rehearsal packet."
+  };
+}
+
+function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = {} } = {}) {
+  const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv) ? profilePreflight.missingSecretEnv : [];
+  const missingOutputFiles = Array.isArray(profilePreflight.missingOutputFiles) ? profilePreflight.missingOutputFiles : [];
+  const recommendedFiles = Array.isArray(profilePreflight.recommendedFiles) ? profilePreflight.recommendedFiles : [];
+  const artifactArchiveRoot = recommendedFiles.find((item) => item.key === "artifact_archive_root")?.path || null;
+  const profileReady = Boolean(profilePreflight.profileFile) && profilePreflight.status !== "profile_not_loaded";
+  const closeoutReady = closeoutReview.safeToEnterFullTestWindow === true;
+  const closeoutStatus = closeoutReady
+    ? "ready"
+    : closeoutReview.status === "not_loaded"
+      ? "not_loaded"
+      : "missing";
+  const checks = [
+    {
+      key: "staging_profile",
+      status: profileReady ? "ready" : "missing",
+      path: profilePreflight.profileFile || null,
+      nextAction: profileReady
+        ? "Use the loaded secret-free staging profile for the real rehearsal."
+        : "Load a secret-free staging profile before the real rehearsal."
+    },
+    {
+      key: "required_secret_env",
+      status: missingSecretEnv.length === 0 ? "ready" : "missing",
+      missing: missingSecretEnv,
+      nextAction: missingSecretEnv.length === 0
+        ? "Required secret environment variables are present."
+        : "Set missing secret environment variables before live-write smoke and evidence recording."
+    },
+    {
+      key: "artifact_output_paths",
+      status: missingOutputFiles.length === 0 ? "ready" : "missing",
+      missing: missingOutputFiles,
+      nextAction: missingOutputFiles.length === 0
+        ? "Artifact output paths are available."
+        : "Provide all launch-duty artifact output paths before the real rehearsal."
+    },
+    {
+      key: "artifact_archive_root",
+      status: artifactArchiveRoot ? "ready" : "missing",
+      path: artifactArchiveRoot,
+      nextAction: artifactArchiveRoot
+        ? "Use this archive root for generated launch-duty artifacts."
+        : "Provide an artifact archive root before generating launch-duty files."
+    },
+    {
+      key: "filled_closeout_input",
+      status: closeoutStatus,
+      missingFieldCount: closeoutReview.missingFieldCount ?? 0,
+      nextAction: closeoutReady
+        ? "Filled closeout input is ready for the full-test window."
+        : "Backfill and reload filled closeout input before the full-test window."
+    }
+  ];
+  const readyCheckCount = checks.filter((item) => item.status === "ready").length;
+  const blockedCheckCount = checks.length - readyCheckCount;
+  let status = "ready_for_real_staging_inputs";
+  if (!profileReady || missingOutputFiles.length) {
+    status = "blocked_until_profile_and_paths";
+  } else if (missingSecretEnv.length) {
+    status = "blocked_until_secret_env";
+  } else if (!closeoutReady) {
+    status = "blocked_until_closeout_input";
+  }
+  const nextAction = status === "ready_for_real_staging_inputs"
+    ? "Run the real staging rehearsal with the generated command sequence."
+    : status === "blocked_until_profile_and_paths"
+      ? "Load the staging profile and provide launch-duty artifact output paths."
+      : status === "blocked_until_secret_env"
+        ? "Set missing secret env, then reload filled closeout input before full-test/sign-off."
+        : "Backfill and reload filled closeout input before full-test/sign-off.";
+  return {
+    status,
+    readyCheckCount,
+    blockedCheckCount,
+    checks,
+    nextAction
   };
 }
 
@@ -4290,6 +4371,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     return "- Not available";
   }
   const focus = summary.operatorFocus || {};
+  const realInputClosure = focus.realStagingInputClosure || {};
   const closure = focus.launchReadinessClosure || {};
   const launchDutyFocus = focus.launchDutyFocus || {};
   const statuses = summary.sourceStatuses || {};
@@ -4303,8 +4385,10 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Can run live-write smoke: ${focus.canRunLiveWriteSmoke ? "yes" : "no"}`,
     `- Can record evidence: ${focus.canRecordEvidence ? "yes" : "no"}`,
     `- Can enter full test window: ${focus.canEnterFullTestWindow ? "yes" : "no"}`,
+    `- Real staging input closure: ${realInputClosure.status || "-"} (ready=${realInputClosure.readyCheckCount ?? "-"}, blocked=${realInputClosure.blockedCheckCount ?? "-"})`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
+    `- Real staging input next action: ${realInputClosure.nextAction || "-"}`,
     `- Launch closure next plan: ${(closure.nextPlan || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
     `- Launch closure next action: ${closure.nextAction || "-"}`,
     `- Launch duty next action: ${launchDutyFocus.nextAction || "-"}`,

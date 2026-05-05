@@ -24920,6 +24920,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       focusReason: summary || label || key || "",
       launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || "",
       launchOpsOverviewStatus: launchOpsOverviewContext?.status || "",
+      launchOpsOverviewDownloadKey: launchOpsOverviewContext?.downloadKey || launchOpsOverviewDownload?.key || "",
+      launchOpsOverviewDownloadFileName: launchOpsOverviewContext?.downloadFileName || launchOpsOverviewDownload?.fileName || "",
       launchOpsOverviewDownloadFormat: launchOpsOverviewContext?.downloadFormat || launchOpsOverviewDownload?.format || "",
       launchOpsOverviewDownloadHref: launchOpsOverviewContext?.downloadHref || launchOpsOverviewDownload?.href || "",
       watchRecordDraftStatus: watchRecordDraftStatus || "",
@@ -24949,7 +24951,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         actionSource: source,
         actionStatus: status,
         launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || "",
+        launchOpsOverviewDownloadKey: launchOpsOverviewContext?.downloadKey || launchOpsOverviewDownload?.key || "",
+        launchOpsOverviewDownloadFileName: launchOpsOverviewContext?.downloadFileName || launchOpsOverviewDownload?.fileName || "",
         launchOpsOverviewDownloadFormat: launchOpsOverviewContext?.downloadFormat || launchOpsOverviewDownload?.format || "",
+        launchOpsOverviewDownloadHref: launchOpsOverviewContext?.downloadHref || launchOpsOverviewDownload?.href || "",
         watchRecordDraftStatus: watchRecordDraftStatus || "",
         watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
         productionSignoffPacket: productionSignoffPacket || "",
@@ -32006,6 +32011,9 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | action=${payload.action || "-"}`
         + ` | intent=${payload.intent || "-"}`
         + ` | launchOpsOverviewContext=${payload.launchOpsOverviewContextKind || "-"}`
+        + ` | launchOpsOverviewDownloadKey=${payload.launchOpsOverviewDownloadKey || "-"}`
+        + ` | launchOpsOverviewDownloadFileName=${payload.launchOpsOverviewDownloadFileName || "-"}`
+        + ` | launchOpsOverviewDownloadHref=${payload.launchOpsOverviewDownloadHref || "-"}`
         + ` | productionSignoffPacket=${payload.productionSignoffPacket || "-"}`
         + ` | launchDayWatchEntry=${payload.launchDayWatchEntry || "-"}`
         + ` | firstWaveLifecycleStatus=${payload.firstWaveLifecycleStatus || "-"}`

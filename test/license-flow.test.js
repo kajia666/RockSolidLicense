@@ -18519,7 +18519,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOverviewStatusAction.executionPlan.mode, "download");
     assert.match(launchOperationsOverviewStatusAction.executionPlan.href, /format=launch-operations-overview-status/);
     assert.equal(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewContextKind, "launch_ops_overview_status");
+    assert.equal(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewDownloadKey, "ops_launch_operations_overview_status");
+    assert.equal(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewDownloadFileName, "developer-ops-launch-operations-overview-status.txt");
     assert.equal(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewDownloadFormat, "launch-operations-overview-status");
+    assert.match(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewDownloadHref, /format=launch-operations-overview-status/);
+    assert.equal(launchOperationsOverviewStatusAction.executionPlan.prefill.launchOpsOverviewDownloadKey, "ops_launch_operations_overview_status");
+    assert.equal(launchOperationsOverviewStatusAction.executionPlan.prefill.launchOpsOverviewDownloadFileName, "developer-ops-launch-operations-overview-status.txt");
+    assert.match(launchOperationsOverviewStatusAction.executionPlan.prefill.launchOpsOverviewDownloadHref, /format=launch-operations-overview-status/);
     assert.ok(launchOperationsShiftActionPlan.operatorActions.every((item) => item.executionPlan?.operatorHint));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*context=launch_ops_overview_status/);
@@ -18554,6 +18560,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.body, /Execution Plans:[\s\S]*format=launch-operations-overview-status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewContext=launch_ops_overview_status/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewDownloadFileName=developer-ops-launch-operations-overview-status\.txt/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /\/api\/developer\/ops\/steady-state-duty-plan\/receipt/);

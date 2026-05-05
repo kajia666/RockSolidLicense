@@ -1401,6 +1401,11 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
       launchOpsOverviewStatus: launchDayWatch.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
     },
+    signoffTargets: (productionSignoffPacket.postSignoffTargets || []).map((item) => ({
+      key: item.key || null,
+      status: item.status || "not_available",
+      path: item.path || null
+    })),
     watchArtifacts: (launchDayWatch.watchRecordDraft?.records || []).map((item) => ({
       key: item.key || null,
       status: item.status || "not_available",
@@ -4756,6 +4761,12 @@ function renderStagingLaunchDutyArchiveIndex(index) {
   ];
   for (const packet of index.packets || []) {
     lines.push(`  - ${packet.key || "-"}: ${packet.status || "-"} -> ${packet.path || "-"}`);
+  }
+  if (Array.isArray(index.signoffTargets) && index.signoffTargets.length) {
+    lines.push("- Launch-duty signoff targets:");
+    for (const target of index.signoffTargets) {
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
+    }
   }
   if (Array.isArray(index.watchArtifacts) && index.watchArtifacts.length) {
     lines.push("- Watch artifacts:");

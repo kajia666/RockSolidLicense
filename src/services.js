@@ -29821,6 +29821,9 @@ function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, 
   if (!summary || typeof summary !== "object") {
     return;
   }
+  const recoveryPayload = summary.failureRecovery?.payload && typeof summary.failureRecovery.payload === "object"
+    ? summary.failureRecovery.payload
+    : {};
   lines.push(title);
   lines.push(
     `- receiptVisibilitySummary=${summary.status || "-"}`
@@ -29830,8 +29833,11 @@ function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, 
   );
   lines.push(
     `- recovery=${summary.failureRecovery?.method || "-"} ${summary.failureRecovery?.route || "-"}`
-    + ` | action=${summary.failureRecovery?.payload?.action || "-"}`
-    + ` | intent=${summary.failureRecovery?.payload?.intent || "-"}`
+    + ` | action=${recoveryPayload.action || "-"}`
+    + ` | intent=${recoveryPayload.intent || "-"}`
+    + (recoveryPayload.launchOpsOverviewDownloadKey ? ` | launchOpsOverviewDownloadKey=${recoveryPayload.launchOpsOverviewDownloadKey}` : "")
+    + (recoveryPayload.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${recoveryPayload.launchOpsOverviewDownloadFileName}` : "")
+    + (recoveryPayload.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${recoveryPayload.launchOpsOverviewDownloadHref}` : "")
   );
 }
 
@@ -32170,13 +32176,20 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
       )}`
     );
   }
+  const receiptRecoveryPayload = overview?.receiptVisibilitySummary?.failureRecovery?.payload
+    && typeof overview.receiptVisibilitySummary.failureRecovery.payload === "object"
+    ? overview.receiptVisibilitySummary.failureRecovery.payload
+    : {};
   lines.push("");
   lines.push("Receipt Recovery:");
   lines.push(
     `- canRecover=${overview?.canRecoverReceipt === true}`
     + ` | route=${overview?.recoveryRoute || "-"}`
-    + ` | action=${overview?.receiptVisibilitySummary?.failureRecovery?.payload?.action || "-"}`
-    + ` | intent=${overview?.receiptVisibilitySummary?.failureRecovery?.payload?.intent || "-"}`
+    + ` | action=${receiptRecoveryPayload.action || "-"}`
+    + ` | intent=${receiptRecoveryPayload.intent || "-"}`
+    + (receiptRecoveryPayload.launchOpsOverviewDownloadKey ? ` | launchOpsOverviewDownloadKey=${receiptRecoveryPayload.launchOpsOverviewDownloadKey}` : "")
+    + (receiptRecoveryPayload.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${receiptRecoveryPayload.launchOpsOverviewDownloadFileName}` : "")
+    + (receiptRecoveryPayload.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${receiptRecoveryPayload.launchOpsOverviewDownloadHref}` : "")
   );
   lines.push("");
   lines.push("Overview Download:");

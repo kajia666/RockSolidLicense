@@ -15190,6 +15190,35 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       item.key === afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
       && item.format === afterSetup.postLaunchLifecycleHandoff.primaryDownload.format
     ));
+    const firstWaveLaunchOperationsHandoffSummary = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchOperationsHandoffSummary;
+    assert.ok(firstWaveLaunchOperationsHandoffSummary);
+    assert.equal(firstWaveLaunchOperationsHandoffSummary.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      firstWaveLaunchOperationsHandoffSummary.firstWaveLifecycle?.nextOperation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
+    const firstWaveLaunchOperationsDailyBrief = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchOperationsDailyBrief;
+    assert.ok(firstWaveLaunchOperationsDailyBrief);
+    assert.equal(firstWaveLaunchOperationsDailyBrief.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      firstWaveLaunchOperationsDailyBrief.firstWaveLifecycle?.primaryDownloadKey,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+    );
+    const firstWaveLaunchOperationsShiftActionPlan = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchOperationsShiftActionPlan;
+    assert.ok(firstWaveLaunchOperationsShiftActionPlan);
+    assert.equal(firstWaveLaunchOperationsShiftActionPlan.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.ok(firstWaveLaunchOperationsShiftActionPlan.operatorActions.some((item) =>
+      item.key === "review_first_wave_lifecycle"
+      && item.executionPlan?.prefill?.firstWaveLifecycleNextOperation === afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+      && item.executionPlan?.receiptPlan?.payload?.firstWaveLifecyclePrimaryDownloadKey === afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+    ));
+    const firstWaveLaunchOperationsOverviewStatus = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOverviewStatus;
+    assert.ok(firstWaveLaunchOperationsOverviewStatus);
+    assert.equal(firstWaveLaunchOperationsOverviewStatus.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.ok(firstWaveLaunchOperationsOverviewStatus.panels.some((item) =>
+      item.key === "first_wave_lifecycle"
+      && item.status === afterSetup.postLaunchLifecycleHandoff.status
+    ));
     assert.equal(
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.firstWaveHandoffConfirmation.auditLogId,
       handoffConfirmation.auditLogId
@@ -15222,6 +15251,10 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*firstWaveLifecycle=hold/);
     assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Duty Action Links:[\s\S]*firstWaveLifecycle=hold/);
     assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Duty Action Links:[\s\S]*intent=review_first_wave_lifecycle/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Launch Operations Handoff Summary:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Launch Operations Daily Brief:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*firstWaveLifecycle=hold/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Status: USED/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Source: first-wave-audit-backfill/);
@@ -15433,6 +15466,41 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       firstWaveSteadyStateDutyActionLinksDownload.body,
       new RegExp(`Execution Plans:[\\s\\S]*firstWaveLifecyclePrimaryDownloadKey=${afterSetup.postLaunchLifecycleHandoff.primaryDownload.key}`)
     );
+
+    const firstWaveLaunchOperationsHandoffSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=launch-operations-handoff-summary&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveLaunchOperationsHandoffSummaryDownload.body, /RockSolid Developer Ops Launch Operations Handoff Summary/);
+    assert.match(firstWaveLaunchOperationsHandoffSummaryDownload.body, firstWaveLifecycleLinePattern);
+
+    const firstWaveLaunchOperationsDailyBriefDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=launch-operations-daily-brief&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveLaunchOperationsDailyBriefDownload.body, /RockSolid Developer Ops Launch Operations Daily Brief/);
+    assert.match(firstWaveLaunchOperationsDailyBriefDownload.body, firstWaveLifecycleLinePattern);
+
+    const firstWaveLaunchOperationsShiftActionPlanDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=launch-operations-shift-action-plan&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveLaunchOperationsShiftActionPlanDownload.body, /RockSolid Developer Ops Launch Operations Shift Action Plan/);
+    assert.match(firstWaveLaunchOperationsShiftActionPlanDownload.body, firstWaveLifecycleLinePattern);
+    assert.match(firstWaveLaunchOperationsShiftActionPlanDownload.body, /Shift Actions:[\s\S]*review_first_wave_lifecycle/);
+    assert.match(firstWaveLaunchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*firstWaveLifecycleStatus=hold/);
+
+    const firstWaveLaunchOperationsOverviewStatusDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=launch-operations-overview-status&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveLaunchOperationsOverviewStatusDownload.body, /RockSolid Developer Ops Launch Operations Overview Status/);
+    assert.match(firstWaveLaunchOperationsOverviewStatusDownload.body, firstWaveLifecycleLinePattern);
+    assert.match(firstWaveLaunchOperationsOverviewStatusDownload.body, /Panels:[\s\S]*first_wave_lifecycle/);
 
     const firstWaveAuditBackfillStatusDownload = await getText(
       baseUrl,

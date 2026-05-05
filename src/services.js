@@ -24427,10 +24427,16 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     || steadyStateHandoffBrief?.launchOpsOverviewContext
     || steadyStateOperationalReview?.launchOpsOverviewContext
   );
+  const firstWaveLifecycle = steadyStateDutyActionLinks?.firstWaveLifecycle
+    || steadyStateDutyBoard?.firstWaveLifecycle
+    || steadyStateHandoffBrief?.firstWaveLifecycle
+    || steadyStateOperationalReview?.firstWaveLifecycle
+    || null;
   const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(handoffScope, launchOpsOverviewContext);
   const supportingDownloads = [
     handoffDownload,
     launchOpsOverviewDownload,
+    firstWaveLifecycle?.handoff?.primaryDownload || null,
     steadyStateHandoffBrief?.handoffDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
     steadyStateDutyActionLinks?.actionLinksDownload || null,
@@ -24460,6 +24466,11 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     watchRecordDraftRecordCount,
     productionSignoffPacket,
     launchDayWatchEntry,
+    firstWaveLifecycle,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     latestSteadyStateDutyPlanReceipt: latestSteadyStateDutyPlanReceiptPayload,
     receiptVisibilitySummary,
     operatorSummary: chain.complete === true
@@ -24545,6 +24556,11 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     || steadyStateDutyBoard?.launchOpsOverviewContext
     || steadyStateOperationalReview?.launchOpsOverviewContext
   );
+  const firstWaveLifecycle = handoffSummary.firstWaveLifecycle
+    || steadyStateDutyActionLinks?.firstWaveLifecycle
+    || steadyStateDutyBoard?.firstWaveLifecycle
+    || steadyStateOperationalReview?.firstWaveLifecycle
+    || null;
   const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(briefScope, launchOpsOverviewContext);
   const dailyChecklist = [
     {
@@ -24592,6 +24608,17 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       href: steadyStateDutyActionLinks?.actionLinksDownload?.href || null
     },
     {
+      key: "first_wave_lifecycle",
+      label: "Review first-wave lifecycle handoff",
+      status: firstWaveLifecycle?.status || "missing",
+      ready: Boolean(firstWaveLifecycle?.status),
+      summary: firstWaveLifecycle?.nextOperation
+        ? `Next operation is ${firstWaveLifecycle.nextOperation}; primary download is ${firstWaveLifecycle.primaryDownloadKey || "-"}.`
+        : "First-wave lifecycle evidence is not attached to this daily brief yet.",
+      fileName: firstWaveLifecycle?.primaryDownloadFileName || null,
+      href: firstWaveLifecycle?.primaryDownloadHref || null
+    },
+    {
       key: "production_signoff_packet",
       label: "Keep production sign-off packet attached",
       status: productionSignoffPacket ? "ready" : "missing",
@@ -24617,6 +24644,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
   for (const item of [
     briefDownload,
     launchOpsOverviewDownload,
+    firstWaveLifecycle?.handoff?.primaryDownload || null,
     handoffSummary.handoffDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
     steadyStateDutyActionLinks?.actionLinksDownload || null,
@@ -24663,6 +24691,11 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     productionSignoffPacket,
     launchDayWatchEntry,
     launchOpsOverviewContext,
+    firstWaveLifecycle,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     briefDownload,
     supportingDownloads,
     dailyChecklist,
@@ -24749,6 +24782,12 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     || steadyStateOperationalReview?.launchOpsOverviewContext
   );
   const launchOpsOverviewDownload = buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext);
+  const firstWaveLifecycle = dailyBrief.firstWaveLifecycle
+    || launchOperationsHandoffSummary?.firstWaveLifecycle
+    || steadyStateDutyActionLinks?.firstWaveLifecycle
+    || steadyStateDutyBoard?.firstWaveLifecycle
+    || steadyStateOperationalReview?.firstWaveLifecycle
+    || null;
   const operatorActions = [];
   const buildShiftExecutionPlan = ({
     key = "",
@@ -24797,6 +24836,11 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
       productionSignoffPacket: productionSignoffPacket || "",
       launchDayWatchEntry: launchDayWatchEntry || "",
+      firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
+      firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || "",
+      firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
+      firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || "",
+      firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
       note: `launch_operations_shift_action:${key || "shift_action"}`
     };
     return {
@@ -24819,7 +24863,12 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         watchRecordDraftStatus: watchRecordDraftStatus || "",
         watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
         productionSignoffPacket: productionSignoffPacket || "",
-        launchDayWatchEntry: launchDayWatchEntry || ""
+        launchDayWatchEntry: launchDayWatchEntry || "",
+        firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
+        firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || "",
+        firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
+        firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || "",
+        firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || ""
       }),
       confirmationLabel: label || key || "Confirm shift action",
       operatorHint: confirmation || summary || "Complete this shift action and record the result in the operator note.",
@@ -24936,6 +24985,21 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     summary: `${steadyStateDutyActionLinks?.actionCount ?? 0} mapped duty action link${Number(steadyStateDutyActionLinks?.actionCount ?? 0) === 1 ? "" : "s"} are available for operator follow-through.`,
     confirmation: "Use the mapped links instead of manually reconstructing API routes during launch watch."
   });
+  if (firstWaveLifecycle?.nextOperation || firstWaveLifecycle?.status) {
+    pushOperatorAction({
+      key: "review_first_wave_lifecycle",
+      label: "Review First-Wave Lifecycle",
+      priority: firstWaveLifecycle.status === "hold" ? "primary" : "secondary",
+      kind: "review",
+      status: firstWaveLifecycle.status || "review",
+      href: firstWaveLifecycle.primaryDownloadHref || steadyStateDutyActionLinks?.primaryIntent?.href || "",
+      fileName: firstWaveLifecycle.primaryDownloadFileName || "",
+      format: firstWaveLifecycle.primaryDownloadFormat || "",
+      source: "first_wave_lifecycle",
+      summary: `First-wave lifecycle is ${firstWaveLifecycle.status || "unknown"}; next operation is ${firstWaveLifecycle.nextOperation || "-"}.`,
+      confirmation: `Confirm first-wave lifecycle primary download ${firstWaveLifecycle.primaryDownloadKey || "-"} before shift handoff.`
+    });
+  }
   pushOperatorAction({
     key: queueTotal > 0 || attentionCount > 0 ? "review_steady_state_exception_queue" : "monitor_steady_state_exception_queue",
     label: queueTotal > 0 || attentionCount > 0 ? "Review Steady-State Exception Queue" : "Monitor Steady-State Exception Queue",
@@ -24982,6 +25046,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
   for (const item of [
     actionPlanDownload,
     launchOpsOverviewDownload,
+    firstWaveLifecycle?.handoff?.primaryDownload || null,
     dailyBrief.briefDownload || null,
     launchOperationsHandoffSummary?.handoffDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
@@ -25025,6 +25090,11 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     productionSignoffPacket,
     launchDayWatchEntry,
     launchOpsOverviewContext,
+    firstWaveLifecycle,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     nextReviewAction: dailyBrief.nextReviewAction || null,
     primaryAction: operatorActions[0] || null,
     actionCount: operatorActions.length,
@@ -25110,6 +25180,10 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     || dailyBrief?.launchOpsOverviewContext
     || handoffSummary?.launchOpsOverviewContext
   );
+  const firstWaveLifecycle = shiftPlan?.firstWaveLifecycle
+    || dailyBrief?.firstWaveLifecycle
+    || handoffSummary?.firstWaveLifecycle
+    || null;
   const overviewDownload = productCode ? buildDeveloperOpsLaunchOperationsOverviewStatusDownload(overviewScope) : null;
   const panels = [
     {
@@ -25143,6 +25217,14 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
       ready: Boolean(shiftPlan?.primaryAction?.executionPlan),
       href: shiftPlan?.actionPlanDownload?.href || null,
       fileName: shiftPlan?.actionPlanDownload?.fileName || null
+    },
+    {
+      key: "first_wave_lifecycle",
+      label: "First-Wave Lifecycle",
+      status: firstWaveLifecycle?.status || "missing",
+      ready: Boolean(firstWaveLifecycle?.status),
+      href: firstWaveLifecycle?.primaryDownloadHref || null,
+      fileName: firstWaveLifecycle?.primaryDownloadFileName || null
     }
   ];
   const receiptVisible = receiptVisibilitySummary?.status === "visible";
@@ -25178,6 +25260,11 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     productionSignoffPacket,
     launchDayWatchEntry,
     launchOpsOverviewContext,
+    firstWaveLifecycle,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     receiptVisibilityStatus: receiptVisibilitySummary?.status || "pending",
     receiptVisibilitySummary,
     canRecoverReceipt: Boolean(receiptVisibilitySummary?.failureRecovery?.route),
@@ -29620,6 +29707,10 @@ function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = 
     `- productionSignoffPacket=${summary.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${summary.launchDayWatchEntry || "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(summary.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   lines.push(
     `- handoffDownload=${summary.handoffDownload?.fileName || "-"}`
     + ` | format=${summary.handoffDownload?.format || "-"}`
@@ -29679,6 +29770,10 @@ function appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, brief = null, 
     `- productionSignoffPacket=${brief.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${brief.launchDayWatchEntry || "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(brief.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(brief.launchOpsOverviewContext);
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
@@ -29733,6 +29828,10 @@ function appendDeveloperOpsLaunchOperationsShiftActionPlanLines(lines, plan = nu
     `- productionSignoffPacket=${plan.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${plan.launchDayWatchEntry || "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(plan.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(plan.launchOpsOverviewContext);
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
@@ -29784,6 +29883,10 @@ function appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, overview =
     `- productionSignoffPacket=${overview.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${overview.launchDayWatchEntry || "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(overview.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(overview.launchOpsOverviewContext);
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
@@ -31433,6 +31536,7 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
     `Operator Summary: ${handoffSummary?.operatorSummary || "-"}`,
     `Watch Record Draft: watchRecordDraft=${handoffSummary?.watchRecordDraftStatus || "-"} | records=${handoffSummary?.watchRecordDraftRecordCount ?? "-"}`,
     `Production Signoff: productionSignoffPacket=${handoffSummary?.productionSignoffPacket || "-"} | launchDayWatchEntry=${handoffSummary?.launchDayWatchEntry || "-"}`,
+    formatDeveloperOpsFirstWaveLifecycleSummaryText(handoffSummary?.firstWaveLifecycle) || "First-Wave Lifecycle: -",
     ""
   ];
   if (launchOpsOverviewContext) {
@@ -31441,6 +31545,10 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
       `- productionSignoffPacket=${handoffSummary?.productionSignoffPacket || "-"}`
       + ` | launchDayWatchEntry=${handoffSummary?.launchDayWatchEntry || "-"}`
     );
+    const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(handoffSummary?.firstWaveLifecycle);
+    if (firstWaveLifecycleText) {
+      lines.push(`- ${firstWaveLifecycleText}`);
+    }
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(
       `- launchOpsOverviewDownload=${formatLaunchHandoffDownloadText(
@@ -31589,6 +31697,10 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
     `- productionSignoffPacket=${dailyBrief?.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${dailyBrief?.launchDayWatchEntry || "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(dailyBrief?.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(
@@ -31736,6 +31848,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     `- productionSignoffPacket=${actionPlan?.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${actionPlan?.launchDayWatchEntry || "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(actionPlan?.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(
@@ -31802,6 +31918,9 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | launchOpsOverviewContext=${payload.launchOpsOverviewContextKind || "-"}`
         + ` | productionSignoffPacket=${payload.productionSignoffPacket || "-"}`
         + ` | launchDayWatchEntry=${payload.launchDayWatchEntry || "-"}`
+        + ` | firstWaveLifecycleStatus=${payload.firstWaveLifecycleStatus || "-"}`
+        + ` | firstWaveLifecycleNextOperation=${payload.firstWaveLifecycleNextOperation || "-"}`
+        + ` | firstWaveLifecyclePrimaryDownloadKey=${payload.firstWaveLifecyclePrimaryDownloadKey || "-"}`
       );
       lines.push(`  - note=${payload.note || "-"} | hint=${receiptPlan.operatorHint || "-"}`);
     }
@@ -31875,6 +31994,10 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     `- productionSignoffPacket=${overview?.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${overview?.launchDayWatchEntry || "-"}`
   );
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(overview?.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   if (launchOpsOverviewContext) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(

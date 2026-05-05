@@ -16689,6 +16689,34 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.stabilizationStatusReceipt.confirmationAuditLogId,
       stabilizationConfirmation.auditLogId
     );
+    const confirmedFirstWaveRecommendations = await getJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations?productCode=EXPORT_ALPHA&channel=stable&limit=20",
+      operatorSession.token
+    );
+    const confirmedLifecycleHandoff = confirmedFirstWaveRecommendations.postLaunchLifecycleHandoff;
+    assert.equal(confirmedLifecycleHandoff.stabilizationConfirmation.status, "confirmed");
+    assert.equal(confirmedLifecycleHandoff.stabilizationConfirmation.auditLogId, stabilizationConfirmation.auditLogId);
+    assert.equal(confirmedLifecycleHandoff.stabilizationConfirmation.decision, "confirmed");
+    assert.equal(confirmedLifecycleHandoff.stabilizationConfirmation.confirmedBy.username, "ops.export.operator");
+    assert.match(confirmedLifecycleHandoff.stabilizationConfirmation.opsDownload.href || "", /format=stabilization-handoff/);
+    assert.match(confirmedLifecycleHandoff.stabilizationConfirmation.mainlineDownload.href || "", /format=stabilization-handoff/);
+    assert.equal(confirmedLifecycleHandoff.closeoutReadiness.status, "awaiting_resolution");
+    assert.equal(confirmedLifecycleHandoff.closeoutReadiness.canClose, false);
+    assert.equal(confirmedLifecycleHandoff.closeoutReadiness.closeoutReviewReady, false);
+    assert.equal(confirmedLifecycleHandoff.closeoutReadiness.nextAction.key, "operational_exception_resolution");
+    assert.equal(confirmedLifecycleHandoff.closeoutReadiness.nextAction.operation, "record_launch_rehearsal_run");
+    const confirmedFirstWaveSummary = await getText(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations/download?productCode=EXPORT_ALPHA&channel=stable&format=summary&limit=20",
+      operatorSession.token
+    );
+    assert.match(confirmedFirstWaveSummary.body, /stabilizationConfirmation=confirmed/);
+    assert.match(confirmedFirstWaveSummary.body, new RegExp(`audit=${stabilizationConfirmation.auditLogId}`));
+    assert.match(confirmedFirstWaveSummary.body, /opsDownload=.*format=stabilization-handoff/i);
+    assert.match(confirmedFirstWaveSummary.body, /mainlineDownload=.*format=stabilization-handoff/i);
+    assert.match(confirmedFirstWaveSummary.body, /closeoutReadiness=awaiting_resolution \| canClose=false \| closeoutReady=false/);
+    assert.match(confirmedFirstWaveSummary.body, /closeoutNext=operational_exception_resolution \| operation=record_launch_rehearsal_run/);
     const operationalExceptionEntry = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.operationalExceptionEntry;
     assert.ok(operationalExceptionEntry);
     assert.equal(operationalExceptionEntry.version, "developer-ops-operational-exception-entry/v1");

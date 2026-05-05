@@ -17626,7 +17626,33 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     );
   }
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
-  appendPostLaunchHandoffTraceabilityTextLines(lines, payload.postLaunchHandoffTraceability);
+  const postLaunchHandoffTraceability = (() => {
+    const traceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload)
+      || payload.postLaunchHandoffTraceability
+      || null;
+    if (!traceability || traceability.stabilizationHandoffConfirmation) {
+      return traceability;
+    }
+    const stabilizationPanel = mainlineSummary.stabilizationHandoffPanel && typeof mainlineSummary.stabilizationHandoffPanel === "object"
+      ? mainlineSummary.stabilizationHandoffPanel
+      : null;
+    if (!stabilizationPanel?.confirmationStatus) {
+      return traceability;
+    }
+    return {
+      ...traceability,
+      stabilizationHandoffConfirmation: {
+        status: stabilizationPanel.confirmationStatus || null,
+        auditLogId: stabilizationPanel.confirmationAuditLogId || null,
+        decision: stabilizationPanel.decision || null,
+        confirmedBy: stabilizationPanel.confirmationBy
+          ? { username: stabilizationPanel.confirmationBy }
+          : null,
+        launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(stabilizationPanel.launchOpsOverviewContext)
+      }
+    };
+  })();
+  appendPostLaunchHandoffTraceabilityTextLines(lines, postLaunchHandoffTraceability);
   if (productionGateChecks.length) {
     lines.push("");
     lines.push("Production Gate Checks:");
@@ -19577,11 +19603,23 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
   const lifecyclePrimaryDownload = lifecycle.primaryRecommendedDownload && typeof lifecycle.primaryRecommendedDownload === "object"
     ? lifecycle.primaryRecommendedDownload
     : null;
-  const stabilizationHandoffConfirmation = buildStabilizationHandoffConfirmationPayload(
+  const stabilizationHandoffConfirmationBase = buildStabilizationHandoffConfirmationPayload(
     opsSnapshot.summary?.initialLaunchOpsReadiness?.stabilizationHandoff?.confirmation
       || opsSnapshot.summary?.initialLaunchOpsReadiness?.traceability?.stabilizationHandoffConfirmation
       || null
   );
+  const stabilizationLaunchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
+    stabilizationHandoffConfirmationBase?.launchOpsOverviewContext
+    || mainlineSummary.stabilizationHandoffPanel?.launchOpsOverviewContext
+    || opsSnapshot.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.launchOpsOverviewContext
+  );
+  const stabilizationHandoffConfirmation = stabilizationHandoffConfirmationBase
+    ? {
+        ...stabilizationHandoffConfirmationBase,
+        launchOpsOverviewContext: stabilizationLaunchOpsOverviewContext,
+        launchOpsOverviewDownload: buildLaunchOpsOverviewContextDownload(stabilizationLaunchOpsOverviewContext)
+      }
+    : null;
   return {
     launchReceiptAuditBackfill,
     launchReceiptAuditBackfillStatus,
@@ -26059,6 +26097,59 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
   const stabilizationLifecycleHandoffDownload = normalizePostLaunchLifecycleDownload(
     opsSnapshot?.mainlineHandoff?.downloads?.stabilizationHandoff
   );
+  const stabilizationHandoffConfirmation = buildStabilizationHandoffConfirmationPayload(
+    readiness.stabilizationHandoff?.confirmation
+      || readiness.traceability?.stabilizationHandoffConfirmation
+      || null
+  );
+  const stabilizationConfirmationPayload = stabilizationHandoffConfirmation
+    ? {
+        auditLogId: stabilizationHandoffConfirmation.auditLogId || null,
+        status: stabilizationHandoffConfirmation.status || null,
+        decision: stabilizationHandoffConfirmation.decision || null,
+        handoffFileName: stabilizationHandoffConfirmation.handoffFileName || null,
+        confirmedAt: stabilizationHandoffConfirmation.confirmedAt || null,
+        confirmedBy: stabilizationHandoffConfirmation.confirmedBy
+          ? {
+              actorType: stabilizationHandoffConfirmation.confirmedBy.actorType || null,
+              username: stabilizationHandoffConfirmation.confirmedBy.username || null,
+              role: stabilizationHandoffConfirmation.confirmedBy.role || null
+            }
+          : null,
+        opsDownload: normalizePostLaunchLifecycleDownload(
+          stabilizationHandoffConfirmation.opsDownloads?.stabilizationHandoff
+        ),
+        mainlineDownload: normalizePostLaunchLifecycleDownload(
+          stabilizationHandoffConfirmation.launchMainlineDownloads?.stabilizationHandoff
+        ) || stabilizationLifecycleHandoffDownload
+      }
+    : null;
+  const closeoutReadinessSummary = readiness.closeoutReadinessSummary
+    || readiness.traceability?.closeoutReadinessSummary
+    || null;
+  const closeoutReadinessPayload = closeoutReadinessSummary && typeof closeoutReadinessSummary === "object"
+    ? {
+        status: closeoutReadinessSummary.status || null,
+        canClose: closeoutReadinessSummary.canClose === true,
+        closeoutReviewReady: closeoutReadinessSummary.closeoutReviewReady === true,
+        steadyStateReady: closeoutReadinessSummary.steadyStateReady === true,
+        blockingCount: Number(closeoutReadinessSummary.blockingCount ?? 0),
+        blockerKeys: Array.isArray(closeoutReadinessSummary.blockerKeys)
+          ? closeoutReadinessSummary.blockerKeys.filter(Boolean)
+          : [],
+        nextAction: closeoutReadinessSummary.nextAction && typeof closeoutReadinessSummary.nextAction === "object"
+          ? {
+              key: closeoutReadinessSummary.nextAction.key || null,
+              operation: closeoutReadinessSummary.nextAction.operation || closeoutReadinessSummary.nextOperation || null,
+              endpoint: closeoutReadinessSummary.nextAction.endpoint || null,
+              method: closeoutReadinessSummary.nextAction.method || null,
+              enabled: closeoutReadinessSummary.nextAction.enabled === true,
+              downloadKey: closeoutReadinessSummary.nextAction.downloadKey || closeoutReadinessSummary.nextDownloadKey || null,
+              recommendedDownload: normalizePostLaunchLifecycleDownload(closeoutReadinessSummary.nextAction.recommendedDownload)
+            }
+          : null
+      }
+    : null;
   const postLaunchLifecycleHandoff = latestLaunchReceipt?.postLaunchLifecycleStatus
     ? {
         status: latestLaunchReceipt.postLaunchLifecycleStatus,
@@ -26085,7 +26176,9 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         handoffDownloads: {
           closeout: closeoutLifecycleHandoffDownload,
           stabilization: stabilizationLifecycleHandoffDownload
-        }
+        },
+        stabilizationConfirmation: stabilizationConfirmationPayload,
+        closeoutReadiness: closeoutReadinessPayload
       }
     : null;
   const firstRoundOpsPayload = {
@@ -26129,6 +26222,8 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         }
       : null,
     initialLaunchOpsReadinessStatus: readiness.status || null,
+    stabilizationConfirmationAuditLogId: stabilizationConfirmationPayload?.auditLogId || null,
+    closeoutReadinessStatus: closeoutReadinessPayload?.status || null,
     firstLaunchHandoffDownload: readiness.firstLaunchHandoffDownload || opsSnapshot?.mainlineHandoff?.downloads?.firstLaunchHandoff || null
   };
   const launchReadinessBridge = buildDeveloperOpsFirstWaveReadinessBridgePayload({
@@ -26435,6 +26530,32 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
         + ` | file=${lifecycleHandoffDownloads.stabilization.fileName || "-"}`
         + ` | format=${lifecycleHandoffDownloads.stabilization.format || "-"}`
         + ` | href=${lifecycleHandoffDownloads.stabilization.href || "-"}`
+      );
+    }
+    if (postLaunchLifecycleHandoff.stabilizationConfirmation) {
+      const confirmation = postLaunchLifecycleHandoff.stabilizationConfirmation;
+      lines.push(
+        `- stabilizationConfirmation=${confirmation.status || "-"}`
+        + ` | audit=${confirmation.auditLogId || "-"}`
+        + ` | decision=${confirmation.decision || "-"}`
+        + ` | by=${confirmation.confirmedBy?.username || "-"}`
+        + ` | opsDownload=${confirmation.opsDownload?.href || confirmation.opsDownload?.key || "-"}`
+        + ` | mainlineDownload=${confirmation.mainlineDownload?.href || confirmation.mainlineDownload?.key || "-"}`
+      );
+    }
+    if (postLaunchLifecycleHandoff.closeoutReadiness) {
+      const closeoutReadiness = postLaunchLifecycleHandoff.closeoutReadiness;
+      lines.push(
+        `- closeoutReadiness=${closeoutReadiness.status || "-"}`
+        + ` | canClose=${closeoutReadiness.canClose === true}`
+        + ` | closeoutReady=${closeoutReadiness.closeoutReviewReady === true}`
+        + ` | blockers=${closeoutReadiness.blockingCount ?? 0}`
+      );
+      lines.push(
+        `- closeoutNext=${closeoutReadiness.nextAction?.key || "-"}`
+        + ` | operation=${closeoutReadiness.nextAction?.operation || "-"}`
+        + ` | enabled=${closeoutReadiness.nextAction?.enabled === true}`
+        + ` | download=${closeoutReadiness.nextAction?.recommendedDownload?.key || closeoutReadiness.nextAction?.downloadKey || "-"}`
       );
     }
   }
@@ -45656,6 +45777,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             productCodes: scopedProductCodes
           })
         : { items: [] };
+      const stabilizationHandoffConfirmationAuditLogs = shouldBackfillProtectiveAuditRows
+        ? queryAuditLogRows(db, {
+            eventType: "developer.ops.stabilization-handoff.confirm",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
       const firstWaveRuntimeLoginAuditLogs = shouldBackfillProtectiveAuditRows
         ? queryAuditLogRows(db, {
             eventType: "session.login",
@@ -45690,6 +45819,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       if (firstWaveReadinessAuditLogs.items?.length) {
         mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveReadinessAuditLogs.items);
       }
+      if (stabilizationHandoffConfirmationAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, stabilizationHandoffConfirmationAuditLogs.items);
+      }
       if (firstWaveRuntimeLoginAuditLogs.items?.length) {
         mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveRuntimeLoginAuditLogs.items);
       }
@@ -45702,6 +45834,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const usedProtectiveAuditBackfill = launchReceiptAuditLogs.items?.length
         || firstWaveHandoffAuditLogs.items?.length
         || firstWaveReadinessAuditLogs.items?.length
+        || stabilizationHandoffConfirmationAuditLogs.items?.length
         || firstWaveRuntimeLoginAuditLogs.items?.length
         || firstWaveRuntimeCardRedeemAuditLogs.items?.length
         || firstWaveRuntimeDirectCardRedeemAuditLogs.items?.length;
@@ -45715,6 +45848,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
               launchReceiptBackfill: launchReceiptAuditLogs.items?.length || 0,
               firstWaveHandoffBackfill: firstWaveHandoffAuditLogs.items?.length || 0,
               firstWaveReadinessBackfill: firstWaveReadinessAuditLogs.items?.length || 0,
+              stabilizationHandoffConfirmationBackfill: stabilizationHandoffConfirmationAuditLogs.items?.length || 0,
               firstWaveRuntimeBackfill: (firstWaveRuntimeLoginAuditLogs.items?.length || 0)
                 + (firstWaveRuntimeCardRedeemAuditLogs.items?.length || 0)
                 + (firstWaveRuntimeDirectCardRedeemAuditLogs.items?.length || 0)

@@ -21090,6 +21090,24 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
   const href = String(item.href ?? metadata.href ?? "").trim();
   const fileName = String(item.fileName ?? metadata.fileName ?? "").trim();
   const format = normalizeDeveloperOpsConfirmationToken(item.format || metadata.format, "");
+  const launchOpsOverviewContextKind = normalizeDeveloperOpsConfirmationToken(
+    item.launchOpsOverviewContextKind || metadata.launchOpsOverviewContextKind,
+    ""
+  );
+  const launchOpsOverviewDownloadKey = normalizeDeveloperOpsConfirmationToken(
+    item.launchOpsOverviewDownloadKey || metadata.launchOpsOverviewDownloadKey,
+    ""
+  );
+  const launchOpsOverviewDownloadFileName = String(
+    item.launchOpsOverviewDownloadFileName ?? metadata.launchOpsOverviewDownloadFileName ?? ""
+  ).trim();
+  const launchOpsOverviewDownloadFormat = normalizeDeveloperOpsConfirmationToken(
+    item.launchOpsOverviewDownloadFormat || metadata.launchOpsOverviewDownloadFormat,
+    ""
+  );
+  const launchOpsOverviewDownloadHref = String(
+    item.launchOpsOverviewDownloadHref ?? metadata.launchOpsOverviewDownloadHref ?? ""
+  ).trim();
   const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
   const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
   const note = String(item.note ?? metadata.note ?? "").trim();
@@ -21110,6 +21128,11 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     href,
     fileName,
     format,
+    launchOpsOverviewContextKind,
+    launchOpsOverviewDownloadKey,
+    launchOpsOverviewDownloadFileName,
+    launchOpsOverviewDownloadFormat,
+    launchOpsOverviewDownloadHref,
     focusKind,
     focusReason,
     note,
@@ -21132,6 +21155,11 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       href,
       fileName,
       format,
+      launchOpsOverviewContextKind,
+      launchOpsOverviewDownloadKey,
+      launchOpsOverviewDownloadFileName,
+      launchOpsOverviewDownloadFormat,
+      launchOpsOverviewDownloadHref,
       focusKind,
       focusReason,
       note,
@@ -21158,6 +21186,11 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
     href: String(receipt.href || "").trim(),
     fileName: String(receipt.fileName || "").trim(),
     format: normalizeDeveloperOpsConfirmationToken(receipt.format, ""),
+    launchOpsOverviewContextKind: normalizeDeveloperOpsConfirmationToken(receipt.launchOpsOverviewContextKind, ""),
+    launchOpsOverviewDownloadKey: normalizeDeveloperOpsConfirmationToken(receipt.launchOpsOverviewDownloadKey, ""),
+    launchOpsOverviewDownloadFileName: String(receipt.launchOpsOverviewDownloadFileName || "").trim(),
+    launchOpsOverviewDownloadFormat: normalizeDeveloperOpsConfirmationToken(receipt.launchOpsOverviewDownloadFormat, ""),
+    launchOpsOverviewDownloadHref: String(receipt.launchOpsOverviewDownloadHref || "").trim(),
     focusKind: normalizeDeveloperOpsConfirmationToken(receipt.focusKind, ""),
     focusReason: String(receipt.focusReason || "").trim(),
     note: String(receipt.note || "").trim()
@@ -23733,6 +23766,13 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
   const watchRecordDraftRecordCount = steadyStateDutyBoard.watchRecordDraftRecordCount ?? null;
   const productionSignoffPacket = steadyStateDutyBoard.productionSignoffPacket || null;
   const launchDayWatchEntry = steadyStateDutyBoard.launchDayWatchEntry || null;
+  const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
+    linkScope,
+    steadyStateDutyBoard.launchOpsOverviewContext
+  );
+  const launchOpsOverviewDownload = productCode
+    ? buildDeveloperOpsLaunchOperationsOverviewStatusDownload(linkScope)
+    : buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext);
   const firstWaveLifecycle = steadyStateDutyBoard.firstWaveLifecycle
     && typeof steadyStateDutyBoard.firstWaveLifecycle === "object"
     ? steadyStateDutyBoard.firstWaveLifecycle
@@ -23840,6 +23880,11 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
       channel,
       productionSignoffPacket: productionSignoffPacket || "",
       launchDayWatchEntry: launchDayWatchEntry || "",
+      launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || "",
+      launchOpsOverviewDownloadKey: launchOpsOverviewDownload?.key || launchOpsOverviewContext?.downloadKey || "",
+      launchOpsOverviewDownloadFileName: launchOpsOverviewDownload?.fileName || launchOpsOverviewContext?.downloadFileName || "",
+      launchOpsOverviewDownloadFormat: launchOpsOverviewDownload?.format || launchOpsOverviewContext?.downloadFormat || "",
+      launchOpsOverviewDownloadHref: launchOpsOverviewDownload?.href || launchOpsOverviewContext?.downloadHref || "",
       watchRecordDraftStatus: watchRecordDraftStatus || "",
       watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
       firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
@@ -23946,6 +23991,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
     firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
     firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
+    launchOpsOverviewContext,
+    launchOpsOverviewDownload,
     actionCount: quickActions.length,
     workspaceLinkCount: workspaceLinks.length,
     controlLinkCount: controlLinks.length,
@@ -24407,7 +24454,11 @@ function buildDeveloperOpsLaunchOperationsEvidenceChain({
       planKind: latestSteadyStateDutyPlanReceipt?.planKind || null,
       planMode: latestSteadyStateDutyPlanReceipt?.planMode || null,
       fileName: latestSteadyStateDutyPlanReceipt?.fileName || null,
-      format: latestSteadyStateDutyPlanReceipt?.format || null
+      format: latestSteadyStateDutyPlanReceipt?.format || null,
+      launchOpsOverviewDownloadKey: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadKey || null,
+      launchOpsOverviewDownloadFileName: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadFileName || null,
+      launchOpsOverviewDownloadFormat: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadFormat || null,
+      launchOpsOverviewDownloadHref: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadHref || null
     }
   ];
   const completedStages = stages.filter((item) => item.auditLogId && item.status !== "missing");
@@ -29715,6 +29766,11 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
         + (prefill.firstWaveLifecycleStatus ? ` | firstWaveLifecycleStatus=${prefill.firstWaveLifecycleStatus}` : "")
         + (prefill.firstWaveLifecycleNextOperation ? ` | firstWaveLifecycleNextOperation=${prefill.firstWaveLifecycleNextOperation}` : "")
         + (prefill.firstWaveLifecyclePrimaryDownloadKey ? ` | firstWaveLifecyclePrimaryDownloadKey=${prefill.firstWaveLifecyclePrimaryDownloadKey}` : "")
+        + (prefill.launchOpsOverviewContextKind ? ` | launchOpsOverviewContextKind=${prefill.launchOpsOverviewContextKind}` : "")
+        + (prefill.launchOpsOverviewDownloadKey ? ` | launchOpsOverviewDownloadKey=${prefill.launchOpsOverviewDownloadKey}` : "")
+        + (prefill.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${prefill.launchOpsOverviewDownloadFileName}` : "")
+        + (prefill.launchOpsOverviewDownloadFormat ? ` | launchOpsOverviewDownloadFormat=${prefill.launchOpsOverviewDownloadFormat}` : "")
+        + (prefill.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${prefill.launchOpsOverviewDownloadHref}` : "")
       );
     }
   };
@@ -29745,6 +29801,9 @@ function appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, chain = nul
       + ` | audit=${item.auditLogId || "-"}`
       + ` | action=${item.action || item.operation || "-"}`
       + ` | file=${item.fileName || item.format || "-"}`
+      + (item.launchOpsOverviewDownloadKey ? ` | launchOpsOverviewDownloadKey=${item.launchOpsOverviewDownloadKey}` : "")
+      + (item.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${item.launchOpsOverviewDownloadFileName}` : "")
+      + (item.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${item.launchOpsOverviewDownloadHref}` : "")
     );
   }
   if (chain.nextReviewAction) {
@@ -30379,6 +30438,9 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | intent=${latestSteadyStateDutyPlanReceipt.intent || "-"}`
         + ` | plan=${latestSteadyStateDutyPlanReceipt.planKind || "-"}:${latestSteadyStateDutyPlanReceipt.planMode || "-"}`
         + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || latestSteadyStateDutyPlanReceipt.format || "-"}`
+        + ` | launchOpsOverviewDownloadKey=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadKey || "-"}`
+        + ` | launchOpsOverviewDownloadFileName=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadFileName || "-"}`
+        + ` | launchOpsOverviewDownloadHref=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadHref || "-"}`
       );
       if (latestSteadyStateDutyPlanReceipt.receiptVisibility) {
         lines.push(
@@ -30962,6 +31024,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       + ` | intent=${latestSteadyStateDutyPlanReceipt.intent || "-"}`
       + ` | plan=${latestSteadyStateDutyPlanReceipt.planKind || "-"}:${latestSteadyStateDutyPlanReceipt.planMode || "-"}`
       + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || latestSteadyStateDutyPlanReceipt.format || "-"}`
+      + ` | launchOpsOverviewDownloadKey=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadKey || "-"}`
+      + ` | launchOpsOverviewDownloadFileName=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadFileName || "-"}`
+      + ` | launchOpsOverviewDownloadHref=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadHref || "-"}`
     );
     if (latestSteadyStateDutyPlanReceipt.receiptVisibility) {
       lines.push(
@@ -46159,6 +46224,27 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const fileName = rawFileName
         ? normalizeDeveloperOpsConfirmationFileName(rawFileName, rawFileName)
         : "";
+      const launchOpsOverviewContextKind = normalizeDeveloperOpsConfirmationToken(
+        body.launchOpsOverviewContextKind || body.dutyPlanLaunchOpsOverviewContextKind,
+        ""
+      );
+      const launchOpsOverviewDownloadKey = normalizeDeveloperOpsConfirmationToken(
+        body.launchOpsOverviewDownloadKey || body.dutyPlanLaunchOpsOverviewDownloadKey,
+        ""
+      );
+      const rawLaunchOpsOverviewDownloadFileName = String(
+        body.launchOpsOverviewDownloadFileName ?? body.dutyPlanLaunchOpsOverviewDownloadFileName ?? ""
+      ).trim();
+      const launchOpsOverviewDownloadFileName = rawLaunchOpsOverviewDownloadFileName
+        ? normalizeDeveloperOpsConfirmationFileName(rawLaunchOpsOverviewDownloadFileName, rawLaunchOpsOverviewDownloadFileName)
+        : "";
+      const launchOpsOverviewDownloadFormat = normalizeDeveloperOpsConfirmationToken(
+        body.launchOpsOverviewDownloadFormat || body.dutyPlanLaunchOpsOverviewDownloadFormat,
+        ""
+      );
+      const launchOpsOverviewDownloadHref = String(
+        body.launchOpsOverviewDownloadHref ?? body.dutyPlanLaunchOpsOverviewDownloadHref ?? ""
+      ).trim().slice(0, 1000);
       const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
       const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
@@ -46196,6 +46282,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           href,
           fileName,
           format,
+          launchOpsOverviewContextKind,
+          launchOpsOverviewDownloadKey,
+          launchOpsOverviewDownloadFileName,
+          launchOpsOverviewDownloadFormat,
+          launchOpsOverviewDownloadHref,
           focusKind,
           focusReason,
           note,
@@ -46222,6 +46313,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           href,
           fileName,
           format,
+          launchOpsOverviewContextKind,
+          launchOpsOverviewDownloadKey,
+          launchOpsOverviewDownloadFileName,
+          launchOpsOverviewDownloadFormat,
+          launchOpsOverviewDownloadHref,
           focusKind,
           focusReason,
           note,

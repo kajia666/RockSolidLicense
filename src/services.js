@@ -23643,6 +23643,10 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
   const watchRecordDraftRecordCount = steadyStateDutyBoard.watchRecordDraftRecordCount ?? null;
   const productionSignoffPacket = steadyStateDutyBoard.productionSignoffPacket || null;
   const launchDayWatchEntry = steadyStateDutyBoard.launchDayWatchEntry || null;
+  const firstWaveLifecycle = steadyStateDutyBoard.firstWaveLifecycle
+    && typeof steadyStateDutyBoard.firstWaveLifecycle === "object"
+    ? steadyStateDutyBoard.firstWaveLifecycle
+    : null;
   const quickActions = Array.isArray(steadyStateDutyBoard.quickActions)
     ? steadyStateDutyBoard.quickActions
     : [];
@@ -23704,6 +23708,9 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     if (type === "download" || /download|format=|\.txt|\.csv|\.zip/.test(signal)) {
       return "download_asset";
     }
+    if (/first.wave.lifecycle|first_wave_lifecycle|first-wave lifecycle|lifecycle/.test(signal)) {
+      return "review_first_wave_lifecycle";
+    }
     if (type === "workspace" || /workspace|developer\/ops/.test(signal)) {
       return "open_workspace";
     }
@@ -23745,6 +23752,11 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
       launchDayWatchEntry: launchDayWatchEntry || "",
       watchRecordDraftStatus: watchRecordDraftStatus || "",
       watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
+      firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
+      firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || "",
+      firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
+      firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || "",
+      firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
       ...hrefParams
     });
     if (intent === "download_asset") {
@@ -23839,6 +23851,11 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     launchDayWatchEntry: steadyStateDutyBoard.launchDayWatchEntry || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
+    firstWaveLifecycle,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     actionCount: quickActions.length,
     workspaceLinkCount: workspaceLinks.length,
     controlLinkCount: controlLinks.length,
@@ -23853,7 +23870,9 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     primaryAction: workspaceLinks[0] || controlLinks[0] || downloadLinks[0] || null,
     actionLinks,
     actionLinksDownload,
-    summary: quickActions.length
+    summary: firstWaveLifecycle?.nextOperation
+      ? `Steady-state duty actions include first-wave lifecycle prefill for ${firstWaveLifecycle.nextOperation}.`
+      : quickActions.length
       ? "Steady-state duty actions are mapped to workspace, control, and download links."
       : "No steady-state duty actions are currently mapped."
   };
@@ -29447,6 +29466,10 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
       + ` | launchDayWatchEntry=${actionLinks.launchDayWatchEntry || "-"}`
     );
   }
+  const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(actionLinks.firstWaveLifecycle);
+  if (firstWaveLifecycleText) {
+    lines.push(`- ${firstWaveLifecycleText}`);
+  }
   if (actionLinks.primaryAction) {
     lines.push(
       `- primaryAction=${actionLinks.primaryAction.label || actionLinks.primaryAction.key || "-"}`
@@ -29498,6 +29521,7 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
     }
     lines.push(`- ${label}:`);
     for (const plan of plans) {
+      const prefill = plan.prefill && typeof plan.prefill === "object" ? plan.prefill : {};
       lines.push(
         `  - kind=${plan.kind || "-"}`
         + ` | mode=${plan.mode || "-"}`
@@ -29506,6 +29530,9 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
         + ` | href=${plan.href || "-"}`
         + (plan.fileName ? ` | file=${plan.fileName}` : "")
         + (plan.format ? ` | format=${plan.format}` : "")
+        + (prefill.firstWaveLifecycleStatus ? ` | firstWaveLifecycleStatus=${prefill.firstWaveLifecycleStatus}` : "")
+        + (prefill.firstWaveLifecycleNextOperation ? ` | firstWaveLifecycleNextOperation=${prefill.firstWaveLifecycleNextOperation}` : "")
+        + (prefill.firstWaveLifecyclePrimaryDownloadKey ? ` | firstWaveLifecyclePrimaryDownloadKey=${prefill.firstWaveLifecyclePrimaryDownloadKey}` : "")
       );
     }
   };
@@ -31147,6 +31174,7 @@ function buildDeveloperOpsSteadyStateDutyActionLinksText(payload = {}) {
       : [];
     if (plans.length) {
       for (const plan of plans) {
+        const prefill = plan.prefill && typeof plan.prefill === "object" ? plan.prefill : {};
         lines.push(
           `- kind=${plan.kind || "-"}`
           + ` | mode=${plan.mode || "-"}`
@@ -31155,6 +31183,9 @@ function buildDeveloperOpsSteadyStateDutyActionLinksText(payload = {}) {
           + ` | href=${plan.href || "-"}`
           + (plan.fileName ? ` | file=${plan.fileName}` : "")
           + (plan.format ? ` | format=${plan.format}` : "")
+          + (prefill.firstWaveLifecycleStatus ? ` | firstWaveLifecycleStatus=${prefill.firstWaveLifecycleStatus}` : "")
+          + (prefill.firstWaveLifecycleNextOperation ? ` | firstWaveLifecycleNextOperation=${prefill.firstWaveLifecycleNextOperation}` : "")
+          + (prefill.firstWaveLifecyclePrimaryDownloadKey ? ` | firstWaveLifecyclePrimaryDownloadKey=${prefill.firstWaveLifecyclePrimaryDownloadKey}` : "")
           + (plan.confirmationLabel ? ` | confirm=${plan.confirmationLabel}` : "")
         );
       }

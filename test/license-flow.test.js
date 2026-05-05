@@ -15156,6 +15156,40 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       firstWaveSteadyStateDutyBoard.firstWaveLifecycle?.primaryDownloadKey,
       afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
     );
+    const firstWaveSteadyStateDutyActionLinks = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.steadyStateDutyActionLinks;
+    assert.ok(firstWaveSteadyStateDutyActionLinks);
+    assert.equal(firstWaveSteadyStateDutyActionLinks.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      firstWaveSteadyStateDutyActionLinks.firstWaveLifecycle?.nextOperation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
+    assert.equal(
+      firstWaveSteadyStateDutyActionLinks.firstWaveLifecycle?.primaryDownloadKey,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+    );
+    assert.ok(firstWaveSteadyStateDutyActionLinks.controlLinks.some((item) =>
+      item.source === "first_wave_lifecycle"
+      && item.key === "review_first_wave_lifecycle"
+      && item.label === "Review First-Wave Lifecycle"
+    ));
+    const firstWaveLifecycleIntent = firstWaveSteadyStateDutyActionLinks.controlIntents.find((item) =>
+      item.source === "first_wave_lifecycle"
+    );
+    assert.ok(firstWaveLifecycleIntent);
+    assert.equal(firstWaveLifecycleIntent.intent, "review_first_wave_lifecycle");
+    assert.equal(firstWaveLifecycleIntent.executionPlan?.prefill?.firstWaveLifecycleStatus, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      firstWaveLifecycleIntent.executionPlan?.prefill?.firstWaveLifecycleNextOperation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
+    assert.equal(
+      firstWaveLifecycleIntent.executionPlan?.prefill?.firstWaveLifecyclePrimaryDownloadKey,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+    );
+    assert.ok(firstWaveSteadyStateDutyActionLinks.downloadLinks.some((item) =>
+      item.key === afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+      && item.format === afterSetup.postLaunchLifecycleHandoff.primaryDownload.format
+    ));
     assert.equal(
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.firstWaveHandoffConfirmation.auditLogId,
       handoffConfirmation.auditLogId
@@ -15186,6 +15220,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*operation=record_operations_walkthrough/);
     assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Handoff Brief:[\s\S]*firstWaveLifecycle=hold/);
     assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Duty Action Links:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(confirmedOpsSnapshot.summaryText, /Steady-State Duty Action Links:[\s\S]*intent=review_first_wave_lifecycle/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Status: USED/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill Source: first-wave-audit-backfill/);
@@ -15381,6 +15417,22 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(firstWaveSteadyStateDutyBoardDownload.body, /RockSolid Developer Ops Steady-State Duty Board/);
     assert.match(firstWaveSteadyStateDutyBoardDownload.body, /Duty Signals:/);
     assert.match(firstWaveSteadyStateDutyBoardDownload.body, firstWaveLifecycleLinePattern);
+
+    const firstWaveSteadyStateDutyActionLinksDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&format=steady-state-duty-action-links&limit=80",
+      operatorSession.token
+    );
+    assert.match(firstWaveSteadyStateDutyActionLinksDownload.body, /RockSolid Developer Ops Steady-State Duty Action Links/);
+    assert.match(firstWaveSteadyStateDutyActionLinksDownload.body, /Action Link Summary:/);
+    assert.match(firstWaveSteadyStateDutyActionLinksDownload.body, firstWaveLifecycleLinePattern);
+    assert.match(firstWaveSteadyStateDutyActionLinksDownload.body, /intent=review_first_wave_lifecycle/);
+    assert.match(firstWaveSteadyStateDutyActionLinksDownload.body, /Execution Plans:[\s\S]*firstWaveLifecycleStatus=hold/);
+    assert.match(firstWaveSteadyStateDutyActionLinksDownload.body, /Execution Plans:[\s\S]*firstWaveLifecycleNextOperation=record_operations_walkthrough/);
+    assert.match(
+      firstWaveSteadyStateDutyActionLinksDownload.body,
+      new RegExp(`Execution Plans:[\\s\\S]*firstWaveLifecyclePrimaryDownloadKey=${afterSetup.postLaunchLifecycleHandoff.primaryDownload.key}`)
+    );
 
     const firstWaveAuditBackfillStatusDownload = await getText(
       baseUrl,

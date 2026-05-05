@@ -649,6 +649,8 @@ function buildStagingRehearsalExecutionSummary(result) {
       });
     }
   }
+  const realStagingInputClosure = buildRealStagingInputClosure({ profilePreflight, closeoutReview });
+  const goLiveProgress = buildGoLiveProgress(result, { realStagingInputClosure });
   return {
     mode: "staging-rehearsal-execution-summary",
     status,
@@ -662,7 +664,8 @@ function buildStagingRehearsalExecutionSummary(result) {
       canRunLiveWriteSmoke: profilePreflight.canRunLiveWriteSmoke === true,
       canRecordEvidence: profilePreflight.canRecordEvidence === true,
       canEnterFullTestWindow: closeoutReview.safeToEnterFullTestWindow === true,
-      realStagingInputClosure: buildRealStagingInputClosure({ profilePreflight, closeoutReview }),
+      realStagingInputClosure,
+      goLiveProgress,
       launchReadinessClosure: buildLaunchReadinessClosure(result, {
         status,
         profilePreflight,
@@ -681,6 +684,78 @@ function buildStagingRehearsalExecutionSummary(result) {
       fullTestWindow: result.fullTestWindowReadiness?.command || closeout.fullTestWindowEntry?.command || "npm.cmd test"
     },
     nextAction: blockingReasons[0]?.nextAction || "Start launch-day watch and stabilization handoff from the final rehearsal packet."
+  };
+}
+
+function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
+  const fullTestWindow = result.fullTestWindowReadiness || {};
+  const productionSignoff = result.productionSignoffReadiness || {};
+  const launchDayWatch = result.launchDayWatchPlan || {};
+  const stabilizationHandoff = result.stabilizationHandoffPlan || {};
+  const realInputChecks = Array.isArray(realStagingInputClosure.checks)
+    ? realStagingInputClosure.checks.map((item) => ({
+      key: item.key,
+      status: item.status,
+      nextAction: item.nextAction
+    }))
+    : [];
+  const checks = [
+    ...realInputChecks,
+    {
+      key: "full_test_window",
+      status: fullTestWindow.canRun === true ? "ready" : "blocked",
+      nextAction: fullTestWindow.nextAction || "Run the reserved full repository test window after closeout input is ready."
+    },
+    {
+      key: "production_signoff",
+      status: productionSignoff.canSignoff === true ? "ready" : "blocked",
+      nextAction: productionSignoff.nextAction || "Backfill production sign-off evidence and receipt visibility before cutover."
+    },
+    {
+      key: "launch_day_watch",
+      status: launchDayWatch.canStartCutoverWatch === true ? "ready" : "blocked",
+      nextAction: launchDayWatch.nextAction || "Start launch-day watch after production sign-off is ready."
+    },
+    {
+      key: "stabilization_handoff",
+      status: stabilizationHandoff.canStartStabilizationHandoff === true ? "ready" : "blocked",
+      nextAction: stabilizationHandoff.nextAction || "Prepare stabilization handoff after cutover watch starts."
+    }
+  ];
+  const readyCheckCount = checks.filter((item) => item.status === "ready").length;
+  const blockedCheckCount = checks.length - readyCheckCount;
+  const realInputsReady = realStagingInputClosure.status === "ready_for_real_staging_inputs";
+  let status = "ready_for_controlled_pilot_launch";
+  if (!realInputsReady) {
+    status = "blocked_until_real_staging_inputs";
+  } else if (fullTestWindow.canRun !== true) {
+    status = "blocked_until_full_test_window";
+  } else if (productionSignoff.canSignoff !== true) {
+    status = "awaiting_production_signoff";
+  } else if (launchDayWatch.canStartCutoverWatch !== true) {
+    status = "awaiting_launch_day_watch";
+  } else if (stabilizationHandoff.canStartStabilizationHandoff !== true) {
+    status = "awaiting_stabilization_handoff";
+  }
+  const nextAction = status === "ready_for_controlled_pilot_launch"
+    ? "Proceed with controlled pilot launch-day watch and first-wave stabilization handoff."
+    : status === "blocked_until_real_staging_inputs"
+      ? "Clear the real staging input closure, then rerun the no-write staging rehearsal."
+      : status === "blocked_until_full_test_window"
+        ? "Run or prepare the full repository test window, then reload closeout input."
+        : status === "awaiting_production_signoff"
+          ? "Backfill production sign-off evidence and receipt visibility after the full test window."
+          : status === "awaiting_launch_day_watch"
+            ? "Start launch-day watch once production sign-off is ready."
+            : "Prepare stabilization handoff after cutover watch starts.";
+  return {
+    status,
+    readyCheckCount,
+    blockedCheckCount,
+    remainingWorkCount: blockedCheckCount,
+    scriptReadinessPercent: checks.length ? Math.round((readyCheckCount / checks.length) * 100) : 0,
+    checks,
+    nextAction
   };
 }
 
@@ -4372,6 +4447,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
   }
   const focus = summary.operatorFocus || {};
   const realInputClosure = focus.realStagingInputClosure || {};
+  const goLiveProgress = focus.goLiveProgress || {};
   const closure = focus.launchReadinessClosure || {};
   const launchDutyFocus = focus.launchDutyFocus || {};
   const statuses = summary.sourceStatuses || {};
@@ -4386,9 +4462,11 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Can record evidence: ${focus.canRecordEvidence ? "yes" : "no"}`,
     `- Can enter full test window: ${focus.canEnterFullTestWindow ? "yes" : "no"}`,
     `- Real staging input closure: ${realInputClosure.status || "-"} (ready=${realInputClosure.readyCheckCount ?? "-"}, blocked=${realInputClosure.blockedCheckCount ?? "-"})`,
+    `- Go-live progress: ${goLiveProgress.status || "-"} (ready=${goLiveProgress.readyCheckCount ?? "-"}, blocked=${goLiveProgress.blockedCheckCount ?? "-"}, scriptReadiness=${goLiveProgress.scriptReadinessPercent ?? "-"}%)`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
     `- Real staging input next action: ${realInputClosure.nextAction || "-"}`,
+    `- Go-live next action: ${goLiveProgress.nextAction || "-"}`,
     `- Launch closure next plan: ${(closure.nextPlan || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
     `- Launch closure next action: ${closure.nextAction || "-"}`,
     `- Launch duty next action: ${launchDutyFocus.nextAction || "-"}`,

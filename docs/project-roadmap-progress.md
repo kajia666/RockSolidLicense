@@ -1,6 +1,6 @@
 # Project Roadmap, Overall Plan, and Development Progress
 
-Updated: 2026-05-03
+Updated: 2026-05-06
 
 This document is the rolling project control sheet for RockSolidLicense. It answers three recurring questions:
 
@@ -15,7 +15,7 @@ The current launch target is not "all imaginable features are finished". The tar
 - can deliver to software authors
 - can operate the first launch wave
 
-Current overall-plan position: the project is mainly in Phase 5, "Production Readiness and Deployment", with the Phase 4 first-launch operations chain already largely connected. The work now is less about inventing new features and more about converting staging rehearsal, closeout backfill, backup/restore, full-test-window entry, production sign-off, and first-wave support into repeatable launch-day execution. The latest staging work has narrowed production sign-off into its own operator packet, so the remaining work is increasingly real-environment execution instead of script-side wiring. New launch features should now be added through the named staging rehearsal extension points instead of being bolted directly into one large script.
+Current overall-plan position: the project is mainly in Phase 5, "Production Readiness and Deployment", with the Phase 4 first-launch operations chain already largely connected. The work now is less about inventing new features and more about converting staging rehearsal, closeout backfill, backup/restore, full-test-window entry, production sign-off, and first-wave support into repeatable launch-day execution. The latest staging work now exposes real staging input closure and go-live progress directly in the rehearsal execution summary, so the remaining work is increasingly real-environment execution instead of script-side wiring. New launch features should now be added through the named staging rehearsal extension points instead of being bolted directly into one large script.
 
 ## Current Position
 
@@ -26,6 +26,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - First-launch operations: launch bootstrap, first batch setup, inventory refill, first-launch handoff, launch receipt follow-ups, initial launch ops readiness.
 - Production readiness: production gate, cutover handoff, recovery drill handoff, operations handoff, post-launch sweep handoff, closeout handoff, stabilization handoff.
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
+- Latest go-live progress slice: `staging:rehearsal` now emits `operatorFocus.goLiveProgress` in JSON and Markdown handoff output. It turns real staging profile readiness, required secret env, artifact output paths, filled closeout input, full-test-window entry, production sign-off, launch-day watch, and stabilization handoff into one ready/blocked queue with a script-side readiness percentage and the next concrete action. This is not a replacement for real staging or full tests; it is the operator-facing "what is still between us and initial launch?" summary.
 - Latest runtime evidence next-action workspace slice: the promoted `runtime_evidence_review` next follow-up now opens Developer Ops directly on the sessions focus with project/channel context, while keeping the direct `ops_first_wave_runtime_evidence` download beside it. This removes the last extra Launch Mainline hop for first-user evidence review after the first real card login and heartbeat are already recorded.
 - Latest first-user validation next-follow-up slice: after first-wave runtime evidence is recorded, Developer Ops now promotes "Review first-user runtime evidence" to the primary `summary.launchReceiptNextFollowUp` and carries the direct `ops_first_wave_runtime_evidence` recommended download there too. The broader first-launch handoff remains available as a secondary follow-up, but the top-level next action now points launch duty straight to the evidence file that proves the first real user path worked.
 - Latest first-user validation follow-up download slice: once first-wave runtime evidence is recorded, the Developer Ops `first_user_validation` follow-up now carries a direct `ops_first_wave_runtime_evidence` download with `format=first-wave-runtime-evidence`, `first-wave-runtime-evidence.txt`, a Developer Ops source, and a service-generated href. The Ops summary text and follow-up CSV therefore point launch duty straight to the source evidence file instead of sending operators back through the broader first-launch handoff packet.
@@ -249,26 +250,26 @@ Current high-level progress:
 - Developer delivery and handoff chain: 92%-94%.
 - Launch Mainline and first-launch operations: 90%-93%.
 - SDK/integration packaging: 80%-85%.
-- Production deployment readiness: 86%-91%.
+- Production deployment readiness: 88%-92%.
 - Commercial operations readiness: 65%-75%.
 
-Overall initial pilot-launch readiness: 93%-95%.
+Overall initial pilot-launch readiness: 94%-96%.
 
-This is high enough to keep moving toward a controlled launch, but not high enough to skip staging, the full repository test window, backup/restore rehearsal, or first-wave support preparation.
+This is high enough to keep moving toward a controlled launch. The remaining 4%-6% is not mostly new product code; it is the real-environment and sign-off work that cannot be honestly replaced by local scripting: staging setup, backup/restore drill, live-write smoke, full repository test window, production sign-off, and first-wave support readiness.
 
 ## Work Remaining Before Initial Launch
 
 Minimum remaining work before a controlled pilot:
 
-1. Finish residual route/download spot checks outside the launch-critical first-wave handoff chain and any less-used Ops export variants.
-2. Keep the full `license-flow` pre-staging gate and grouped launch-readiness checks green after any new backend/API changes.
-3. Run the full repository test suite once before staging rehearsal sign-off.
-4. Prepare staging environment with non-default secrets and public HTTPS.
-5. Run one complete staging rehearsal:
+1. Keep the full `license-flow` pre-staging gate and grouped launch-readiness checks green after any new backend/API changes.
+2. Run the full repository test suite once before staging rehearsal sign-off.
+3. Prepare staging environment with non-default secrets and public HTTPS.
+4. Run one complete staging rehearsal:
    release package -> launch workflow -> bootstrap -> first batch setup -> launch review -> `staging:rehearsal --handoff-file ... --closeout-file ...` -> `launch:route-map-gate` -> `launch:smoke:staging --base-url https://... --allow-live-writes` -> launch smoke workspace -> launch mainline -> developer ops -> post-launch sweep -> backfill closeout input with full-test status, production sign-off decision, and all five visible receipt-visibility lanes.
-6. Use the `staging:rehearsal` recovery commands to verify backup/restore and recovery drill on a separate restore target.
-7. Create first pilot software-author project and first batch of test cards/accounts.
-8. Prepare support and escalation notes for first users.
+5. Use the `staging:rehearsal` recovery commands to verify backup/restore and recovery drill on a separate restore target.
+6. Create first pilot software-author project and first batch of test cards/accounts.
+7. Prepare support and escalation notes for first users.
+8. Spot-check any residual route/download variants outside the launch-critical first-wave handoff chain only if they are used by the pilot lane.
 
 ## Testing Rhythm
 

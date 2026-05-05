@@ -16633,6 +16633,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewStatus","launchOpsOverviewWatchRecordDraftStatus","launchOpsOverviewDownloadFormat"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewProductionSignoffPacket","launchOpsOverviewLaunchDayWatchEntry"/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewFirstWaveLifecycleStatus","launchOpsOverviewFirstWaveLifecycleNextOperation","launchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch_ops_overview_status/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch-operations-overview-status/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
@@ -16679,6 +16680,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewStatus","launchOpsOverviewWatchRecordDraftStatus","launchOpsOverviewDownloadFormat"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewProductionSignoffPacket","launchOpsOverviewLaunchDayWatchEntry"/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewFirstWaveLifecycleStatus","launchOpsOverviewFirstWaveLifecycleNextOperation","launchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"operationalReadinessWatchRecordDraftStatus","operationalReadinessWatchRecordDraftRecordCount"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_ops_overview_status/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch-operations-overview-status/);

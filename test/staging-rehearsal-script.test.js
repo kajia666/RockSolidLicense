@@ -1582,6 +1582,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Profile preflight status: profile_not_loaded/);
     assert.match(handoff, /## Staging Rehearsal Execution Summary/);
     assert.match(handoff, /Execution summary status: profile_not_loaded/);
+    assert.match(handoff, /Launch duty focus: blocked_until_signoff_ready \(postSignoffBlocked=5, watchPending=0\)/);
+    assert.match(handoff, /Launch duty next action: Complete production sign-off before starting launch-day watch\./);
     assert.match(handoff, /## Launch Route Map Targeted Gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate/);
     assert.match(handoff, /npm\.cmd run launch:route-map-gate -- --dry-run --json/);
@@ -2098,6 +2100,17 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.stagingRehearsalExecutionSummary.status, "ready_for_full_test_window");
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.closeoutMissingFieldCount, 0);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canEnterFullTestWindow, true);
+    assert.deepEqual(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyFocus, {
+      status: "blocked_until_signoff_backfill",
+      postSignoffActionCount: 5,
+      blockedPostSignoffActionCount: 5,
+      readyPostSignoffActionCount: 0,
+      watchArtifactCount: 5,
+      pendingWatchArtifactCount: 0,
+      blockedWatchArtifactCount: 5,
+      firstPostSignoffAction: "production_signoff_packet",
+      nextAction: "Run the full test window and backfill production sign-off before launch-day watch."
+    });
     assert.deepEqual(
       output.stagingRehearsalExecutionSummary.blockingReasons.map((item) => item.key),
       ["production_signoff_pending"]
@@ -2491,6 +2504,17 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       productionSignoff: "ready",
       launchDayWatch: "ready",
       stabilizationHandoff: "ready"
+    });
+    assert.deepEqual(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyFocus, {
+      status: "ready_for_cutover_watch",
+      postSignoffActionCount: 5,
+      blockedPostSignoffActionCount: 0,
+      readyPostSignoffActionCount: 5,
+      watchArtifactCount: 5,
+      pendingWatchArtifactCount: 5,
+      blockedWatchArtifactCount: 0,
+      firstPostSignoffAction: "production_signoff_packet",
+      nextAction: "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."
     });
     assert.deepEqual(
       output.finalRehearsalPacket.postSignoffActionChecklist.map((item) => [item.key, item.status]),

@@ -661,7 +661,8 @@ function buildStagingRehearsalExecutionSummary(result) {
       canRunDryRun: profilePreflight.canRunDryRun === true,
       canRunLiveWriteSmoke: profilePreflight.canRunLiveWriteSmoke === true,
       canRecordEvidence: profilePreflight.canRecordEvidence === true,
-      canEnterFullTestWindow: closeoutReview.safeToEnterFullTestWindow === true
+      canEnterFullTestWindow: closeoutReview.safeToEnterFullTestWindow === true,
+      launchDutyFocus: buildLaunchDutyOperatorFocus(result, { status, finalPacket })
     },
     blockingReasons,
     orderedNextActions,
@@ -1196,6 +1197,41 @@ function buildPostSignoffActionChecklist(result, overrides = {}) {
       path: watchRecordByKey.get("stabilization_owner_handoff")?.artifactPath || path.posix.join(archiveRoot, "stabilization-owner-handoff.md")
     }
   ];
+}
+
+function buildLaunchDutyOperatorFocus(result, { status = null, finalPacket = null } = {}) {
+  const effectiveResult = finalPacket
+    ? { ...result, finalRehearsalPacket: finalPacket }
+    : result;
+  const checklist = Array.isArray(finalPacket?.postSignoffActionChecklist) && finalPacket.postSignoffActionChecklist.length
+    ? finalPacket.postSignoffActionChecklist
+    : buildPostSignoffActionChecklist(effectiveResult);
+  const watchRecords = result.launchDayWatchPlan?.watchRecordDraft?.records || [];
+  const blockedPostSignoffActionCount = checklist.filter((item) => String(item.status || "").startsWith("blocked_")).length;
+  const pendingWatchArtifactCount = watchRecords.filter((item) => item.status === "pending_operator_entry").length;
+  const blockedWatchArtifactCount = watchRecords.filter((item) => String(item.status || "").startsWith("blocked_")).length;
+  let focusStatus = "blocked_until_signoff_ready";
+  if (status === "ready_for_launch_day_watch" || result.launchDayWatchPlan?.canStartCutoverWatch === true) {
+    focusStatus = "ready_for_cutover_watch";
+  } else if (status === "ready_for_full_test_window" || result.fullTestWindowReadiness?.canRun === true) {
+    focusStatus = "blocked_until_signoff_backfill";
+  }
+  const nextAction = focusStatus === "ready_for_cutover_watch"
+    ? "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."
+    : focusStatus === "blocked_until_signoff_backfill"
+      ? "Run the full test window and backfill production sign-off before launch-day watch."
+      : "Complete production sign-off before starting launch-day watch.";
+  return {
+    status: focusStatus,
+    postSignoffActionCount: checklist.length,
+    blockedPostSignoffActionCount,
+    readyPostSignoffActionCount: checklist.length - blockedPostSignoffActionCount,
+    watchArtifactCount: watchRecords.length,
+    pendingWatchArtifactCount,
+    blockedWatchArtifactCount,
+    firstPostSignoffAction: checklist[0]?.key || null,
+    nextAction
+  };
 }
 
 function buildStagingProductionSignoffPacket(result) {
@@ -4144,6 +4180,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     return "- Not available";
   }
   const focus = summary.operatorFocus || {};
+  const launchDutyFocus = focus.launchDutyFocus || {};
   const statuses = summary.sourceStatuses || {};
   const lines = [
     `- Execution summary status: ${summary.status || "-"}`,
@@ -4155,6 +4192,8 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Can run live-write smoke: ${focus.canRunLiveWriteSmoke ? "yes" : "no"}`,
     `- Can record evidence: ${focus.canRecordEvidence ? "yes" : "no"}`,
     `- Can enter full test window: ${focus.canEnterFullTestWindow ? "yes" : "no"}`,
+    `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
+    `- Launch duty next action: ${launchDutyFocus.nextAction || "-"}`,
     `- Ordered next actions: ${(summary.orderedNextActions || []).join(", ") || "-"}`,
     `- Staging dry run: \`${summary.commands?.stagingDryRun || "-"}\``,
     `- Closeout reload: \`${summary.commands?.closeoutReload || "-"}\``,

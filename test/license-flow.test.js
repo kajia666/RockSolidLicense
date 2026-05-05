@@ -15036,6 +15036,17 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(handoffConfirmation.sourceRecommendation.recommendedCardCount, 150);
     assert.equal(handoffConfirmation.traceability.downloads.summary, "first-wave-recommendations.txt");
     assert.ok(handoffConfirmation.auditLogId);
+    assert.ok(afterSetup.postLaunchLifecycleHandoff);
+    assert.equal(handoffConfirmation.postLaunchLifecycleHandoff?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      handoffConfirmation.postLaunchLifecycleHandoff?.nextAction?.operation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
+    assert.equal(
+      handoffConfirmation.postLaunchLifecycleHandoff?.primaryDownload?.format,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.format
+    );
+    assert.equal(handoffConfirmation.postLaunchLifecycleHandoff?.handoffDownloads?.closeout?.format, "closeout-handoff");
 
     const handoffConfirmationAudit = await getJson(
       baseUrl,
@@ -15049,6 +15060,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && item.metadata?.handoffFileName === "developer-ops-first-wave-recommendations-firstwave-stable.txt"
       && item.metadata?.inventoryStatus === "ready"
       && item.metadata?.latestLaunchReceiptOperation === "first_batch_setup"
+      && item.metadata?.postLaunchLifecycleStatus === afterSetup.postLaunchLifecycleHandoff.status
+      && item.metadata?.postLaunchLifecycleNextOperation === afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+      && item.metadata?.postLaunchLifecycleHandoff?.primaryDownload?.format === afterSetup.postLaunchLifecycleHandoff.primaryDownload.format
     ));
 
     const confirmedOpsSnapshot = await getJson(
@@ -15064,11 +15078,21 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(latestFirstWaveConfirmation.decision, "confirmed");
     assert.equal(latestFirstWaveConfirmation.handoffFileName, "developer-ops-first-wave-recommendations-firstwave-stable.txt");
     assert.equal(latestFirstWaveConfirmation.sourceRecommendation.inventoryStatus, "ready");
+    assert.equal(latestFirstWaveConfirmation.postLaunchLifecycleHandoff?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      latestFirstWaveConfirmation.postLaunchLifecycleHandoff?.nextAction?.operation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
 
     const readinessFirstWaveConfirmation = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveHandoffConfirmation;
     assert.ok(readinessFirstWaveConfirmation);
     assert.equal(readinessFirstWaveConfirmation.auditLogId, handoffConfirmation.auditLogId);
     assert.equal(readinessFirstWaveConfirmation.sourceRecommendation.latestLaunchReceiptOperation, "first_batch_setup");
+    assert.equal(readinessFirstWaveConfirmation.postLaunchLifecycleHandoff?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      readinessFirstWaveConfirmation.postLaunchLifecycleHandoff?.primaryDownload?.key,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+    );
     const firstWaveConfirmationChain = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveConfirmationChain;
     assert.ok(firstWaveConfirmationChain);
     assert.equal(firstWaveConfirmationChain.status, "confirmed");
@@ -15103,6 +15127,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     ));
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Handoff Confirmation:[\s\S]*postLaunchLifecycle=hold/);
+    assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Handoff Confirmation:[\s\S]*operation=record_operations_walkthrough/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Confirmation Chain:/);
     assert.match(confirmedOpsSnapshot.summaryText, /segments=3\/3/);
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Audit Backfill: handoff=[1-9]\d* \| readiness=[1-9]\d* \| total=[1-9]\d*/);
@@ -15241,6 +15267,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineConfirmedCloseoutHandoff.body, /RockSolid Developer Launch Mainline Closeout Handoff/);
     assert.match(mainlineConfirmedCloseoutHandoff.body, /First-Wave Handoff Confirmation:/);
     assert.match(mainlineConfirmedCloseoutHandoff.body, new RegExp(`audit=${handoffConfirmation.auditLogId}`));
+    assert.match(mainlineConfirmedCloseoutHandoff.body, /First-Wave Handoff Confirmation:[\s\S]*postLaunchLifecycle=hold/);
     assert.match(mainlineConfirmedCloseoutHandoff.body, /First-Wave Confirmation Chain:/);
     assert.match(mainlineConfirmedCloseoutHandoff.body, /segments=3\/3/);
 
@@ -15261,6 +15288,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       operatorSession.token
     );
     assert.match(firstWaveHandoffIndex.body, /First-Wave Handoff Confirmation:/);
+    assert.match(firstWaveHandoffIndex.body, /First-Wave Handoff Confirmation:[\s\S]*postLaunchLifecycle=hold/);
     assert.match(firstWaveHandoffIndex.body, /First-Wave Confirmation Chain:/);
     assert.match(firstWaveHandoffIndex.body, /segments=3\/3/);
     assert.match(firstWaveHandoffIndex.body, /developer-ops-first-wave-recommendations-firstwave-stable\.txt/);

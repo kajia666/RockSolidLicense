@@ -17090,6 +17090,24 @@ function appendFirstWaveHandoffConfirmationTextLines(lines = [], confirmation = 
     + ` | ops=${confirmation.sourceRecommendation?.firstRoundOpsStatus || "-"}`
     + ` | latestReceipt=${confirmation.sourceRecommendation?.latestLaunchReceiptOperation || "-"}`
   );
+  const lifecycleHandoff = confirmation.postLaunchLifecycleHandoff && typeof confirmation.postLaunchLifecycleHandoff === "object"
+    ? confirmation.postLaunchLifecycleHandoff
+    : null;
+  if (lifecycleHandoff) {
+    lines.push(
+      `- postLaunchLifecycle=${lifecycleHandoff.status || "-"}`
+      + ` | next=${lifecycleHandoff.nextAction?.key || "-"}`
+      + ` | operation=${lifecycleHandoff.nextAction?.operation || "-"}`
+      + ` | primaryDownload=${lifecycleHandoff.primaryDownload?.key || "-"}`
+      + ` | format=${lifecycleHandoff.primaryDownload?.format || "-"}`
+    );
+    lines.push(
+      `- lifecycleCloseout=${lifecycleHandoff.closeoutReadiness?.status || "-"}`
+      + ` | blockers=${lifecycleHandoff.closeoutReadiness?.blockingCount ?? 0}`
+      + ` | stabilization=${lifecycleHandoff.stabilizationConfirmation?.status || "-"}`
+      + ` | stabilizationAudit=${lifecycleHandoff.stabilizationConfirmation?.auditLogId || "-"}`
+    );
+  }
   return true;
 }
 
@@ -20708,6 +20726,27 @@ function buildFirstWaveHandoffConfirmationPayload(item = null) {
         recommendedCardCount: metadata.recommendedCardCount ?? null,
         issuedFreshCardCount: metadata.issuedFreshCardCount ?? null
       };
+  const postLaunchLifecycleHandoff = normalizeDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload(
+    item.postLaunchLifecycleHandoff && typeof item.postLaunchLifecycleHandoff === "object"
+      ? item.postLaunchLifecycleHandoff
+      : metadata.postLaunchLifecycleHandoff && typeof metadata.postLaunchLifecycleHandoff === "object"
+        ? metadata.postLaunchLifecycleHandoff
+        : metadata.postLaunchLifecycleStatus
+          ? {
+              status: metadata.postLaunchLifecycleStatus,
+              nextAction: {
+                key: metadata.postLaunchLifecycleNextActionKey || null,
+                operation: metadata.postLaunchLifecycleNextOperation || null
+              },
+              primaryDownload: {
+                key: metadata.postLaunchLifecyclePrimaryDownloadKey || null,
+                format: metadata.postLaunchLifecyclePrimaryDownloadFormat || null,
+                fileName: metadata.postLaunchLifecyclePrimaryDownloadFileName || null,
+                href: metadata.postLaunchLifecyclePrimaryDownloadHref || null
+              }
+            }
+          : null
+  );
   return {
     auditLogId: item.auditLogId || item.id || null,
     eventType: item.eventType || "developer.ops.first-wave.handoff.confirm",
@@ -20723,6 +20762,7 @@ function buildFirstWaveHandoffConfirmationPayload(item = null) {
     confirmedBy,
     note: item.note || metadata.note || "",
     sourceRecommendation,
+    postLaunchLifecycleHandoff,
     firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload({
       ...item,
       metadata,
@@ -25842,6 +25882,236 @@ function buildDeveloperOpsFirstWaveInventoryStatePayload(item = {}) {
   };
 }
 
+function normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(download = null) {
+  if (!download || typeof download !== "object") {
+    return null;
+  }
+  return {
+    key: download.key || null,
+    label: download.label || null,
+    source: download.source || "developer-launch-mainline",
+    format: download.format || null,
+    fileName: download.fileName || null,
+    href: download.href || null
+  };
+}
+
+function normalizeDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload(handoff = null) {
+  if (!handoff || typeof handoff !== "object") {
+    return null;
+  }
+  const handoffDownloads = handoff.handoffDownloads && typeof handoff.handoffDownloads === "object"
+    ? handoff.handoffDownloads
+    : {};
+  const stabilizationConfirmation = handoff.stabilizationConfirmation && typeof handoff.stabilizationConfirmation === "object"
+    ? handoff.stabilizationConfirmation
+    : null;
+  const closeoutReadiness = handoff.closeoutReadiness && typeof handoff.closeoutReadiness === "object"
+    ? handoff.closeoutReadiness
+    : null;
+  const normalized = {
+    status: handoff.status || null,
+    phaseState: handoff.phaseState && typeof handoff.phaseState === "object"
+      ? {
+          totalCount: Number(handoff.phaseState.totalCount ?? 0),
+          readyCount: Number(handoff.phaseState.readyCount ?? 0),
+          holdCount: Number(handoff.phaseState.holdCount ?? 0),
+          reviewCount: Number(handoff.phaseState.reviewCount ?? 0)
+        }
+      : null,
+    nextAction: handoff.nextAction && typeof handoff.nextAction === "object"
+      ? {
+          key: handoff.nextAction.key || null,
+          operation: handoff.nextAction.operation || null
+        }
+      : null,
+    primaryDownload: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(handoff.primaryDownload),
+    handoffDownloads: {
+      closeout: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(handoffDownloads.closeout),
+      stabilization: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(handoffDownloads.stabilization)
+    },
+    stabilizationConfirmation: stabilizationConfirmation
+      ? {
+          auditLogId: stabilizationConfirmation.auditLogId || null,
+          status: stabilizationConfirmation.status || null,
+          decision: stabilizationConfirmation.decision || null,
+          handoffFileName: stabilizationConfirmation.handoffFileName || null,
+          confirmedAt: stabilizationConfirmation.confirmedAt || null,
+          confirmedBy: stabilizationConfirmation.confirmedBy && typeof stabilizationConfirmation.confirmedBy === "object"
+            ? {
+                actorType: stabilizationConfirmation.confirmedBy.actorType || null,
+                username: stabilizationConfirmation.confirmedBy.username || null,
+                role: stabilizationConfirmation.confirmedBy.role || null
+              }
+            : null,
+          opsDownload: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(
+            stabilizationConfirmation.opsDownload
+            || stabilizationConfirmation.opsDownloads?.stabilizationHandoff
+          ),
+          mainlineDownload: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(
+            stabilizationConfirmation.mainlineDownload
+            || stabilizationConfirmation.launchMainlineDownloads?.stabilizationHandoff
+          )
+        }
+      : null,
+    closeoutReadiness: closeoutReadiness
+      ? {
+          status: closeoutReadiness.status || null,
+          canClose: closeoutReadiness.canClose === true,
+          closeoutReviewReady: closeoutReadiness.closeoutReviewReady === true,
+          steadyStateReady: closeoutReadiness.steadyStateReady === true,
+          blockingCount: Number(closeoutReadiness.blockingCount ?? 0),
+          blockerKeys: Array.isArray(closeoutReadiness.blockerKeys)
+            ? closeoutReadiness.blockerKeys.filter(Boolean)
+            : [],
+          nextAction: closeoutReadiness.nextAction && typeof closeoutReadiness.nextAction === "object"
+            ? {
+                key: closeoutReadiness.nextAction.key || null,
+                operation: closeoutReadiness.nextAction.operation || closeoutReadiness.nextOperation || null,
+                endpoint: closeoutReadiness.nextAction.endpoint || null,
+                method: closeoutReadiness.nextAction.method || null,
+                enabled: closeoutReadiness.nextAction.enabled === true,
+                downloadKey: closeoutReadiness.nextAction.downloadKey || closeoutReadiness.nextDownloadKey || null,
+                recommendedDownload: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(
+                  closeoutReadiness.nextAction.recommendedDownload
+                )
+              }
+            : null
+        }
+      : null
+  };
+  if (
+    !normalized.status
+    && !normalized.phaseState
+    && !normalized.nextAction
+    && !normalized.primaryDownload
+    && !normalized.handoffDownloads.closeout
+    && !normalized.handoffDownloads.stabilization
+    && !normalized.stabilizationConfirmation
+    && !normalized.closeoutReadiness
+  ) {
+    return null;
+  }
+  return normalized;
+}
+
+function buildDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
+  opsSnapshot = null,
+  readiness = null,
+  latestLaunchReceipt = null
+} = {}) {
+  const snapshotReadiness = readiness && typeof readiness === "object"
+    ? readiness
+    : opsSnapshot?.summary?.initialLaunchOpsReadiness && typeof opsSnapshot.summary.initialLaunchOpsReadiness === "object"
+      ? opsSnapshot.summary.initialLaunchOpsReadiness
+      : {};
+  const latestReceipt = latestLaunchReceipt && typeof latestLaunchReceipt === "object"
+    ? latestLaunchReceipt
+    : Array.isArray(opsSnapshot?.overview?.latestLaunchReceipts)
+      ? opsSnapshot.overview.latestLaunchReceipts[0] || null
+      : null;
+  const closeoutLifecycleHandoffDownload = normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(
+    opsSnapshot?.mainlineHandoff?.downloads?.closeoutHandoff
+  );
+  const stabilizationLifecycleHandoffDownload = normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(
+    opsSnapshot?.mainlineHandoff?.downloads?.stabilizationHandoff
+  );
+  const stabilizationHandoffConfirmation = buildStabilizationHandoffConfirmationPayload(
+    snapshotReadiness.stabilizationHandoff?.confirmation
+      || snapshotReadiness.traceability?.stabilizationHandoffConfirmation
+      || null
+  );
+  const stabilizationConfirmationPayload = stabilizationHandoffConfirmation
+    ? {
+        auditLogId: stabilizationHandoffConfirmation.auditLogId || null,
+        status: stabilizationHandoffConfirmation.status || null,
+        decision: stabilizationHandoffConfirmation.decision || null,
+        handoffFileName: stabilizationHandoffConfirmation.handoffFileName || null,
+        confirmedAt: stabilizationHandoffConfirmation.confirmedAt || null,
+        confirmedBy: stabilizationHandoffConfirmation.confirmedBy
+          ? {
+              actorType: stabilizationHandoffConfirmation.confirmedBy.actorType || null,
+              username: stabilizationHandoffConfirmation.confirmedBy.username || null,
+              role: stabilizationHandoffConfirmation.confirmedBy.role || null
+            }
+          : null,
+        opsDownload: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(
+          stabilizationHandoffConfirmation.opsDownloads?.stabilizationHandoff
+        ),
+        mainlineDownload: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(
+          stabilizationHandoffConfirmation.launchMainlineDownloads?.stabilizationHandoff
+        ) || stabilizationLifecycleHandoffDownload
+      }
+    : null;
+  const closeoutReadinessSummary = snapshotReadiness.closeoutReadinessSummary
+    || snapshotReadiness.traceability?.closeoutReadinessSummary
+    || null;
+  const closeoutReadinessPayload = closeoutReadinessSummary && typeof closeoutReadinessSummary === "object"
+    ? {
+        status: closeoutReadinessSummary.status || null,
+        canClose: closeoutReadinessSummary.canClose === true,
+        closeoutReviewReady: closeoutReadinessSummary.closeoutReviewReady === true,
+        steadyStateReady: closeoutReadinessSummary.steadyStateReady === true,
+        blockingCount: Number(closeoutReadinessSummary.blockingCount ?? 0),
+        blockerKeys: Array.isArray(closeoutReadinessSummary.blockerKeys)
+          ? closeoutReadinessSummary.blockerKeys.filter(Boolean)
+          : [],
+        nextAction: closeoutReadinessSummary.nextAction && typeof closeoutReadinessSummary.nextAction === "object"
+          ? {
+              key: closeoutReadinessSummary.nextAction.key || null,
+              operation: closeoutReadinessSummary.nextAction.operation || closeoutReadinessSummary.nextOperation || null,
+              endpoint: closeoutReadinessSummary.nextAction.endpoint || null,
+              method: closeoutReadinessSummary.nextAction.method || null,
+              enabled: closeoutReadinessSummary.nextAction.enabled === true,
+              downloadKey: closeoutReadinessSummary.nextAction.downloadKey || closeoutReadinessSummary.nextDownloadKey || null,
+              recommendedDownload: normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(
+                closeoutReadinessSummary.nextAction.recommendedDownload
+              )
+            }
+          : null
+      }
+    : null;
+  if (!latestReceipt?.postLaunchLifecycleStatus) {
+    return normalizeDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
+      stabilizationConfirmation: stabilizationConfirmationPayload,
+      closeoutReadiness: closeoutReadinessPayload,
+      handoffDownloads: {
+        closeout: closeoutLifecycleHandoffDownload,
+        stabilization: stabilizationLifecycleHandoffDownload
+      }
+    });
+  }
+  return normalizeDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
+    status: latestReceipt.postLaunchLifecycleStatus,
+    phaseState: {
+      totalCount: Number(latestReceipt.postLaunchLifecyclePhaseCount ?? 0),
+      readyCount: Number(latestReceipt.postLaunchLifecycleReadyCount ?? 0),
+      holdCount: Number(latestReceipt.postLaunchLifecycleHoldCount ?? 0),
+      reviewCount: Number(latestReceipt.postLaunchLifecycleReviewCount ?? 0)
+    },
+    nextAction: {
+      key: latestReceipt.postLaunchLifecycleNextActionKey || null,
+      operation: latestReceipt.postLaunchLifecycleNextOperation || null
+    },
+    primaryDownload: latestReceipt.postLaunchLifecyclePrimaryDownloadKey || latestReceipt.postLaunchLifecyclePrimaryDownloadHref
+      ? {
+          key: latestReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
+          label: "Post-launch lifecycle handoff",
+          source: "developer-launch-mainline",
+          format: latestReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
+          fileName: latestReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
+          href: latestReceipt.postLaunchLifecyclePrimaryDownloadHref || null
+        }
+      : null,
+    handoffDownloads: {
+      closeout: closeoutLifecycleHandoffDownload,
+      stabilization: stabilizationLifecycleHandoffDownload
+    },
+    stabilizationConfirmation: stabilizationConfirmationPayload,
+    closeoutReadiness: closeoutReadinessPayload
+  });
+}
+
 function buildDeveloperOpsFirstWaveRecommendationsPayload({
   generatedAt = nowIso(),
   product = {},
@@ -26078,109 +26348,13 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         primaryDownload: firstUserValidationDownload
       }
     : null;
-  const normalizePostLaunchLifecycleDownload = (download = null) => {
-    if (!download || typeof download !== "object") {
-      return null;
-    }
-    return {
-      key: download.key || null,
-      label: download.label || null,
-      source: download.source || "developer-launch-mainline",
-      format: download.format || null,
-      fileName: download.fileName || null,
-      href: download.href || null
-    };
-  };
-  const closeoutLifecycleHandoffDownload = normalizePostLaunchLifecycleDownload(
-    opsSnapshot?.mainlineHandoff?.downloads?.closeoutHandoff
-  );
-  const stabilizationLifecycleHandoffDownload = normalizePostLaunchLifecycleDownload(
-    opsSnapshot?.mainlineHandoff?.downloads?.stabilizationHandoff
-  );
-  const stabilizationHandoffConfirmation = buildStabilizationHandoffConfirmationPayload(
-    readiness.stabilizationHandoff?.confirmation
-      || readiness.traceability?.stabilizationHandoffConfirmation
-      || null
-  );
-  const stabilizationConfirmationPayload = stabilizationHandoffConfirmation
-    ? {
-        auditLogId: stabilizationHandoffConfirmation.auditLogId || null,
-        status: stabilizationHandoffConfirmation.status || null,
-        decision: stabilizationHandoffConfirmation.decision || null,
-        handoffFileName: stabilizationHandoffConfirmation.handoffFileName || null,
-        confirmedAt: stabilizationHandoffConfirmation.confirmedAt || null,
-        confirmedBy: stabilizationHandoffConfirmation.confirmedBy
-          ? {
-              actorType: stabilizationHandoffConfirmation.confirmedBy.actorType || null,
-              username: stabilizationHandoffConfirmation.confirmedBy.username || null,
-              role: stabilizationHandoffConfirmation.confirmedBy.role || null
-            }
-          : null,
-        opsDownload: normalizePostLaunchLifecycleDownload(
-          stabilizationHandoffConfirmation.opsDownloads?.stabilizationHandoff
-        ),
-        mainlineDownload: normalizePostLaunchLifecycleDownload(
-          stabilizationHandoffConfirmation.launchMainlineDownloads?.stabilizationHandoff
-        ) || stabilizationLifecycleHandoffDownload
-      }
-    : null;
-  const closeoutReadinessSummary = readiness.closeoutReadinessSummary
-    || readiness.traceability?.closeoutReadinessSummary
-    || null;
-  const closeoutReadinessPayload = closeoutReadinessSummary && typeof closeoutReadinessSummary === "object"
-    ? {
-        status: closeoutReadinessSummary.status || null,
-        canClose: closeoutReadinessSummary.canClose === true,
-        closeoutReviewReady: closeoutReadinessSummary.closeoutReviewReady === true,
-        steadyStateReady: closeoutReadinessSummary.steadyStateReady === true,
-        blockingCount: Number(closeoutReadinessSummary.blockingCount ?? 0),
-        blockerKeys: Array.isArray(closeoutReadinessSummary.blockerKeys)
-          ? closeoutReadinessSummary.blockerKeys.filter(Boolean)
-          : [],
-        nextAction: closeoutReadinessSummary.nextAction && typeof closeoutReadinessSummary.nextAction === "object"
-          ? {
-              key: closeoutReadinessSummary.nextAction.key || null,
-              operation: closeoutReadinessSummary.nextAction.operation || closeoutReadinessSummary.nextOperation || null,
-              endpoint: closeoutReadinessSummary.nextAction.endpoint || null,
-              method: closeoutReadinessSummary.nextAction.method || null,
-              enabled: closeoutReadinessSummary.nextAction.enabled === true,
-              downloadKey: closeoutReadinessSummary.nextAction.downloadKey || closeoutReadinessSummary.nextDownloadKey || null,
-              recommendedDownload: normalizePostLaunchLifecycleDownload(closeoutReadinessSummary.nextAction.recommendedDownload)
-            }
-          : null
-      }
-    : null;
-  const postLaunchLifecycleHandoff = latestLaunchReceipt?.postLaunchLifecycleStatus
-    ? {
-        status: latestLaunchReceipt.postLaunchLifecycleStatus,
-        phaseState: {
-          totalCount: Number(latestLaunchReceipt.postLaunchLifecyclePhaseCount ?? 0),
-          readyCount: Number(latestLaunchReceipt.postLaunchLifecycleReadyCount ?? 0),
-          holdCount: Number(latestLaunchReceipt.postLaunchLifecycleHoldCount ?? 0),
-          reviewCount: Number(latestLaunchReceipt.postLaunchLifecycleReviewCount ?? 0)
-        },
-        nextAction: {
-          key: latestLaunchReceipt.postLaunchLifecycleNextActionKey || null,
-          operation: latestLaunchReceipt.postLaunchLifecycleNextOperation || null
-        },
-        primaryDownload: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref
-          ? {
-              key: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
-              label: "Post-launch lifecycle handoff",
-              source: "developer-launch-mainline",
-              format: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
-              fileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
-              href: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref || null
-            }
-          : null,
-        handoffDownloads: {
-          closeout: closeoutLifecycleHandoffDownload,
-          stabilization: stabilizationLifecycleHandoffDownload
-        },
-        stabilizationConfirmation: stabilizationConfirmationPayload,
-        closeoutReadiness: closeoutReadinessPayload
-      }
-    : null;
+  const postLaunchLifecycleHandoff = buildDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
+    opsSnapshot,
+    readiness,
+    latestLaunchReceipt
+  });
+  const stabilizationConfirmationPayload = postLaunchLifecycleHandoff?.stabilizationConfirmation || null;
+  const closeoutReadinessPayload = postLaunchLifecycleHandoff?.closeoutReadiness || null;
   const firstRoundOpsPayload = {
     status: firstRoundStatus,
     actionCount: firstRoundActions.length,
@@ -26236,7 +26410,8 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     firstRoundAction: primaryFirstRoundAction,
     recommendedCardCount: targetCardCount,
     issuedFreshCardCount: freshCardCount,
-    latestLaunchReceipt: traceabilityPayload.latestLaunchReceipt
+    latestLaunchReceipt: traceabilityPayload.latestLaunchReceipt,
+    postLaunchLifecycleHandoff
   });
 
   return {
@@ -26321,7 +26496,8 @@ function buildDeveloperOpsFirstWaveReadinessBridgePayload({
   firstRoundAction = null,
   recommendedCardCount = 0,
   issuedFreshCardCount = 0,
-  latestLaunchReceipt = null
+  latestLaunchReceipt = null,
+  postLaunchLifecycleHandoff = null
 } = {}) {
   const buildSegment = (key, label, status) => {
     const normalizedStatus = normalizeDeveloperOpsConfirmationToken(status, "unknown");
@@ -26362,6 +26538,7 @@ function buildDeveloperOpsFirstWaveReadinessBridgePayload({
     json: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "json"),
     checksums: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "checksums")
   };
+  const normalizedPostLaunchLifecycleHandoff = normalizeDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload(postLaunchLifecycleHandoff);
   const confirmationPayloadTemplate = {
     productCode,
     channel,
@@ -26372,7 +26549,8 @@ function buildDeveloperOpsFirstWaveReadinessBridgePayload({
     firstRoundOpsStatus,
     latestLaunchReceiptOperation: latestLaunchReceipt?.operation || null,
     recommendedCardCount: Number(recommendedCardCount || 0),
-    issuedFreshCardCount: Number(issuedFreshCardCount || 0)
+    issuedFreshCardCount: Number(issuedFreshCardCount || 0),
+    ...(normalizedPostLaunchLifecycleHandoff ? { postLaunchLifecycleHandoff: normalizedPostLaunchLifecycleHandoff } : {})
   };
   return {
     version: "developer-ops-first-wave-readiness-bridge/v1",
@@ -29592,20 +29770,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     const firstWaveHandoffConfirmation = initialLaunchOpsReadiness.firstWaveHandoffConfirmation || null;
     if (firstWaveHandoffConfirmation) {
       lines.push("");
-      lines.push("First-Wave Handoff Confirmation:");
-      lines.push(
-        `- status=${firstWaveHandoffConfirmation.status || "-"}`
-        + ` | audit=${firstWaveHandoffConfirmation.auditLogId || "-"}`
-        + ` | decision=${firstWaveHandoffConfirmation.decision || "-"}`
-        + ` | by=${firstWaveHandoffConfirmation.confirmedBy?.username || "-"}`
-        + ` | file=${firstWaveHandoffConfirmation.handoffFileName || "-"}`
-      );
-      lines.push(
-        `- inventory=${firstWaveHandoffConfirmation.sourceRecommendation?.inventoryStatus || "-"}`
-        + ` | cards=${firstWaveHandoffConfirmation.sourceRecommendation?.firstCardStatus || "-"}`
-        + ` | ops=${firstWaveHandoffConfirmation.sourceRecommendation?.firstRoundOpsStatus || "-"}`
-        + ` | latestReceipt=${firstWaveHandoffConfirmation.sourceRecommendation?.latestLaunchReceiptOperation || "-"}`
-      );
+      appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
     }
     const firstWaveConfirmationChain = initialLaunchOpsReadiness.firstWaveConfirmationChain
       || initialLaunchOpsReadiness.traceability?.firstWaveConfirmationChain
@@ -31776,19 +31941,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const firstWaveHandoffConfirmation = readiness.firstWaveHandoffConfirmation || readiness.traceability?.firstWaveHandoffConfirmation || null;
   if (firstWaveHandoffConfirmation) {
     lines.push("");
-    lines.push("First-Wave Handoff Confirmation:");
-    lines.push(
-      `- status=${firstWaveHandoffConfirmation.status || "-"}`
-      + ` | audit=${firstWaveHandoffConfirmation.auditLogId || "-"}`
-      + ` | decision=${firstWaveHandoffConfirmation.decision || "-"}`
-      + ` | by=${firstWaveHandoffConfirmation.confirmedBy?.username || "-"}`
-    );
-    lines.push(
-      `- file=${firstWaveHandoffConfirmation.handoffFileName || "-"}`
-      + ` | inventory=${firstWaveHandoffConfirmation.sourceRecommendation?.inventoryStatus || "-"}`
-      + ` | cards=${firstWaveHandoffConfirmation.sourceRecommendation?.firstCardStatus || "-"}`
-      + ` | ops=${firstWaveHandoffConfirmation.sourceRecommendation?.firstRoundOpsStatus || "-"}`
-    );
+    appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);
   }
 
   const firstWaveConfirmationChain = readiness.firstWaveConfirmationChain
@@ -45484,6 +45637,17 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           checksums: "first-wave-recommendations-sha256.txt"
         }
       };
+      let postLaunchLifecycleHandoff = normalizeDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload(body.postLaunchLifecycleHandoff);
+      if (!postLaunchLifecycleHandoff && hasDeveloperPermission(session, "ops.read")) {
+        const opsSnapshot = await this.developerExportOpsSnapshot(token, {
+          productCode: product.code,
+          channel,
+          limit: 80
+        });
+        postLaunchLifecycleHandoff = buildDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
+          opsSnapshot
+        });
+      }
       const confirmedBy = {
         actorType: session.actor_scope === "member" ? "developer_member" : "developer",
         actorScope: session.actor_scope,
@@ -45512,6 +45676,16 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           latestLaunchReceiptOperation: sourceRecommendation.latestLaunchReceiptOperation,
           recommendedCardCount: sourceRecommendation.recommendedCardCount,
           issuedFreshCardCount: sourceRecommendation.issuedFreshCardCount,
+          postLaunchLifecycleHandoff,
+          postLaunchLifecycleStatus: postLaunchLifecycleHandoff?.status || null,
+          postLaunchLifecycleNextActionKey: postLaunchLifecycleHandoff?.nextAction?.key || null,
+          postLaunchLifecycleNextOperation: postLaunchLifecycleHandoff?.nextAction?.operation || null,
+          postLaunchLifecyclePrimaryDownloadKey: postLaunchLifecycleHandoff?.primaryDownload?.key || null,
+          postLaunchLifecyclePrimaryDownloadFormat: postLaunchLifecycleHandoff?.primaryDownload?.format || null,
+          postLaunchLifecyclePrimaryDownloadFileName: postLaunchLifecycleHandoff?.primaryDownload?.fileName || null,
+          postLaunchLifecyclePrimaryDownloadHref: postLaunchLifecycleHandoff?.primaryDownload?.href || null,
+          postLaunchLifecycleStabilizationConfirmationAuditLogId: postLaunchLifecycleHandoff?.stabilizationConfirmation?.auditLogId || null,
+          postLaunchLifecycleCloseoutReadinessStatus: postLaunchLifecycleHandoff?.closeoutReadiness?.status || null,
           downloads: traceability.downloads
         }
       );
@@ -45529,6 +45703,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         handoffFileName,
         handoffFormat: "first-wave-recommendations",
         sourceRecommendation,
+        postLaunchLifecycleHandoff,
         firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload({
           auditLogId,
           productCode: product.code,
@@ -45538,7 +45713,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           confirmedAt,
           confirmedBy,
           handoffFileName,
-          sourceRecommendation
+          sourceRecommendation,
+          postLaunchLifecycleHandoff
         }),
         traceability,
         auditLogId,

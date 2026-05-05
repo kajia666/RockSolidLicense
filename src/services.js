@@ -17130,6 +17130,23 @@ function appendFirstWaveConfirmationChainTextLines(lines = [], chain = null, {
     + ` | firstRoundOps=${chain.firstRoundOpsStatus || "-"}`
     + ` | latestReceipt=${chain.latestLaunchReceiptOperation || "-"}`
   );
+  const lifecycleHandoff = chain.postLaunchLifecycleHandoff && typeof chain.postLaunchLifecycleHandoff === "object"
+    ? chain.postLaunchLifecycleHandoff
+    : null;
+  if (lifecycleHandoff) {
+    lines.push(
+      `- postLaunchLifecycle=${chain.postLaunchLifecycleStatus || lifecycleHandoff.status || "-"}`
+      + ` | next=${chain.postLaunchLifecycleNextActionKey || lifecycleHandoff.nextAction?.key || "-"}`
+      + ` | operation=${chain.postLaunchLifecycleNextOperation || lifecycleHandoff.nextAction?.operation || "-"}`
+      + ` | primaryDownload=${chain.postLaunchLifecyclePrimaryDownloadKey || lifecycleHandoff.primaryDownload?.key || "-"}`
+      + ` | format=${lifecycleHandoff.primaryDownload?.format || "-"}`
+    );
+    lines.push(
+      `- lifecycleCloseout=${chain.postLaunchLifecycleCloseoutReadinessStatus || lifecycleHandoff.closeoutReadiness?.status || "-"}`
+      + ` | stabilization=${chain.postLaunchLifecycleStabilizationConfirmationStatus || lifecycleHandoff.stabilizationConfirmation?.status || "-"}`
+      + ` | stabilizationAudit=${chain.postLaunchLifecycleStabilizationConfirmationAuditLogId || lifecycleHandoff.stabilizationConfirmation?.auditLogId || "-"}`
+    );
+  }
   return true;
 }
 
@@ -20767,7 +20784,8 @@ function buildFirstWaveHandoffConfirmationPayload(item = null) {
       ...item,
       metadata,
       confirmedBy,
-      sourceRecommendation
+      sourceRecommendation,
+      postLaunchLifecycleHandoff
     }),
     downloads: item.downloads || metadata.downloads || null,
     createdAt: item.createdAt || null
@@ -26890,6 +26908,38 @@ function buildFirstWaveConfirmationChainPayload(item = null) {
         username: metadata.actorUsername || null,
         role: metadata.actorRole || null
       };
+  const postLaunchLifecycleHandoff = normalizeDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload(
+    item.postLaunchLifecycleHandoff && typeof item.postLaunchLifecycleHandoff === "object"
+      ? item.postLaunchLifecycleHandoff
+      : metadata.postLaunchLifecycleHandoff && typeof metadata.postLaunchLifecycleHandoff === "object"
+        ? metadata.postLaunchLifecycleHandoff
+        : metadata.postLaunchLifecycleStatus
+          ? {
+              status: metadata.postLaunchLifecycleStatus,
+              nextAction: {
+                key: metadata.postLaunchLifecycleNextActionKey || null,
+                operation: metadata.postLaunchLifecycleNextOperation || null
+              },
+              primaryDownload: {
+                key: metadata.postLaunchLifecyclePrimaryDownloadKey || null,
+                format: metadata.postLaunchLifecyclePrimaryDownloadFormat || null,
+                fileName: metadata.postLaunchLifecyclePrimaryDownloadFileName || null,
+                href: metadata.postLaunchLifecyclePrimaryDownloadHref || null
+              },
+              closeoutReadiness: metadata.postLaunchLifecycleCloseoutReadinessStatus
+                ? {
+                    status: metadata.postLaunchLifecycleCloseoutReadinessStatus
+                  }
+                : null,
+              stabilizationConfirmation: metadata.postLaunchLifecycleStabilizationConfirmationAuditLogId
+                ? {
+                    auditLogId: metadata.postLaunchLifecycleStabilizationConfirmationAuditLogId,
+                    status: metadata.postLaunchLifecycleStabilizationConfirmationStatus || null
+                  }
+                : null
+            }
+          : null
+  );
   return {
     version: "developer-ops-first-wave-confirmation-chain/v1",
     status: item.status || metadata.status || "confirmed",
@@ -26906,6 +26956,14 @@ function buildFirstWaveConfirmationChainPayload(item = null) {
     firstRoundOpsStatus: segments[2].status,
     recommendedCardCount: sourceRecommendation.recommendedCardCount ?? null,
     issuedFreshCardCount: sourceRecommendation.issuedFreshCardCount ?? null,
+    postLaunchLifecycleStatus: postLaunchLifecycleHandoff?.status || null,
+    postLaunchLifecycleNextActionKey: postLaunchLifecycleHandoff?.nextAction?.key || null,
+    postLaunchLifecycleNextOperation: postLaunchLifecycleHandoff?.nextAction?.operation || null,
+    postLaunchLifecyclePrimaryDownloadKey: postLaunchLifecycleHandoff?.primaryDownload?.key || null,
+    postLaunchLifecycleCloseoutReadinessStatus: postLaunchLifecycleHandoff?.closeoutReadiness?.status || null,
+    postLaunchLifecycleStabilizationConfirmationStatus: postLaunchLifecycleHandoff?.stabilizationConfirmation?.status || null,
+    postLaunchLifecycleStabilizationConfirmationAuditLogId: postLaunchLifecycleHandoff?.stabilizationConfirmation?.auditLogId || null,
+    postLaunchLifecycleHandoff,
     segmentCount: segments.length,
     confirmedSegmentCount,
     allSegmentsConfirmed: confirmedSegmentCount === segments.length,
@@ -29778,19 +29836,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       || null;
     if (firstWaveConfirmationChain) {
       lines.push("");
-      lines.push("First-Wave Confirmation Chain:");
-      lines.push(
-        `- status=${firstWaveConfirmationChain.status || "-"}`
-        + ` | segments=${firstWaveConfirmationChain.confirmedSegmentCount ?? 0}/${firstWaveConfirmationChain.segmentCount ?? 0}`
-        + ` | allConfirmed=${firstWaveConfirmationChain.allSegmentsConfirmed === true}`
-        + ` | audit=${firstWaveConfirmationChain.auditLogId || "-"}`
-      );
-      lines.push(
-        `- inventory=${firstWaveConfirmationChain.inventoryStatus || "-"}`
-        + ` | firstCards=${firstWaveConfirmationChain.firstCardStatus || "-"}`
-        + ` | firstRoundOps=${firstWaveConfirmationChain.firstRoundOpsStatus || "-"}`
-        + ` | latestReceipt=${firstWaveConfirmationChain.latestLaunchReceiptOperation || "-"}`
-      );
+      appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
     }
     const stabilizationHandoff = initialLaunchOpsReadiness.stabilizationHandoff || null;
     if (stabilizationHandoff) {
@@ -31950,19 +31996,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     || null;
   if (firstWaveConfirmationChain) {
     lines.push("");
-    lines.push("First-Wave Confirmation Chain:");
-    lines.push(
-      `- status=${firstWaveConfirmationChain.status || "-"}`
-      + ` | segments=${firstWaveConfirmationChain.confirmedSegmentCount ?? 0}/${firstWaveConfirmationChain.segmentCount ?? 0}`
-      + ` | allConfirmed=${firstWaveConfirmationChain.allSegmentsConfirmed === true}`
-      + ` | audit=${firstWaveConfirmationChain.auditLogId || "-"}`
-    );
-    lines.push(
-      `- inventory=${firstWaveConfirmationChain.inventoryStatus || "-"}`
-      + ` | firstCards=${firstWaveConfirmationChain.firstCardStatus || "-"}`
-      + ` | firstRoundOps=${firstWaveConfirmationChain.firstRoundOpsStatus || "-"}`
-      + ` | latestReceipt=${firstWaveConfirmationChain.latestLaunchReceiptOperation || "-"}`
-    );
+    appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
   }
 
   lines.push("");

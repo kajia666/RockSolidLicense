@@ -688,15 +688,102 @@ function buildStagingRehearsalExecutionSummary(result) {
 }
 
 function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
+  const profilePreflight = result.stagingProfileOperatorPreflight || {};
   const fullTestWindow = result.fullTestWindowReadiness || {};
   const productionSignoff = result.productionSignoffReadiness || {};
   const launchDayWatch = result.launchDayWatchPlan || {};
   const stabilizationHandoff = result.stabilizationHandoffPlan || {};
+  const recommendedFileByKey = new Map((profilePreflight.recommendedFiles || []).map((item) => [item.key, item]));
+  const watchRecordByKey = new Map((launchDayWatch.watchRecordDraft?.records || []).map((item) => [item.key, item]));
+  const filePath = (key) => recommendedFileByKey.get(key)?.path || null;
+  const action = ({
+    kind,
+    command = null,
+    artifactPath = null,
+    envKeys = [],
+    summary = ""
+  }) => ({
+    kind,
+    command,
+    artifactPath,
+    envKeys,
+    summary
+  });
+  const operatorActionFor = (check) => {
+    if (check.key === "staging_profile") {
+      return action({
+        kind: "load_profile",
+        command: profilePreflight.commands?.profileDrivenRehearsal || null,
+        artifactPath: check.path || null,
+        summary: "Load the secret-free staging profile and rerun the profile-driven rehearsal."
+      });
+    }
+    if (check.key === "required_secret_env") {
+      return action({
+        kind: "set_env",
+        envKeys: Array.isArray(check.missing) ? check.missing : profilePreflight.missingSecretEnv || [],
+        summary: "Set required environment variables before continuing the real staging rehearsal."
+      });
+    }
+    if (check.key === "artifact_output_paths") {
+      return action({
+        kind: "provide_artifact_paths",
+        artifactPath: filePath("artifact_archive_root"),
+        summary: "Provide every launch-duty output path before the real rehearsal."
+      });
+    }
+    if (check.key === "artifact_archive_root") {
+      return action({
+        kind: "prepare_archive_root",
+        artifactPath: check.path || filePath("artifact_archive_root"),
+        summary: "Prepare the staging artifact archive root."
+      });
+    }
+    if (check.key === "filled_closeout_input") {
+      return action({
+        kind: "create_file",
+        command: profilePreflight.commands?.closeoutReload || null,
+        artifactPath: filePath("filled_closeout_input"),
+        summary: "Create or reload the filled closeout input with redacted staging evidence."
+      });
+    }
+    if (check.key === "full_test_window") {
+      return action({
+        kind: "run_command",
+        command: fullTestWindow.command || "npm.cmd test",
+        summary: "Run the reserved full repository test window."
+      });
+    }
+    if (check.key === "production_signoff") {
+      return action({
+        kind: "backfill_artifact",
+        command: productionSignoff.reloadCommand || profilePreflight.commands?.closeoutReload || null,
+        artifactPath: result.productionSignoffPacketFile?.path || filePath("production_signoff_packet"),
+        summary: "Backfill production sign-off evidence and receipt visibility."
+      });
+    }
+    if (check.key === "launch_day_watch") {
+      return action({
+        kind: "record_artifact",
+        artifactPath: watchRecordByKey.get("launch_day_watch_summary")?.artifactPath || null,
+        summary: "Record launch-day watch summary once production sign-off is ready."
+      });
+    }
+    if (check.key === "stabilization_handoff") {
+      return action({
+        kind: "record_handoff",
+        artifactPath: watchRecordByKey.get("stabilization_owner_handoff")?.artifactPath || null,
+        summary: "Record stabilization owner handoff after cutover watch starts."
+      });
+    }
+    return action({
+      kind: "operator_review",
+      summary: check.nextAction || "Review this go-live checkpoint."
+    });
+  };
   const realInputChecks = Array.isArray(realStagingInputClosure.checks)
     ? realStagingInputClosure.checks.map((item) => ({
-      key: item.key,
-      status: item.status,
-      nextAction: item.nextAction
+      ...item
     }))
     : [];
   const checks = [
@@ -721,7 +808,10 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
       status: stabilizationHandoff.canStartStabilizationHandoff === true ? "ready" : "blocked",
       nextAction: stabilizationHandoff.nextAction || "Prepare stabilization handoff after cutover watch starts."
     }
-  ];
+  ].map((check) => ({
+    ...check,
+    operatorAction: operatorActionFor(check)
+  }));
   const readyCheckCount = checks.filter((item) => item.status === "ready").length;
   const blockedQueue = checks.filter((item) => item.status !== "ready");
   const blockedCheckCount = checks.length - readyCheckCount;
@@ -4451,6 +4541,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
   const focus = summary.operatorFocus || {};
   const realInputClosure = focus.realStagingInputClosure || {};
   const goLiveProgress = focus.goLiveProgress || {};
+  const goLiveAction = goLiveProgress.currentBlocker?.operatorAction || {};
   const closure = focus.launchReadinessClosure || {};
   const launchDutyFocus = focus.launchDutyFocus || {};
   const statuses = summary.sourceStatuses || {};
@@ -4467,6 +4558,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Real staging input closure: ${realInputClosure.status || "-"} (ready=${realInputClosure.readyCheckCount ?? "-"}, blocked=${realInputClosure.blockedCheckCount ?? "-"})`,
     `- Go-live progress: ${goLiveProgress.status || "-"} (ready=${goLiveProgress.readyCheckCount ?? "-"}, blocked=${goLiveProgress.blockedCheckCount ?? "-"}, scriptReadiness=${goLiveProgress.scriptReadinessPercent ?? "-"}%)`,
     `- Go-live current blocker: ${goLiveProgress.currentBlocker?.key || "-"}`,
+    `- Go-live current action: ${goLiveAction.kind || "-"} (command=${goLiveAction.command || "-"}, env=${(goLiveAction.envKeys || []).join(", ") || "-"}, artifact=${goLiveAction.artifactPath || "-"})`,
     `- Go-live blocked queue: ${(goLiveProgress.blockedQueue || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,

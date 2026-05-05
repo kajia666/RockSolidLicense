@@ -1391,8 +1391,9 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.readyCheckCount, 3);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.blockedCheckCount, 6);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.scriptReadinessPercent, 33);
+    const goLiveProgress = output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress;
     assert.deepEqual(
-      output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.blockedQueue.map((item) => item.key),
+      goLiveProgress.blockedQueue.map((item) => item.key),
       [
         "required_secret_env",
         "filled_closeout_input",
@@ -1402,11 +1403,13 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
         "stabilization_handoff"
       ]
     );
-    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.currentBlocker.key, "required_secret_env");
-    assert.match(
-      output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.currentBlocker.nextAction,
-      /Set missing secret environment variables/
-    );
+    assert.equal(goLiveProgress.currentBlocker.key, "required_secret_env");
+    assert.equal(goLiveProgress.currentBlocker.operatorAction.kind, "set_env");
+    assert.deepEqual(goLiveProgress.currentBlocker.operatorAction.envKeys, ["RSL_DEVELOPER_BEARER_TOKEN"]);
+    assert.equal(goLiveProgress.blockedQueue.find((item) => item.key === "filled_closeout_input").operatorAction.artifactPath, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(goLiveProgress.blockedQueue.find((item) => item.key === "filled_closeout_input").operatorAction.command, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(goLiveProgress.blockedQueue.find((item) => item.key === "full_test_window").operatorAction.command, "npm.cmd test");
+    assert.equal(goLiveProgress.blockedQueue.find((item) => item.key === "production_signoff").operatorAction.artifactPath, productionSignoffPacketFile);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.status, "blocked_until_real_staging_inputs");
     assert.deepEqual(
       output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.remainingBlockers.slice(0, 3).map((item) => item.key),
@@ -1651,6 +1654,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Real staging input closure: blocked_until_profile_and_paths \(ready=1, blocked=4\)/);
     assert.match(handoff, /Go-live progress: blocked_until_real_staging_inputs \(ready=1, blocked=8, scriptReadiness=11%\)/);
     assert.match(handoff, /Go-live current blocker: staging_profile/);
+    assert.match(handoff, /Go-live current action: load_profile \(command=npm\.cmd run staging:rehearsal -- --profile-file <staging-profile\.json>.*env=-, artifact=-\)/);
     assert.match(handoff, /Go-live blocked queue: staging_profile -> required_secret_env -> artifact_output_paths -> filled_closeout_input -> full_test_window -> production_signoff -> launch_day_watch -> stabilization_handoff/);
     assert.match(handoff, /Launch closure status: blocked_until_real_staging_inputs \(remainingBlockers=5\)/);
     assert.match(handoff, /Launch closure next plan: load_staging_profile -> set_missing_secret_env -> backfill_and_reload_closeout_input -> run_full_test_window -> backfill_production_signoff -> start_launch_day_watch/);
@@ -2199,6 +2203,8 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
       ]
     );
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.currentBlocker.key, "staging_profile");
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.currentBlocker.operatorAction.kind, "load_profile");
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.blockedQueue.find((item) => item.key === "production_signoff").operatorAction.command, "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>");
     assert.equal(
       output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.nextAction,
       "Clear the real staging input closure, then rerun the no-write staging rehearsal."

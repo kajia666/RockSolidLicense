@@ -644,6 +644,8 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     closeoutReloadPacket: "awaiting_closeout_backfill",
     readinessReviewPacket: "blocked_until_closeout_reload",
     productionSignoffPacket: "blocked_until_closeout_reload",
+    launchDayWatch: "blocked",
+    stabilizationHandoff: "blocked",
     finalPacket: "ready_for_operator_rehearsal"
   });
   assert.deepEqual(
@@ -657,6 +659,34 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["production_signoff_packet", "blocked_until_closeout_reload", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"]
     ]
   );
+  assert.equal(
+    output.stagingLaunchDutyArchiveIndex.receiptVisibilityRoutes.launchOpsOverviewStatus,
+    output.nextCommands.receiptVisibilitySummaries.launchOpsOverviewStatus
+  );
+  assert.deepEqual(
+    output.stagingLaunchDutyArchiveIndex.watchArtifacts.map((item) => [item.key, item.status, item.path]),
+    [
+      ["launch_day_watch_summary", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+      ["receipt_visibility_snapshot", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt"],
+      ["first_wave_incident_log", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md"],
+      ["rollback_signal_review", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+      ["stabilization_owner_handoff", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+    ]
+  );
+  assert.deepEqual(output.stagingLaunchDutyArchiveIndex.stabilizationHandoff, {
+    status: "blocked",
+    requiredEvidenceKeys: [
+      "launch_day_watch_summary",
+      "first_wave_incident_log",
+      "receipt_visibility_snapshot",
+      "rollback_signal_review",
+      "stabilization_owner_handoff"
+    ],
+    handoffWindows: [
+      ["stabilization_owner_handoff", "T+2h stabilization owner handoff", "blocked_until_cutover_watch"],
+      ["first_wave_closeout", "T+24h first-wave closeout", "blocked_until_stabilization_owner_handoff"]
+    ].map(([key, label, status]) => ({ key, label, status }))
+  });
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.fullTestWindow, "npm.cmd test");
   assert.equal(output.stagingLaunchDutyArchiveIndex.nextAction, "Archive the listed launch-duty packets, then use readiness review to decide whether the full test window can start.");
@@ -1577,6 +1607,13 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /pre_full_test_closeout: awaiting_operator_evidence \(records=7\)/);
     assert.match(handoff, /production_signoff: blocked_until_full_test_window \(records=7\)/);
     assert.match(handoff, /Next action: Collect the missing pre-full-test record artifacts, backfill filled-closeout-input\.json, then reload closeout input\./);
+    assert.match(handoff, /## Staging Launch Duty Archive Index/);
+    assert.match(handoff, /Launch-duty archive index: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(handoff, /Launch day watch status: blocked/);
+    assert.match(handoff, /Stabilization handoff status: blocked/);
+    assert.match(handoff, /Launch Ops overview status: https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=launch-operations-overview-status&limit=20/);
+    assert.match(handoff, /launch_day_watch_summary: blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+    assert.match(handoff, /stabilization_owner_handoff: blocked_until_cutover_watch \(T\+2h stabilization owner handoff\)/);
     assert.match(handoff, /## Staging Environment Binding/);
     assert.match(handoff, /Binding status: ready_for_real_staging_binding/);
     assert.match(handoff, /Admin password env: RSL_SMOKE_ADMIN_PASSWORD/);
@@ -2339,6 +2376,25 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       ]
     );
     assert.equal(output.stagingProductionSignoffPacket.nextAction, "Archive production sign-off packet, then start launch-day watch and stabilization handoff.");
+    assert.equal(output.stagingLaunchDutyArchiveIndex.sourceStatuses.launchDayWatch, "ready");
+    assert.equal(output.stagingLaunchDutyArchiveIndex.sourceStatuses.stabilizationHandoff, "ready");
+    assert.deepEqual(
+      output.stagingLaunchDutyArchiveIndex.watchArtifacts.map((item) => [item.key, item.status]),
+      [
+        ["launch_day_watch_summary", "pending_operator_entry"],
+        ["receipt_visibility_snapshot", "pending_operator_entry"],
+        ["first_wave_incident_log", "pending_operator_entry"],
+        ["rollback_signal_review", "pending_operator_entry"],
+        ["stabilization_owner_handoff", "pending_operator_entry"]
+      ]
+    );
+    assert.deepEqual(
+      output.stagingLaunchDutyArchiveIndex.stabilizationHandoff.handoffWindows.map((item) => [item.key, item.status]),
+      [
+        ["stabilization_owner_handoff", "operator_handoff"],
+        ["first_wave_closeout", "operator_closeout"]
+      ]
+    );
     assert.equal(output.finalRehearsalPacket.status, "ready_for_launch_day_watch");
     assert.equal(output.finalRehearsalPacket.readinessTransitionStatus, "ready_for_launch_day_watch");
     assert.deepEqual(output.finalRehearsalPacket.sourceReadiness, {

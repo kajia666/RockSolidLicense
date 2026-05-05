@@ -1289,6 +1289,8 @@ function buildStagingLaunchDutyArchiveIndex(result) {
   const closeoutReloadPacket = result.stagingCloseoutReloadPacket || buildStagingCloseoutReloadPacket(result);
   const readinessReviewPacket = result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result);
   const productionSignoffPacket = result.stagingProductionSignoffPacket || buildStagingProductionSignoffPacket(result);
+  const launchDayWatch = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
+  const stabilizationHandoff = result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result);
   const finalPacket = result.finalRehearsalPacket || buildFinalRehearsalPacket(result);
   const archiveRoot = readinessReviewPacket.archiveRoot
     || closeoutReloadPacket.archiveRoot
@@ -1313,6 +1315,8 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       closeoutReloadPacket: closeoutReloadPacket.status || "not_available",
       readinessReviewPacket: readinessReviewPacket.status || "not_available",
       productionSignoffPacket: productionSignoffPacket.status || "not_available",
+      launchDayWatch: launchDayWatch.status || "not_available",
+      stabilizationHandoff: stabilizationHandoff.status || "not_available",
       finalPacket: finalPacket.status || "not_available"
     },
     packets: [
@@ -1347,6 +1351,29 @@ function buildStagingLaunchDutyArchiveIndex(result) {
         path: packetPath("production_signoff_packet", productionSignoffPacket.packetFile)
       }
     ],
+    receiptVisibilityRoutes: {
+      launchMainline: launchDayWatch.routes?.launchMainline || result.nextCommands?.launchMainline || null,
+      developerOps: launchDayWatch.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
+      launchReviewSummary: launchDayWatch.routes?.launchReviewSummary || result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
+      launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
+      launchOpsOverviewStatus: launchDayWatch.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
+    },
+    watchArtifacts: (launchDayWatch.watchRecordDraft?.records || []).map((item) => ({
+      key: item.key || null,
+      status: item.status || "not_available",
+      path: item.artifactPath || null,
+      receiptOperations: item.receiptOperations || [],
+      expectedEvidence: item.expectedEvidence || null
+    })),
+    stabilizationHandoff: {
+      status: stabilizationHandoff.status || "not_available",
+      requiredEvidenceKeys: stabilizationHandoff.requiredEvidenceKeys || [],
+      handoffWindows: (stabilizationHandoff.handoffWindows || []).map((item) => ({
+        key: item.key || null,
+        label: item.label || null,
+        status: item.status || "not_available"
+      }))
+    },
     commands: {
       stagingDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
       closeoutReload: readinessReviewPacket.commands?.closeoutReload || closeoutReloadPacket.commands?.closeoutReload || null,
@@ -4656,6 +4683,52 @@ function renderStagingRehearsalRunRecordIndex(index) {
   return lines.join("\n");
 }
 
+function renderStagingLaunchDutyArchiveIndex(index) {
+  if (!index) {
+    return "- Not available";
+  }
+  const statuses = index.sourceStatuses || {};
+  const routes = index.receiptVisibilityRoutes || {};
+  const stabilization = index.stabilizationHandoff || {};
+  const lines = [
+    `- Index status: ${index.status || "-"}`,
+    `- Writes data by itself: ${index.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${index.archiveRoot || "-"}`,
+    `- Launch-duty archive index: ${index.indexFile || "-"}`,
+    `- Launch day watch status: ${statuses.launchDayWatch || "-"}`,
+    `- Stabilization handoff status: ${statuses.stabilizationHandoff || "-"}`,
+    `- Launch Mainline: ${routes.launchMainline || "-"}`,
+    `- Developer Ops: ${routes.developerOps || "-"}`,
+    `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
+    `- Launch Smoke summary: ${routes.launchSmokeSummary || "-"}`,
+    `- Launch Ops overview status: ${routes.launchOpsOverviewStatus || "-"}`,
+    `- Closeout reload: \`${index.commands?.closeoutReload || "-"}\``,
+    `- Full test window: \`${index.commands?.fullTestWindow || "-"}\``,
+    "- Packets:"
+  ];
+  for (const packet of index.packets || []) {
+    lines.push(`  - ${packet.key || "-"}: ${packet.status || "-"} -> ${packet.path || "-"}`);
+  }
+  if (Array.isArray(index.watchArtifacts) && index.watchArtifacts.length) {
+    lines.push("- Watch artifacts:");
+    for (const artifact of index.watchArtifacts) {
+      lines.push(`  - ${artifact.key || "-"}: ${artifact.status || "-"} -> ${artifact.path || "-"}`);
+      if (Array.isArray(artifact.receiptOperations) && artifact.receiptOperations.length) {
+        lines.push(`    - receiptOperations: ${artifact.receiptOperations.join(", ")}`);
+      }
+    }
+  }
+  if (Array.isArray(stabilization.handoffWindows) && stabilization.handoffWindows.length) {
+    lines.push("- Stabilization handoff windows:");
+    for (const window of stabilization.handoffWindows) {
+      lines.push(`  - ${window.key || "-"}: ${window.status || "-"} (${window.label || "-"})`);
+    }
+  }
+  lines.push(`- Required stabilization evidence: ${(stabilization.requiredEvidenceKeys || []).join(", ") || "-"}`);
+  lines.push(`- Next action: ${index.nextAction || "-"}`);
+  return lines.join("\n");
+}
+
 function renderStagingEnvironmentBinding(binding) {
   if (!binding) {
     return "- Not available";
@@ -4961,6 +5034,10 @@ function renderHandoffFile(result) {
     "## Staging Rehearsal Run Record Index",
     "",
     renderStagingRehearsalRunRecordIndex(result.stagingRehearsalRunRecordIndex),
+    "",
+    "## Staging Launch Duty Archive Index",
+    "",
+    renderStagingLaunchDutyArchiveIndex(result.stagingLaunchDutyArchiveIndex),
     "",
     "## Staging Environment Binding",
     "",

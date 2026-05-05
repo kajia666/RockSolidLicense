@@ -1431,6 +1431,30 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
         ["stabilization_handoff", "record_handoff"]
       ]
     );
+    assert.equal(goLiveProgress.operatorActionPlan.mode, "go-live-operator-action-plan");
+    assert.equal(goLiveProgress.operatorActionPlan.status, "blocked_until_real_staging_inputs");
+    assert.equal(goLiveProgress.operatorActionPlan.remainingActionCount, 6);
+    assert.equal(goLiveProgress.operatorActionPlan.currentAction.key, "required_secret_env");
+    assert.equal(goLiveProgress.operatorActionPlan.currentAction.phase, "real_staging_inputs");
+    assert.deepEqual(
+      goLiveProgress.operatorActionPlan.actions.slice(0, 5).map((item) => [item.sequence, item.key, item.phase, item.status, item.needsOperatorAction]),
+      [
+        [1, "staging_profile", "real_staging_inputs", "ready", false],
+        [2, "required_secret_env", "real_staging_inputs", "missing", true],
+        [3, "artifact_output_paths", "real_staging_inputs", "ready", false],
+        [4, "artifact_archive_root", "real_staging_inputs", "ready", false],
+        [5, "filled_closeout_input", "full_test_window_entry", "not_loaded", true]
+      ]
+    );
+    assert.deepEqual(
+      goLiveProgress.operatorActionPlan.phaseSummary.map((item) => [item.phase, item.readyCount, item.blockedCount]),
+      [
+        ["real_staging_inputs", 3, 1],
+        ["full_test_window_entry", 0, 2],
+        ["production_signoff", 0, 1],
+        ["launch_watch_and_stabilization", 0, 2]
+      ]
+    );
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.status, "blocked_until_real_staging_inputs");
     assert.deepEqual(
       output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.remainingBlockers.slice(0, 3).map((item) => item.key),
@@ -1828,6 +1852,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Final packet go-live current blocker: staging_profile/);
     assert.match(handoff, /Final packet go-live action queue:/);
     assert.match(handoff, /staging_profile: load_profile \(command=npm\.cmd run staging:rehearsal -- --profile-file <staging-profile\.json>/);
+    assert.match(handoff, /Final packet go-live operator action plan: status=blocked_until_real_staging_inputs, remaining=8/);
+    assert.match(handoff, /Current go-live action: staging_profile \(phase=real_staging_inputs, kind=load_profile\)/);
+    assert.match(handoff, /Phase real_staging_inputs: ready=1, blocked=3/);
     assert.match(handoff, /Post-signoff action checklist:/);
     assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
@@ -2059,6 +2086,8 @@ test("staging rehearsal runner can write a redacted closeout template file", () 
     );
     assert.equal(template.finalRehearsalPacket.goLiveCurrentBlocker.key, "staging_profile");
     assert.equal(template.finalRehearsalPacket.goLiveActionQueue.find((item) => item.key === "filled_closeout_input").operatorAction.kind, "create_file");
+    assert.equal(template.finalRehearsalPacket.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
+    assert.equal(template.finalRehearsalPacket.goLiveOperatorActionPlan.actions.find((item) => item.key === "production_signoff").phase, "production_signoff");
     assert.equal(template.operatorExecutionPlan.status, "ready_for_staging_execution");
     assert.equal(
       template.operatorExecutionPlan.outputFiles.find((item) => item.key === "closeout_file").status,

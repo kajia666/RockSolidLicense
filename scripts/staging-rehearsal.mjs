@@ -687,6 +687,72 @@ function buildStagingRehearsalExecutionSummary(result) {
   };
 }
 
+const GO_LIVE_ACTION_PHASES = {
+  staging_profile: "real_staging_inputs",
+  required_secret_env: "real_staging_inputs",
+  artifact_output_paths: "real_staging_inputs",
+  artifact_archive_root: "real_staging_inputs",
+  filled_closeout_input: "full_test_window_entry",
+  full_test_window: "full_test_window_entry",
+  production_signoff: "production_signoff",
+  launch_day_watch: "launch_watch_and_stabilization",
+  stabilization_handoff: "launch_watch_and_stabilization"
+};
+
+const GO_LIVE_PHASE_ORDER = [
+  "real_staging_inputs",
+  "full_test_window_entry",
+  "production_signoff",
+  "launch_watch_and_stabilization"
+];
+
+function buildGoLiveOperatorActionPlan(progress = {}) {
+  const checks = Array.isArray(progress.checks) ? progress.checks : [];
+  const actions = checks.map((check, index) => {
+    const operatorAction = check.operatorAction || {};
+    const needsOperatorAction = check.status !== "ready";
+    return {
+      sequence: index + 1,
+      key: check.key || null,
+      phase: GO_LIVE_ACTION_PHASES[check.key] || "operator_review",
+      status: check.status || "unknown",
+      ready: !needsOperatorAction,
+      needsOperatorAction,
+      nextAction: check.nextAction || null,
+      operatorAction,
+      command: operatorAction.command || null,
+      artifactPath: operatorAction.artifactPath || null,
+      envKeys: Array.isArray(operatorAction.envKeys) ? operatorAction.envKeys : []
+    };
+  });
+  const actionQueue = actions.filter((item) => item.needsOperatorAction);
+  const phaseSummary = GO_LIVE_PHASE_ORDER
+    .map((phase) => {
+      const phaseActions = actions.filter((item) => item.phase === phase);
+      return {
+        phase,
+        actionCount: phaseActions.length,
+        readyCount: phaseActions.filter((item) => item.ready).length,
+        blockedCount: phaseActions.filter((item) => item.needsOperatorAction).length
+      };
+    })
+    .filter((item) => item.actionCount > 0);
+  return {
+    mode: "go-live-operator-action-plan",
+    status: progress.status || "unknown",
+    readyToProceed: actionQueue.length === 0 && progress.status === "ready_for_controlled_pilot_launch",
+    actionCount: actions.length,
+    readyActionCount: actions.length - actionQueue.length,
+    remainingActionCount: actionQueue.length,
+    scriptReadinessPercent: progress.scriptReadinessPercent ?? 0,
+    currentAction: actionQueue[0] || null,
+    actions,
+    actionQueue,
+    phaseSummary,
+    nextAction: progress.nextAction || null
+  };
+}
+
 function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
   const profilePreflight = result.stagingProfileOperatorPreflight || {};
   const fullTestWindow = result.fullTestWindowReadiness || {};
@@ -845,7 +911,7 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
           : status === "awaiting_launch_day_watch"
             ? "Start launch-day watch once production sign-off is ready."
             : "Prepare stabilization handoff after cutover watch starts.";
-  return {
+  const progress = {
     status,
     readyCheckCount,
     blockedCheckCount,
@@ -856,6 +922,10 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
     operatorActionQueue,
     currentBlocker: blockedQueue[0] || null,
     nextAction
+  };
+  return {
+    ...progress,
+    operatorActionPlan: buildGoLiveOperatorActionPlan(progress)
   };
 }
 
@@ -3492,6 +3562,7 @@ function buildFinalRehearsalPacket(result) {
     goLiveStatus: goLiveProgress.status,
     goLiveCurrentBlocker: goLiveProgress.currentBlocker,
     goLiveActionQueue: goLiveProgress.operatorActionQueue,
+    goLiveOperatorActionPlan: goLiveProgress.operatorActionPlan,
     commands: {
       stagingRehearsalDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
       routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
@@ -4560,6 +4631,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
   const focus = summary.operatorFocus || {};
   const realInputClosure = focus.realStagingInputClosure || {};
   const goLiveProgress = focus.goLiveProgress || {};
+  const goLiveActionPlan = goLiveProgress.operatorActionPlan || {};
   const goLiveAction = goLiveProgress.currentBlocker?.operatorAction || {};
   const closure = focus.launchReadinessClosure || {};
   const launchDutyFocus = focus.launchDutyFocus || {};
@@ -4579,6 +4651,8 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Go-live current blocker: ${goLiveProgress.currentBlocker?.key || "-"}`,
     `- Go-live current action: ${goLiveAction.kind || "-"} (command=${goLiveAction.command || "-"}, env=${(goLiveAction.envKeys || []).join(", ") || "-"}, artifact=${goLiveAction.artifactPath || "-"})`,
     `- Go-live blocked queue: ${(goLiveProgress.blockedQueue || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
+    `- Go-live operator action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
+    `- Go-live operator current action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
     `- Real staging input next action: ${realInputClosure.nextAction || "-"}`,
@@ -4597,6 +4671,12 @@ function renderStagingRehearsalExecutionSummary(summary) {
       for (const item of goLiveProgress.operatorActionQueue) {
         const itemAction = item.operatorAction || {};
         lines.push(`  - ${item.key || "-"}: ${itemAction.kind || "-"} (command=${itemAction.command || "-"}, env=${(itemAction.envKeys || []).join(", ") || "-"}, artifact=${itemAction.artifactPath || "-"})`);
+      }
+    }
+    if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
+      lines.push("- Go-live operator phases:");
+      for (const phase of goLiveActionPlan.phaseSummary) {
+        lines.push(`  - ${phase.phase || "-"}: ready=${phase.readyCount ?? 0}, blocked=${phase.blockedCount ?? 0}`);
       }
     }
     lines.push("- Blocking reasons:");
@@ -5420,6 +5500,7 @@ function renderFinalRehearsalPacket(packet) {
   const fileByKey = new Map((packet.localFiles || []).map((item) => [item.key, item]));
   const review = packet.closeoutInputReview || {};
   const goLiveActionQueue = Array.isArray(packet.goLiveActionQueue) ? packet.goLiveActionQueue : [];
+  const goLiveActionPlan = packet.goLiveOperatorActionPlan || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
@@ -5441,8 +5522,16 @@ function renderFinalRehearsalPacket(packet) {
     `- Closeout review: ${review.status || "-"} (missing=${review.missingFieldCount ?? 0}, safeForFullTest=${review.safeToEnterFullTestWindow ? "yes" : "no"})`,
     `- Ordered packet steps: ${(packet.orderedSteps || []).map((item) => item.key).join(", ") || "-"}`,
     `- Final packet go-live current blocker: ${packet.goLiveCurrentBlocker?.key || "-"}`,
+    `- Final packet go-live operator action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
+    `- Current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Next action: ${packet.nextAction || "-"}`
   ];
+  if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
+    lines.push("- Final packet go-live operator phases:");
+    for (const phase of goLiveActionPlan.phaseSummary) {
+      lines.push(`  - Phase ${phase.phase || "-"}: ready=${phase.readyCount ?? 0}, blocked=${phase.blockedCount ?? 0}`);
+    }
+  }
   if (goLiveActionQueue.length) {
     lines.push("- Final packet go-live action queue:");
     for (const item of goLiveActionQueue) {

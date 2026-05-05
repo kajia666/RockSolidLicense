@@ -874,6 +874,13 @@ function buildStagingCloseoutReloadPacket(result) {
   const packetFile = result.closeoutReloadPacketFile?.path
     || bindingFiles.get("closeout_reload_packet")?.path
     || path.posix.join(archiveRoot, "staging-closeout-reload-packet.json");
+  const postReloadTarget = (key, outputPath, fallbackFileName, status) => ({
+    key,
+    path: outputPath
+      || bindingFiles.get(key)?.path
+      || path.posix.join(archiveRoot, fallbackFileName),
+    status
+  });
   const requiredCloseoutKeys = (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
   const missingCloseoutKeys = Array.isArray(result.closeoutInput?.missingKeys)
     ? result.closeoutInput.missingKeys
@@ -899,6 +906,11 @@ function buildStagingCloseoutReloadPacket(result) {
       filledCloseoutInputFile,
       closeoutTemplateFile
     },
+    postReloadTargets: [
+      postReloadTarget("readiness_review_packet", result.readinessReviewPacketFile?.path, "staging-readiness-review-packet.json", "review_after_reload"),
+      postReloadTarget("production_signoff_packet", result.productionSignoffPacketFile?.path, "staging-production-signoff-packet.json", "prepare_after_full_test"),
+      postReloadTarget("launch_duty_archive_index", result.launchDutyArchiveIndexFile?.path, "staging-launch-duty-archive-index.json", "archive_after_signoff")
+    ],
     sourceStatuses: {
       closeoutInput: result.closeoutInput?.status || "not_loaded",
       closeoutReview: closeoutReview.status || "not_loaded",
@@ -4440,6 +4452,43 @@ function renderStagingBackupRestoreDrillPacket(packet) {
   return lines.join("\n");
 }
 
+function renderStagingCloseoutReloadPacket(packet) {
+  if (!packet) {
+    return "- Not available";
+  }
+  const paths = packet.paths || {};
+  const review = packet.closeoutReview || {};
+  const lines = [
+    `- Packet status: ${packet.status || "-"}`,
+    `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${packet.archiveRoot || "-"}`,
+    `- Packet file: ${paths.packetFile || "-"}`,
+    `- Filled closeout draft: ${paths.filledCloseoutDraftFile || "-"}`,
+    `- Filled closeout input: ${paths.filledCloseoutInputFile || "-"}`,
+    `- Closeout template: ${paths.closeoutTemplateFile || "-"}`,
+    `- Closeout review: ${review.status || "-"} (missing=${review.missingFieldCount ?? 0}, safeForFullTest=${review.safeToEnterFullTestWindow ? "yes" : "no"})`,
+    `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
+    `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
+    `- Next action: ${packet.nextAction || "-"}`
+  ];
+  if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
+    lines.push("- Operator steps:");
+    for (const step of packet.operatorSteps) {
+      lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+      if (step.command) {
+        lines.push(`    - command: \`${step.command}\``);
+      }
+    }
+  }
+  if (Array.isArray(packet.postReloadTargets) && packet.postReloadTargets.length) {
+    lines.push("- Post-reload targets:");
+    for (const target of packet.postReloadTargets) {
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderStagingProductionSignoffPacket(packet) {
   if (!packet) {
     return "- Not available";
@@ -4983,6 +5032,10 @@ function renderHandoffFile(result) {
     "## Staging Backup / Restore Drill Packet",
     "",
     renderStagingBackupRestoreDrillPacket(result.stagingBackupRestoreDrillPacket),
+    "",
+    "## Staging Closeout Reload Packet",
+    "",
+    renderStagingCloseoutReloadPacket(result.stagingCloseoutReloadPacket),
     "",
     "## Staging Production Sign-Off Packet",
     "",

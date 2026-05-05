@@ -576,6 +576,14 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     filledCloseoutInputFile: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
     closeoutTemplateFile: "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-template.json"
   });
+  assert.deepEqual(
+    output.stagingCloseoutReloadPacket.postReloadTargets.map((item) => [item.key, item.path, item.status]),
+    [
+      ["readiness_review_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json", "review_after_reload"],
+      ["production_signoff_packet", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json", "prepare_after_full_test"],
+      ["launch_duty_archive_index", "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json", "archive_after_signoff"]
+    ]
+  );
   assert.deepEqual(output.stagingCloseoutReloadPacket.sourceStatuses, {
     closeoutInput: "not_loaded",
     closeoutReview: "not_loaded",
@@ -1628,6 +1636,13 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Closeout review: not_loaded \(missing=7, safeForFullTest=no\)/);
     assert.match(handoff, /route_map_gate_result: run_route_map_gate -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
     assert.match(handoff, /operator_go_no_go: backfill_filled_closeout_input -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md/);
+    assert.match(handoff, /## Staging Closeout Reload Packet/);
+    assert.match(handoff, /Packet file: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-reload-packet\.json/);
+    assert.match(handoff, /Filled closeout draft: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.draft\.json/);
+    assert.match(handoff, /Filled closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
+    assert.match(handoff, /readiness_review_packet: review_after_reload -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-readiness-review-packet\.json/);
+    assert.match(handoff, /production_signoff_packet: prepare_after_full_test -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(handoff, /launch_duty_archive_index: archive_after_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /## Staging Readiness Transition/);
     assert.match(handoff, /Transition status: blocked_until_closeout_reload/);
     assert.match(handoff, /Closeout input status: missing/);

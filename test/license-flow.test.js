@@ -15219,6 +15219,43 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       item.key === "first_wave_lifecycle"
       && item.status === afterSetup.postLaunchLifecycleHandoff.status
     ));
+    const firstWaveLaunchReviewAfterConfirmation = await getJson(
+      baseUrl,
+      "/api/developer/launch-review?productCode=FIRSTWAVE&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    const firstWaveLaunchReviewOpsOverview = firstWaveLaunchReviewAfterConfirmation.reviewSummary.launchOperationsOverviewStatus;
+    assert.ok(firstWaveLaunchReviewOpsOverview);
+    assert.equal(firstWaveLaunchReviewOpsOverview.firstWaveLifecycle?.status, afterSetup.postLaunchLifecycleHandoff.status);
+    assert.equal(
+      firstWaveLaunchReviewOpsOverview.firstWaveLifecycle?.nextOperation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
+    const firstWaveLaunchReviewOpsOverviewAction = firstWaveLaunchReviewAfterConfirmation.reviewSummary.actionPlan.find((item) =>
+      item.key === "launch_review_launch_ops_overview"
+    );
+    assert.ok(firstWaveLaunchReviewOpsOverviewAction?.context);
+    assert.equal(
+      firstWaveLaunchReviewOpsOverviewAction.context.firstWaveLifecycleStatus,
+      afterSetup.postLaunchLifecycleHandoff.status
+    );
+    assert.equal(
+      firstWaveLaunchReviewOpsOverviewAction.context.firstWaveLifecycleNextOperation,
+      afterSetup.postLaunchLifecycleHandoff.nextAction.operation
+    );
+    assert.equal(
+      firstWaveLaunchReviewOpsOverviewAction.context.firstWaveLifecyclePrimaryDownloadKey,
+      afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
+    );
+    assert.match(firstWaveLaunchReviewAfterConfirmation.summaryText, /Launch Review Launch Ops Overview:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(firstWaveLaunchReviewAfterConfirmation.summaryText, /context=launch_ops_overview_status[\s\S]*firstWaveLifecycleStatus=hold/);
+    const firstWaveLaunchReviewSummaryAfterConfirmation = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(firstWaveLaunchReviewSummaryAfterConfirmation.body, /Launch Review Launch Ops Overview:[\s\S]*firstWaveLifecycle=hold/);
+    assert.match(firstWaveLaunchReviewSummaryAfterConfirmation.body, /context=launch_ops_overview_status[\s\S]*firstWaveLifecycleNextOperation=record_operations_walkthrough/);
     assert.equal(
       confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.traceability.firstWaveHandoffConfirmation.auditLogId,
       handoffConfirmation.auditLogId

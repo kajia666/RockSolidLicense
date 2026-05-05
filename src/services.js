@@ -4413,6 +4413,11 @@ function buildLaunchOpsOverviewActionContext({
   const watchRecordDraftRecordCount = overview?.watchRecordDraftRecordCount
     ?? readiness?.watchRecordDraftRecordCount
     ?? (watchDraft ? watchRecords.length : null);
+  const firstWaveLifecycle = overview?.firstWaveLifecycle && typeof overview.firstWaveLifecycle === "object"
+    ? overview.firstWaveLifecycle
+    : readiness?.firstWaveLifecycle && typeof readiness.firstWaveLifecycle === "object"
+      ? readiness.firstWaveLifecycle
+      : null;
   return normalizeLaunchOpsOverviewContext({
     version: "launch-ops-overview-action-context/v1",
     kind: "launch_ops_overview_status",
@@ -4423,6 +4428,11 @@ function buildLaunchOpsOverviewActionContext({
     watchRecordDraftRecordCount,
     nextActionKey: overview?.nextAction?.key || readiness?.nextActionKey || watchPanel?.nextActionKey || null,
     nextActionOperation: readiness?.nextActionOperation || watchPanel?.nextActionOperation || null,
+    firstWaveLifecycleStatus: overview?.firstWaveLifecycleStatus || readiness?.firstWaveLifecycleStatus || firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextActionKey: overview?.firstWaveLifecycleNextActionKey || readiness?.firstWaveLifecycleNextActionKey || firstWaveLifecycle?.nextActionKey || null,
+    firstWaveLifecycleNextOperation: overview?.firstWaveLifecycleNextOperation || readiness?.firstWaveLifecycleNextOperation || firstWaveLifecycle?.nextOperation || null,
+    firstWaveLifecyclePrimaryDownloadKey: overview?.firstWaveLifecyclePrimaryDownloadKey || readiness?.firstWaveLifecyclePrimaryDownloadKey || firstWaveLifecycle?.primaryDownloadKey || null,
+    firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || null,
     downloadKey: download?.key || null,
     downloadFileName: download?.fileName || null,
     downloadFormat: download?.format || null,
@@ -4437,7 +4447,7 @@ function formatLaunchWorkflowActionContextText(context = null) {
     return "";
   }
   if (context.kind === "launch_ops_overview_status") {
-    return [
+    const segments = [
       "context=launch_ops_overview_status",
       `status=${context.status || "-"}`,
       `receipt=${context.receiptVisibilityStatus || "-"}`,
@@ -4446,7 +4456,15 @@ function formatLaunchWorkflowActionContextText(context = null) {
       `ready=${context.readyForOperations === true}`,
       `next=${context.nextActionKey || context.nextActionOperation || "-"}`,
       `downloadFormat=${context.downloadFormat || context.overviewDownload?.format || "-"}`
-    ].join(" | ");
+    ];
+    if (context.firstWaveLifecycleStatus
+      || context.firstWaveLifecycleNextOperation
+      || context.firstWaveLifecyclePrimaryDownloadKey) {
+      segments.push(`firstWaveLifecycleStatus=${context.firstWaveLifecycleStatus || "-"}`);
+      segments.push(`firstWaveLifecycleNextOperation=${context.firstWaveLifecycleNextOperation || "-"}`);
+      segments.push(`firstWaveLifecyclePrimaryDownloadKey=${context.firstWaveLifecyclePrimaryDownloadKey || "-"}`);
+    }
+    return segments.join(" | ");
   }
   return `context=${context.kind || context.version || "action_context"}`;
 }

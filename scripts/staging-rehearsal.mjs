@@ -723,6 +723,7 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
     }
   ];
   const readyCheckCount = checks.filter((item) => item.status === "ready").length;
+  const blockedQueue = checks.filter((item) => item.status !== "ready");
   const blockedCheckCount = checks.length - readyCheckCount;
   const realInputsReady = realStagingInputClosure.status === "ready_for_real_staging_inputs";
   let status = "ready_for_controlled_pilot_launch";
@@ -755,6 +756,8 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
     remainingWorkCount: blockedCheckCount,
     scriptReadinessPercent: checks.length ? Math.round((readyCheckCount / checks.length) * 100) : 0,
     checks,
+    blockedQueue,
+    currentBlocker: blockedQueue[0] || null,
     nextAction
   };
 }
@@ -4463,6 +4466,8 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Can enter full test window: ${focus.canEnterFullTestWindow ? "yes" : "no"}`,
     `- Real staging input closure: ${realInputClosure.status || "-"} (ready=${realInputClosure.readyCheckCount ?? "-"}, blocked=${realInputClosure.blockedCheckCount ?? "-"})`,
     `- Go-live progress: ${goLiveProgress.status || "-"} (ready=${goLiveProgress.readyCheckCount ?? "-"}, blocked=${goLiveProgress.blockedCheckCount ?? "-"}, scriptReadiness=${goLiveProgress.scriptReadinessPercent ?? "-"}%)`,
+    `- Go-live current blocker: ${goLiveProgress.currentBlocker?.key || "-"}`,
+    `- Go-live blocked queue: ${(goLiveProgress.blockedQueue || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
     `- Real staging input next action: ${realInputClosure.nextAction || "-"}`,

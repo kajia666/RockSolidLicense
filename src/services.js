@@ -4466,8 +4466,14 @@ function formatLaunchWorkflowActionContextText(context = null) {
       `records=${context.watchRecordDraftRecordCount ?? "-"}`,
       `ready=${context.readyForOperations === true}`,
       `next=${context.nextActionKey || context.nextActionOperation || "-"}`,
+      `downloadKey=${context.downloadKey || context.overviewDownload?.key || "-"}`,
+      `downloadFileName=${context.downloadFileName || context.overviewDownload?.fileName || "-"}`,
       `downloadFormat=${context.downloadFormat || context.overviewDownload?.format || "-"}`
     ];
+    const downloadHref = context.downloadHref || context.overviewDownload?.href || "";
+    if (downloadHref) {
+      segments.push(`downloadHref=${downloadHref}`);
+    }
     if (context.productionSignoffPacket || context.launchDayWatchEntry) {
       segments.push(`productionSignoffPacket=${context.productionSignoffPacket || "-"}`);
       segments.push(`launchDayWatchEntry=${context.launchDayWatchEntry || "-"}`);
@@ -20416,7 +20422,10 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       "launchReceiptLaunchOpsOverviewContext",
       "launchReceiptLaunchOpsOverviewStatus",
       "launchReceiptLaunchOpsOverviewWatchRecordDraftStatus",
+      "launchReceiptLaunchOpsOverviewDownloadKey",
+      "launchReceiptLaunchOpsOverviewDownloadFileName",
       "launchReceiptLaunchOpsOverviewDownloadFormat",
+      "launchReceiptLaunchOpsOverviewHasDownloadHref",
       "launchReceiptLaunchOpsOverviewProductionSignoffPacket",
       "launchReceiptLaunchOpsOverviewLaunchDayWatchEntry",
       "launchReceiptLaunchOpsOverviewFirstWaveLifecycleStatus",
@@ -20456,7 +20465,10 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
         launchOpsOverviewContext?.kind,
         launchOpsOverviewContext?.status,
         launchOpsOverviewContext?.watchRecordDraftStatus,
+        launchOpsOverviewContext?.downloadKey,
+        launchOpsOverviewContext?.downloadFileName,
         launchOpsOverviewContext?.downloadFormat,
+        launchOpsOverviewContext?.hasDownloadHref === true || Boolean(launchOpsOverviewContext?.downloadHref),
         launchOpsOverviewContext?.productionSignoffPacket,
         launchOpsOverviewContext?.launchDayWatchEntry,
         launchOpsOverviewContext?.firstWaveLifecycleStatus,
@@ -20504,7 +20516,10 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "launchOpsOverviewContext",
       "launchOpsOverviewStatus",
       "launchOpsOverviewWatchRecordDraftStatus",
+      "launchOpsOverviewDownloadKey",
+      "launchOpsOverviewDownloadFileName",
       "launchOpsOverviewDownloadFormat",
+      "launchOpsOverviewDownloadHref",
       "launchOpsOverviewProductionSignoffPacket",
       "launchOpsOverviewLaunchDayWatchEntry",
       "launchOpsOverviewFirstWaveLifecycleStatus",
@@ -20548,7 +20563,10 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
         launchOpsOverviewContext?.kind,
         launchOpsOverviewContext?.status,
         launchOpsOverviewContext?.watchRecordDraftStatus,
+        launchOpsOverviewContext?.downloadKey,
+        launchOpsOverviewContext?.downloadFileName,
         launchOpsOverviewContext?.downloadFormat,
+        launchOpsOverviewContext?.downloadHref,
         launchOpsOverviewContext?.productionSignoffPacket,
         launchOpsOverviewContext?.launchDayWatchEntry,
         launchOpsOverviewContext?.firstWaveLifecycleStatus,

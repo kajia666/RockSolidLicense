@@ -16060,6 +16060,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.watchRecordDraftRecordCount, expectedLaunchOpsOverviewContext.watchRecordDraftRecordCount);
     assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.productionSignoffPacket, expectedLaunchOpsOverviewContext.productionSignoffPacket);
     assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.launchDayWatchEntry, expectedLaunchOpsOverviewContext.launchDayWatchEntry);
+    assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.downloadKey, "ops_launch_operations_overview_status");
+    assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.downloadFileName, "developer-ops-launch-operations-overview-status.txt");
     assert.equal(latestLaunchReceipt.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
     assert.equal(latestLaunchReceipt.operationalReadinessStatus, launchOpsAction.receipt.mainlineOperationalReadiness.status);
     assert.equal(latestLaunchReceipt.operationalReadinessLabel, "Still Needs Evidence");
@@ -16608,6 +16610,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Next Follow-up: \[REVIEW\]\[production_evidence\]/);
     assert.match(launchReceiptSnapshot.summaryText, /context=launch_ops_overview_status/);
+    assert.match(launchReceiptSnapshot.summaryText, /downloadKey=ops_launch_operations_overview_status/);
+    assert.match(launchReceiptSnapshot.summaryText, /downloadFileName=developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchReceiptSnapshot.summaryText, /downloadFormat=launch-operations-overview-status/);
     assert.match(
       launchReceiptSnapshot.summaryText,
@@ -16631,10 +16635,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"stage","priority","title"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
-    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewStatus","launchOpsOverviewWatchRecordDraftStatus","launchOpsOverviewDownloadFormat"/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewStatus","launchOpsOverviewWatchRecordDraftStatus","launchOpsOverviewDownloadKey","launchOpsOverviewDownloadFileName","launchOpsOverviewDownloadFormat","launchOpsOverviewDownloadHref"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewProductionSignoffPacket","launchOpsOverviewLaunchDayWatchEntry"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /"launchOpsOverviewFirstWaveLifecycleStatus","launchOpsOverviewFirstWaveLifecycleNextOperation","launchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey"/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch_ops_overview_status/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /ops_launch_operations_overview_status/);
+    assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /launch-operations-overview-status/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchReceiptSnapshot.csv.launchReceiptFollowUps, /enter_after_production_signoff/);
@@ -16654,10 +16660,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.csv.auditLogs, new RegExp(latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat));
     assert.match(launchReceiptSnapshot.csv.auditLogs, /launchReceiptPostLaunchPrimaryDownloadFileName/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, new RegExp(latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName));
-    assert.match(launchReceiptSnapshot.csv.auditLogs, /"launchReceiptLaunchOpsOverviewContext","launchReceiptLaunchOpsOverviewStatus","launchReceiptLaunchOpsOverviewWatchRecordDraftStatus","launchReceiptLaunchOpsOverviewDownloadFormat"/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /"launchReceiptLaunchOpsOverviewContext","launchReceiptLaunchOpsOverviewStatus","launchReceiptLaunchOpsOverviewWatchRecordDraftStatus","launchReceiptLaunchOpsOverviewDownloadKey","launchReceiptLaunchOpsOverviewDownloadFileName","launchReceiptLaunchOpsOverviewDownloadFormat","launchReceiptLaunchOpsOverviewHasDownloadHref"/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /"launchReceiptLaunchOpsOverviewProductionSignoffPacket","launchReceiptLaunchOpsOverviewLaunchDayWatchEntry"/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /"launchReceiptLaunchOpsOverviewFirstWaveLifecycleStatus","launchReceiptLaunchOpsOverviewFirstWaveLifecycleNextOperation","launchReceiptLaunchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey"/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /launch_ops_overview_status/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /ops_launch_operations_overview_status/);
+    assert.match(launchReceiptSnapshot.csv.auditLogs, /developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /launch-operations-overview-status/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchReceiptSnapshot.csv.auditLogs, /enter_after_production_signoff/);
@@ -16685,11 +16693,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptFollowUpsCsvDownload.contentDisposition || "", /developer-ops-launch-receipt-follow-ups\.csv/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"stage","priority","title"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"downloadKey","downloadFileName","downloadFormat","downloadHref"/);
-    assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewStatus","launchOpsOverviewWatchRecordDraftStatus","launchOpsOverviewDownloadFormat"/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewStatus","launchOpsOverviewWatchRecordDraftStatus","launchOpsOverviewDownloadKey","launchOpsOverviewDownloadFileName","launchOpsOverviewDownloadFormat","launchOpsOverviewDownloadHref"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewProductionSignoffPacket","launchOpsOverviewLaunchDayWatchEntry"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewFirstWaveLifecycleStatus","launchOpsOverviewFirstWaveLifecycleNextOperation","launchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"operationalReadinessWatchRecordDraftStatus","operationalReadinessWatchRecordDraftRecordCount"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_ops_overview_status/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /ops_launch_operations_overview_status/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch-operations-overview-status/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /enter_after_production_signoff/);
@@ -16731,6 +16741,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptNextFollowUpDownload.body, /Download Format: launch-receipt-next-follow-up/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Download Href: .*format=launch-receipt-next-follow-up/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Launch Ops Overview Context:/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /downloadKey=ops_launch_operations_overview_status/);
+    assert.match(launchReceiptNextFollowUpDownload.body, /downloadFileName=developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchReceiptNextFollowUpDownload.body, /context=launch_ops_overview_status.*watchRecordDraft=blocked_until_runway_evidence.*downloadFormat=launch-operations-overview-status/);
     assert.match(launchReceiptNextFollowUpDownload.body, /download: .*format=launch-operations-overview-status/);
 

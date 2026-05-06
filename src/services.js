@@ -21445,6 +21445,23 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
   const launchOpsOverviewDownloadHref = String(
     item.launchOpsOverviewDownloadHref ?? metadata.launchOpsOverviewDownloadHref ?? ""
   ).trim();
+  const launchReadinessNextGateStatus = normalizeDeveloperOpsConfirmationToken(
+    item.launchReadinessNextGateStatus || metadata.launchReadinessNextGateStatus,
+    ""
+  );
+  const launchReadinessNextGateDecision = normalizeDeveloperOpsConfirmationToken(
+    item.launchReadinessNextGateDecision || metadata.launchReadinessNextGateDecision,
+    ""
+  );
+  const launchReadinessNextGateCurrentGate = normalizeDeveloperOpsConfirmationToken(
+    item.launchReadinessNextGateCurrentGate || metadata.launchReadinessNextGateCurrentGate,
+    ""
+  );
+  const launchReadinessNextGateCanEnterInitialLaunch = item.launchReadinessNextGateCanEnterInitialLaunch === true
+    || metadata.launchReadinessNextGateCanEnterInitialLaunch === true
+    || String(item.launchReadinessNextGateCanEnterInitialLaunch ?? metadata.launchReadinessNextGateCanEnterInitialLaunch ?? "")
+      .trim()
+      .toLowerCase() === "true";
   const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
   const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
   const note = String(item.note ?? metadata.note ?? "").trim();
@@ -21470,6 +21487,10 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     launchOpsOverviewDownloadFileName,
     launchOpsOverviewDownloadFormat,
     launchOpsOverviewDownloadHref,
+    launchReadinessNextGateStatus,
+    launchReadinessNextGateDecision,
+    launchReadinessNextGateCurrentGate,
+    launchReadinessNextGateCanEnterInitialLaunch,
     focusKind,
     focusReason,
     note,
@@ -21497,6 +21518,10 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       launchOpsOverviewDownloadFileName,
       launchOpsOverviewDownloadFormat,
       launchOpsOverviewDownloadHref,
+      launchReadinessNextGateStatus,
+      launchReadinessNextGateDecision,
+      launchReadinessNextGateCurrentGate,
+      launchReadinessNextGateCanEnterInitialLaunch,
       focusKind,
       focusReason,
       note,
@@ -21528,6 +21553,10 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
     launchOpsOverviewDownloadFileName: String(receipt.launchOpsOverviewDownloadFileName || "").trim(),
     launchOpsOverviewDownloadFormat: normalizeDeveloperOpsConfirmationToken(receipt.launchOpsOverviewDownloadFormat, ""),
     launchOpsOverviewDownloadHref: String(receipt.launchOpsOverviewDownloadHref || "").trim(),
+    launchReadinessNextGateStatus: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateStatus, ""),
+    launchReadinessNextGateDecision: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateDecision, ""),
+    launchReadinessNextGateCurrentGate: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateCurrentGate, ""),
+    launchReadinessNextGateCanEnterInitialLaunch: receipt.launchReadinessNextGateCanEnterInitialLaunch === true,
     focusKind: normalizeDeveloperOpsConfirmationToken(receipt.focusKind, ""),
     focusReason: String(receipt.focusReason || "").trim(),
     note: String(receipt.note || "").trim()
@@ -24097,7 +24126,9 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
 
 function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
   scope = {},
-  steadyStateDutyBoard = null
+  steadyStateDutyBoard = null,
+  launchReadinessNextGate = null,
+  launchReadinessNextGateHandoff = null
 } = {}) {
   if (!steadyStateDutyBoard || typeof steadyStateDutyBoard !== "object") {
     return null;
@@ -24125,6 +24156,16 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     && typeof steadyStateDutyBoard.firstWaveLifecycle === "object"
     ? steadyStateDutyBoard.firstWaveLifecycle
     : null;
+  const currentLaunchReadinessNextGate = launchReadinessNextGate && typeof launchReadinessNextGate === "object"
+    ? launchReadinessNextGate
+    : steadyStateDutyBoard.launchReadinessNextGate && typeof steadyStateDutyBoard.launchReadinessNextGate === "object"
+      ? steadyStateDutyBoard.launchReadinessNextGate
+      : null;
+  const currentLaunchReadinessNextGateHandoff = launchReadinessNextGateHandoff && typeof launchReadinessNextGateHandoff === "object"
+    ? launchReadinessNextGateHandoff
+    : steadyStateDutyBoard.launchReadinessNextGateHandoff && typeof steadyStateDutyBoard.launchReadinessNextGateHandoff === "object"
+      ? steadyStateDutyBoard.launchReadinessNextGateHandoff
+      : null;
   const quickActions = Array.isArray(steadyStateDutyBoard.quickActions)
     ? steadyStateDutyBoard.quickActions
     : [];
@@ -24233,6 +24274,10 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
       launchOpsOverviewDownloadFileName: launchOpsOverviewDownload?.fileName || launchOpsOverviewContext?.downloadFileName || "",
       launchOpsOverviewDownloadFormat: launchOpsOverviewDownload?.format || launchOpsOverviewContext?.downloadFormat || "",
       launchOpsOverviewDownloadHref: launchOpsOverviewDownload?.href || launchOpsOverviewContext?.downloadHref || "",
+      launchReadinessNextGateStatus: currentLaunchReadinessNextGate?.status || "",
+      launchReadinessNextGateDecision: currentLaunchReadinessNextGate?.decision || "",
+      launchReadinessNextGateCurrentGate: currentLaunchReadinessNextGate?.currentGate || "",
+      launchReadinessNextGateCanEnterInitialLaunch: currentLaunchReadinessNextGate?.canEnterInitialLaunch === true,
       watchRecordDraftStatus: watchRecordDraftStatus || "",
       watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
       firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
@@ -24339,6 +24384,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
     firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
     firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
+    launchReadinessNextGate: currentLaunchReadinessNextGate,
+    launchReadinessNextGateHandoff: currentLaunchReadinessNextGateHandoff,
     launchOpsOverviewContext,
     launchOpsOverviewDownload,
     actionCount: quickActions.length,
@@ -26248,7 +26295,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   });
   const steadyStateDutyActionLinks = buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     scope,
-    steadyStateDutyBoard
+    steadyStateDutyBoard,
+    launchReadinessNextGate,
+    launchReadinessNextGateHandoff
   });
   const launchOperationsEvidenceChain = buildDeveloperOpsLaunchOperationsEvidenceChain({
     scope,
@@ -31803,6 +31852,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | launchOpsOverviewDownloadKey=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadKey || "-"}`
         + ` | launchOpsOverviewDownloadFileName=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadFileName || "-"}`
         + ` | launchOpsOverviewDownloadHref=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadHref || "-"}`
+        + ` | launchReadinessNextGateStatus=${latestSteadyStateDutyPlanReceipt.launchReadinessNextGateStatus || "-"}`
+        + ` | launchReadinessNextGateCurrentGate=${latestSteadyStateDutyPlanReceipt.launchReadinessNextGateCurrentGate || "-"}`
       );
       if (latestSteadyStateDutyPlanReceipt.receiptVisibility) {
         lines.push(
@@ -32395,6 +32446,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       + ` | launchOpsOverviewDownloadKey=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadKey || "-"}`
       + ` | launchOpsOverviewDownloadFileName=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadFileName || "-"}`
       + ` | launchOpsOverviewDownloadHref=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadHref || "-"}`
+      + ` | launchReadinessNextGateStatus=${latestSteadyStateDutyPlanReceipt.launchReadinessNextGateStatus || "-"}`
+      + ` | launchReadinessNextGateCurrentGate=${latestSteadyStateDutyPlanReceipt.launchReadinessNextGateCurrentGate || "-"}`
     );
     if (latestSteadyStateDutyPlanReceipt.receiptVisibility) {
       lines.push(
@@ -32814,6 +32867,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksText(payload = {}) {
           + ` | href=${plan.href || "-"}`
           + (plan.fileName ? ` | file=${plan.fileName}` : "")
           + (plan.format ? ` | format=${plan.format}` : "")
+          + (prefill.launchReadinessNextGateStatus ? ` | launchReadinessNextGateStatus=${prefill.launchReadinessNextGateStatus}` : "")
+          + (prefill.launchReadinessNextGateCurrentGate ? ` | launchReadinessNextGateCurrentGate=${prefill.launchReadinessNextGateCurrentGate}` : "")
           + (prefill.firstWaveLifecycleStatus ? ` | firstWaveLifecycleStatus=${prefill.firstWaveLifecycleStatus}` : "")
           + (prefill.firstWaveLifecycleNextOperation ? ` | firstWaveLifecycleNextOperation=${prefill.firstWaveLifecycleNextOperation}` : "")
           + (prefill.firstWaveLifecyclePrimaryDownloadKey ? ` | firstWaveLifecyclePrimaryDownloadKey=${prefill.firstWaveLifecyclePrimaryDownloadKey}` : "")
@@ -47722,6 +47777,23 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const launchOpsOverviewDownloadHref = String(
         body.launchOpsOverviewDownloadHref ?? body.dutyPlanLaunchOpsOverviewDownloadHref ?? ""
       ).trim().slice(0, 1000);
+      const launchReadinessNextGateStatus = normalizeDeveloperOpsConfirmationToken(
+        body.launchReadinessNextGateStatus || body.dutyPlanLaunchReadinessNextGateStatus,
+        ""
+      );
+      const launchReadinessNextGateDecision = normalizeDeveloperOpsConfirmationToken(
+        body.launchReadinessNextGateDecision || body.dutyPlanLaunchReadinessNextGateDecision,
+        ""
+      );
+      const launchReadinessNextGateCurrentGate = normalizeDeveloperOpsConfirmationToken(
+        body.launchReadinessNextGateCurrentGate || body.dutyPlanLaunchReadinessNextGateCurrentGate,
+        ""
+      );
+      const launchReadinessNextGateCanEnterInitialLaunch = body.launchReadinessNextGateCanEnterInitialLaunch === true
+        || body.dutyPlanLaunchReadinessNextGateCanEnterInitialLaunch === true
+        || String(body.launchReadinessNextGateCanEnterInitialLaunch ?? body.dutyPlanLaunchReadinessNextGateCanEnterInitialLaunch ?? "")
+          .trim()
+          .toLowerCase() === "true";
       const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
       const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
@@ -47764,6 +47836,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchOpsOverviewDownloadFileName,
           launchOpsOverviewDownloadFormat,
           launchOpsOverviewDownloadHref,
+          launchReadinessNextGateStatus,
+          launchReadinessNextGateDecision,
+          launchReadinessNextGateCurrentGate,
+          launchReadinessNextGateCanEnterInitialLaunch,
           focusKind,
           focusReason,
           note,
@@ -47795,6 +47871,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchOpsOverviewDownloadFileName,
           launchOpsOverviewDownloadFormat,
           launchOpsOverviewDownloadHref,
+          launchReadinessNextGateStatus,
+          launchReadinessNextGateDecision,
+          launchReadinessNextGateCurrentGate,
+          launchReadinessNextGateCanEnterInitialLaunch,
           focusKind,
           focusReason,
           note,

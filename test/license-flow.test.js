@@ -15140,6 +15140,34 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       afterSetup.postLaunchLifecycleHandoff.primaryDownload.format
     );
     assert.equal(handoffConfirmation.postLaunchLifecycleHandoff?.handoffDownloads?.closeout?.format, "closeout-handoff");
+    assert.deepEqual(
+      {
+        version: handoffConfirmation.firstLaunchOperatingChain?.version,
+        status: handoffConfirmation.firstLaunchOperatingChain?.status,
+        currentPhaseKey: handoffConfirmation.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: handoffConfirmation.firstLaunchOperatingChain?.readyPhaseCount,
+        phaseCount: handoffConfirmation.firstLaunchOperatingChain?.phaseCount,
+        nextActionKey: handoffConfirmation.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionStage: handoffConfirmation.firstLaunchOperatingChain?.nextAction?.stage,
+        nextActionOperation: handoffConfirmation.firstLaunchOperatingChain?.nextAction?.operation,
+        nextActionOwner: handoffConfirmation.firstLaunchOperatingChain?.nextAction?.ownerRole,
+        primaryDownloadKey: handoffConfirmation.firstLaunchOperatingChain?.primaryDownload?.key,
+        handoffConfirmed: handoffConfirmation.firstLaunchOperatingChain?.handoffConfirmed
+      },
+      {
+        version: "developer-ops-first-launch-operating-chain/v1",
+        status: "pending_first_user_validation",
+        currentPhaseKey: "first_user_validation",
+        readyPhaseCount: 3,
+        phaseCount: 5,
+        nextActionKey: "card_redemption_watch",
+        nextActionStage: "first_sale_watch",
+        nextActionOperation: "record_launch_rehearsal_run",
+        nextActionOwner: "support",
+        primaryDownloadKey: "launch_mainline_first_launch_handoff",
+        handoffConfirmed: true
+      }
+    );
 
     const handoffConfirmationAudit = await getJson(
       baseUrl,
@@ -15186,6 +15214,37 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       readinessFirstWaveConfirmation.postLaunchLifecycleHandoff?.primaryDownload?.key,
       afterSetup.postLaunchLifecycleHandoff.primaryDownload.key
     );
+    assert.deepEqual(
+      {
+        status: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.status,
+        currentPhaseKey: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.readyPhaseCount,
+        phaseCount: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.phaseCount,
+        nextActionKey: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionStage: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.stage,
+        nextActionOperation: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.operation,
+        primaryDownloadKey: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.primaryDownload?.key,
+        handoffConfirmed: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.handoffConfirmed
+      },
+      {
+        status: "pending_first_user_validation",
+        currentPhaseKey: "first_user_validation",
+        readyPhaseCount: 3,
+        phaseCount: 5,
+        nextActionKey: "card_redemption_watch",
+        nextActionStage: "first_sale_watch",
+        nextActionOperation: "record_launch_rehearsal_run",
+        primaryDownloadKey: "launch_mainline_first_launch_handoff",
+        handoffConfirmed: true
+      }
+    );
+    assert.equal(
+      confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveReadinessBridge.operatingChain.status,
+      "pending_first_user_validation"
+    );
+    assert.match(confirmedOpsSnapshot.summaryText, /First Launch Operating Chain:/);
+    assert.match(confirmedOpsSnapshot.summaryText, /status=pending_first_user_validation \| ready=false \| current=first_user_validation \| phases=3\/5/);
+    assert.match(confirmedOpsSnapshot.summaryText, /next=card_redemption_watch \| phase=first_sale_watch \| operation=record_launch_rehearsal_run/);
     const firstWaveConfirmationChain = confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveConfirmationChain;
     assert.ok(firstWaveConfirmationChain);
     assert.equal(firstWaveConfirmationChain.status, "confirmed");

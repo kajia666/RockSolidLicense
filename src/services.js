@@ -25709,6 +25709,14 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       };
     })
     .filter((item) => item.stage || item.actionKey || item.operationToRecord || item.downloadKey);
+  const firstLaunchOperatingChain = buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
+    productCode: scope.productCode || latestReceipt?.productCode || firstWaveReadinessBridge?.productCode || "",
+    channel: scope.channel || latestReceipt?.channel || firstWaveReadinessBridge?.channel || "stable",
+    latestReceipt,
+    followUpQueue,
+    firstWaveReadinessBridge,
+    firstWaveConfirmationChain
+  });
   const recommendedDownloads = [];
   const seenRecommendedDownloads = new Set();
   for (const download of [
@@ -26142,6 +26150,12 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     nextFollowUpDownload,
     primaryWorkspaceAction
   });
+  const currentFirstWaveReadinessBridge = firstWaveReadinessBridge && firstLaunchOperatingChain
+    ? {
+        ...firstWaveReadinessBridge,
+        operatingChain: firstLaunchOperatingChain
+      }
+    : firstWaveReadinessBridge;
   return {
     status,
     headline: !latestReceipt
@@ -26225,7 +26239,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsDailyBrief,
     launchOperationsShiftActionPlan,
     launchOperationsOverviewStatus,
-    firstWaveReadinessBridge,
+    firstLaunchOperatingChain,
+    firstWaveReadinessBridge: currentFirstWaveReadinessBridge,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
     traceability,
@@ -26833,6 +26848,160 @@ function appendDeveloperOpsFirstLaunchOperatingChainLines(lines = [], chain = nu
       + ` | download=${phase.download?.key || "-"}`
     );
   }
+}
+
+function buildFirstLaunchDeliveryHandoffFromReceipt(latestReceipt = null, productCode = "") {
+  if (!latestReceipt || typeof latestReceipt !== "object") {
+    return null;
+  }
+  const status = latestReceipt.firstLaunchDutyDeliveryExportStatus || null;
+  const csvKey = latestReceipt.firstLaunchDutyDeliveryExportCsvDownloadKey || null;
+  const csvHref = latestReceipt.firstLaunchDutyDeliveryExportCsvHref || null;
+  const cardCount = Number(latestReceipt.firstLaunchDutyDeliveryExportCardCount || 0);
+  const usageStatus = latestReceipt.firstLaunchDutyDeliveryExportUsageStatus || "unused";
+  if (!status && !csvKey && !csvHref && cardCount <= 0) {
+    return null;
+  }
+  const primaryDownload = csvKey || csvHref
+    ? {
+        key: csvKey || "developer_cards_first_launch_csv",
+        label: "Deliver first-launch card export",
+        source: "developer-cards",
+        format: "csv",
+        fileName: "developer-cards-first-launch-unused.csv",
+        href: csvHref || buildLaunchWorkflowDownloadHref("developer-cards", "csv", {
+          productCode: productCode || latestReceipt.productCode,
+          usageStatus
+        })
+      }
+    : null;
+  return {
+    status: status || (primaryDownload ? "ready" : "review"),
+    stage: "first_launch_delivery",
+    priority: "secondary",
+    title: "Deliver first-launch card export",
+    summary: "Attach the first-launch unused-card export to the handoff before opening the first sales wave.",
+    cardCount,
+    usageStatus,
+    primaryDownload,
+    downloads: primaryDownload ? [primaryDownload] : []
+  };
+}
+
+function buildFirstUserValidationHandoffFromFollowUps(followUpQueue = [], latestReceipt = null) {
+  const action = (Array.isArray(followUpQueue) ? followUpQueue : [])
+    .find((item) => item?.stage === "first_user_validation" || item?.firstUserValidationStatus)
+    || null;
+  const latest = latestReceipt && typeof latestReceipt === "object" ? latestReceipt : {};
+  if (!action && !latest.firstLaunchDutyFirstUserValidationStatus && !latest.firstLaunchDutyFirstUserValidationNextActionKey) {
+    return null;
+  }
+  const recommendedDownload = action?.recommendedDownload && typeof action.recommendedDownload === "object"
+    ? action.recommendedDownload
+    : null;
+  const downloadKey = action?.downloadKey
+    || recommendedDownload?.key
+    || latest.firstLaunchDutyHandoffDownloadKey
+    || latest.firstLaunchDutyPrimaryDownloadKey
+    || null;
+  const download = downloadKey || recommendedDownload
+    ? {
+        key: downloadKey || recommendedDownload?.key || null,
+        label: action?.title || recommendedDownload?.label || "Run first-user validation",
+        source: action?.downloadSource || recommendedDownload?.source || inferLaunchWorkflowDownloadSource(downloadKey, null),
+        format: action?.downloadFormat || recommendedDownload?.format || inferRouteDownloadFormat(downloadKey),
+        fileName: action?.downloadFileName || recommendedDownload?.fileName || "launch-mainline-first-launch-handoff.txt",
+        href: action?.downloadHref || recommendedDownload?.href || null
+      }
+    : null;
+  return {
+    status: action?.firstUserValidationStatus || latest.firstLaunchDutyFirstUserValidationStatus || "pending_validation",
+    stage: action?.stage || "first_user_validation",
+    priority: action?.priority || "primary",
+    title: action?.title || "Run first-user validation",
+    summary: action?.summary || "",
+    actionCount: Number(action?.firstUserValidationActionCount ?? latest.firstLaunchDutyFirstUserValidationActionCount ?? 0),
+    remainingCount: Number(action?.firstUserValidationRemainingCount ?? latest.firstLaunchDutyFirstUserValidationRemainingCount ?? 0),
+    nextAction: {
+      key: action?.actionKey || latest.firstLaunchDutyFirstUserValidationNextActionKey || null,
+      stage: action?.firstUserValidationNextStage || latest.firstLaunchDutyFirstUserValidationNextStage || null,
+      ownerRole: action?.firstUserValidationNextOwnerRole || latest.firstLaunchDutyFirstUserValidationNextOwnerRole || null,
+      operation: action?.operationToRecord || action?.operation || latest.firstLaunchDutyFirstUserValidationProductionNextOperation || null
+    },
+    runtimeEvidence: action?.firstUserValidationRuntimeEvidenceStatus
+      ? {
+          status: action.firstUserValidationRuntimeEvidenceStatus,
+          ready: action.firstUserValidationRuntimeEvidenceReady === true,
+          activeSessionCount: action.runtimeEvidenceActiveSessionCount ?? null,
+          heartbeatSeenCount: action.runtimeEvidenceHeartbeatSeenCount ?? null
+        }
+      : null,
+    primaryDownload: download
+  };
+}
+
+function buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
+  productCode = "",
+  channel = "stable",
+  latestReceipt = null,
+  followUpQueue = [],
+  firstWaveReadinessBridge = null,
+  firstWaveConfirmationChain = null
+} = {}) {
+  if (!firstWaveReadinessBridge && !latestReceipt && !firstWaveConfirmationChain) {
+    return null;
+  }
+  const sourceRecommendation = firstWaveReadinessBridge?.sourceRecommendation && typeof firstWaveReadinessBridge.sourceRecommendation === "object"
+    ? firstWaveReadinessBridge.sourceRecommendation
+    : firstWaveConfirmationChain?.sourceRecommendation && typeof firstWaveConfirmationChain.sourceRecommendation === "object"
+      ? firstWaveConfirmationChain.sourceRecommendation
+      : {};
+  const segmentStatus = (key = "", fallback = "unknown") => {
+    const segment = Array.isArray(firstWaveReadinessBridge?.segments)
+      ? firstWaveReadinessBridge.segments.find((item) => item?.key === key)
+      : null;
+    return segment?.status || fallback;
+  };
+  const inventoryStatus = sourceRecommendation.inventoryStatus
+    || segmentStatus("first_batch_inventory", latestReceipt ? "ready" : "unknown");
+  const firstCardStatus = sourceRecommendation.firstCardStatus
+    || segmentStatus("first_cards", latestReceipt ? "ready" : "unknown");
+  const recommendedCardCount = Number(sourceRecommendation.recommendedCardCount ?? latestReceipt?.firstLaunchDutyDeliveryExportCardCount ?? 0);
+  const issuedFreshCardCount = Number(sourceRecommendation.issuedFreshCardCount ?? latestReceipt?.firstLaunchDutyDeliveryExportCardCount ?? 0);
+  const inventory = {
+    status: inventoryStatus,
+    targetCardCount: recommendedCardCount,
+    freshCardCount: issuedFreshCardCount,
+    refillCardCount: 0,
+    action: firstWaveReadinessBridge?.currentGate === "first_batch_inventory"
+      ? firstWaveReadinessBridge.nextAction || null
+      : {
+          operation: latestReceipt?.operation || sourceRecommendation.latestLaunchReceiptOperation || "monitor",
+          label: "Monitor First-Wave Inventory"
+        }
+  };
+  const firstCards = {
+    status: firstCardStatus,
+    recommendedCardCount,
+    issuedFreshCardCount
+  };
+  const deliveryHandoff = buildFirstLaunchDeliveryHandoffFromReceipt(latestReceipt, productCode);
+  const firstUserValidationHandoff = buildFirstUserValidationHandoffFromFollowUps(followUpQueue, latestReceipt);
+  const postLaunchLifecycleHandoff = firstWaveConfirmationChain?.postLaunchLifecycleHandoff
+    && typeof firstWaveConfirmationChain.postLaunchLifecycleHandoff === "object"
+    ? firstWaveConfirmationChain.postLaunchLifecycleHandoff
+    : null;
+  return buildDeveloperOpsFirstLaunchOperatingChainPayload({
+    productCode: productCode || latestReceipt?.productCode || firstWaveReadinessBridge?.productCode || "",
+    channel: channel || latestReceipt?.channel || firstWaveReadinessBridge?.channel || "stable",
+    inventory,
+    firstCards,
+    deliveryHandoff,
+    firstUserValidationHandoff,
+    postLaunchLifecycleHandoff,
+    launchReadinessBridge: firstWaveReadinessBridge,
+    firstWaveConfirmationChain
+  });
 }
 
 function buildDeveloperOpsFirstWaveRecommendationsPayload({
@@ -30561,6 +30730,10 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     lines.push(`- workspace: ${initialLaunchOpsReadiness.primaryWorkspaceAction?.label || "-"}@${initialLaunchOpsReadiness.primaryWorkspaceAction?.autofocus || "-"}`);
     lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"}) | href=${initialLaunchOpsReadiness.primaryDownload?.href || "-"}`);
     lines.push(`- firstLaunchHandoff: ${initialLaunchOpsReadiness.firstLaunchHandoffDownload?.fileName || "-"}`);
+    if (initialLaunchOpsReadiness.firstLaunchOperatingChain) {
+      lines.push("");
+      appendDeveloperOpsFirstLaunchOperatingChainLines(lines, initialLaunchOpsReadiness.firstLaunchOperatingChain);
+    }
     if (initialLaunchOpsReadiness.firstWaveReadinessBridge) {
       lines.push("");
       appendDeveloperOpsFirstWaveReadinessBridgeLines(lines, initialLaunchOpsReadiness.firstWaveReadinessBridge);
@@ -31253,6 +31426,10 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     `First Launch Handoff: ${readiness.firstLaunchHandoffDownload?.fileName || "-"} | href=${readiness.firstLaunchHandoffDownload?.href || "-"}`,
     ""
   ];
+  if (readiness.firstLaunchOperatingChain) {
+    appendDeveloperOpsFirstLaunchOperatingChainLines(lines, readiness.firstLaunchOperatingChain);
+    lines.push("");
+  }
   if (readiness.firstWaveReadinessBridge) {
     appendDeveloperOpsFirstWaveReadinessBridgeLines(lines, readiness.firstWaveReadinessBridge);
     lines.push("");
@@ -46594,6 +46771,43 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           downloads: traceability.downloads
         }
       );
+      const firstWaveConfirmationChain = buildFirstWaveConfirmationChainPayload({
+        auditLogId,
+        productCode: product.code,
+        channel,
+        status: "confirmed",
+        decision,
+        confirmedAt,
+        confirmedBy,
+        handoffFileName,
+        sourceRecommendation,
+        postLaunchLifecycleHandoff
+      });
+      let firstLaunchOperatingChain = null;
+      if (hasDeveloperPermission(session, "ops.read")) {
+        const confirmedOpsSnapshot = await this.developerExportOpsSnapshot(token, {
+          productCode: product.code,
+          channel,
+          limit: 80
+        });
+        firstLaunchOperatingChain = confirmedOpsSnapshot?.summary?.initialLaunchOpsReadiness?.firstLaunchOperatingChain || null;
+      }
+      if (!firstLaunchOperatingChain) {
+        firstLaunchOperatingChain = buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
+          productCode: product.code,
+          channel,
+          latestReceipt: null,
+          followUpQueue: [],
+          firstWaveReadinessBridge: {
+            productCode: product.code,
+            channel,
+            status: "ready_for_first_wave_handoff",
+            currentGate: "first_round_ops",
+            sourceRecommendation
+          },
+          firstWaveConfirmationChain
+        });
+      }
 
       return {
         version: "developer-ops-first-wave-handoff-confirmation/v1",
@@ -46609,18 +46823,8 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         handoffFormat: "first-wave-recommendations",
         sourceRecommendation,
         postLaunchLifecycleHandoff,
-        firstWaveConfirmationChain: buildFirstWaveConfirmationChainPayload({
-          auditLogId,
-          productCode: product.code,
-          channel,
-          status: "confirmed",
-          decision,
-          confirmedAt,
-          confirmedBy,
-          handoffFileName,
-          sourceRecommendation,
-          postLaunchLifecycleHandoff
-        }),
+        firstWaveConfirmationChain,
+        firstLaunchOperatingChain,
         traceability,
         auditLogId,
         message: `First-wave handoff confirmed for ${product.code} (${channel}).`

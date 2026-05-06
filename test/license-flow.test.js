@@ -11070,6 +11070,17 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveFullTestWindow=npm\.cmd test/);
+    const stabilizationGateNextFollowUpDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=launch-receipt-next-follow-up&limit=40",
+      ownerSession.token
+    );
+    assert.equal(stabilizationGateNextFollowUpDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(stabilizationGateNextFollowUpDownload.body, /Launch Readiness Next Gate:/);
+    assert.match(stabilizationGateNextFollowUpDownload.body, /status=awaiting_launch_readiness/);
+    assert.match(stabilizationGateNextFollowUpDownload.body, /currentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateNextFollowUpDownload.body, /fullTestWindow=npm\.cmd test/);
+    assert.match(stabilizationGateNextFollowUpDownload.body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
 
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,

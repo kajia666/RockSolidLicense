@@ -31564,6 +31564,16 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
       && (!item?.productCode || receipt.productCode === item.productCode)
       && (!item?.channel || receipt.channel === item.channel)
   )) || latestLaunchReceipts.find((receipt) => receipt?.receiptVisibility);
+  const launchReadinessNextGateSource = latestLaunchReceipts.find((receipt) => (
+    receipt?.launchReadinessNextGateKey
+      && item?.handoffFileName
+      && receipt.handoffFileName === item.handoffFileName
+  )) || latestLaunchReceipts.find((receipt) => (
+    receipt?.launchReadinessNextGateKey
+      && (!item?.operation || receipt.operation === item.operation)
+      && (!item?.productCode || receipt.productCode === item.productCode)
+      && (!item?.channel || receipt.channel === item.channel)
+  )) || latestLaunchReceipts.find((receipt) => receipt?.launchReadinessNextGateKey);
   const lines = [
     "RockSolid Developer Ops Launch Receipt Next Follow-up",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -31613,6 +31623,23 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
     lines.push("Launch Ops Overview Context:");
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(`- download: ${formatLaunchHandoffDownloadText(launchOpsOverviewDownload, { fileSeparator: " | " })}`);
+  }
+  if (launchReadinessNextGateSource) {
+    lines.push("");
+    lines.push("Launch Readiness Next Gate:");
+    lines.push(
+      `- status=${launchReadinessNextGateSource.launchReadinessNextGateStatus || "-"}`
+      + ` | decision=${launchReadinessNextGateSource.launchReadinessNextGateDecision || "-"}`
+      + ` | canEnterInitialLaunch=${launchReadinessNextGateSource.launchReadinessNextGateCanEnterInitialLaunch === true}`
+      + ` | currentGate=${launchReadinessNextGateSource.launchReadinessNextGateCurrentGate || "-"}`
+    );
+    lines.push(`- closeoutReload=${launchReadinessNextGateSource.launchReadinessNextGateCloseoutReloadCommand || "-"}`);
+    lines.push(`- fullTestWindow=${launchReadinessNextGateSource.launchReadinessNextGateFullTestWindowCommand || "-"}`);
+    lines.push(
+      `- productionSignoffPacket=${launchReadinessNextGateSource.launchReadinessNextGateProductionSignoffPacket || "-"}`
+      + ` | launchDayWatchEntry=${launchReadinessNextGateSource.launchReadinessNextGateLaunchDayWatchEntry || "-"}`
+    );
+    lines.push(`- nextAction=${launchReadinessNextGateSource.launchReadinessNextGateNextAction || "-"}`);
   }
   if (receiptVisibilitySource) {
     lines.push("");

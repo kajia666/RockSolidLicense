@@ -23509,7 +23509,8 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
   stabilizationStatusReceipt = null,
   firstWaveConfirmationChain = null,
   followUpQueue = [],
-  stabilizationHandoff = null
+  stabilizationHandoff = null,
+  launchReadinessNextGate = null
 } = {}) {
   if (
     !latestReceipt
@@ -23542,6 +23543,13 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
     ?? stabilizationStatusReceipt?.watchRecordDraftRecordCount
     ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
     ?? null;
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+    || closeoutReadinessSummary?.launchReadinessNextGate
+    || launchDayWatchReceipt?.launchReadinessNextGate
+    || stabilizationStatusReceipt?.launchReadinessNextGate
+    || latestReceipt
+  );
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
     closeoutReadinessSummary?.launchOpsOverviewContext
     || stabilizationHandoff?.launchOpsOverviewContext
@@ -23657,6 +23665,7 @@ function buildDeveloperOpsSteadyStateOperationalReviewPayload({
     firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
     firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
     followUpCount: remainingFollowUpCount,
+    ...gateCarry,
     launchOpsOverviewContext,
     blockers: Array.isArray(closeoutReadinessSummary?.blockers)
       ? closeoutReadinessSummary.blockers
@@ -23689,7 +23698,8 @@ function buildDeveloperOpsSteadyStateExceptionDigestPayload({
   overview = {},
   latestReceipt = null,
   closeoutReadinessSummary = null,
-  steadyStateOperationalReview = null
+  steadyStateOperationalReview = null,
+  launchReadinessNextGate = null
 } = {}) {
   if (!overview || typeof overview !== "object") {
     return null;
@@ -23712,6 +23722,12 @@ function buildDeveloperOpsSteadyStateExceptionDigestPayload({
     productCode: productCode || scope.productCode || "",
     channel
   };
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+    || steadyStateOperationalReview?.launchReadinessNextGate
+    || closeoutReadinessSummary?.launchReadinessNextGate
+    || latestReceipt
+  );
   const monitoringReady = steadyStateOperationalReview?.monitoringReady === true
     || (closeoutReadinessSummary?.steadyStateReady === true && closeoutReadinessSummary?.canClose === true);
   const attentionMetrics = {
@@ -23803,6 +23819,7 @@ function buildDeveloperOpsSteadyStateExceptionDigestPayload({
     auditSignals,
     focusUsers,
     focusDevices,
+    ...gateCarry,
     workspaceAction,
     digestDownload,
     operatorActions,
@@ -23818,7 +23835,8 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
   closeoutReadinessSummary = null,
   steadyStateOperationalReview = null,
   steadyStateExceptionDigest = null,
-  stabilizationHandoff = null
+  stabilizationHandoff = null,
+  launchReadinessNextGate = null
 } = {}) {
   if (!steadyStateOperationalReview && !steadyStateExceptionDigest && !closeoutReadinessSummary) {
     return null;
@@ -23854,6 +23872,13 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
     || closeoutReadinessSummary?.launchOpsOverviewContext
     || stabilizationHandoff?.launchOpsOverviewContext
     || latestReceipt?.launchOpsOverviewContext
+  );
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+    || steadyStateOperationalReview?.launchReadinessNextGate
+    || steadyStateExceptionDigest?.launchReadinessNextGate
+    || closeoutReadinessSummary?.launchReadinessNextGate
+    || latestReceipt
   );
   const firstWaveLifecycle = steadyStateOperationalReview?.firstWaveLifecycle || null;
   const handoffDownload = productCode ? buildDeveloperOpsSteadyStateHandoffBriefDownload(briefScope) : null;
@@ -23940,6 +23965,7 @@ function buildDeveloperOpsSteadyStateHandoffBriefPayload({
     firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
     firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
     firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
+    ...gateCarry,
     recordedAction: closeoutReadinessSummary?.recordedAction || null,
     latestReceipt: latestReceipt
       ? {
@@ -23969,7 +23995,8 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
   steadyStateExceptionDigest = null,
   steadyStateHandoffBrief = null,
   closeoutReadinessSummary = null,
-  stagingLaunchDutyArchive = null
+  stagingLaunchDutyArchive = null,
+  launchReadinessNextGate = null
 } = {}) {
   if (!steadyStateOperationalReview && !steadyStateExceptionDigest && !steadyStateHandoffBrief) {
     return null;
@@ -24010,6 +24037,14 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     || steadyStateOperationalReview?.launchOpsOverviewContext
     || closeoutReadinessSummary?.launchOpsOverviewContext
     || latestReceipt?.launchOpsOverviewContext
+  );
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+    || steadyStateHandoffBrief?.launchReadinessNextGate
+    || steadyStateExceptionDigest?.launchReadinessNextGate
+    || steadyStateOperationalReview?.launchReadinessNextGate
+    || closeoutReadinessSummary?.launchReadinessNextGate
+    || latestReceipt
   );
   const firstWaveLifecycle = steadyStateHandoffBrief?.firstWaveLifecycle
     || steadyStateOperationalReview?.firstWaveLifecycle
@@ -24170,6 +24205,7 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
     firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
     firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
+    ...gateCarry,
     latestReceipt: latestReceipt
       ? {
           operation: latestReceipt.operation || null,
@@ -26349,14 +26385,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     stabilizationStatusReceipt,
     firstWaveConfirmationChain,
     followUpQueue,
-    stabilizationHandoff
+    stabilizationHandoff,
+    launchReadinessNextGate
   });
   const steadyStateExceptionDigest = buildDeveloperOpsSteadyStateExceptionDigestPayload({
     scope,
     overview,
     latestReceipt,
     closeoutReadinessSummary,
-    steadyStateOperationalReview
+    steadyStateOperationalReview,
+    launchReadinessNextGate
   });
   const steadyStateHandoffBrief = buildDeveloperOpsSteadyStateHandoffBriefPayload({
     scope,
@@ -26364,7 +26402,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     closeoutReadinessSummary,
     steadyStateOperationalReview,
     steadyStateExceptionDigest,
-    stabilizationHandoff
+    stabilizationHandoff,
+    launchReadinessNextGate
   });
   const steadyStateDutyBoard = buildDeveloperOpsSteadyStateDutyBoardPayload({
     scope,
@@ -26373,7 +26412,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateExceptionDigest,
     steadyStateHandoffBrief,
     closeoutReadinessSummary,
-    stagingLaunchDutyArchive
+    stagingLaunchDutyArchive,
+    launchReadinessNextGate
   });
   const steadyStateDutyActionLinks = buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     scope,
@@ -30860,6 +30900,8 @@ function appendDeveloperOpsSteadyStateOperationalReviewLines(lines, steadyStateO
     + ` | stabilization=${steadyStateOperationalReview.stabilizationStatus || "-"}`
     + ` | firstWave=${steadyStateOperationalReview.firstWaveStatus || "-"}`
     + ` | followUps=${steadyStateOperationalReview.followUpCount ?? 0}`
+    + ` | launchReadinessNextGate=${steadyStateOperationalReview.launchReadinessNextGateStatus || "-"}`
+    + ` | goLiveCurrentGate=${steadyStateOperationalReview.launchReadinessNextGateCurrentGate || "-"}`
   );
   const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(
     steadyStateOperationalReview.firstWaveLifecycle
@@ -30953,6 +30995,8 @@ function appendDeveloperOpsSteadyStateExceptionDigestLines(lines, digest = null,
     + ` | high=${queueSummary.high ?? 0}`
     + ` | medium=${queueSummary.medium ?? 0}`
     + ` | low=${queueSummary.low ?? 0}`
+    + ` | launchReadinessNextGate=${digest.launchReadinessNextGateStatus || "-"}`
+    + ` | goLiveCurrentGate=${digest.launchReadinessNextGateCurrentGate || "-"}`
   );
   lines.push(
     `- attentionCount=${digest.attentionCount ?? 0}`
@@ -31005,6 +31049,8 @@ function appendDeveloperOpsSteadyStateHandoffBriefLines(lines, brief = null, {
     + ` | queueStatus=${brief.queueStatus || "-"}`
     + ` | queueTotal=${brief.queueTotal ?? 0}`
     + ` | attention=${brief.attentionCount ?? 0}`
+    + ` | launchReadinessNextGate=${brief.launchReadinessNextGateStatus || "-"}`
+    + ` | goLiveCurrentGate=${brief.launchReadinessNextGateCurrentGate || "-"}`
   );
   lines.push(
     `- closeout=${brief.closeoutStatus || "-"}`
@@ -31079,6 +31125,8 @@ function appendDeveloperOpsSteadyStateDutyBoardLines(lines, board = null, {
     + ` | closeout=${board.closeoutStatus || "-"}`
     + ` | watchRecordDraft=${board.watchRecordDraftStatus || "-"}`
     + ` | records=${board.watchRecordDraftRecordCount ?? "-"}`
+    + ` | launchReadinessNextGate=${board.launchReadinessNextGateStatus || "-"}`
+    + ` | goLiveCurrentGate=${board.launchReadinessNextGateCurrentGate || "-"}`
   );
   const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(board.firstWaveLifecycle);
   if (firstWaveLifecycleText) {

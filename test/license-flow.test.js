@@ -11156,6 +11156,50 @@ test("developer license quickstart first-batch setup can create recommended laun
       stabilizationGateOperationalExceptionCloseout.closeoutReviewAction.body.launchReadinessNextGateCurrentGate,
       "ready_for_closeout_reload"
     );
+    const stabilizationGateSteadyStateReview = stabilizationGateInitialOps?.steadyStateOperationalReview;
+    assert.ok(stabilizationGateSteadyStateReview);
+    assertGoLiveNextGatePayload(stabilizationGateSteadyStateReview.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateSteadyStateReview.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateSteadyStateReview.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    const stabilizationGateSteadyStateDigest = stabilizationGateInitialOps?.steadyStateExceptionDigest;
+    assert.ok(stabilizationGateSteadyStateDigest);
+    assertGoLiveNextGatePayload(stabilizationGateSteadyStateDigest.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateSteadyStateDigest.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateSteadyStateDigest.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    const stabilizationGateSteadyStateBrief = stabilizationGateInitialOps?.steadyStateHandoffBrief;
+    assert.ok(stabilizationGateSteadyStateBrief);
+    assertGoLiveNextGatePayload(stabilizationGateSteadyStateBrief.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateSteadyStateBrief.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateSteadyStateBrief.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    const stabilizationGateSteadyStateDutyBoard = stabilizationGateInitialOps?.steadyStateDutyBoard;
+    assert.ok(stabilizationGateSteadyStateDutyBoard);
+    assertGoLiveNextGatePayload(stabilizationGateSteadyStateDutyBoard.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateSteadyStateDutyBoard.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateSteadyStateDutyBoard.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
     assert.deepEqual(
       {
         sourceReceiptOperation: stabilizationGateOpsSnapshot.summary?.launchReadinessNextGateHandoff?.sourceReceipt?.operation,
@@ -11181,6 +11225,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Stabilization Status Receipt:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Closeout Readiness Summary:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Closeout Readiness Summary:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Operational Review:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Exception Digest:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Exception Digest:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Handoff Brief:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Handoff Brief:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(
       stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps,
       /"launchReadinessNextGateStatus","launchReadinessNextGateDecision","launchReadinessNextGateCurrentGate","launchReadinessNextGateFullTestWindowCommand","launchReadinessNextGateProductionSignoffPacket","launchReadinessNextGateLaunchDayWatchEntry"/

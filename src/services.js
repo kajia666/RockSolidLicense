@@ -22336,7 +22336,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusDownload(scope = {}) {
   );
 }
 
-function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
+function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}, launchReadinessNextGate = null) {
   const productCode = sanitizeExportNameSegment(scope.productCode || "product", "product");
   const channel = sanitizeExportNameSegment(scope.channel || "stable", "stable");
   const archiveRoot = `artifacts/staging/${productCode}/${channel}`;
@@ -22396,6 +22396,7 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
     "--launch-duty-archive-index-file", files.launchDutyArchiveIndex,
     "--filled-closeout-draft-file", files.filledCloseoutDraft
   ];
+  const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(launchReadinessNextGate);
   return {
     mode: "developer-ops-staging-launch-duty-archive",
     status: "awaiting_staging_archive_index",
@@ -22411,6 +22412,7 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}) {
       closeoutReload: `npm.cmd run staging:rehearsal -- --profile-file ${profileFile} --product-code ${productCode} --channel ${channel} --closeout-input-file ${files.filledCloseoutInput}`,
       fullTestWindow: "npm.cmd test"
     },
+    ...launchReadinessNextGateCarry,
     nextAction: "Run staging rehearsal with the non-secret profile, archive the launch-duty index, then reload closeout before opening the full test window."
   };
 }
@@ -22423,6 +22425,15 @@ function appendDeveloperOpsStagingLaunchDutyArchiveLines(lines = [], archive = n
   lines.push(`- Status: ${archive.status || "-"}`);
   lines.push(`- Archive Root: ${archive.archiveRoot || "-"}`);
   lines.push(`- Launch Duty Archive Index: ${archive.files?.launchDutyArchiveIndex || archive.indexFile || "-"}`);
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(archive);
+  if (launchReadinessNextGate) {
+    lines.push(
+      `- launchReadinessNextGate=${launchReadinessNextGate.status || "-"}`
+      + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
+      + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
+      + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+    );
+  }
   lines.push("- Packet Files:");
   for (const item of Array.isArray(archive.packetFiles) ? archive.packetFiles : []) {
     lines.push(`  - ${item.key || "-"}: ${item.path || "-"}`);
@@ -26324,7 +26335,6 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const launchMainlineHandoffRoutesDownload = buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope);
   const stagingLaunchDutyArchiveDownload = buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope);
   const initialLaunchReadinessDownload = buildDeveloperOpsInitialLaunchReadinessDownload(scope);
-  const stagingLaunchDutyArchive = buildDeveloperOpsStagingLaunchDutyArchive(scope);
   const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
   const stabilizationHandoffDownload = mainlineHandoff?.downloads?.stabilizationHandoff || null;
   const followUpQueue = followUps
@@ -26390,6 +26400,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   });
   const launchReadinessNextGate = launchReadinessNextGateBundle.launchReadinessNextGate || null;
   const launchReadinessNextGateHandoff = launchReadinessNextGateBundle.launchReadinessNextGateHandoff || null;
+  const stagingLaunchDutyArchive = buildDeveloperOpsStagingLaunchDutyArchive(scope, launchReadinessNextGate);
   const firstLaunchOperatingChain = buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
     productCode: scope.productCode || latestReceipt?.productCode || firstWaveReadinessBridge?.productCode || "",
     channel: scope.channel || latestReceipt?.channel || firstWaveReadinessBridge?.channel || "stable",
@@ -32277,6 +32288,15 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | archiveRoot=${stagingArchive.archiveRoot || "-"}`
         + ` | launchDutyArchiveIndex=${stagingArchive.files?.launchDutyArchiveIndex || "-"}`
       );
+      const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(stagingArchive);
+      if (launchReadinessNextGate) {
+        lines.push(
+          `- launchReadinessNextGate=${launchReadinessNextGate.status || "-"}`
+          + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
+          + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
+          + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+        );
+      }
       const packetCompleteness = stagingArchive.packetCompleteness || null;
       if (packetCompleteness && typeof packetCompleteness === "object") {
         const expectedCount = Number.isFinite(Number(packetCompleteness.expectedCount))

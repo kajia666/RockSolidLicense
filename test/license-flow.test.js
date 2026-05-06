@@ -11141,6 +11141,21 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assertGoLiveNextGatePayload(stabilizationGateOpsSnapshot.summary?.launchReadinessNextGate);
     const stabilizationGateInitialOps = stabilizationGateOpsSnapshot.summary?.initialLaunchOpsReadiness;
+    const stabilizationGateStagingArchive = stabilizationGateInitialOps?.stagingLaunchDutyArchive;
+    assert.ok(stabilizationGateStagingArchive);
+    assertGoLiveNextGatePayload(stabilizationGateStagingArchive.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateStagingArchive.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateStagingArchive.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assert.equal(
+      stabilizationGateStagingArchive.launchReadinessNextGateProductionSignoffPacket,
+      "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json"
+    );
     assertGoLiveNextGatePayload(stabilizationGateInitialOps?.traceability?.latestLaunchReceipt?.launchReadinessNextGate);
     assert.equal(
       stabilizationGateInitialOps?.traceability?.latestLaunchReceipt?.launchReadinessNextGateStatus,
@@ -11329,6 +11344,9 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveFullTestWindow=npm\.cmd test/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Staging Launch-Duty Archive:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Staging Launch-Duty Archive:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Staging Launch-Duty Archive:[\s\S]*productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Next Action:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Next Action:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Action Manifest:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
@@ -11390,6 +11408,18 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateNextFollowUpDownload.body, /currentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateNextFollowUpDownload.body, /fullTestWindow=npm\.cmd test/);
     assert.match(stabilizationGateNextFollowUpDownload.body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+
+    const stabilizationGateStagingArchiveDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=staging-launch-duty-archive&limit=40",
+      ownerSession.token
+    );
+    assert.equal(stabilizationGateStagingArchiveDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(stabilizationGateStagingArchiveDownload.body, /Staging Launch-Duty Archive:/);
+    assert.match(stabilizationGateStagingArchiveDownload.body, /launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateStagingArchiveDownload.body, /goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateStagingArchiveDownload.body, /goLiveFullTestWindow=npm\.cmd test/);
+    assert.match(stabilizationGateStagingArchiveDownload.body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
 
     const stabilizationGateOpsHandoffIndex = await getText(
       baseUrl,

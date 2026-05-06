@@ -22603,14 +22603,39 @@ function buildDeveloperOpsInitialLaunchOpsGate({
   };
 }
 
+function buildDeveloperOpsLaunchReadinessNextGateCarry(source = null) {
+  const normalized = source
+    && typeof source === "object"
+    && !source.launchReadinessNextGate
+    && (source.status || source.decision || source.currentGate || source.fullTestWindowCommand)
+    ? normalizeLaunchReadinessNextGateForHandoff({ launchReadinessNextGate: source })
+    : normalizeLaunchReadinessNextGateForHandoff(source);
+  return {
+    launchReadinessNextGate: normalized,
+    launchReadinessNextGateStatus: normalized?.status || null,
+    launchReadinessNextGateDecision: normalized?.decision || null,
+    launchReadinessNextGateCurrentGate: normalized?.currentGate || null,
+    launchReadinessNextGateCanEnterInitialLaunch: normalized?.canEnterInitialLaunch === true,
+    launchReadinessNextGateFullTestWindowCommand: normalized?.fullTestWindowCommand || null,
+    launchReadinessNextGateProductionSignoffPacket: normalized?.productionSignoffPacket || null,
+    launchReadinessNextGateLaunchDayWatchEntry: normalized?.launchDayWatchEntry || null
+  };
+}
+
 function buildDeveloperOpsLaunchDayWatchReceiptPayload({
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
-  traceability = {}
+  traceability = {},
+  launchReadinessNextGate = null
 } = {}) {
   if (!latestReceipt || typeof latestReceipt !== "object") {
     return null;
   }
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+    || latestReceipt
+    || traceability.launchReadinessNextGate
+  );
   const operation = latestReceipt.operation || null;
   const status = latestReceipt.operationalReadinessWatchCheckInStatus
     || (operation === "record_post_launch_ops_sweep" ? "receipt_recorded" : "unknown");
@@ -22657,6 +22682,7 @@ function buildDeveloperOpsLaunchDayWatchReceiptPayload({
       || launchReceiptNextFollowUp?.downloadHref
       || launchReceiptNextFollowUp?.recommendedDownload?.href
       || null,
+    ...gateCarry,
     stabilizationStatus: latestReceipt.operationalReadinessStabilizationStatus || null,
     steadyStateStatus: latestReceipt.operationalReadinessSteadyStateStatus || null,
     stabilizationNextOperation: latestReceipt.postLaunchLifecycleNextOperation || null,
@@ -22715,11 +22741,18 @@ function buildDeveloperOpsStabilizationStatusReceiptPayload({
   stabilizationHandoff = null,
   stabilizationHandoffConfirmation = null,
   launchDayWatchReceipt = null,
-  followUpQueue = []
+  followUpQueue = [],
+  launchReadinessNextGate = null
 } = {}) {
   if (!latestReceipt && !stabilizationHandoff && !stabilizationHandoffConfirmation) {
     return null;
   }
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+    || launchDayWatchReceipt?.launchReadinessNextGate
+    || latestReceipt
+    || stabilizationHandoff?.latestLaunchReceipt
+  );
   const confirmation = buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation);
   const handoffConfirmed = confirmation?.status === "confirmed";
   const followUps = Array.isArray(followUpQueue) ? followUpQueue : [];
@@ -22773,6 +22806,7 @@ function buildDeveloperOpsStabilizationStatusReceiptPayload({
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
     launchDayWatchRecorded: launchDayWatchReceipt?.receiptRecorded === true || latestReceipt?.operation === "record_post_launch_ops_sweep",
+    ...gateCarry,
     postLaunchLifecycleStatus: latestReceipt?.postLaunchLifecycleStatus || stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleStatus || null,
     stabilizationNextOperation: latestReceipt?.postLaunchLifecycleNextOperation || stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleNextOperation || null,
     followUpCount,
@@ -22814,7 +22848,8 @@ function buildDeveloperOpsOperationalExceptionEntryPayload({
   primaryDownload = null,
   launchDayWatchReceipt = null,
   stabilizationStatusReceipt = null,
-  followUpQueue = []
+  followUpQueue = [],
+  launchReadinessNextGate = null
 } = {}) {
   const followUps = Array.isArray(followUpQueue) ? followUpQueue : [];
   const currentReceiptFollowUps = filterDeveloperOpsCurrentReceiptFollowUps(followUps, latestReceipt);
@@ -22830,6 +22865,12 @@ function buildDeveloperOpsOperationalExceptionEntryPayload({
     ?? stabilizationStatusReceipt?.watchRecordDraftRecordCount
     ?? latestReceipt?.operationalReadinessWatchRecordDraftRecordCount
     ?? null;
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+    || launchDayWatchReceipt?.launchReadinessNextGate
+    || stabilizationStatusReceipt?.launchReadinessNextGate
+    || latestReceipt
+  );
   const blockingFollowUps = currentReceiptFollowUps.filter((item) => !isDeveloperOpsCloseoutReadinessFollowUp(item, followUpContext));
   const launchReceiptNextFollowUpIsCloseout = isDeveloperOpsCloseoutReadinessFollowUp(
     launchReceiptNextFollowUp,
@@ -22902,6 +22943,7 @@ function buildDeveloperOpsOperationalExceptionEntryPayload({
     watchRecordDraftRecordCount,
     stabilizationStatus: stabilizationStatusReceipt?.status || null,
     confirmationAuditLogId: stabilizationStatusReceipt?.confirmationAuditLogId || null,
+    ...gateCarry,
     workspaceAction: primaryWorkspaceAction
       ? {
           key: primaryWorkspaceAction.key || null,
@@ -22984,6 +23026,17 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
   const nextOperation = operationalExceptionEntry.operation || null;
   const nextActionKey = operationalExceptionEntry.actionKey || null;
   const nextDownloadKey = operationalExceptionEntry.downloadKey || operationalExceptionEntry.download?.key || null;
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    operationalExceptionEntry.launchReadinessNextGate || operationalExceptionEntry
+  );
+  const gateActionBody = gateCarry.launchReadinessNextGate
+    ? compactRouteParams({
+        launchReadinessNextGateStatus: gateCarry.launchReadinessNextGateStatus || "",
+        launchReadinessNextGateDecision: gateCarry.launchReadinessNextGateDecision || "",
+        launchReadinessNextGateCurrentGate: gateCarry.launchReadinessNextGateCurrentGate || "",
+        launchReadinessNextGateCanEnterInitialLaunch: gateCarry.launchReadinessNextGateCanEnterInitialLaunch === true
+      })
+    : {};
   const cloneWorkspaceAction = (workspaceAction = null) => workspaceAction && typeof workspaceAction === "object"
     ? {
         key: workspaceAction.key || null,
@@ -23023,7 +23076,8 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
       channel,
       operation: nextOperation,
       actionKey: nextActionKey,
-      downloadKey: nextDownloadKey
+      downloadKey: nextDownloadKey,
+      ...gateActionBody
     },
     workspaceAction: cloneWorkspaceAction(operationalExceptionEntry.workspaceAction),
     recommendedDownload: cloneDownload(operationalExceptionEntry.download)
@@ -23062,7 +23116,8 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
       channel,
       operation: closeoutOperation,
       actionKey: closeoutActionKey,
-      downloadKey: closeoutDownloadKey
+      downloadKey: closeoutDownloadKey,
+      ...gateActionBody
     },
     workspaceAction: productCode
       ? createLaunchWorkflowWorkspaceShortcut(
@@ -23097,6 +23152,7 @@ function buildDeveloperOpsOperationalExceptionCloseoutPayload({
     downloadHref: operationalExceptionEntry.download?.href || null,
     confirmationAuditLogId: operationalExceptionEntry.confirmationAuditLogId || null,
     latestReceiptAuditLogId: operationalExceptionEntry.latestReceiptAuditLogId || null,
+    ...gateCarry,
     resolutionAction,
     closeoutReviewAction,
     closeoutCriteria,
@@ -23112,7 +23168,8 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
   operationalExceptionCloseout = null,
   launchDayWatchReceipt = null,
   stabilizationStatusReceipt = null,
-  firstWaveConfirmationChain = null
+  firstWaveConfirmationChain = null,
+  launchReadinessNextGate = null
 } = {}) {
   if (
     !latestReceipt
@@ -23136,6 +23193,12 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
     ?? null;
   const stabilizationStatus = stabilizationStatusReceipt?.status || null;
   const firstWaveConfirmationStatus = firstWaveConfirmationChain?.status || null;
+  const gateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+    || launchDayWatchReceipt?.launchReadinessNextGate
+    || stabilizationStatusReceipt?.launchReadinessNextGate
+    || latestReceipt
+  );
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
     latestReceipt?.launchOpsOverviewContext
     || launchDayWatchReceipt?.launchOpsOverviewContext
@@ -23353,6 +23416,7 @@ function buildDeveloperOpsCloseoutReadinessSummaryPayload({
     watchRecordDraftRecordCount,
     stabilizationStatus,
     firstWaveConfirmationStatus,
+    ...gateCarry,
     launchOpsOverviewContext,
     recordedAction,
     nextAction,
@@ -24419,20 +24483,27 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
   latestReceipt = null,
   launchReceiptNextFollowUp = null,
   stabilizationHandoffConfirmation = null,
-  firstWaveHandoffConfirmation = null
+  firstWaveHandoffConfirmation = null,
+  launchReadinessNextGate = null
 } = {}) {
   const launchDayWatchReceipt = buildDeveloperOpsLaunchDayWatchReceiptPayload({
     latestReceipt,
-    launchReceiptNextFollowUp
+    launchReceiptNextFollowUp,
+    launchReadinessNextGate
   });
   const stabilizationStatusReceipt = buildDeveloperOpsStabilizationStatusReceiptPayload({
     latestReceipt,
     launchReceiptNextFollowUp,
-    stabilizationHandoffConfirmation
+    stabilizationHandoffConfirmation,
+    launchDayWatchReceipt,
+    launchReadinessNextGate
   });
   const operationalExceptionEntry = buildDeveloperOpsOperationalExceptionEntryPayload({
     latestReceipt,
-    launchReceiptNextFollowUp
+    launchReceiptNextFollowUp,
+    launchDayWatchReceipt,
+    stabilizationStatusReceipt,
+    launchReadinessNextGate
   });
   const operationalExceptionCloseout = buildDeveloperOpsOperationalExceptionCloseoutPayload({
     operationalExceptionEntry
@@ -24444,7 +24515,8 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
     operationalExceptionCloseout,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
-    firstWaveConfirmationChain
+    firstWaveConfirmationChain,
+    launchReadinessNextGate
   });
   return {
     latestLaunchReceipt: latestReceipt
@@ -24486,6 +24558,7 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
     stabilizationHandoffConfirmation: buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation),
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
+    launchReadinessNextGate: buildDeveloperOpsLaunchReadinessNextGateCarry(launchReadinessNextGate).launchReadinessNextGate,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
     operationalExceptionEntry,
@@ -26181,14 +26254,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       latestReceipt,
       launchReceiptNextFollowUp,
       stabilizationHandoffConfirmation,
-      firstWaveHandoffConfirmation
+      firstWaveHandoffConfirmation,
+      launchReadinessNextGate
     }),
     firstWaveReadinessBridge
   };
   const launchDayWatchReceipt = buildDeveloperOpsLaunchDayWatchReceiptPayload({
     latestReceipt,
     launchReceiptNextFollowUp,
-    traceability
+    traceability,
+    launchReadinessNextGate
   });
   const contract = buildDeveloperOpsInitialLaunchContract({
     scope,
@@ -26241,7 +26316,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     stabilizationHandoff,
     stabilizationHandoffConfirmation,
     launchDayWatchReceipt,
-    followUpQueue
+    followUpQueue,
+    launchReadinessNextGate
   });
   const operationalExceptionEntry = buildDeveloperOpsOperationalExceptionEntryPayload({
     latestReceipt,
@@ -26250,7 +26326,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
-    followUpQueue
+    followUpQueue,
+    launchReadinessNextGate
   });
   const operationalExceptionCloseout = buildDeveloperOpsOperationalExceptionCloseoutPayload({
     operationalExceptionEntry
@@ -26261,7 +26338,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     operationalExceptionCloseout,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
-    firstWaveConfirmationChain
+    firstWaveConfirmationChain,
+    launchReadinessNextGate
   });
   const steadyStateOperationalReview = buildDeveloperOpsSteadyStateOperationalReviewPayload({
     scope,
@@ -30710,6 +30788,8 @@ function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadines
     + ` | watchRecordDraft=${closeoutReadinessSummary.watchRecordDraftStatus || "-"}`
     + ` | stabilization=${closeoutReadinessSummary.stabilizationStatus || "-"}`
     + ` | firstWave=${closeoutReadinessSummary.firstWaveConfirmationStatus || "-"}`
+    + ` | launchReadinessNextGate=${closeoutReadinessSummary.launchReadinessNextGateStatus || "-"}`
+    + ` | goLiveCurrentGate=${closeoutReadinessSummary.launchReadinessNextGateCurrentGate || "-"}`
   );
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(closeoutReadinessSummary.launchOpsOverviewContext);
   if (launchOpsOverviewContext) {
@@ -31743,6 +31823,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push(
         `- stabilizationNext=${launchDayWatchReceipt.stabilizationNextOperation || "-"}`
         + ` | postLaunchStatus=${launchDayWatchReceipt.postLaunchLifecycleStatus || "-"}`
+        + ` | launchReadinessNextGate=${launchDayWatchReceipt.launchReadinessNextGateStatus || "-"}`
+        + ` | goLiveCurrentGate=${launchDayWatchReceipt.launchReadinessNextGateCurrentGate || "-"}`
       );
     }
     const stabilizationStatusReceipt = initialLaunchOpsReadiness.stabilizationStatusReceipt
@@ -31763,6 +31845,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | watchRecordDraft=${stabilizationStatusReceipt.watchRecordDraftStatus || "-"}`
         + ` | next=${stabilizationStatusReceipt.nextOperation || "-"}`
         + ` | steadyNext=${stabilizationStatusReceipt.steadyStateNextStep || "-"}`
+        + ` | launchReadinessNextGate=${stabilizationStatusReceipt.launchReadinessNextGateStatus || "-"}`
+        + ` | goLiveCurrentGate=${stabilizationStatusReceipt.launchReadinessNextGateCurrentGate || "-"}`
       );
     }
     const operationalExceptionEntry = initialLaunchOpsReadiness.operationalExceptionEntry
@@ -31787,6 +31871,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | watchRecordDraft=${operationalExceptionEntry.watchRecordDraftStatus || "-"}`
         + ` | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"}`
         + ` | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`
+        + ` | launchReadinessNextGate=${operationalExceptionEntry.launchReadinessNextGateStatus || "-"}`
+        + ` | goLiveCurrentGate=${operationalExceptionEntry.launchReadinessNextGateCurrentGate || "-"}`
       );
     }
     const operationalExceptionCloseout = initialLaunchOpsReadiness.operationalExceptionCloseout
@@ -31810,6 +31896,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         `- actions: resolutionAction=${operationalExceptionCloseout.resolutionAction?.operation || "-"}`
         + ` | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"}`
         + ` | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`
+        + ` | launchReadinessNextGate=${operationalExceptionCloseout.launchReadinessNextGateStatus || "-"}`
+        + ` | goLiveCurrentGate=${operationalExceptionCloseout.launchReadinessNextGateCurrentGate || "-"}`
       );
     }
     const closeoutReadinessSummary = initialLaunchOpsReadiness.closeoutReadinessSummary
@@ -32381,7 +32469,14 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push(`- Next: action=${operationalExceptionEntry.actionKey || "-"} | operation=${operationalExceptionEntry.operation || "-"} | download=${operationalExceptionEntry.downloadKey || "-"}`);
     lines.push(`- Workspace: ${operationalExceptionEntry.workspaceAction?.label || "-"} | href=${operationalExceptionEntry.workspaceAction?.href || "-"}`);
     lines.push(`- Download: ${operationalExceptionEntry.download?.fileName || "-"} | format=${operationalExceptionEntry.download?.format || "-"} | href=${operationalExceptionEntry.download?.href || "-"}`);
-    lines.push(`- Signals: watch=${operationalExceptionEntry.launchDayWatchStatus || "-"} | watchRecordDraft=${operationalExceptionEntry.watchRecordDraftStatus || "-"} | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"} | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`);
+    lines.push(
+      `- Signals: watch=${operationalExceptionEntry.launchDayWatchStatus || "-"}`
+      + ` | watchRecordDraft=${operationalExceptionEntry.watchRecordDraftStatus || "-"}`
+      + ` | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"}`
+      + ` | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`
+      + ` | launchReadinessNextGate=${operationalExceptionEntry.launchReadinessNextGateStatus || "-"}`
+      + ` | goLiveCurrentGate=${operationalExceptionEntry.launchReadinessNextGateCurrentGate || "-"}`
+    );
     if (Array.isArray(operationalExceptionEntry.reasons) && operationalExceptionEntry.reasons.length) {
       lines.push("- Reasons:");
       for (const item of operationalExceptionEntry.reasons) {
@@ -32397,8 +32492,20 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     lines.push("Operational Exception Closeout:");
     lines.push(`- Status: ${operationalExceptionCloseout.status || "-"} | canClose=${operationalExceptionCloseout.canClose === true} | reviewRequired=${operationalExceptionCloseout.reviewRequired === true}`);
     lines.push(`- Next: action=${operationalExceptionCloseout.nextActionKey || "-"} | operation=${operationalExceptionCloseout.nextOperation || "-"} | download=${operationalExceptionCloseout.downloadKey || "-"}`);
-    lines.push(`- Source: exception=${operationalExceptionCloseout.sourceExceptionStatus || "-"} | severity=${operationalExceptionCloseout.severity || "-"} | reasons=${operationalExceptionCloseout.blockingReasonCount ?? 0}`);
-    lines.push(`- Actions: resolutionAction=${operationalExceptionCloseout.resolutionAction?.operation || "-"} | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"} | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`);
+    lines.push(
+      `- Source: exception=${operationalExceptionCloseout.sourceExceptionStatus || "-"}`
+      + ` | severity=${operationalExceptionCloseout.severity || "-"}`
+      + ` | reasons=${operationalExceptionCloseout.blockingReasonCount ?? 0}`
+      + ` | launchReadinessNextGate=${operationalExceptionCloseout.launchReadinessNextGateStatus || "-"}`
+      + ` | goLiveCurrentGate=${operationalExceptionCloseout.launchReadinessNextGateCurrentGate || "-"}`
+    );
+    lines.push(
+      `- Actions: resolutionAction=${operationalExceptionCloseout.resolutionAction?.operation || "-"}`
+      + ` | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"}`
+      + ` | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`
+      + ` | launchReadinessNextGate=${operationalExceptionCloseout.launchReadinessNextGateStatus || "-"}`
+      + ` | goLiveCurrentGate=${operationalExceptionCloseout.launchReadinessNextGateCurrentGate || "-"}`
+    );
     if (Array.isArray(operationalExceptionCloseout.closeoutCriteria) && operationalExceptionCloseout.closeoutCriteria.length) {
       lines.push("- Closeout Criteria:");
       for (const item of operationalExceptionCloseout.closeoutCriteria) {
@@ -33865,6 +33972,8 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | watchRecordDraft=${operationalExceptionEntry.watchRecordDraftStatus || "-"}`
       + ` | stabilization=${operationalExceptionEntry.stabilizationStatus || "-"}`
       + ` | audit=${operationalExceptionEntry.confirmationAuditLogId || operationalExceptionEntry.latestReceiptAuditLogId || "-"}`
+      + ` | launchReadinessNextGate=${operationalExceptionEntry.launchReadinessNextGateStatus || "-"}`
+      + ` | goLiveCurrentGate=${operationalExceptionEntry.launchReadinessNextGateCurrentGate || "-"}`
     );
   }
 
@@ -33889,6 +33998,8 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       `- actions: resolutionAction=${operationalExceptionCloseout.resolutionAction?.operation || "-"}`
       + ` | closeoutReview=${operationalExceptionCloseout.closeoutReviewAction?.operation || "-"}`
       + ` | endpoint=${operationalExceptionCloseout.closeoutReviewAction?.endpoint || "-"}`
+      + ` | launchReadinessNextGate=${operationalExceptionCloseout.launchReadinessNextGateStatus || "-"}`
+      + ` | goLiveCurrentGate=${operationalExceptionCloseout.launchReadinessNextGateCurrentGate || "-"}`
     );
   }
 

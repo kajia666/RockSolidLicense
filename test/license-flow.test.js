@@ -11106,6 +11106,56 @@ test("developer license quickstart first-batch setup can create recommended laun
       }
     );
     assertGoLiveNextGatePayload(stabilizationGateOpsSnapshot.summary?.launchReadinessNextGate);
+    const stabilizationGateInitialOps = stabilizationGateOpsSnapshot.summary?.initialLaunchOpsReadiness;
+    assertGoLiveNextGatePayload(stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assertGoLiveNextGatePayload(stabilizationGateInitialOps?.stabilizationStatusReceipt?.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateInitialOps?.stabilizationStatusReceipt?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateInitialOps?.stabilizationStatusReceipt?.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assertGoLiveNextGatePayload(stabilizationGateInitialOps?.closeoutReadinessSummary?.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateInitialOps?.closeoutReadinessSummary?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateInitialOps?.closeoutReadinessSummary?.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    const stabilizationGateOperationalExceptionEntry = stabilizationGateInitialOps?.operationalExceptionEntry;
+    assert.ok(stabilizationGateOperationalExceptionEntry);
+    assertGoLiveNextGatePayload(stabilizationGateOperationalExceptionEntry.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateOperationalExceptionEntry.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateOperationalExceptionEntry.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    const stabilizationGateOperationalExceptionCloseout = stabilizationGateInitialOps?.operationalExceptionCloseout;
+    assert.ok(stabilizationGateOperationalExceptionCloseout);
+    assertGoLiveNextGatePayload(stabilizationGateOperationalExceptionCloseout.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateOperationalExceptionCloseout.resolutionAction.body.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateOperationalExceptionCloseout.closeoutReviewAction.body.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
     assert.deepEqual(
       {
         sourceReceiptOperation: stabilizationGateOpsSnapshot.summary?.launchReadinessNextGateHandoff?.sourceReceipt?.operation,
@@ -11125,6 +11175,12 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveFullTestWindow=npm\.cmd test/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch-Day Watch Receipt:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch-Day Watch Receipt:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Stabilization Status Receipt:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Stabilization Status Receipt:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Closeout Readiness Summary:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Closeout Readiness Summary:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(
       stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps,
       /"launchReadinessNextGateStatus","launchReadinessNextGateDecision","launchReadinessNextGateCurrentGate","launchReadinessNextGateFullTestWindowCommand","launchReadinessNextGateProductionSignoffPacket","launchReadinessNextGateLaunchDayWatchEntry"/

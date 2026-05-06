@@ -10808,6 +10808,56 @@ test("developer license quickstart first-batch setup can create recommended laun
       }
     );
 
+    const postLaunchOperationsAction = await postJson(
+      baseUrl,
+      runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain.nextAction.endpoint,
+      runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain.nextAction.body,
+      ownerSession.token
+    );
+    assert.equal(postLaunchOperationsAction.operation, "record_operations_walkthrough");
+    assert.equal(
+      postLaunchOperationsAction.receipt?.postLaunchLifecycleSummary?.nextAction?.setupAction?.operation,
+      "record_post_launch_ops_sweep"
+    );
+
+    const afterOperationsLifecycleOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTBATCH&channel=stable&limit=40",
+      ownerSession.token
+    );
+    assert.deepEqual(
+      {
+        latestReceiptOperation: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.latestReceipt?.operation,
+        status: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.status,
+        currentPhaseKey: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.readyPhaseCount,
+        phaseCount: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.phaseCount,
+        nextActionKey: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionOperation: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.operation,
+        nextActionBody: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.body,
+        primaryDownloadKey: afterOperationsLifecycleOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.primaryDownload?.key
+      },
+      {
+        latestReceiptOperation: "record_operations_walkthrough",
+        status: "pending_post_launch_lifecycle",
+        currentPhaseKey: "post_launch_lifecycle",
+        readyPhaseCount: 4,
+        phaseCount: 5,
+        nextActionKey: "production_post_launch_ops_sweep_recent",
+        nextActionOperation: "record_post_launch_ops_sweep",
+        nextActionBody: {
+          productCode: "FIRSTBATCH",
+          channel: "stable",
+          operation: "record_post_launch_ops_sweep",
+          actionKey: "production_post_launch_ops_sweep_recent",
+          downloadKey: "launch_mainline_post_launch_sweep_handoff"
+        },
+        primaryDownloadKey: "launch_mainline_post_launch_sweep_handoff"
+      }
+    );
+    assert.match(afterOperationsLifecycleOpsSnapshot.summaryText, /First Launch Operating Chain:/);
+    assert.match(afterOperationsLifecycleOpsSnapshot.summaryText, /next=production_post_launch_ops_sweep_recent \| phase=post_launch_lifecycle \| operation=record_post_launch_ops_sweep/);
+
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,
       "/api/developer/launch-mainline?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",

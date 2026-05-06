@@ -26980,6 +26980,12 @@ function buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
     : firstWaveConfirmationChain?.sourceRecommendation && typeof firstWaveConfirmationChain.sourceRecommendation === "object"
       ? firstWaveConfirmationChain.sourceRecommendation
       : {};
+  const bridgeOperatingChain = firstWaveReadinessBridge?.operatingChain && typeof firstWaveReadinessBridge.operatingChain === "object"
+    ? firstWaveReadinessBridge.operatingChain
+    : null;
+  const bridgePhase = (key = "") => Array.isArray(bridgeOperatingChain?.phases)
+    ? bridgeOperatingChain.phases.find((item) => item?.key === key) || null
+    : null;
   const segmentStatus = (key = "", fallback = "unknown") => {
     const segment = Array.isArray(firstWaveReadinessBridge?.segments)
       ? firstWaveReadinessBridge.segments.find((item) => item?.key === key)
@@ -27009,12 +27015,31 @@ function buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
     recommendedCardCount,
     issuedFreshCardCount
   };
-  const deliveryHandoff = buildFirstLaunchDeliveryHandoffFromReceipt(latestReceipt, productCode);
+  const deliveryPhase = bridgePhase("delivery");
+  const deliveryHandoffFromReceipt = buildFirstLaunchDeliveryHandoffFromReceipt(latestReceipt, productCode);
+  const deliveryHandoff = deliveryHandoffFromReceipt
+    || (deliveryPhase?.ready === true || normalizeDeveloperOpsConfirmationToken(firstCardStatus, "") === "ready"
+      ? {
+          status: deliveryPhase?.status || "ready",
+          stage: "first_launch_delivery",
+          priority: "secondary",
+          title: "Deliver first-launch card export",
+          summary: "First-launch card delivery was already confirmed in the first-wave handoff.",
+          cardCount: issuedFreshCardCount,
+          usageStatus: "unused",
+          primaryDownload: normalizeFirstLaunchOperatingChainDownload(deliveryPhase?.download),
+          downloads: deliveryPhase?.download ? [normalizeFirstLaunchOperatingChainDownload(deliveryPhase.download)] : []
+        }
+      : null);
   const firstUserValidationHandoff = buildFirstUserValidationHandoffFromFollowUps(followUpQueue, latestReceipt);
-  const postLaunchLifecycleHandoff = firstWaveConfirmationChain?.postLaunchLifecycleHandoff
+  const latestPostLaunchLifecycleHandoff = buildDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
+    latestLaunchReceipt: latestReceipt
+  });
+  const postLaunchLifecycleHandoff = latestPostLaunchLifecycleHandoff
+    || (firstWaveConfirmationChain?.postLaunchLifecycleHandoff
     && typeof firstWaveConfirmationChain.postLaunchLifecycleHandoff === "object"
-    ? firstWaveConfirmationChain.postLaunchLifecycleHandoff
-    : null;
+      ? firstWaveConfirmationChain.postLaunchLifecycleHandoff
+      : null);
   return buildDeveloperOpsFirstLaunchOperatingChainPayload({
     productCode: productCode || latestReceipt?.productCode || firstWaveReadinessBridge?.productCode || "",
     channel: channel || latestReceipt?.channel || firstWaveReadinessBridge?.channel || "stable",

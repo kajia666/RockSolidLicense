@@ -16977,6 +16977,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       || launchPanel?.primaryDownload
       || null;
     const routeMapDownload = steadyStateHandoff?.routeMapDownload || stabilizationPanel?.routeMapDownload || null;
+    const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+      launchPanel || stabilizationPanel || launchRunway || initialLaunchOpsReadiness
+    );
     const checks = [
       {
         key: "runway_evidence",
@@ -17071,6 +17074,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       steadyStateStatus,
       nextActionKey,
       nextActionOperation,
+      ...launchReadinessNextGateCarry,
       primaryWorkspaceAction: ensureLaunchWorkflowWorkspaceHref(primaryWorkspaceAction, params),
       primaryDownload: ensureLaunchWorkflowDownloadHref(primaryDownload, params),
       supportingDownload: ensureLaunchWorkflowDownloadHref(supportingDownload, params),
@@ -17338,6 +17342,16 @@ function appendOperationalReadinessTextLines(lines = [], operationalReadiness = 
     + ` | stabilization=${operationalReadiness.stabilizationStatus || "-"}`
     + ` | steadyState=${operationalReadiness.steadyStateStatus || "-"}`
   );
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(operationalReadiness);
+  if (launchReadinessNextGate) {
+    lines.push(
+      `- launchReadinessNextGate: ${launchReadinessNextGate.status || "-"}`
+      + ` | decision=${launchReadinessNextGate.decision || "-"}`
+      + ` | canEnterInitialLaunch=${launchReadinessNextGate.canEnterInitialLaunch === true}`
+      + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
+    );
+    lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+  }
   if (operationalReadiness.nextActionKey || operationalReadiness.nextActionOperation) {
     lines.push(`- nextAction: ${operationalReadiness.nextActionKey || "-"} | operation=${operationalReadiness.nextActionOperation || "-"}`);
   }

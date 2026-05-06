@@ -31300,6 +31300,22 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Receipt Next Follow-up Workspace: ${launchReceiptNextFollowUpWorkspace?.label || "-"}@${launchReceiptNextFollowUpWorkspace?.autofocus || "-"}`,
     `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"}) | href=${launchReceiptNextFollowUpDownload?.href || "-"}`
   ];
+  appendLaunchReadinessNextGateHandoffText(
+    lines,
+    summary.launchReadinessNextGate
+      ? { launchReadinessNextGate: summary.launchReadinessNextGate }
+      : null
+  );
+  if (summary.launchReadinessNextGateHandoff) {
+    const handoff = summary.launchReadinessNextGateHandoff;
+    lines.push(
+      `- sourceReceipt=${handoff.sourceReceipt?.operation || "-"}`
+      + ` | handoff=${handoff.sourceReceipt?.handoffFileName || "-"}`
+      + ` | nextFollowUp=${handoff.nextFollowUp?.operationToRecord || handoff.nextFollowUp?.operation || "-"}`
+      + ` | download=${handoff.recommendedDownload?.fileName || handoff.recommendedDownload?.key || "-"}`
+      + ` | href=${handoff.recommendedDownload?.href || "-"}`
+    );
+  }
   appendFirstWaveAuditBackfillStatusText(lines, payload);
 
   if (initialLaunchOpsReadiness) {
@@ -33739,6 +33755,94 @@ function buildDeveloperOpsSnapshotPayload({
     launchReceiptNextFollowUp,
     mainlineHandoff: routeReview.mainlineHandoff
   });
+  const launchReadinessNextGateSource = findLaunchReadinessNextGateReceipt(
+    overview.latestLaunchReceipts || [],
+    launchReceiptNextFollowUp || initialLaunchOpsReadiness?.nextFollowUp || null
+  );
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(launchReadinessNextGateSource);
+  const launchReadinessNextGateSourceOperation = launchReadinessNextGateSource?.operation || "";
+  const launchReadinessNextGateFollowUpBase = launchReadinessNextGateSource
+    ? launchReceiptFollowUps.find((item) => {
+        const operation = item?.operationToRecord || item?.operation || "";
+        return Boolean(operation && launchReadinessNextGateSourceOperation && operation === launchReadinessNextGateSourceOperation);
+      }) || launchReceiptFollowUps.find((item) => (
+        !launchReadinessNextGateSourceOperation
+          && item?.handoffFileName
+          && launchReadinessNextGateSource.handoffFileName
+          && item.handoffFileName === launchReadinessNextGateSource.handoffFileName
+      )) || {
+        key: `${launchReadinessNextGateSourceOperation || "launch_readiness_next_gate"}:go_live_gate`,
+        stage: "launch_readiness",
+        priority: "primary",
+        title: launchReadinessNextGateSource.operationLabel || "Review launch readiness next gate",
+        summary: launchReadinessNextGate?.nextAction || "Review the launch readiness gate before entering initial launch.",
+        productCode: launchReadinessNextGateSource.productCode || scope.productCode || null,
+        channel: launchReadinessNextGateSource.channel || scope.channel || "stable",
+        operation: launchReadinessNextGateSourceOperation || null,
+        operationToRecord: launchReadinessNextGateSourceOperation || null,
+        actionKey: null,
+        downloadKey: null,
+        handoffFileName: launchReadinessNextGateSource.handoffFileName || null
+      }
+    : null;
+  const launchReadinessNextGateFollowUp = launchReadinessNextGateFollowUpBase
+    ? {
+        ...launchReadinessNextGateFollowUpBase,
+        operationToRecord: launchReadinessNextGateFollowUpBase.operationToRecord
+          || launchReadinessNextGateFollowUpBase.operation
+          || null,
+        recommendedAction: launchReadinessNextGateFollowUpBase.recommendedAction
+          || buildDeveloperOpsLaunchReceiptNextFollowUpAction(launchReadinessNextGateFollowUpBase),
+        recommendedDownload: buildDeveloperOpsLaunchReceiptNextFollowUpDownload(
+          scope,
+          launchReadinessNextGateFollowUpBase
+        )
+      }
+    : null;
+  const launchReadinessNextGateHandoff = launchReadinessNextGate
+    ? {
+        status: launchReadinessNextGate.status || null,
+        decision: launchReadinessNextGate.decision || null,
+        canEnterInitialLaunch: launchReadinessNextGate.canEnterInitialLaunch === true,
+        currentGate: launchReadinessNextGate.currentGate || null,
+        nextAction: launchReadinessNextGate.nextAction || null,
+        closeoutReloadCommand: launchReadinessNextGate.closeoutReloadCommand || null,
+        fullTestWindowCommand: launchReadinessNextGate.fullTestWindowCommand || null,
+        productionSignoffPacket: launchReadinessNextGate.productionSignoffPacket || null,
+        launchDayWatchEntry: launchReadinessNextGate.launchDayWatchEntry || null,
+        sourceReceipt: launchReadinessNextGateSource
+          ? {
+              auditLogId: launchReadinessNextGateSource.auditLogId || null,
+              operation: launchReadinessNextGateSource.operation || null,
+              operationLabel: launchReadinessNextGateSource.operationLabel || null,
+              productCode: launchReadinessNextGateSource.productCode || null,
+              channel: launchReadinessNextGateSource.channel || null,
+              handoffFileName: launchReadinessNextGateSource.handoffFileName || null,
+              createdAt: launchReadinessNextGateSource.createdAt || null
+            }
+          : null,
+        nextFollowUp: launchReadinessNextGateFollowUp
+          ? {
+              key: launchReadinessNextGateFollowUp.key || null,
+              stage: launchReadinessNextGateFollowUp.stage || null,
+              priority: launchReadinessNextGateFollowUp.priority || null,
+              title: launchReadinessNextGateFollowUp.title || null,
+              actionKey: launchReadinessNextGateFollowUp.actionKey || null,
+              operation: launchReadinessNextGateFollowUp.operation || null,
+              operationToRecord: launchReadinessNextGateFollowUp.operationToRecord || null,
+              downloadKey: launchReadinessNextGateFollowUp.downloadKey || null,
+              recommendedAction: launchReadinessNextGateFollowUp.recommendedAction || null,
+              recommendedDownload: launchReadinessNextGateFollowUp.recommendedDownload || null
+            }
+          : null,
+        recommendedAction: launchReadinessNextGateFollowUp?.recommendedAction || null,
+        recommendedDownload: launchReadinessNextGateFollowUp?.recommendedDownload || null
+      }
+    : null;
+  if (launchReadinessNextGate) {
+    overview.launchReadinessNextGate = launchReadinessNextGate;
+    overview.launchReadinessNextGateHandoff = launchReadinessNextGateHandoff;
+  }
   const launchReceiptFollowUpsForExport = Array.isArray(initialLaunchOpsReadiness?.followUpQueue)
     && initialLaunchOpsReadiness.followUpQueue.length
     ? initialLaunchOpsReadiness.followUpQueue
@@ -33775,6 +33879,8 @@ function buildDeveloperOpsSnapshotPayload({
       launchReceiptFollowUps: launchReceiptFollowUps.length,
       launchReceiptFollowUpPriorities,
       launchReceiptNextFollowUp,
+      launchReadinessNextGate,
+      launchReadinessNextGateHandoff,
       initialLaunchOpsReadiness
     },
     overview,

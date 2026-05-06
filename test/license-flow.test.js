@@ -11039,6 +11039,44 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.equal(launchStabilizationAuditEntry.metadata?.launchReceipt?.handoffText, undefined);
 
+    const assertGoLiveNextGateHandoffText = (body) => {
+      assert.match(body, /Launch Readiness Next Gate:/);
+      assert.match(body, /status=awaiting_launch_readiness/);
+      assert.match(body, /decision=no_go/);
+      assert.match(body, /canEnterInitialLaunch=false/);
+      assert.match(body, /currentGate=ready_for_closeout_reload/);
+      assert.match(body, /closeoutReload=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code FIRSTBATCH --channel stable --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json/);
+      assert.match(body, /fullTestWindow=npm\.cmd test/);
+      assert.match(body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+      assert.match(body, /launchDayWatchEntry=enter_after_production_signoff/);
+      assert.match(body, /nextAction=Run closeout reload with the filled closeout input, then reserve the guarded full-test-window and review production sign-off\./);
+    };
+    const assertGoLiveNextGatePayload = (gate) => {
+      assert.deepEqual(
+        gate
+          ? {
+              status: gate.status,
+              decision: gate.decision,
+              canEnterInitialLaunch: gate.canEnterInitialLaunch,
+              currentGate: gate.currentGate,
+              fullTestWindowCommand: gate.fullTestWindowCommand,
+              productionSignoffPacket: gate.productionSignoffPacket,
+              launchDayWatchEntry: gate.launchDayWatchEntry
+            }
+          : null,
+        {
+          status: "awaiting_launch_readiness",
+          decision: "no_go",
+          canEnterInitialLaunch: false,
+          currentGate: "ready_for_closeout_reload",
+          fullTestWindowCommand: "npm.cmd test",
+          productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json",
+          launchDayWatchEntry: "enter_after_production_signoff"
+        }
+      );
+      assert.match(gate?.closeoutReloadCommand || "", /npm\.cmd run staging:rehearsal/);
+    };
+
     const stabilizationGateOpsSnapshot = await getJson(
       baseUrl,
       "/api/developer/ops/export?productCode=FIRSTBATCH&channel=stable&limit=40",
@@ -11067,6 +11105,23 @@ test("developer license quickstart first-batch setup can create recommended laun
         productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json"
       }
     );
+    assertGoLiveNextGatePayload(stabilizationGateOpsSnapshot.summary?.launchReadinessNextGate);
+    assert.deepEqual(
+      {
+        sourceReceiptOperation: stabilizationGateOpsSnapshot.summary?.launchReadinessNextGateHandoff?.sourceReceipt?.operation,
+        sourceReceiptHandoffFileName: Boolean(stabilizationGateOpsSnapshot.summary?.launchReadinessNextGateHandoff?.sourceReceipt?.handoffFileName),
+        nextFollowUpOperation: stabilizationGateOpsSnapshot.summary?.launchReadinessNextGateHandoff?.nextFollowUp?.operationToRecord
+          || stabilizationGateOpsSnapshot.summary?.launchReadinessNextGateHandoff?.nextFollowUp?.operation,
+        recommendedDownloadFormat: stabilizationGateOpsSnapshot.summary?.launchReadinessNextGateHandoff?.recommendedDownload?.format
+      },
+      {
+        sourceReceiptOperation: "record_launch_stabilization_review",
+        sourceReceiptHandoffFileName: true,
+        nextFollowUpOperation: "record_launch_stabilization_review",
+        recommendedDownloadFormat: "launch-receipt-next-follow-up"
+      }
+    );
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch Readiness Next Gate:/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveFullTestWindow=npm\.cmd test/);
@@ -11112,43 +11167,6 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateNextFollowUpDownload.body, /fullTestWindow=npm\.cmd test/);
     assert.match(stabilizationGateNextFollowUpDownload.body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
 
-    const assertGoLiveNextGateHandoffText = (body) => {
-      assert.match(body, /Launch Readiness Next Gate:/);
-      assert.match(body, /status=awaiting_launch_readiness/);
-      assert.match(body, /decision=no_go/);
-      assert.match(body, /canEnterInitialLaunch=false/);
-      assert.match(body, /currentGate=ready_for_closeout_reload/);
-      assert.match(body, /closeoutReload=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code FIRSTBATCH --channel stable --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json/);
-      assert.match(body, /fullTestWindow=npm\.cmd test/);
-      assert.match(body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
-      assert.match(body, /launchDayWatchEntry=enter_after_production_signoff/);
-      assert.match(body, /nextAction=Run closeout reload with the filled closeout input, then reserve the guarded full-test-window and review production sign-off\./);
-    };
-    const assertGoLiveNextGatePayload = (gate) => {
-      assert.deepEqual(
-        gate
-          ? {
-              status: gate.status,
-              decision: gate.decision,
-              canEnterInitialLaunch: gate.canEnterInitialLaunch,
-              currentGate: gate.currentGate,
-              fullTestWindowCommand: gate.fullTestWindowCommand,
-              productionSignoffPacket: gate.productionSignoffPacket,
-              launchDayWatchEntry: gate.launchDayWatchEntry
-            }
-          : null,
-        {
-          status: "awaiting_launch_readiness",
-          decision: "no_go",
-          canEnterInitialLaunch: false,
-          currentGate: "ready_for_closeout_reload",
-          fullTestWindowCommand: "npm.cmd test",
-          productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json",
-          launchDayWatchEntry: "enter_after_production_signoff"
-        }
-      );
-      assert.match(gate?.closeoutReloadCommand || "", /npm\.cmd run staging:rehearsal/);
-    };
     const stabilizationGateOpsHandoffIndex = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=handoff-index&limit=40",

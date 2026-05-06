@@ -10728,6 +10728,86 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceFirstWaveSummary.body, /closeout=launch_mainline_closeout_handoff[\s\S]*format=closeout-handoff/i);
     assert.match(runtimeEvidenceFirstWaveSummary.body, /stabilization=launch_mainline_stabilization_handoff[\s\S]*format=stabilization-handoff/i);
 
+    const runtimeEvidenceHandoffConfirmation = await postJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations/confirm",
+      {
+        productCode: "FIRSTBATCH",
+        channel: "stable",
+        decision: "confirmed",
+        note: "first-wave handoff confirmed after runtime evidence",
+        handoffFileName: "developer-ops-first-wave-recommendations-firstbatch-stable.txt",
+        inventoryStatus: runtimeEvidenceFirstWaveRecommendations.inventory.status,
+        firstCardStatus: runtimeEvidenceFirstWaveRecommendations.firstCards.status,
+        firstRoundOpsStatus: runtimeEvidenceFirstWaveRecommendations.firstRoundOps.status,
+        latestLaunchReceiptOperation: runtimeEvidenceFirstWaveRecommendations.traceability.latestLaunchReceipt.operation,
+        recommendedCardCount: runtimeEvidenceFirstWaveRecommendations.firstCards.recommendedCardCount,
+        issuedFreshCardCount: runtimeEvidenceFirstWaveRecommendations.firstCards.issuedFreshCardCount
+      },
+      ownerSession.token
+    );
+    assert.deepEqual(
+      {
+        status: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.status,
+        currentPhaseKey: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.readyPhaseCount,
+        phaseCount: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.phaseCount,
+        nextActionKey: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionOperation: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.nextAction?.operation,
+        nextActionMethod: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.nextAction?.method,
+        nextActionEndpoint: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.nextAction?.endpoint,
+        nextActionBody: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.nextAction?.body,
+        primaryDownloadKey: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.primaryDownload?.key,
+        handoffConfirmed: runtimeEvidenceHandoffConfirmation.firstLaunchOperatingChain?.handoffConfirmed
+      },
+      {
+        status: "pending_post_launch_lifecycle",
+        currentPhaseKey: "post_launch_lifecycle",
+        readyPhaseCount: 4,
+        phaseCount: 5,
+        nextActionKey: "production_operations_walkthrough_recent",
+        nextActionOperation: "record_operations_walkthrough",
+        nextActionMethod: "POST",
+        nextActionEndpoint: "/api/developer/launch-mainline/action",
+        nextActionBody: {
+          productCode: "FIRSTBATCH",
+          channel: "stable",
+          operation: "record_operations_walkthrough",
+          actionKey: "production_operations_walkthrough_recent",
+          downloadKey: "launch_mainline_operations_handoff"
+        },
+        primaryDownloadKey: "launch_mainline_operations_handoff",
+        handoffConfirmed: true
+      }
+    );
+
+    const confirmedRuntimeEvidenceOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTBATCH&channel=stable&limit=40",
+      ownerSession.token
+    );
+    assert.equal(
+      confirmedRuntimeEvidenceOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.status,
+      "pending_post_launch_lifecycle"
+    );
+    assert.equal(
+      confirmedRuntimeEvidenceOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveReadinessBridge?.operatingChain?.currentPhaseKey,
+      "post_launch_lifecycle"
+    );
+    assert.match(confirmedRuntimeEvidenceOpsSnapshot.summaryText, /First Launch Operating Chain:/);
+    assert.match(confirmedRuntimeEvidenceOpsSnapshot.summaryText, /status=pending_post_launch_lifecycle \| ready=false \| current=post_launch_lifecycle \| phases=4\/5/);
+    assert.match(confirmedRuntimeEvidenceOpsSnapshot.summaryText, /next=production_operations_walkthrough_recent \| phase=post_launch_lifecycle \| operation=record_operations_walkthrough/);
+    assert.deepEqual(
+      confirmedRuntimeEvidenceOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.body,
+      {
+        productCode: "FIRSTBATCH",
+        channel: "stable",
+        operation: "record_operations_walkthrough",
+        actionKey: "production_operations_walkthrough_recent",
+        downloadKey: "launch_mainline_operations_handoff"
+      }
+    );
+
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,
       "/api/developer/launch-mainline?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",

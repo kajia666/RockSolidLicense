@@ -26567,6 +26567,8 @@ function normalizeFirstLaunchOperatingChainDownload(download = null) {
 }
 
 function buildFirstLaunchOperatingChainAction(phase = null, {
+  productCode = "",
+  channel = "stable",
   inventory = {},
   deliveryHandoff = null,
   firstUserValidationHandoff = null,
@@ -26644,11 +26646,31 @@ function buildFirstLaunchOperatingChainAction(phase = null, {
       ? postLaunchLifecycleHandoff.nextAction
       : {};
     const download = normalizeFirstLaunchOperatingChainDownload(postLaunchLifecycleHandoff?.primaryDownload);
+    const operation = nextAction.operation || null;
+    const actionKey = nextAction.actionKey || nextAction.key || "post_launch_lifecycle";
+    const downloadKey = nextAction.downloadKey || download?.key || null;
+    const requestBody = productCode && operation
+      ? {
+          productCode,
+          channel,
+          operation,
+          actionKey,
+          downloadKey
+        }
+      : null;
     return {
-      key: nextAction.key || "post_launch_lifecycle",
+      key: actionKey,
       stage: "post_launch_lifecycle",
-      operation: nextAction.operation || null,
+      operation,
       label: "Continue Post-Launch Lifecycle",
+      method: requestBody ? "POST" : null,
+      endpoint: requestBody ? "/api/developer/launch-mainline/action" : null,
+      enabled: Boolean(requestBody),
+      productCode: productCode || null,
+      channel,
+      actionKey,
+      downloadKey,
+      body: requestBody,
       recommendedDownload: download
     };
   }
@@ -26754,6 +26776,8 @@ function buildDeveloperOpsFirstLaunchOperatingChainPayload({
   const readyPhaseCount = phases.filter((item) => item.ready === true).length;
   const nextAction = currentPhase
     ? buildFirstLaunchOperatingChainAction(currentPhase, {
+        productCode,
+        channel,
         inventory,
         deliveryHandoff,
         firstUserValidationHandoff,

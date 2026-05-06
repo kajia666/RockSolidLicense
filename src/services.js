@@ -19888,6 +19888,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
         launchOpsOverviewDownload: buildLaunchOpsOverviewContextDownload(stabilizationLaunchOpsOverviewContext)
       }
     : null;
+  const latestLaunchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(latestLaunchReceipt);
+  const nextFollowUpLaunchReadinessNextGateCarryCandidate = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReceiptNextFollowUp
+  );
+  const nextFollowUpLaunchReadinessNextGateCarry =
+    nextFollowUpLaunchReadinessNextGateCarryCandidate.launchReadinessNextGate
+      ? nextFollowUpLaunchReadinessNextGateCarryCandidate
+      : latestLaunchReadinessNextGateCarry;
   return {
     launchReceiptAuditBackfill,
     launchReceiptAuditBackfillStatus,
@@ -19909,7 +19917,20 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           postLaunchLifecyclePrimaryDownloadFormat: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
           postLaunchLifecyclePrimaryDownloadFileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
           postLaunchLifecyclePrimaryDownloadHref: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref || null,
-          launchReadinessNextGate: normalizeLaunchReadinessNextGateForHandoff(latestLaunchReceipt)
+          launchReadinessNextGate: latestLaunchReadinessNextGateCarry.launchReadinessNextGate,
+          launchReadinessNextGateStatus: latestLaunchReadinessNextGateCarry.launchReadinessNextGateStatus,
+          launchReadinessNextGateDecision: latestLaunchReadinessNextGateCarry.launchReadinessNextGateDecision,
+          launchReadinessNextGateCurrentGate: latestLaunchReadinessNextGateCarry.launchReadinessNextGateCurrentGate,
+          launchReadinessNextGateCanEnterInitialLaunch: latestLaunchReadinessNextGateCarry.launchReadinessNextGateCanEnterInitialLaunch,
+          launchReadinessNextGateNextAction: latestLaunchReadinessNextGateCarry.launchReadinessNextGateNextAction,
+          launchReadinessNextGateCloseoutReloadCommand: latestLaunchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
+          launchReadinessNextGateFullTestWindowCommand: latestLaunchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
+          launchReadinessNextGateProductionSignoffPacket: latestLaunchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+          launchReadinessNextGateLaunchDayWatchEntry: latestLaunchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
+          launchReadinessNextGatePrimaryDownloadKey: latestLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
+          launchReadinessNextGatePrimaryDownloadFileName: latestLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
+          launchReadinessNextGatePrimaryDownloadFormat: latestLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFormat,
+          launchReadinessNextGatePrimaryDownloadHref: latestLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadHref
         }
       : null,
     nextFollowUp: launchReceiptNextFollowUp
@@ -19927,7 +19948,21 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           downloadFormat: launchReceiptNextFollowUp.downloadFormat || launchReceiptNextFollowUp.recommendedDownload?.format || null,
           downloadSource: launchReceiptNextFollowUp.downloadSource || launchReceiptNextFollowUp.recommendedDownload?.source || null,
           launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(launchReceiptNextFollowUp.launchOpsOverviewContext),
-          handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
+          handoffFileName: launchReceiptNextFollowUp.handoffFileName || null,
+          launchReadinessNextGate: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGate,
+          launchReadinessNextGateStatus: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateStatus,
+          launchReadinessNextGateDecision: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateDecision,
+          launchReadinessNextGateCurrentGate: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateCurrentGate,
+          launchReadinessNextGateCanEnterInitialLaunch: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateCanEnterInitialLaunch,
+          launchReadinessNextGateNextAction: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateNextAction,
+          launchReadinessNextGateCloseoutReloadCommand: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
+          launchReadinessNextGateFullTestWindowCommand: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
+          launchReadinessNextGateProductionSignoffPacket: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+          launchReadinessNextGateLaunchDayWatchEntry: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
+          launchReadinessNextGatePrimaryDownloadKey: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
+          launchReadinessNextGatePrimaryDownloadFileName: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
+          launchReadinessNextGatePrimaryDownloadFormat: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFormat,
+          launchReadinessNextGatePrimaryDownloadHref: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadHref
         }
       : null,
     postLaunchLifecycle: {
@@ -22616,9 +22651,15 @@ function buildDeveloperOpsLaunchReadinessNextGateCarry(source = null) {
     launchReadinessNextGateDecision: normalized?.decision || null,
     launchReadinessNextGateCurrentGate: normalized?.currentGate || null,
     launchReadinessNextGateCanEnterInitialLaunch: normalized?.canEnterInitialLaunch === true,
+    launchReadinessNextGateNextAction: normalized?.nextAction || null,
+    launchReadinessNextGateCloseoutReloadCommand: normalized?.closeoutReloadCommand || null,
     launchReadinessNextGateFullTestWindowCommand: normalized?.fullTestWindowCommand || null,
     launchReadinessNextGateProductionSignoffPacket: normalized?.productionSignoffPacket || null,
-    launchReadinessNextGateLaunchDayWatchEntry: normalized?.launchDayWatchEntry || null
+    launchReadinessNextGateLaunchDayWatchEntry: normalized?.launchDayWatchEntry || null,
+    launchReadinessNextGatePrimaryDownloadKey: normalized?.primaryDownloadKey || null,
+    launchReadinessNextGatePrimaryDownloadFileName: normalized?.primaryDownloadFileName || null,
+    launchReadinessNextGatePrimaryDownloadFormat: normalized?.primaryDownloadFormat || null,
+    launchReadinessNextGatePrimaryDownloadHref: normalized?.primaryDownloadHref || null
   };
 }
 
@@ -24580,9 +24621,15 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
           launchReadinessNextGateDecision: launchReadinessNextGateCarry.launchReadinessNextGateDecision,
           launchReadinessNextGateCurrentGate: launchReadinessNextGateCarry.launchReadinessNextGateCurrentGate,
           launchReadinessNextGateCanEnterInitialLaunch: launchReadinessNextGateCarry.launchReadinessNextGateCanEnterInitialLaunch,
+          launchReadinessNextGateNextAction: launchReadinessNextGateCarry.launchReadinessNextGateNextAction,
+          launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
           launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
           launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
-          launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry
+          launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
+          launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
+          launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
+          launchReadinessNextGatePrimaryDownloadFormat: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFormat,
+          launchReadinessNextGatePrimaryDownloadHref: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadHref
         }
       : null,
     nextFollowUp: launchReceiptNextFollowUp
@@ -24599,7 +24646,21 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
           downloadHref: launchReceiptNextFollowUp.downloadHref || launchReceiptNextFollowUp.recommendedDownload?.href || null,
           downloadFormat: launchReceiptNextFollowUp.downloadFormat || launchReceiptNextFollowUp.recommendedDownload?.format || null,
           downloadSource: launchReceiptNextFollowUp.downloadSource || launchReceiptNextFollowUp.recommendedDownload?.source || null,
-          handoffFileName: launchReceiptNextFollowUp.handoffFileName || null
+          handoffFileName: launchReceiptNextFollowUp.handoffFileName || null,
+          launchReadinessNextGate: launchReadinessNextGateCarry.launchReadinessNextGate,
+          launchReadinessNextGateStatus: launchReadinessNextGateCarry.launchReadinessNextGateStatus,
+          launchReadinessNextGateDecision: launchReadinessNextGateCarry.launchReadinessNextGateDecision,
+          launchReadinessNextGateCurrentGate: launchReadinessNextGateCarry.launchReadinessNextGateCurrentGate,
+          launchReadinessNextGateCanEnterInitialLaunch: launchReadinessNextGateCarry.launchReadinessNextGateCanEnterInitialLaunch,
+          launchReadinessNextGateNextAction: launchReadinessNextGateCarry.launchReadinessNextGateNextAction,
+          launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
+          launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
+          launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+          launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
+          launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
+          launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
+          launchReadinessNextGatePrimaryDownloadFormat: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFormat,
+          launchReadinessNextGatePrimaryDownloadHref: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadHref
         }
       : null,
     stabilizationHandoffConfirmation: buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation),

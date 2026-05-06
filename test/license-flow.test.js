@@ -11116,6 +11116,23 @@ test("developer license quickstart first-batch setup can create recommended laun
       stabilizationGateInitialOps?.traceability?.latestLaunchReceipt?.launchReadinessNextGateCurrentGate,
       "ready_for_closeout_reload"
     );
+    assertGoLiveNextGatePayload(stabilizationGateInitialOps?.traceability?.nextFollowUp?.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateInitialOps?.traceability?.nextFollowUp?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateInitialOps?.traceability?.nextFollowUp?.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assert.match(
+      stabilizationGateInitialOps?.traceability?.nextFollowUp?.launchReadinessNextGateCloseoutReloadCommand || "",
+      /npm\.cmd run staging:rehearsal/
+    );
+    assert.equal(
+      stabilizationGateInitialOps?.traceability?.nextFollowUp?.launchReadinessNextGatePrimaryDownloadFormat,
+      "launch-receipt-next-follow-up"
+    );
     assertGoLiveNextGatePayload(stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGate);
     assert.equal(
       stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGateStatus,
@@ -11333,6 +11350,20 @@ test("developer license quickstart first-batch setup can create recommended laun
       ownerSession.token
     );
     assertGoLiveNextGatePayload(runtimeEvidenceLaunchMainline.mainlineSummary?.launchReadinessNextGate);
+    assertGoLiveNextGatePayload(runtimeEvidenceLaunchMainline.postLaunchHandoffTraceability?.latestLaunchReceipt?.launchReadinessNextGate);
+    assert.equal(
+      runtimeEvidenceLaunchMainline.postLaunchHandoffTraceability?.latestLaunchReceipt?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assertGoLiveNextGatePayload(runtimeEvidenceLaunchMainline.postLaunchHandoffTraceability?.nextFollowUp?.launchReadinessNextGate);
+    assert.equal(
+      runtimeEvidenceLaunchMainline.postLaunchHandoffTraceability?.nextFollowUp?.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assert.equal(
+      runtimeEvidenceLaunchMainline.postLaunchHandoffTraceability?.nextFollowUp?.launchReadinessNextGatePrimaryDownloadFormat,
+      "launch-receipt-next-follow-up"
+    );
     assert.ok(
       runtimeEvidenceLaunchMainline.mainlineSummary.overviewCards.some((item) =>
         item.key === "launch_readiness_next_gate"

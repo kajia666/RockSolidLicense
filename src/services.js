@@ -11662,6 +11662,13 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
   const launchOperationsOverviewStatus = reviewSummary.launchOperationsOverviewStatus
     || opsSnapshot.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus
     || null;
+  const launchReadinessNextGateSource = findLaunchReadinessNextGateReceipt(
+    opsOverview.latestLaunchReceipts || [],
+    opsSnapshot.summary?.launchReceiptNextFollowUp
+      || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
+      || reviewSummary.routeFocus
+      || null
+  );
   const lines = [
     "RockSolid Developer Launch Review",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -11711,6 +11718,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     opsOverview.latestLaunchReceipts,
     "Launch Review Receipt Visibility:"
   );
+  appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
   if (launchOperationsOverviewStatus) {
     lines.push("");
     appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, launchOperationsOverviewStatus, {
@@ -13911,6 +13919,13 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
   const launchDutyActionOrder = smokeSummary.launchDutyActionOrder
     || opsSnapshot.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder
     || null;
+  const launchReadinessNextGateSource = findLaunchReadinessNextGateReceipt(
+    opsOverview.latestLaunchReceipts || [],
+    opsSnapshot.summary?.launchReceiptNextFollowUp
+      || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
+      || smokeSummary.routeFocus
+      || null
+  );
   const formatWorkspaceActionText = (action = null) => {
     if (!action || typeof action !== "object") {
       return "-";
@@ -13944,6 +13959,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     opsOverview.latestLaunchReceipts,
     "Launch Smoke Receipt Visibility:"
   );
+  appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
   if (launchDutyActionOrder) {
     lines.push("");
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {

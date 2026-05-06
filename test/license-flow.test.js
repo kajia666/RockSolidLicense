@@ -11152,6 +11152,20 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(stabilizationGateMainlineRouteMap.contentType || "", /^text\/plain/);
     assertGoLiveNextGateHandoffText(stabilizationGateMainlineRouteMap.body);
+    const stabilizationGateLaunchReviewSummary = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(stabilizationGateLaunchReviewSummary.contentType || "", /^text\/plain/);
+    assertGoLiveNextGateHandoffText(stabilizationGateLaunchReviewSummary.body);
+    const stabilizationGateLaunchSmokeSummary = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=summary",
+      ownerSession.token
+    );
+    assert.match(stabilizationGateLaunchSmokeSummary.contentType || "", /^text\/plain/);
+    assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeSummary.body);
 
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,

@@ -11124,6 +11124,31 @@ test("developer license quickstart first-batch setup can create recommended laun
       assert.match(body, /launchDayWatchEntry=enter_after_production_signoff/);
       assert.match(body, /nextAction=Run closeout reload with the filled closeout input, then reserve the guarded full-test-window and review production sign-off\./);
     };
+    const assertGoLiveNextGatePayload = (gate) => {
+      assert.deepEqual(
+        gate
+          ? {
+              status: gate.status,
+              decision: gate.decision,
+              canEnterInitialLaunch: gate.canEnterInitialLaunch,
+              currentGate: gate.currentGate,
+              fullTestWindowCommand: gate.fullTestWindowCommand,
+              productionSignoffPacket: gate.productionSignoffPacket,
+              launchDayWatchEntry: gate.launchDayWatchEntry
+            }
+          : null,
+        {
+          status: "awaiting_launch_readiness",
+          decision: "no_go",
+          canEnterInitialLaunch: false,
+          currentGate: "ready_for_closeout_reload",
+          fullTestWindowCommand: "npm.cmd test",
+          productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json",
+          launchDayWatchEntry: "enter_after_production_signoff"
+        }
+      );
+      assert.match(gate?.closeoutReloadCommand || "", /npm\.cmd run staging:rehearsal/);
+    };
     const stabilizationGateOpsHandoffIndex = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=handoff-index&limit=40",
@@ -11262,6 +11287,7 @@ test("developer license quickstart first-batch setup can create recommended laun
       "/api/developer/launch-review?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",
       ownerSession.token
     );
+    assertGoLiveNextGatePayload(runtimeEvidenceLaunchReview.reviewSummary?.launchReadinessNextGate);
     assert.deepEqual(
       runtimeEvidenceLaunchReview.reviewSummary?.firstWaveRuntimeEvidence
         ? {
@@ -11336,6 +11362,7 @@ test("developer license quickstart first-batch setup can create recommended laun
       "/api/developer/launch-smoke-kit?productCode=FIRSTBATCH&channel=stable",
       ownerSession.token
     );
+    assertGoLiveNextGatePayload(runtimeEvidenceLaunchSmoke.smokeSummary?.launchReadinessNextGate);
     assert.deepEqual(
       runtimeEvidenceLaunchSmoke.smokeSummary?.firstWaveRuntimeEvidence
         ? {

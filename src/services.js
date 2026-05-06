@@ -12803,6 +12803,15 @@ function buildDeveloperLaunchReviewSummaryPayload({
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads
   });
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(
+    findLaunchReadinessNextGateReceipt(
+      opsOverview.latestLaunchReceipts || [],
+      opsSnapshot?.summary?.launchReceiptNextFollowUp
+        || opsSnapshot?.summary?.initialLaunchOpsReadiness?.nextFollowUp
+        || routeFocus
+        || null
+    )
+  );
 
   return {
     status: reviewStatus,
@@ -12816,6 +12825,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     reviewTargets: visibleReviewTargets,
     launchDutyActionOrder,
     launchOperationsOverviewStatus,
+    launchReadinessNextGate,
     firstWaveRuntimeEvidence,
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads,
@@ -13883,6 +13893,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         : null
     ].filter((item) => item?.workspaceAction || item?.recommendedDownload)
   };
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(
+    findLaunchReadinessNextGateReceipt(
+      opsSnapshot?.overview?.latestLaunchReceipts || [],
+      opsSnapshot?.summary?.launchReceiptNextFollowUp
+        || opsSnapshot?.summary?.initialLaunchOpsReadiness?.nextFollowUp
+        || routeFocus
+        || null
+    )
+  );
 
   return {
     status,
@@ -13903,6 +13922,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     workspaceActions,
     launchDutyActionOrder,
     firstWaveRuntimeEvidence,
+    launchReadinessNextGate,
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
     actionPlan,

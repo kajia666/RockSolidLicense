@@ -1724,6 +1724,89 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
   }
 });
 
+test("staging rehearsal runner focuses closeout reload after real staging inputs are ready", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-real-ready-"));
+  const profileFile = join(tempDir, "staging-profile.json");
+  try {
+    const handoffFile = join(tempDir, "ready-handoff.md");
+    const closeoutFile = join(tempDir, "ready-closeout.json");
+    const runRecordFile = join(tempDir, "ready-run-record-index.json");
+    const artifactManifestFile = join(tempDir, "ready-artifact-manifest.json");
+    const backupRestorePacketFile = join(tempDir, "ready-backup-restore-drill-packet.json");
+    const closeoutReloadPacketFile = join(tempDir, "ready-closeout-reload-packet.json");
+    const readinessReviewPacketFile = join(tempDir, "ready-readiness-review-packet.json");
+    const productionSignoffPacketFile = join(tempDir, "ready-production-signoff-packet.json");
+    const launchDutyArchiveIndexFile = join(tempDir, "ready-launch-duty-archive-index.json");
+    const filledCloseoutDraftFile = join(tempDir, "ready-filled-closeout-input.draft.json");
+    writeFileSync(profileFile, JSON.stringify({
+      baseUrl: "https://ready-staging.example.com",
+      productCode: "READY_PRODUCT",
+      channel: "stable",
+      adminUsername: "ready-admin@example.com",
+      developerUsername: "ready.developer",
+      targetOs: "linux",
+      storageProfile: "postgres-preview",
+      targetEnvFile: "/etc/rocksolidlicense/ready.env",
+      appBackupDir: "/var/lib/rocksolid/ready-backups",
+      postgresBackupDir: "/var/lib/rocksolid/ready-postgres-backups"
+    }, null, 2));
+
+    const result = runRehearsal([
+      "--profile-file",
+      profileFile,
+      "--handoff-file",
+      handoffFile,
+      "--closeout-file",
+      closeoutFile,
+      "--run-record-file",
+      runRecordFile,
+      "--artifact-manifest-file",
+      artifactManifestFile,
+      "--backup-restore-packet-file",
+      backupRestorePacketFile,
+      "--closeout-reload-packet-file",
+      closeoutReloadPacketFile,
+      "--readiness-review-packet-file",
+      readinessReviewPacketFile,
+      "--production-signoff-packet-file",
+      productionSignoffPacketFile,
+      "--launch-duty-archive-index-file",
+      launchDutyArchiveIndexFile,
+      "--filled-closeout-draft-file",
+      filledCloseoutDraftFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "ReadyAdmin123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "ReadyDeveloper123!",
+      RSL_DEVELOPER_BEARER_TOKEN: "ready-developer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.stagingProfileOperatorPreflight.status, "ready_for_real_staging_rehearsal");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.status, "ready_for_real_staging_rehearsal");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.canRunDryRun, true);
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.canRecordEvidence, true);
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.currentAction.key, "run_staging_dry_run");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.postDryRunAction.key, "backfill_and_reload_closeout_input");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.postDryRunAction.status, "blocked_until_closeout_reload");
+    assert.equal(
+      output.operatorExecutionPlan.realStagingRunFocus.postDryRunAction.command,
+      "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json"
+    );
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.status, "blocked_until_closeout_reload");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.command, "npm.cmd test");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.missingCloseoutKeys.length, 7);
+    const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, /Real staging run focus: ready_for_real_staging_rehearsal \(dryRun=yes, liveWriteSmoke=yes, evidence=yes\)/);
+    assert.match(handoff, /Real staging current action: run_staging_dry_run \(env=-\)/);
+    assert.match(handoff, /Real staging post-dry-run action: backfill_and_reload_closeout_input \(blocked_until_closeout_reload\)/);
+    assert.match(handoff, /Real staging full-test entry: blocked_until_closeout_reload \(command=npm\.cmd test\)/);
+    assert.doesNotMatch(result.stdout, /ReadyAdmin123!|ReadyDeveloper123!|ready-developer-token/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging rehearsal runner refuses staging profile files containing secret values", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-profile-secret-"));
   const profileFile = join(tempDir, "staging-profile.json");

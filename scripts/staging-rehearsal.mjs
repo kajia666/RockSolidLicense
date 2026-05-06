@@ -1025,6 +1025,11 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     liveWriteSmoke: preflight.commands?.liveWriteSmoke || result.nextCommands?.launchSmoke || null,
     closeoutReload: preflight.commands?.closeoutReload || result.finalRehearsalPacket?.commands?.closeoutReload || null
   };
+  const fullTestWindow = result.fullTestWindowReadiness || {};
+  const filledCloseoutInputFile = pathFor("filled_closeout_input");
+  const fullTestEntryStatus = fullTestWindow.canRun === true
+    ? "ready_for_full_test_window"
+    : (result.stagingReadinessTransition?.status || "blocked_until_closeout_reload");
   let currentAction = {
     key: "run_staging_dry_run",
     status: preflight.canRunDryRun === true ? "ready" : "blocked",
@@ -1053,6 +1058,21 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
       nextAction: "Set the missing secret environment variables before evidence recording or live-write duty continues."
     };
   }
+  const postDryRunAction = fullTestWindow.canRun === true
+    ? {
+      key: "run_full_test_window",
+      status: "ready_for_full_test_window",
+      command: fullTestWindow.command || "npm.cmd test",
+      nextAction: "Run the full test window, then backfill production sign-off evidence."
+    }
+    : {
+      key: "backfill_and_reload_closeout_input",
+      status: fullTestEntryStatus,
+      command: commands.closeoutReload,
+      filledCloseoutInputFile,
+      missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
+      nextAction: "Backfill filled-closeout-input.json from real staging artifacts, reload closeout input, then re-check full-test entry."
+    };
   return {
     mode: "real-staging-run-focus",
     status: preflight.status || "not_available",
@@ -1063,6 +1083,14 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     missingSecretEnv,
     missingOutputFiles,
     currentAction,
+    postDryRunAction,
+    fullTestEntry: {
+      status: fullTestEntryStatus,
+      canRun: fullTestWindow.canRun === true,
+      command: fullTestWindow.command || "npm.cmd test",
+      missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
+      nextAction: fullTestWindow.nextAction || null
+    },
     commandSequence,
     commands,
     paths: {
@@ -1072,7 +1100,7 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
       artifactManifestFile: pathFor("artifact_manifest"),
       closeoutReloadPacketFile: pathFor("closeout_reload_packet"),
       launchDutyArchiveIndexFile: pathFor("launch_duty_archive_index"),
-      filledCloseoutInputFile: pathFor("filled_closeout_input"),
+      filledCloseoutInputFile,
       artifactArchiveRoot: pathFor("artifact_archive_root")
     },
     nextAction: currentAction.nextAction
@@ -5053,6 +5081,8 @@ function renderOperatorExecutionPlan(plan) {
     lines.push(`- Real staging archive root: ${focus.paths?.artifactArchiveRoot || "-"}`);
     lines.push(`- Real staging dry-run command: \`${focus.commands?.stagingDryRun || "-"}\``);
     lines.push(`- Real staging closeout reload: \`${focus.commands?.closeoutReload || "-"}\``);
+    lines.push(`- Real staging post-dry-run action: ${focus.postDryRunAction?.key || "-"} (${focus.postDryRunAction?.status || "-"})`);
+    lines.push(`- Real staging full-test entry: ${focus.fullTestEntry?.status || "-"} (command=${focus.fullTestEntry?.command || "-"})`);
   }
   if (plan.closeoutBackfillFocus) {
     const focus = plan.closeoutBackfillFocus;

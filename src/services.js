@@ -22468,7 +22468,8 @@ function buildDeveloperOpsLaunchDutyActionOrder({
   launchReceiptNextFollowUp = null,
   primaryDownload = null,
   nextFollowUpDownload = null,
-  primaryWorkspaceAction = null
+  primaryWorkspaceAction = null,
+  launchReadinessNextGate = null
 } = {}) {
   const normalizedStatus = String(status || "unknown").trim().toLowerCase() || "unknown";
   const nextFollowUpStatus = launchReceiptNextFollowUp
@@ -22487,17 +22488,28 @@ function buildDeveloperOpsLaunchDutyActionOrder({
       source: download.source || null
     };
   };
+  const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate || stagingLaunchDutyArchive
+  );
+  const normalizedLaunchReadinessNextGate = launchReadinessNextGateCarry.launchReadinessNextGate;
   const stagingArchiveNextOperations = stagingLaunchDutyArchive && typeof stagingLaunchDutyArchive === "object"
     ? {
         status: stagingLaunchDutyArchive.packetCompleteness?.missingCount ? "waiting_for_packet_paths" : "ready_for_closeout_reload",
         closeoutReload: stagingLaunchDutyArchive.commands?.closeoutReload || null,
         fullTestWindow: stagingLaunchDutyArchive.commands?.fullTestWindow || null,
         productionSignoffPacket: stagingLaunchDutyArchive.files?.productionSignoffPacket || null,
+        ...launchReadinessNextGateCarry,
         launchRunway: {
           mode: "staging-archive-launch-runway",
-          currentGate: stagingLaunchDutyArchive.packetCompleteness?.missingCount ? "waiting_for_packet_paths" : "ready_for_closeout_reload",
+          launchReadinessNextGate: normalizedLaunchReadinessNextGate,
+          launchReadinessNextGateStatus: normalizedLaunchReadinessNextGate?.status || null,
+          launchReadinessNextGateDecision: normalizedLaunchReadinessNextGate?.decision || null,
+          launchReadinessNextGateCanEnterInitialLaunch: normalizedLaunchReadinessNextGate?.canEnterInitialLaunch === true,
+          currentGate: normalizedLaunchReadinessNextGate?.currentGate
+            || (stagingLaunchDutyArchive.packetCompleteness?.missingCount ? "waiting_for_packet_paths" : "ready_for_closeout_reload"),
           sequence: ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"],
-          launchDayWatchEntry: "enter_after_production_signoff"
+          launchDayWatchEntry: normalizedLaunchReadinessNextGate?.launchDayWatchEntry || "enter_after_production_signoff",
+          nextAction: normalizedLaunchReadinessNextGate?.nextAction || null
         },
         nextAction: stagingLaunchDutyArchive.packetCompleteness?.missingCount
           ? stagingLaunchDutyArchive.packetCompleteness.nextAction || "Fill missing staging packet paths before closeout reload."
@@ -22513,6 +22525,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
       summary: "Pull the staging archive bridge before the real rehearsal so packet paths and full-test-window commands are visible.",
       packetCompleteness: stagingLaunchDutyArchive?.packetCompleteness || null,
       nextOperations: stagingArchiveNextOperations,
+      ...launchReadinessNextGateCarry,
       download: copyDownload(stagingLaunchDutyArchiveDownload)
     },
     {
@@ -22537,6 +22550,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
     mode: "developer-ops-launch-duty-action-order",
     status: normalizedStatus,
     operatorSummary: "Staging archive -> Launch readiness -> Next follow-up",
+    ...launchReadinessNextGateCarry,
     stagingArchivePacketCompleteness: stagingLaunchDutyArchive?.packetCompleteness || null,
     stagingArchiveNextOperations,
     primaryStepKey: steps[0].key,
@@ -22581,6 +22595,16 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
     lines.push(`- Staging Archive Closeout Reload: ${stagingArchiveNextOperations.closeoutReload || "-"}`);
     lines.push(`- Staging Archive Production Signoff Packet: ${stagingArchiveNextOperations.productionSignoffPacket || "-"}`);
     lines.push(`- Staging Archive Full Test Window: ${stagingArchiveNextOperations.fullTestWindow || "-"}`);
+    const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(stagingArchiveNextOperations);
+    if (launchReadinessNextGate) {
+      lines.push(
+        `- Staging Archive Launch Readiness Next Gate: ${launchReadinessNextGate.status || "-"}`
+        + ` | decision=${launchReadinessNextGate.decision || "-"}`
+        + ` | canEnterInitialLaunch=${launchReadinessNextGate.canEnterInitialLaunch === true}`
+        + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
+        + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
+      );
+    }
     const launchRunway = stagingArchiveNextOperations.launchRunway || null;
     if (launchRunway && typeof launchRunway === "object") {
       const sequence = Array.isArray(launchRunway.sequence) && launchRunway.sequence.length
@@ -26859,7 +26883,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchReceiptNextFollowUp,
     primaryDownload,
     nextFollowUpDownload,
-    primaryWorkspaceAction
+    primaryWorkspaceAction,
+    launchReadinessNextGate
   });
   const currentFirstWaveReadinessBridge = firstWaveReadinessBridge && firstLaunchOperatingChain
     ? {

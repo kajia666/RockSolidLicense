@@ -11156,6 +11156,24 @@ test("developer license quickstart first-batch setup can create recommended laun
       stabilizationGateStagingArchive.launchReadinessNextGateProductionSignoffPacket,
       "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json"
     );
+    const stabilizationGateLaunchDutyActionOrder = stabilizationGateInitialOps?.launchDutyActionOrder;
+    assert.ok(stabilizationGateLaunchDutyActionOrder);
+    assertGoLiveNextGatePayload(stabilizationGateLaunchDutyActionOrder.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateLaunchDutyActionOrder.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assertGoLiveNextGatePayload(
+      stabilizationGateLaunchDutyActionOrder.stagingArchiveNextOperations?.launchReadinessNextGate
+    );
+    assert.equal(
+      stabilizationGateLaunchDutyActionOrder.stagingArchiveNextOperations?.launchRunway?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateLaunchDutyActionOrder.stagingArchiveNextOperations?.launchRunway?.launchReadinessNextGateDecision,
+      "no_go"
+    );
     assertGoLiveNextGatePayload(stabilizationGateInitialOps?.traceability?.latestLaunchReceipt?.launchReadinessNextGate);
     assert.equal(
       stabilizationGateInitialOps?.traceability?.latestLaunchReceipt?.launchReadinessNextGateStatus,
@@ -11347,6 +11365,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Staging Launch-Duty Archive:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Staging Launch-Duty Archive:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Staging Launch-Duty Archive:[\s\S]*productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch Duty Action Order:[\s\S]*Staging Archive Launch Readiness Next Gate: awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch Duty Action Order:[\s\S]*decision=no_go[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Next Action:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Next Action:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Action Manifest:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
@@ -11420,6 +11440,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateStagingArchiveDownload.body, /goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateStagingArchiveDownload.body, /goLiveFullTestWindow=npm\.cmd test/);
     assert.match(stabilizationGateStagingArchiveDownload.body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(stabilizationGateStagingArchiveDownload.body, /Launch Duty Action Order:[\s\S]*Staging Archive Launch Readiness Next Gate: awaiting_launch_readiness/);
+    assert.match(stabilizationGateStagingArchiveDownload.body, /Launch Duty Action Order:[\s\S]*decision=no_go[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
 
     const stabilizationGateOpsHandoffIndex = await getText(
       baseUrl,
@@ -11428,6 +11450,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.equal(stabilizationGateOpsHandoffIndex.contentType, "text/plain; charset=utf-8");
     assertGoLiveNextGateHandoffText(stabilizationGateOpsHandoffIndex.body);
+    assert.match(stabilizationGateOpsHandoffIndex.body, /Launch Duty Action Order:[\s\S]*Staging Archive Launch Readiness Next Gate: awaiting_launch_readiness/);
     const stabilizationGateOpsMainlineRoutes = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=launch-mainline-handoff-routes&limit=40",

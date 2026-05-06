@@ -21579,7 +21579,11 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
       "developer_ops_snapshot",
       "initial_launch_ops_readiness",
       "launch_operations_evidence_chain",
-      "launch_operations_handoff_summary"
+      "launch_operations_handoff_summary",
+      "launch_operations_daily_brief",
+      "launch_operations_shift_action_plan",
+      "launch_operations_overview_status",
+      "developer_ops_handoff_index"
     ],
     handoffEvidence: {
       stageKey: "steady_state_duty_plan_receipt",
@@ -31220,6 +31224,8 @@ function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, 
     + (recoveryPayload.launchOpsOverviewDownloadKey ? ` | launchOpsOverviewDownloadKey=${recoveryPayload.launchOpsOverviewDownloadKey}` : "")
     + (recoveryPayload.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${recoveryPayload.launchOpsOverviewDownloadFileName}` : "")
     + (recoveryPayload.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${recoveryPayload.launchOpsOverviewDownloadHref}` : "")
+    + (recoveryPayload.launchReadinessNextGateStatus ? ` | launchReadinessNextGateStatus=${recoveryPayload.launchReadinessNextGateStatus}` : "")
+    + (recoveryPayload.launchReadinessNextGateCurrentGate ? ` | launchReadinessNextGateCurrentGate=${recoveryPayload.launchReadinessNextGateCurrentGate}` : "")
   );
 }
 
@@ -33630,6 +33636,8 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     + (receiptRecoveryPayload.launchOpsOverviewDownloadKey ? ` | launchOpsOverviewDownloadKey=${receiptRecoveryPayload.launchOpsOverviewDownloadKey}` : "")
     + (receiptRecoveryPayload.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${receiptRecoveryPayload.launchOpsOverviewDownloadFileName}` : "")
     + (receiptRecoveryPayload.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${receiptRecoveryPayload.launchOpsOverviewDownloadHref}` : "")
+    + (receiptRecoveryPayload.launchReadinessNextGateStatus ? ` | launchReadinessNextGateStatus=${receiptRecoveryPayload.launchReadinessNextGateStatus}` : "")
+    + (receiptRecoveryPayload.launchReadinessNextGateCurrentGate ? ` | launchReadinessNextGateCurrentGate=${receiptRecoveryPayload.launchReadinessNextGateCurrentGate}` : "")
   );
   lines.push("");
   lines.push("Overview Download:");
@@ -33750,7 +33758,9 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | downloadKey=${launchOperationsOverviewStatus?.overviewDownload?.key || "-"}`
       + ` | href=${launchOperationsOverviewStatus?.overviewDownload?.href || "-"}`
       + ` | recoveryDownloadKey=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadKey || "-"}`
-      + ` | recoveryDownloadHref=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadHref || "-"}`,
+      + ` | recoveryDownloadHref=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadHref || "-"}`
+      + ` | recoveryLaunchReadinessNextGateStatus=${launchOperationsOverviewRecoveryPayload.launchReadinessNextGateStatus || "-"}`
+      + ` | recoveryLaunchReadinessNextGateCurrentGate=${launchOperationsOverviewRecoveryPayload.launchReadinessNextGateCurrentGate || "-"}`,
     `Launch Operations Overview Signoff: productionSignoffPacket=${launchOperationsOverviewStatus?.productionSignoffPacket || "-"} | launchDayWatchEntry=${launchOperationsOverviewStatus?.launchDayWatchEntry || "-"}`,
     ""
   ];

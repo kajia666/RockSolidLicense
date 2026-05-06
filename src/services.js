@@ -7092,6 +7092,9 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
   const initialLaunchOperator = receipt.initialLaunchOperatorActionReceipt && typeof receipt.initialLaunchOperatorActionReceipt === "object"
     ? receipt.initialLaunchOperatorActionReceipt
     : null;
+  const launchReadinessNextGate = receipt.launchReadinessNextGate && typeof receipt.launchReadinessNextGate === "object"
+    ? receipt.launchReadinessNextGate
+    : null;
   const gate = receipt.mainlineOverallGate && typeof receipt.mainlineOverallGate === "object"
     ? receipt.mainlineOverallGate
     : null;
@@ -7251,6 +7254,30 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
             handoffIndex: initialLaunchOperator.files?.handoffIndex || null,
             launchReceiptNextFollowUp: initialLaunchOperator.files?.launchReceiptNextFollowUp || null
           }
+        }
+      : null,
+    launchReadinessNextGate: launchReadinessNextGate
+      ? {
+          key: launchReadinessNextGate.key || null,
+          status: launchReadinessNextGate.status || null,
+          decision: launchReadinessNextGate.decision || null,
+          label: launchReadinessNextGate.label || null,
+          canEnterInitialLaunch: launchReadinessNextGate.canEnterInitialLaunch === true,
+          firstLaunchOperatingChainReady: launchReadinessNextGate.firstLaunchOperatingChainReady === true,
+          firstLaunchOperatingChainStatus: launchReadinessNextGate.firstLaunchOperatingChainStatus || null,
+          currentGate: launchReadinessNextGate.currentGate || null,
+          nextAction: launchReadinessNextGate.nextAction || null,
+          sequence: Array.isArray(launchReadinessNextGate.sequence)
+            ? launchReadinessNextGate.sequence.filter(Boolean)
+            : [],
+          closeoutReloadCommand: launchReadinessNextGate.closeoutReloadCommand || null,
+          fullTestWindowCommand: launchReadinessNextGate.fullTestWindowCommand || null,
+          productionSignoffPacket: launchReadinessNextGate.productionSignoffPacket || null,
+          launchDayWatchEntry: launchReadinessNextGate.launchDayWatchEntry || null,
+          primaryDownloadKey: launchReadinessNextGate.primaryDownload?.key || null,
+          primaryDownloadFormat: launchReadinessNextGate.primaryDownload?.format || null,
+          primaryDownloadFileName: launchReadinessNextGate.primaryDownload?.fileName || null,
+          primaryDownloadHref: launchReadinessNextGate.primaryDownload?.href || null
         }
       : null,
     visibility: buildLaunchReceiptAuditVisibility(visibility),
@@ -20757,6 +20784,26 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         initialLaunchOperatorNextDownloadHref: receipt.initialLaunchOperator?.nextDownloadHref || null,
         initialLaunchOperatorWorkspaceKey: receipt.initialLaunchOperator?.workspaceKey || null,
         initialLaunchOperatorWorkspaceAutofocus: receipt.initialLaunchOperator?.workspaceAutofocus || null,
+        launchReadinessNextGateKey: receipt.launchReadinessNextGate?.key || null,
+        launchReadinessNextGateStatus: receipt.launchReadinessNextGate?.status || null,
+        launchReadinessNextGateDecision: receipt.launchReadinessNextGate?.decision || null,
+        launchReadinessNextGateLabel: receipt.launchReadinessNextGate?.label || null,
+        launchReadinessNextGateCanEnterInitialLaunch: receipt.launchReadinessNextGate?.canEnterInitialLaunch === true,
+        launchReadinessNextGateFirstLaunchOperatingChainReady: receipt.launchReadinessNextGate?.firstLaunchOperatingChainReady === true,
+        launchReadinessNextGateFirstLaunchOperatingChainStatus: receipt.launchReadinessNextGate?.firstLaunchOperatingChainStatus || null,
+        launchReadinessNextGateCurrentGate: receipt.launchReadinessNextGate?.currentGate || null,
+        launchReadinessNextGateNextAction: receipt.launchReadinessNextGate?.nextAction || null,
+        launchReadinessNextGateSequence: Array.isArray(receipt.launchReadinessNextGate?.sequence)
+          ? receipt.launchReadinessNextGate.sequence.filter(Boolean)
+          : [],
+        launchReadinessNextGateCloseoutReloadCommand: receipt.launchReadinessNextGate?.closeoutReloadCommand || null,
+        launchReadinessNextGateFullTestWindowCommand: receipt.launchReadinessNextGate?.fullTestWindowCommand || null,
+        launchReadinessNextGateProductionSignoffPacket: receipt.launchReadinessNextGate?.productionSignoffPacket || null,
+        launchReadinessNextGateLaunchDayWatchEntry: receipt.launchReadinessNextGate?.launchDayWatchEntry || null,
+        launchReadinessNextGatePrimaryDownloadKey: receipt.launchReadinessNextGate?.primaryDownloadKey || null,
+        launchReadinessNextGatePrimaryDownloadFormat: receipt.launchReadinessNextGate?.primaryDownloadFormat || null,
+        launchReadinessNextGatePrimaryDownloadFileName: receipt.launchReadinessNextGate?.primaryDownloadFileName || null,
+        launchReadinessNextGatePrimaryDownloadHref: receipt.launchReadinessNextGate?.primaryDownloadHref || null,
         receiptVisibility: receipt.visibility || null,
         createdAt: item.createdAt || null
       };
@@ -31366,7 +31413,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     if (Array.isArray(overview.latestLaunchReceipts) && overview.latestLaunchReceipts.length) {
       lines.push("Latest Launch Receipts:");
       for (const item of overview.latestLaunchReceipts) {
-        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | readiness=${item.operationalReadinessStatus || "-"} | watchRecordDraft=${item.operationalReadinessWatchRecordDraftStatus || "-"} | readinessNext=${item.operationalReadinessNextOperation || "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | handoff=${item.handoffFileName || "-"}`);
+        lines.push(`- ${item.operationLabel || item.operation || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | gate=${item.mainlineGateStatus || "-"} | evidenceRemaining=${item.productionEvidenceRemainingCount ?? "-"} | readiness=${item.operationalReadinessStatus || "-"} | watchRecordDraft=${item.operationalReadinessWatchRecordDraftStatus || "-"} | readinessNext=${item.operationalReadinessNextOperation || "-"} | operatorNext=${item.initialLaunchOperatorNextOperation || "-"} | launchReadinessNextGate=${item.launchReadinessNextGateStatus || "-"} | goLiveCurrentGate=${item.launchReadinessNextGateCurrentGate || "-"} | goLiveFullTestWindow=${item.launchReadinessNextGateFullTestWindowCommand || "-"} | handoff=${item.handoffFileName || "-"}`);
         appendDeveloperOpsReceiptVisibilityText(lines, item);
       }
     }

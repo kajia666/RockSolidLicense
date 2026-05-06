@@ -11007,6 +11007,70 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(launchStabilizationAction.receipt?.handoffText || "", /currentGate=ready_for_closeout_reload/);
     assert.match(launchStabilizationAction.receipt?.handoffText || "", /fullTestWindow=npm\.cmd test/);
 
+    const launchStabilizationAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=FIRSTBATCH&eventType=product.launch-mainline.action&limit=10",
+      ownerSession.token
+    );
+    const launchStabilizationAuditEntry = launchStabilizationAudit.items.find((entry) =>
+      entry.metadata?.productCode === "FIRSTBATCH"
+      && entry.metadata?.operation === "record_launch_stabilization_review"
+    );
+    assert.ok(launchStabilizationAuditEntry);
+    assert.deepEqual(
+      {
+        key: launchStabilizationAuditEntry.metadata?.launchReceipt?.launchReadinessNextGate?.key,
+        status: launchStabilizationAuditEntry.metadata?.launchReceipt?.launchReadinessNextGate?.status,
+        decision: launchStabilizationAuditEntry.metadata?.launchReceipt?.launchReadinessNextGate?.decision,
+        canEnterInitialLaunch: launchStabilizationAuditEntry.metadata?.launchReceipt?.launchReadinessNextGate?.canEnterInitialLaunch,
+        currentGate: launchStabilizationAuditEntry.metadata?.launchReceipt?.launchReadinessNextGate?.currentGate,
+        fullTestWindowCommand: launchStabilizationAuditEntry.metadata?.launchReceipt?.launchReadinessNextGate?.fullTestWindowCommand,
+        productionSignoffPacket: launchStabilizationAuditEntry.metadata?.launchReceipt?.launchReadinessNextGate?.productionSignoffPacket
+      },
+      {
+        key: "initial_launch_go_live_next_gate",
+        status: "awaiting_launch_readiness",
+        decision: "no_go",
+        canEnterInitialLaunch: false,
+        currentGate: "ready_for_closeout_reload",
+        fullTestWindowCommand: "npm.cmd test",
+        productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json"
+      }
+    );
+    assert.equal(launchStabilizationAuditEntry.metadata?.launchReceipt?.handoffText, undefined);
+
+    const stabilizationGateOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTBATCH&channel=stable&limit=40",
+      ownerSession.token
+    );
+    const latestStabilizationReceipt = stabilizationGateOpsSnapshot.overview?.latestLaunchReceipts?.find((item) =>
+      item.operation === "record_launch_stabilization_review"
+    );
+    assert.deepEqual(
+      {
+        key: latestStabilizationReceipt?.launchReadinessNextGateKey,
+        status: latestStabilizationReceipt?.launchReadinessNextGateStatus,
+        decision: latestStabilizationReceipt?.launchReadinessNextGateDecision,
+        canEnterInitialLaunch: latestStabilizationReceipt?.launchReadinessNextGateCanEnterInitialLaunch,
+        currentGate: latestStabilizationReceipt?.launchReadinessNextGateCurrentGate,
+        fullTestWindowCommand: latestStabilizationReceipt?.launchReadinessNextGateFullTestWindowCommand,
+        productionSignoffPacket: latestStabilizationReceipt?.launchReadinessNextGateProductionSignoffPacket
+      },
+      {
+        key: "initial_launch_go_live_next_gate",
+        status: "awaiting_launch_readiness",
+        decision: "no_go",
+        canEnterInitialLaunch: false,
+        currentGate: "ready_for_closeout_reload",
+        fullTestWindowCommand: "npm.cmd test",
+        productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json"
+      }
+    );
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveFullTestWindow=npm\.cmd test/);
+
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,
       "/api/developer/launch-mainline?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",

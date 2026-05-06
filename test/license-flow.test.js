@@ -10979,6 +10979,33 @@ test("developer license quickstart first-batch setup can create recommended laun
         nextAction: null
       }
     );
+    assert.deepEqual(
+      {
+        key: launchStabilizationAction.receipt?.launchReadinessNextGate?.key,
+        status: launchStabilizationAction.receipt?.launchReadinessNextGate?.status,
+        decision: launchStabilizationAction.receipt?.launchReadinessNextGate?.decision,
+        canEnterInitialLaunch: launchStabilizationAction.receipt?.launchReadinessNextGate?.canEnterInitialLaunch,
+        firstLaunchOperatingChainReady: launchStabilizationAction.receipt?.launchReadinessNextGate?.firstLaunchOperatingChainReady,
+        currentGate: launchStabilizationAction.receipt?.launchReadinessNextGate?.currentGate,
+        launchDayWatchEntry: launchStabilizationAction.receipt?.launchReadinessNextGate?.launchDayWatchEntry,
+        fullTestWindowCommand: launchStabilizationAction.receipt?.launchReadinessNextGate?.fullTestWindowCommand,
+        productionSignoffPacket: launchStabilizationAction.receipt?.launchReadinessNextGate?.productionSignoffPacket
+      },
+      {
+        key: "initial_launch_go_live_next_gate",
+        status: "awaiting_launch_readiness",
+        decision: "no_go",
+        canEnterInitialLaunch: false,
+        firstLaunchOperatingChainReady: true,
+        currentGate: "ready_for_closeout_reload",
+        launchDayWatchEntry: "enter_after_production_signoff",
+        fullTestWindowCommand: "npm.cmd test",
+        productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json"
+      }
+    );
+    assert.match(launchStabilizationAction.receipt?.handoffText || "", /Launch Readiness Next Gate:/);
+    assert.match(launchStabilizationAction.receipt?.handoffText || "", /currentGate=ready_for_closeout_reload/);
+    assert.match(launchStabilizationAction.receipt?.handoffText || "", /fullTestWindow=npm\.cmd test/);
 
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,

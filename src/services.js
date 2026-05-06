@@ -4874,6 +4874,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
   firstLaunchDutySummary = null,
   postLaunchLifecycleSummary = null,
   firstLaunchOperatingChain = null,
+  launchReadinessNextGate = null,
   initialLaunchOperatorActionReceipt = null,
   visibility = null,
   mainlineRecapCards = [],
@@ -4973,6 +4974,24 @@ function buildLaunchMainlineActionReceiptHandoffText({
 
   if (firstLaunchOperatingChain) {
     appendDeveloperOpsFirstLaunchOperatingChainLines(lines, firstLaunchOperatingChain);
+  }
+
+  if (launchReadinessNextGate) {
+    lines.push("");
+    lines.push("Launch Readiness Next Gate:");
+    lines.push(
+      `- status=${launchReadinessNextGate.status || "-"}`
+      + ` | decision=${launchReadinessNextGate.decision || "-"}`
+      + ` | canEnterInitialLaunch=${launchReadinessNextGate.canEnterInitialLaunch === true}`
+      + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
+    );
+    lines.push(`- closeoutReload=${launchReadinessNextGate.closeoutReloadCommand || "-"}`);
+    lines.push(`- fullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+    lines.push(
+      `- productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+      + ` | launchDayWatchEntry=${launchReadinessNextGate.launchDayWatchEntry || "-"}`
+    );
+    lines.push(`- nextAction=${launchReadinessNextGate.nextAction || "-"}`);
   }
 
   if (firstLaunchInventoryQueue) {
@@ -5681,14 +5700,22 @@ function buildLaunchMainlineActionReceipt({
         controls: postLaunchLifecycleControls
       }
     : null;
-  const baseFirstLaunchOperatingChain = launchMainline?.opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstLaunchOperatingChain
-    && typeof launchMainline.opsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain === "object"
-      ? launchMainline.opsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain
+  const actionOpsReadiness = launchMainline?.opsSnapshot?.summary?.initialLaunchOpsReadiness
+    && typeof launchMainline.opsSnapshot.summary.initialLaunchOpsReadiness === "object"
+      ? launchMainline.opsSnapshot.summary.initialLaunchOpsReadiness
+      : null;
+  const baseFirstLaunchOperatingChain = actionOpsReadiness?.firstLaunchOperatingChain
+    && typeof actionOpsReadiness.firstLaunchOperatingChain === "object"
+      ? actionOpsReadiness.firstLaunchOperatingChain
       : null;
   const firstLaunchOperatingChain = refreshFirstLaunchOperatingChainPostLaunchAction(baseFirstLaunchOperatingChain, {
     productCode: result?.productCode || launchMainline?.manifest?.project?.code || mainlineSummary.form?.productCode || "",
     channel: result?.channel || launchMainline?.manifest?.channel || mainlineSummary.form?.channel || "stable",
     postLaunchLifecycleSummary
+  });
+  const launchReadinessNextGate = buildLaunchMainlineReceiptLaunchReadinessNextGate({
+    firstLaunchOperatingChain,
+    initialLaunchOpsReadiness: actionOpsReadiness
   });
   const mainlineOverviewCards = (Array.isArray(mainlineSummary.overviewCards) ? mainlineSummary.overviewCards : [])
     .slice(0, 3)
@@ -6847,6 +6874,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     firstLaunchDutySummary,
     postLaunchLifecycleSummary,
     firstLaunchOperatingChain,
+    launchReadinessNextGate,
     initialLaunchOperatorActionReceipt,
     visibility,
     mainlineRecapCards,
@@ -6881,6 +6909,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     firstLaunchDutySummary,
     postLaunchLifecycleSummary,
     firstLaunchOperatingChain,
+    launchReadinessNextGate,
     initialLaunchOperatorActionManifest,
     initialLaunchOperatorActionReceipt,
     mainlineRecapCards,
@@ -26756,6 +26785,64 @@ function refreshFirstLaunchOperatingChainPostLaunchAction(chain = null, {
     nextAction: postLaunchLifecycleHandoff.status === "ready" ? null : nextAction,
     primaryDownload: primaryDownload || nextAction?.recommendedDownload || chain.primaryDownload || null,
     phases
+  };
+}
+
+function buildLaunchMainlineReceiptLaunchReadinessNextGate({
+  firstLaunchOperatingChain = null,
+  initialLaunchOpsReadiness = null
+} = {}) {
+  if (
+    !firstLaunchOperatingChain
+    || typeof firstLaunchOperatingChain !== "object"
+    || firstLaunchOperatingChain.ready !== true
+    || !initialLaunchOpsReadiness
+    || typeof initialLaunchOpsReadiness !== "object"
+  ) {
+    return null;
+  }
+  const gate = initialLaunchOpsReadiness.gate && typeof initialLaunchOpsReadiness.gate === "object"
+    ? initialLaunchOpsReadiness.gate
+    : {};
+  const goNoGo = initialLaunchOpsReadiness.goNoGo && typeof initialLaunchOpsReadiness.goNoGo === "object"
+    ? initialLaunchOpsReadiness.goNoGo
+    : {};
+  const launchDutyActionOrder = initialLaunchOpsReadiness.launchDutyActionOrder
+    && typeof initialLaunchOpsReadiness.launchDutyActionOrder === "object"
+      ? initialLaunchOpsReadiness.launchDutyActionOrder
+      : null;
+  const stagingArchiveStep = Array.isArray(launchDutyActionOrder?.steps)
+    ? launchDutyActionOrder.steps.find((item) => item?.key === "staging_archive") || null
+    : null;
+  const stagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations
+    || stagingArchiveStep?.nextOperations
+    || null;
+  const launchRunway = stagingArchiveNextOperations?.launchRunway
+    && typeof stagingArchiveNextOperations.launchRunway === "object"
+      ? stagingArchiveNextOperations.launchRunway
+      : null;
+  const canEnterInitialLaunch = goNoGo.canEnterInitialLaunch === true || gate.canEnterInitialLaunch === true;
+  const sequence = Array.isArray(launchRunway?.sequence)
+    ? launchRunway.sequence.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  return {
+    key: "initial_launch_go_live_next_gate",
+    status: canEnterInitialLaunch ? "ready_for_initial_launch" : "awaiting_launch_readiness",
+    decision: goNoGo.decision || gate.decision || (canEnterInitialLaunch ? "go" : "no_go"),
+    label: goNoGo.label || gate.label || (canEnterInitialLaunch ? "GO" : "NO-GO"),
+    canEnterInitialLaunch,
+    firstLaunchOperatingChainReady: true,
+    firstLaunchOperatingChainStatus: firstLaunchOperatingChain.status || null,
+    currentGate: launchRunway?.currentGate || stagingArchiveNextOperations?.status || null,
+    nextAction: stagingArchiveNextOperations?.nextAction || launchRunway?.nextAction || null,
+    sequence,
+    closeoutReloadCommand: stagingArchiveNextOperations?.closeoutReload || null,
+    fullTestWindowCommand: stagingArchiveNextOperations?.fullTestWindow || null,
+    productionSignoffPacket: stagingArchiveNextOperations?.productionSignoffPacket
+      || launchRunway?.productionSignoffPacket
+      || null,
+    launchDayWatchEntry: launchRunway?.launchDayWatchEntry || null,
+    primaryDownload: initialLaunchOpsReadiness.primaryDownload || gate.primaryDownload || null
   };
 }
 

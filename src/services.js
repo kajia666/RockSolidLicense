@@ -4943,6 +4943,9 @@ function buildLaunchMainlineActionReceiptHandoffText({
   }
 
   if (initialLaunchOperatorActionReceipt) {
+    const launchReadinessNextGateForOperatorReceipt = normalizeLaunchReadinessNextGateForHandoff(
+      initialLaunchOperatorActionReceipt
+    );
     lines.push("");
     lines.push("Initial Launch Operator Actions:");
     lines.push(
@@ -4950,6 +4953,14 @@ function buildLaunchMainlineActionReceiptHandoffText({
       + ` | primary=${initialLaunchOperatorActionReceipt.primaryActionKey || "-"}`
       + ` | actions=${initialLaunchOperatorActionReceipt.actionCount ?? 0}`
     );
+    if (launchReadinessNextGateForOperatorReceipt) {
+      lines.push(
+        `- launchReadinessNextGate=${launchReadinessNextGateForOperatorReceipt.status || "-"}`
+        + ` | goLiveCurrentGate=${launchReadinessNextGateForOperatorReceipt.currentGate || "-"}`
+        + ` | goLiveFullTestWindow=${launchReadinessNextGateForOperatorReceipt.fullTestWindowCommand || "-"}`
+        + ` | productionSignoffPacket=${launchReadinessNextGateForOperatorReceipt.productionSignoffPacket || "-"}`
+      );
+    }
     lines.push(
       `- next: stage=${initialLaunchOperatorActionReceipt.nextStage || "-"}`
       + ` | operation=${initialLaunchOperatorActionReceipt.nextOperation || "-"}`
@@ -5950,6 +5961,24 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     || initialLaunchOperatorPrimaryAction?.recommendedDownload
     || initialLaunchOperatorFallbackAction?.recommendedDownload
     || null;
+  const initialLaunchOperatorGateCarryCandidate = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    initialLaunchOperatorActionManifest
+    || initialLaunchOperatorPrimaryAction
+  );
+  const mainlineLaunchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate
+      ? { launchReadinessNextGate }
+      : mainlineSummary.launchReadinessNextGate
+      ? { launchReadinessNextGate: mainlineSummary.launchReadinessNextGate }
+      : launchMainline?.opsSnapshot?.summary?.launchReadinessNextGate
+        ? { launchReadinessNextGate: launchMainline.opsSnapshot.summary.launchReadinessNextGate }
+        : null
+  );
+  const initialLaunchOperatorGateCarry =
+    initialLaunchOperatorGateCarryCandidate.launchReadinessNextGateStatus
+    && initialLaunchOperatorGateCarryCandidate.launchReadinessNextGateCurrentGate
+      ? initialLaunchOperatorGateCarryCandidate
+      : mainlineLaunchReadinessNextGateCarry;
   const initialLaunchOperatorActionReceipt = initialLaunchOperatorActionManifest
     ? {
         source: "launch_mainline_action_receipt",
@@ -5973,6 +6002,20 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
         workspaceKey: initialLaunchOperatorWorkspaceAction?.key || null,
         workspaceAutofocus: initialLaunchOperatorWorkspaceAction?.autofocus || null,
         workspaceHref: initialLaunchOperatorWorkspaceAction?.href || initialLaunchOperatorActionManifest.entrypoints?.workspaceHref || null,
+        launchReadinessNextGate: initialLaunchOperatorGateCarry.launchReadinessNextGate,
+        launchReadinessNextGateStatus: initialLaunchOperatorGateCarry.launchReadinessNextGateStatus,
+        launchReadinessNextGateDecision: initialLaunchOperatorGateCarry.launchReadinessNextGateDecision,
+        launchReadinessNextGateCurrentGate: initialLaunchOperatorGateCarry.launchReadinessNextGateCurrentGate,
+        launchReadinessNextGateCanEnterInitialLaunch: initialLaunchOperatorGateCarry.launchReadinessNextGateCanEnterInitialLaunch,
+        launchReadinessNextGateNextAction: initialLaunchOperatorGateCarry.launchReadinessNextGateNextAction,
+        launchReadinessNextGateCloseoutReloadCommand: initialLaunchOperatorGateCarry.launchReadinessNextGateCloseoutReloadCommand,
+        launchReadinessNextGateFullTestWindowCommand: initialLaunchOperatorGateCarry.launchReadinessNextGateFullTestWindowCommand,
+        launchReadinessNextGateProductionSignoffPacket: initialLaunchOperatorGateCarry.launchReadinessNextGateProductionSignoffPacket,
+        launchReadinessNextGateLaunchDayWatchEntry: initialLaunchOperatorGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
+        launchReadinessNextGatePrimaryDownloadKey: initialLaunchOperatorGateCarry.launchReadinessNextGatePrimaryDownloadKey,
+        launchReadinessNextGatePrimaryDownloadFileName: initialLaunchOperatorGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
+        launchReadinessNextGatePrimaryDownloadFormat: initialLaunchOperatorGateCarry.launchReadinessNextGatePrimaryDownloadFormat,
+        launchReadinessNextGatePrimaryDownloadHref: initialLaunchOperatorGateCarry.launchReadinessNextGatePrimaryDownloadHref,
         files: {
           initialLaunchOpsReadiness: initialLaunchOperatorActionManifest.files?.initialLaunchOpsReadiness || initialLaunchOperatorActionManifest.entrypoints?.readinessFile || null,
           handoffIndex: initialLaunchOperatorActionManifest.files?.handoffIndex || initialLaunchOperatorActionManifest.entrypoints?.handoffIndexFile || null,
@@ -17652,9 +17695,18 @@ function appendInitialLaunchOperatorNextActionTextLines(lines = [], operatorNext
     : { action: "Action", workspace: "Workspace", download: "Download" };
   const workspaceAction = operatorNextAction.workspaceAction || {};
   const download = operatorNextAction.download || {};
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(operatorNextAction);
   lines.push("");
   lines.push(title);
   lines.push(`- ${labels.action}: ${operatorNextAction.kind || "-"} | stage=${operatorNextAction.stage || "-"} | operation=${operatorNextAction.operation || "-"} | action=${operatorNextAction.actionKey || "-"}`);
+  if (launchReadinessNextGate) {
+    lines.push(
+      `- launchReadinessNextGate=${launchReadinessNextGate.status || "-"}`
+      + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
+      + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
+      + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+    );
+  }
   lines.push(`- ${labels.workspace}: ${workspaceAction.label || "-"}@${workspaceAction.autofocus || "-"} | href=${workspaceAction.href || "-"}`);
   lines.push(`- ${labels.download}: ${download.fileName || "-"} (${download.format || "-"}) | href=${download.href || "-"}`);
   return true;
@@ -17674,9 +17726,18 @@ function appendInitialLaunchOperatorActionManifestTextLines(lines = [], manifest
   const workspaceAction = primaryAction.workspaceAction || {};
   const primaryDownload = primaryAction.download || primaryAction.recommendedDownload || {};
   const files = manifest.files || {};
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(manifest);
   lines.push("");
   lines.push(title);
   lines.push(`- ${labels.manifest}: ${manifest.version || "-"} | primary=${manifest.primaryActionKey || "-"} | actions=${manifest.actionCount ?? (Array.isArray(manifest.actions) ? manifest.actions.length : 0)}`);
+  if (launchReadinessNextGate) {
+    lines.push(
+      `- launchReadinessNextGate=${launchReadinessNextGate.status || "-"}`
+      + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
+      + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
+      + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+    );
+  }
   lines.push(
     `- ${labels.primaryAction}: stage=${primaryAction.stage || "-"}`
     + ` | operation=${primaryAction.operation || "-"}`
@@ -24865,6 +24926,12 @@ function buildDeveloperOpsInitialLaunchOperatorNextAction({
         source: primaryDownload.source || null
       }
     : null;
+  const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    traceability.nextFollowUp
+    || traceability.launchReadinessNextGate
+    || launchReceiptNextFollowUp
+    || traceability.latestLaunchReceipt
+  );
   return {
     kind: "launch_mainline_follow_up",
     source: "initial_launch_operator",
@@ -24878,6 +24945,20 @@ function buildDeveloperOpsInitialLaunchOperatorNextAction({
     downloadKey: nextRequiredAction.downloadKey || launchReceiptNextFollowUp?.downloadKey || goNoGo.nextDownloadKey || download?.key || null,
     workspaceAction,
     download,
+    launchReadinessNextGate: launchReadinessNextGateCarry.launchReadinessNextGate,
+    launchReadinessNextGateStatus: launchReadinessNextGateCarry.launchReadinessNextGateStatus,
+    launchReadinessNextGateDecision: launchReadinessNextGateCarry.launchReadinessNextGateDecision,
+    launchReadinessNextGateCurrentGate: launchReadinessNextGateCarry.launchReadinessNextGateCurrentGate,
+    launchReadinessNextGateCanEnterInitialLaunch: launchReadinessNextGateCarry.launchReadinessNextGateCanEnterInitialLaunch,
+    launchReadinessNextGateNextAction: launchReadinessNextGateCarry.launchReadinessNextGateNextAction,
+    launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
+    launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
+    launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+    launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
+    launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
+    launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
+    launchReadinessNextGatePrimaryDownloadFormat: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFormat,
+    launchReadinessNextGatePrimaryDownloadHref: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadHref,
     traceability: {
       handoffIndex: opsFiles.handoffIndex || files.handoffIndex || "handoff-index.txt",
       initialLaunchOpsReadiness: opsFiles.initialLaunchOpsReadiness || files.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
@@ -24894,6 +24975,11 @@ function buildDeveloperOpsInitialLaunchOperatorActionManifest({
 } = {}) {
   const files = contract.files || {};
   const action = operatorNextAction && typeof operatorNextAction === "object" ? operatorNextAction : null;
+  const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    action
+    || latestReceipt
+    || contract.latestLaunchReceipt
+  );
   return {
     version: "initial-launch-operator-actions/v1",
     generatedFor: "initial_launch_operator",
@@ -24903,6 +24989,20 @@ function buildDeveloperOpsInitialLaunchOperatorActionManifest({
     decision: contract.decision || action?.decision || null,
     decisionLabel: contract.label || action?.decisionLabel || operatorHeadline.decisionLabel || null,
     primaryActionKey: action?.kind || null,
+    launchReadinessNextGate: launchReadinessNextGateCarry.launchReadinessNextGate,
+    launchReadinessNextGateStatus: launchReadinessNextGateCarry.launchReadinessNextGateStatus,
+    launchReadinessNextGateDecision: launchReadinessNextGateCarry.launchReadinessNextGateDecision,
+    launchReadinessNextGateCurrentGate: launchReadinessNextGateCarry.launchReadinessNextGateCurrentGate,
+    launchReadinessNextGateCanEnterInitialLaunch: launchReadinessNextGateCarry.launchReadinessNextGateCanEnterInitialLaunch,
+    launchReadinessNextGateNextAction: launchReadinessNextGateCarry.launchReadinessNextGateNextAction,
+    launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
+    launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
+    launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+    launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
+    launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
+    launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
+    launchReadinessNextGatePrimaryDownloadFormat: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFormat,
+    launchReadinessNextGatePrimaryDownloadHref: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadHref,
     actionCount: action ? 1 : 0,
     actions: action ? [action] : [],
     entrypoints: {

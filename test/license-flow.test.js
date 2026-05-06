@@ -11006,6 +11006,40 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(launchStabilizationAction.receipt?.handoffText || "", /Launch Readiness Next Gate:/);
     assert.match(launchStabilizationAction.receipt?.handoffText || "", /currentGate=ready_for_closeout_reload/);
     assert.match(launchStabilizationAction.receipt?.handoffText || "", /fullTestWindow=npm\.cmd test/);
+    assert.deepEqual(
+      launchStabilizationAction.receipt?.initialLaunchOperatorActionReceipt?.launchReadinessNextGate
+        ? {
+            status: launchStabilizationAction.receipt.initialLaunchOperatorActionReceipt.launchReadinessNextGate.status,
+            decision: launchStabilizationAction.receipt.initialLaunchOperatorActionReceipt.launchReadinessNextGate.decision,
+            canEnterInitialLaunch: launchStabilizationAction.receipt.initialLaunchOperatorActionReceipt.launchReadinessNextGate.canEnterInitialLaunch,
+            currentGate: launchStabilizationAction.receipt.initialLaunchOperatorActionReceipt.launchReadinessNextGate.currentGate,
+            fullTestWindowCommand: launchStabilizationAction.receipt.initialLaunchOperatorActionReceipt.launchReadinessNextGate.fullTestWindowCommand,
+            productionSignoffPacket: launchStabilizationAction.receipt.initialLaunchOperatorActionReceipt.launchReadinessNextGate.productionSignoffPacket,
+            launchDayWatchEntry: launchStabilizationAction.receipt.initialLaunchOperatorActionReceipt.launchReadinessNextGate.launchDayWatchEntry
+          }
+        : null,
+      {
+        status: "awaiting_launch_readiness",
+        decision: "no_go",
+        canEnterInitialLaunch: false,
+        currentGate: "ready_for_closeout_reload",
+        fullTestWindowCommand: "npm.cmd test",
+        productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json",
+        launchDayWatchEntry: "enter_after_production_signoff"
+      }
+    );
+    assert.equal(
+      launchStabilizationAction.receipt?.initialLaunchOperatorActionReceipt?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      launchStabilizationAction.receipt?.initialLaunchOperatorActionReceipt?.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assert.match(
+      launchStabilizationAction.receipt?.handoffText || "",
+      /Initial Launch Operator Actions:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/
+    );
 
     const launchStabilizationAudit = await getJson(
       baseUrl,
@@ -11133,6 +11167,33 @@ test("developer license quickstart first-batch setup can create recommended laun
       stabilizationGateInitialOps?.traceability?.nextFollowUp?.launchReadinessNextGatePrimaryDownloadFormat,
       "launch-receipt-next-follow-up"
     );
+    const stabilizationGateOperatorNextAction = stabilizationGateInitialOps?.operatorNextAction;
+    assert.ok(stabilizationGateOperatorNextAction);
+    assertGoLiveNextGatePayload(stabilizationGateOperatorNextAction.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateOperatorNextAction.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateOperatorNextAction.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assert.match(
+      stabilizationGateOperatorNextAction.launchReadinessNextGateFullTestWindowCommand || "",
+      /npm\.cmd test/
+    );
+    const stabilizationGateOperatorActionManifest = stabilizationGateInitialOps?.operatorActionManifest;
+    assert.ok(stabilizationGateOperatorActionManifest);
+    assertGoLiveNextGatePayload(stabilizationGateOperatorActionManifest.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateOperatorActionManifest.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assertGoLiveNextGatePayload(stabilizationGateOperatorActionManifest.actions?.[0]?.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateOperatorActionManifest.actions?.[0]?.launchReadinessNextGatePrimaryDownloadFormat,
+      "launch-receipt-next-follow-up"
+    );
     assertGoLiveNextGatePayload(stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGate);
     assert.equal(
       stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGateStatus,
@@ -11245,6 +11306,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveFullTestWindow=npm\.cmd test/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Next Action:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Next Action:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Action Manifest:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Action Manifest:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch-Day Watch Receipt:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch-Day Watch Receipt:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Stabilization Status Receipt:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);

@@ -20516,6 +20516,16 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       "launchReceiptLaunchOpsOverviewFirstWaveLifecycleStatus",
       "launchReceiptLaunchOpsOverviewFirstWaveLifecycleNextOperation",
       "launchReceiptLaunchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey",
+      "launchReceiptLaunchReadinessNextGateStatus",
+      "launchReceiptLaunchReadinessNextGateDecision",
+      "launchReceiptLaunchReadinessNextGateCurrentGate",
+      "launchReceiptLaunchReadinessNextGateFullTestWindowCommand",
+      "launchReceiptLaunchReadinessNextGateProductionSignoffPacket",
+      "launchReceiptLaunchReadinessNextGateLaunchDayWatchEntry",
+      "launchReceiptLaunchReadinessNextGateCloseoutReloadCommand",
+      "launchReceiptLaunchReadinessNextGatePrimaryDownloadKey",
+      "launchReceiptLaunchReadinessNextGatePrimaryDownloadFileName",
+      "launchReceiptLaunchReadinessNextGatePrimaryDownloadFormat",
       "launchReceiptInitialOperatorDecision",
       "launchReceiptInitialOperatorPrimaryActionKey",
       "launchReceiptInitialOperatorNextOperation",
@@ -20526,6 +20536,9 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
     items.map((item) => {
       const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(
         item.metadata?.launchReceipt?.launchOpsOverviewContext
+      );
+      const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(
+        item.metadata?.launchReceipt || null
       );
       return [
         item.id,
@@ -20559,6 +20572,16 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
         launchOpsOverviewContext?.firstWaveLifecycleStatus,
         launchOpsOverviewContext?.firstWaveLifecycleNextOperation,
         launchOpsOverviewContext?.firstWaveLifecyclePrimaryDownloadKey,
+        launchReadinessNextGate?.status,
+        launchReadinessNextGate?.decision,
+        launchReadinessNextGate?.currentGate,
+        launchReadinessNextGate?.fullTestWindowCommand,
+        launchReadinessNextGate?.productionSignoffPacket,
+        launchReadinessNextGate?.launchDayWatchEntry,
+        launchReadinessNextGate?.closeoutReloadCommand,
+        launchReadinessNextGate?.primaryDownloadKey,
+        launchReadinessNextGate?.primaryDownloadFileName,
+        launchReadinessNextGate?.primaryDownloadFormat,
         item.metadata?.launchReceipt?.initialLaunchOperator?.decision ?? "",
         item.metadata?.launchReceipt?.initialLaunchOperator?.primaryActionKey ?? "",
         item.metadata?.launchReceipt?.initialLaunchOperator?.nextOperation ?? "",
@@ -20610,6 +20633,16 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "launchOpsOverviewFirstWaveLifecycleStatus",
       "launchOpsOverviewFirstWaveLifecycleNextOperation",
       "launchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey",
+      "launchReadinessNextGateStatus",
+      "launchReadinessNextGateDecision",
+      "launchReadinessNextGateCurrentGate",
+      "launchReadinessNextGateFullTestWindowCommand",
+      "launchReadinessNextGateProductionSignoffPacket",
+      "launchReadinessNextGateLaunchDayWatchEntry",
+      "launchReadinessNextGateCloseoutReloadCommand",
+      "launchReadinessNextGatePrimaryDownloadKey",
+      "launchReadinessNextGatePrimaryDownloadFileName",
+      "launchReadinessNextGatePrimaryDownloadFormat",
       "firstUserValidationRuntimeEvidenceStatus",
       "firstUserValidationRuntimeEvidenceReady",
       "runtimeEvidenceActiveSessionCount",
@@ -20657,6 +20690,16 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
         launchOpsOverviewContext?.firstWaveLifecycleStatus,
         launchOpsOverviewContext?.firstWaveLifecycleNextOperation,
         launchOpsOverviewContext?.firstWaveLifecyclePrimaryDownloadKey,
+        item.launchReadinessNextGateStatus,
+        item.launchReadinessNextGateDecision,
+        item.launchReadinessNextGateCurrentGate,
+        item.launchReadinessNextGateFullTestWindowCommand,
+        item.launchReadinessNextGateProductionSignoffPacket,
+        item.launchReadinessNextGateLaunchDayWatchEntry,
+        item.launchReadinessNextGateCloseoutReloadCommand,
+        item.launchReadinessNextGatePrimaryDownloadKey,
+        item.launchReadinessNextGatePrimaryDownloadFileName,
+        item.launchReadinessNextGatePrimaryDownloadFormat,
         item.firstUserValidationRuntimeEvidenceStatus,
         item.firstUserValidationRuntimeEvidenceReady,
         item.runtimeEvidenceActiveSessionCount,
@@ -21520,6 +21563,7 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
     if (!stage || !payload.title) {
       return;
     }
+    const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(receipt);
     const actionKey = payload.actionKey || null;
     const downloadKey = payload.downloadKey || null;
     const key = [
@@ -21569,6 +21613,16 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       operationalReadinessWatchRecordDraftStatus: receipt.operationalReadinessWatchRecordDraftStatus || null,
       operationalReadinessWatchRecordDraftRecordCount: receipt.operationalReadinessWatchRecordDraftRecordCount ?? null,
       launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(payload.launchOpsOverviewContext || receipt.launchOpsOverviewContext),
+      launchReadinessNextGateStatus: launchReadinessNextGate?.status || null,
+      launchReadinessNextGateDecision: launchReadinessNextGate?.decision || null,
+      launchReadinessNextGateCurrentGate: launchReadinessNextGate?.currentGate || null,
+      launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGate?.fullTestWindowCommand || null,
+      launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGate?.productionSignoffPacket || null,
+      launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGate?.launchDayWatchEntry || null,
+      launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGate?.closeoutReloadCommand || null,
+      launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGate?.primaryDownloadKey || null,
+      launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGate?.primaryDownloadFileName || null,
+      launchReadinessNextGatePrimaryDownloadFormat: launchReadinessNextGate?.primaryDownloadFormat || null,
       createdAt: receipt.createdAt || receipt.handoffGeneratedAt || null
     });
   };
@@ -25809,6 +25863,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         runtimeEvidenceActiveSessionCount: item.runtimeEvidenceActiveSessionCount ?? null,
         runtimeEvidenceHeartbeatSeenCount: item.runtimeEvidenceHeartbeatSeenCount ?? null,
         launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(item.launchOpsOverviewContext || latestReceipt?.launchOpsOverviewContext),
+        launchReadinessNextGateStatus: item.launchReadinessNextGateStatus || null,
+        launchReadinessNextGateDecision: item.launchReadinessNextGateDecision || null,
+        launchReadinessNextGateCurrentGate: item.launchReadinessNextGateCurrentGate || null,
+        launchReadinessNextGateFullTestWindowCommand: item.launchReadinessNextGateFullTestWindowCommand || null,
+        launchReadinessNextGateProductionSignoffPacket: item.launchReadinessNextGateProductionSignoffPacket || null,
+        launchReadinessNextGateLaunchDayWatchEntry: item.launchReadinessNextGateLaunchDayWatchEntry || null,
+        launchReadinessNextGateCloseoutReloadCommand: item.launchReadinessNextGateCloseoutReloadCommand || null,
+        launchReadinessNextGatePrimaryDownloadKey: item.launchReadinessNextGatePrimaryDownloadKey || null,
+        launchReadinessNextGatePrimaryDownloadFileName: item.launchReadinessNextGatePrimaryDownloadFileName || null,
+        launchReadinessNextGatePrimaryDownloadFormat: item.launchReadinessNextGatePrimaryDownloadFormat || null,
         handoffFileName: item.handoffFileName || latestReceipt?.handoffFileName || null
       };
       const recommendedDownload = buildDeveloperOpsLaunchReceiptFollowUpDownload(normalizedItem, scope);

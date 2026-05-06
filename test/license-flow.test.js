@@ -11070,6 +11070,36 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /goLiveFullTestWindow=npm\.cmd test/);
+    assert.match(
+      stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps,
+      /"launchReadinessNextGateStatus","launchReadinessNextGateDecision","launchReadinessNextGateCurrentGate","launchReadinessNextGateFullTestWindowCommand","launchReadinessNextGateProductionSignoffPacket","launchReadinessNextGateLaunchDayWatchEntry"/
+    );
+    assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /npm\.cmd test/);
+    assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /enter_after_production_signoff/);
+    assert.match(
+      stabilizationGateOpsSnapshot.csv.auditLogs,
+      /"launchReceiptLaunchReadinessNextGateStatus","launchReceiptLaunchReadinessNextGateDecision","launchReceiptLaunchReadinessNextGateCurrentGate","launchReceiptLaunchReadinessNextGateFullTestWindowCommand","launchReceiptLaunchReadinessNextGateProductionSignoffPacket","launchReceiptLaunchReadinessNextGateLaunchDayWatchEntry"/
+    );
+    assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /npm\.cmd test/);
+    assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /enter_after_production_signoff/);
+    const stabilizationGateFollowUpsCsvDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=launch-receipt-follow-ups&limit=40",
+      ownerSession.token
+    );
+    assert.equal(stabilizationGateFollowUpsCsvDownload.contentType, "text/csv; charset=utf-8");
+    assert.match(stabilizationGateFollowUpsCsvDownload.body, /launchReadinessNextGateStatus/);
+    assert.match(stabilizationGateFollowUpsCsvDownload.body, /awaiting_launch_readiness/);
+    assert.match(stabilizationGateFollowUpsCsvDownload.body, /ready_for_closeout_reload/);
+    assert.match(stabilizationGateFollowUpsCsvDownload.body, /npm\.cmd test/);
+    assert.match(stabilizationGateFollowUpsCsvDownload.body, /artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+
     const stabilizationGateNextFollowUpDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=launch-receipt-next-follow-up&limit=40",

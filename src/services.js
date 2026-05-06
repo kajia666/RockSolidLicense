@@ -14886,6 +14886,30 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     };
   };
   const launchRunwayChecklistState = buildLaunchRunwayChecklistState(launchRunwayOperatorChecklist);
+  const launchRunwayGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    stagingArchiveNextOperations || stagingArchiveLaunchRunway || launchDutyActionOrder
+  );
+  const launchRunwayCurrentGate = stagingArchiveLaunchRunway?.currentGate
+    || stagingArchiveNextOperations?.status
+    || "unknown";
+  const fallbackLaunchRunwayNextGate = {
+    key: "initial_launch_go_live_next_gate",
+    status: initialLaunchOpsGate?.canEnterInitialLaunch === true
+      ? "ready_for_initial_launch"
+      : "awaiting_launch_readiness",
+    decision: initialLaunchOpsGate?.canEnterInitialLaunch === true ? "go" : "no_go",
+    canEnterInitialLaunch: initialLaunchOpsGate?.canEnterInitialLaunch === true,
+    currentGate: launchRunwayCurrentGate,
+    nextAction: stagingArchiveNextOperations?.nextAction || stagingArchiveLaunchRunway?.nextAction || null,
+    closeoutReloadCommand: stagingArchiveNextOperations?.closeoutReload || null,
+    fullTestWindowCommand: stagingArchiveNextOperations?.fullTestWindow || null,
+    productionSignoffPacket: stagingArchiveNextOperations?.productionSignoffPacket || null,
+    launchDayWatchEntry: stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff"
+  };
+  const launchRunwayNextGate = launchRunwayGateCarry.launchReadinessNextGate?.currentGate
+    ? launchRunwayGateCarry.launchReadinessNextGate
+    : fallbackLaunchRunwayNextGate;
+  const launchRunwayNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(launchRunwayNextGate);
   const buildLaunchRunwayHeroStatus = (checklistState = null) => {
     if (!checklistState || typeof checklistState !== "object") {
       return null;
@@ -14906,7 +14930,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         pendingEvidenceOperationCount,
         nextActionKey: nextAction?.actionKey || nextAction?.setupAction?.key || null,
         nextActionOperation: nextAction?.operation || nextAction?.setupAction?.operation || null,
-        launchDayWatchEntry
+        launchDayWatchEntry,
+        launchReadinessNextGateStatus: launchRunwayNextGate?.status || null,
+        launchReadinessNextGateDecision: launchRunwayNextGate?.decision || null,
+        launchReadinessNextGateCurrentGate: launchRunwayNextGate?.currentGate || null
       };
     }
     return {
@@ -14917,7 +14944,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       pendingEvidenceOperationCount,
       nextActionKey: null,
       nextActionOperation: null,
-      launchDayWatchEntry
+      launchDayWatchEntry,
+      launchReadinessNextGateStatus: launchRunwayNextGate?.status || null,
+      launchReadinessNextGateDecision: launchRunwayNextGate?.decision || null,
+      launchReadinessNextGateCurrentGate: launchRunwayNextGate?.currentGate || null
     };
   };
   const launchRunwayHeroStatus = buildLaunchRunwayHeroStatus(launchRunwayChecklistState);
@@ -14926,9 +14956,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         source: "developer-ops-launch-duty-action-order",
         mode: stagingArchiveLaunchRunway?.mode || "staging-archive-launch-runway",
         status: stagingArchiveNextOperations?.status || stagingArchiveLaunchRunway?.currentGate || "unknown",
-        currentGate: stagingArchiveLaunchRunway?.currentGate || stagingArchiveNextOperations?.status || "unknown",
+        currentGate: launchRunwayCurrentGate,
         launchDayWatchEntry: stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff",
         productionSignoffPacket: stagingArchiveNextOperations?.productionSignoffPacket || null,
+        ...launchRunwayNextGateCarry,
         sequence: Array.isArray(stagingArchiveLaunchRunway?.sequence) && stagingArchiveLaunchRunway.sequence.length
           ? stagingArchiveLaunchRunway.sequence
           : ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"],
@@ -17201,6 +17232,16 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
   lines.push(`- status: ${launchRunway.status || "-"}`);
   lines.push(`- currentGate: ${launchRunway.currentGate || "-"}`);
   lines.push(`- launchDayWatchEntry: ${launchRunway.launchDayWatchEntry || "-"}`);
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(launchRunway);
+  if (launchReadinessNextGate) {
+    lines.push(
+      `- launchReadinessNextGate: ${launchReadinessNextGate.status || "-"}`
+      + ` | decision=${launchReadinessNextGate.decision || "-"}`
+      + ` | canEnterInitialLaunch=${launchReadinessNextGate.canEnterInitialLaunch === true}`
+      + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
+    );
+    lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+  }
   lines.push(`- sequence: ${sequence}`);
   if (launchRunway.nextAction) {
     lines.push(`- nextAction: ${launchRunway.nextAction}`);

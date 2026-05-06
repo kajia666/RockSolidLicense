@@ -6590,6 +6590,28 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(mainlineLaunchRunway.currentGate, "ready_for_closeout_reload");
       assert.equal(mainlineLaunchRunway.launchDayWatchEntry, "enter_after_production_signoff");
       assert.deepEqual(
+        mainlineLaunchRunway.launchReadinessNextGate
+          ? {
+              status: mainlineLaunchRunway.launchReadinessNextGate.status,
+              decision: mainlineLaunchRunway.launchReadinessNextGate.decision,
+              canEnterInitialLaunch: mainlineLaunchRunway.launchReadinessNextGate.canEnterInitialLaunch,
+              currentGate: mainlineLaunchRunway.launchReadinessNextGate.currentGate,
+              fullTestWindowCommand: mainlineLaunchRunway.launchReadinessNextGate.fullTestWindowCommand,
+              productionSignoffPacket: mainlineLaunchRunway.launchReadinessNextGate.productionSignoffPacket
+            }
+          : null,
+        {
+          status: "awaiting_launch_readiness",
+          decision: "no_go",
+          canEnterInitialLaunch: false,
+          currentGate: "ready_for_closeout_reload",
+          fullTestWindowCommand: "npm.cmd test",
+          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json"
+        }
+      );
+      assert.equal(mainlineLaunchRunway.launchReadinessNextGateStatus, "awaiting_launch_readiness");
+      assert.equal(mainlineLaunchRunway.launchReadinessNextGateDecision, "no_go");
+      assert.deepEqual(
         mainlineLaunchRunway.sequence,
         ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"]
       );
@@ -6706,7 +6728,10 @@ test("developer release package export bundles integration, versions, and notice
         pendingEvidenceOperationCount: 3,
         nextActionKey: "launch_mainline_record_launch_rehearsal_run",
         nextActionOperation: "record_launch_rehearsal_run",
-        launchDayWatchEntry: "enter_after_production_signoff"
+        launchDayWatchEntry: "enter_after_production_signoff",
+        launchReadinessNextGateStatus: "awaiting_launch_readiness",
+        launchReadinessNextGateDecision: "no_go",
+        launchReadinessNextGateCurrentGate: "ready_for_closeout_reload"
       });
       assert.deepEqual({
         status: launchMainline.mainlineSummary.launchDayWatchPanel?.status,
@@ -7127,6 +7152,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Mainline Continuation:[\s\S]*recommendedDownload: .*href=.*\/api\/developer\//);
       assert.match(launchMainline.summaryText, /control: Download Launch Mainline Summary \| download=.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=summary/);
       assert.match(launchMainline.summaryText, /Mainline Launch Runway:/);
+      assert.match(launchMainline.summaryText, /- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
+      assert.match(launchMainline.summaryText, /- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
       assert.match(launchMainline.summaryText, /- sequence: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
       assert.match(launchMainline.summaryText, /- action=Copy Closeout Reload \| kind=command \| value=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable --closeout-input-file artifacts\/staging\/RELPKG_ALPHA\/stable\/filled-closeout-input\.json/);
       assert.match(launchMainline.summaryText, /- action=Copy Full Test Window \| kind=command \| value=npm\.cmd test/);
@@ -7202,6 +7229,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /download=launch_mainline_post_launch_sweep_handoff \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=post-launch-sweep-handoff/);
       assert.match(launchMainlineSummaryDownload.body, /control: Download Launch Mainline Summary \| download=.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=summary/);
       assert.match(launchMainlineSummaryDownload.body, /Mainline Launch Runway:/);
+      assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
+      assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGateFullTestWindow: npm\.cmd test/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Closeout Reload/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Full Test Window/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Sign-off Packet/);

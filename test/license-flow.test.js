@@ -11107,6 +11107,15 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assertGoLiveNextGatePayload(stabilizationGateOpsSnapshot.summary?.launchReadinessNextGate);
     const stabilizationGateInitialOps = stabilizationGateOpsSnapshot.summary?.initialLaunchOpsReadiness;
+    assertGoLiveNextGatePayload(stabilizationGateInitialOps?.traceability?.latestLaunchReceipt?.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateInitialOps?.traceability?.latestLaunchReceipt?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      stabilizationGateInitialOps?.traceability?.latestLaunchReceipt?.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
     assertGoLiveNextGatePayload(stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGate);
     assert.equal(
       stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGateStatus,

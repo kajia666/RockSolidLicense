@@ -24554,6 +24554,9 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
     firstWaveConfirmationChain,
     launchReadinessNextGate
   });
+  const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    launchReadinessNextGate || latestReceipt
+  );
   return {
     latestLaunchReceipt: latestReceipt
       ? {
@@ -24571,7 +24574,15 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
           postLaunchLifecycleNextOperation: latestReceipt.postLaunchLifecycleNextOperation || null,
           postLaunchLifecyclePrimaryDownloadKey: latestReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
           postLaunchLifecyclePrimaryDownloadFormat: latestReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
-          postLaunchLifecyclePrimaryDownloadFileName: latestReceipt.postLaunchLifecyclePrimaryDownloadFileName || null
+          postLaunchLifecyclePrimaryDownloadFileName: latestReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
+          launchReadinessNextGate: launchReadinessNextGateCarry.launchReadinessNextGate,
+          launchReadinessNextGateStatus: launchReadinessNextGateCarry.launchReadinessNextGateStatus,
+          launchReadinessNextGateDecision: launchReadinessNextGateCarry.launchReadinessNextGateDecision,
+          launchReadinessNextGateCurrentGate: launchReadinessNextGateCarry.launchReadinessNextGateCurrentGate,
+          launchReadinessNextGateCanEnterInitialLaunch: launchReadinessNextGateCarry.launchReadinessNextGateCanEnterInitialLaunch,
+          launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
+          launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+          launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry
         }
       : null,
     nextFollowUp: launchReceiptNextFollowUp
@@ -24594,7 +24605,7 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
     stabilizationHandoffConfirmation: buildStabilizationHandoffConfirmationPayload(stabilizationHandoffConfirmation),
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
     firstWaveConfirmationChain,
-    launchReadinessNextGate: buildDeveloperOpsLaunchReadinessNextGateCarry(launchReadinessNextGate).launchReadinessNextGate,
+    launchReadinessNextGate: launchReadinessNextGateCarry.launchReadinessNextGate,
     launchDayWatchReceipt,
     stabilizationStatusReceipt,
     operationalExceptionEntry,

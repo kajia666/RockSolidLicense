@@ -651,6 +651,8 @@ function buildStagingRehearsalExecutionSummary(result) {
   }
   const realStagingInputClosure = buildRealStagingInputClosure({ profilePreflight, closeoutReview });
   const goLiveProgress = buildGoLiveProgress(result, { realStagingInputClosure });
+  const launchDutyCurrentAction = result.finalRehearsalPacket?.launchDutyCurrentAction
+    || buildLaunchDutyCurrentActionFromResult(result);
   return {
     mode: "staging-rehearsal-execution-summary",
     status,
@@ -671,7 +673,8 @@ function buildStagingRehearsalExecutionSummary(result) {
         profilePreflight,
         closeoutReview
       }),
-      launchDutyFocus: buildLaunchDutyOperatorFocus(result, { status, finalPacket })
+      launchDutyFocus: buildLaunchDutyOperatorFocus(result, { status, finalPacket }),
+      launchDutyCurrentAction
     },
     blockingReasons,
     orderedNextActions,
@@ -2753,13 +2756,19 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
 function buildFullTestSignoffFocus(result, { outputFiles = [] } = {}) {
   const fullTestWindow = result.fullTestWindowReadiness || buildFullTestWindowReadiness(result);
   const productionSignoff = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
-  const signoffPacket = result.stagingProductionSignoffPacket || buildStagingProductionSignoffPacket(result);
+  const signoffPacket = result.stagingProductionSignoffPacket || null;
   const closeoutReview = result.closeoutInput?.backfillReview
     || buildCloseoutInputBackfillReview(null, result.stagingAcceptanceCloseout || {});
   const bindingFiles = result.stagingEnvironmentBinding?.recommendedOutputFiles || [];
+  const archiveRoot = result.stagingReadinessReviewPacket?.archiveRoot
+    || result.stagingRunRecordTemplate?.archiveRoot
+    || result.finalRehearsalPacket?.archiveRoot
+    || result.stagingAcceptanceCloseout?.artifactReceiptLedger?.archiveRoot
+    || "artifacts/staging/product/stable";
   const productionSignoffPacketFile = keyedPath(outputFiles, "production_signoff_packet")
     || keyedPath(bindingFiles, "production_signoff_packet")
-    || signoffPacket.packetFile
+    || signoffPacket?.packetFile
+    || path.posix.join(archiveRoot, "staging-production-signoff-packet.json")
     || null;
   const readinessReviewPacketFile = keyedPath(outputFiles, "readiness_review_packet")
     || keyedPath(bindingFiles, "readiness_review_packet")
@@ -2767,7 +2776,8 @@ function buildFullTestSignoffFocus(result, { outputFiles = [] } = {}) {
     || null;
   const filledCloseoutInputFile = keyedPath(outputFiles, "filled_closeout_input")
     || keyedPath(bindingFiles, "filled_closeout_input")
-    || signoffPacket.closeoutInputPath
+    || signoffPacket?.closeoutInputPath
+    || path.posix.join(archiveRoot, "filled-closeout-input.json")
     || null;
   const canRunFullTestWindow = fullTestWindow.canRun === true;
   const canSignoffProduction = productionSignoff.canSignoff === true;
@@ -2784,9 +2794,9 @@ function buildFullTestSignoffFocus(result, { outputFiles = [] } = {}) {
       key: "archive_production_signoff",
       status,
       packetPath: productionSignoffPacketFile,
-      nextAction: signoffPacket.nextAction || productionSignoff.nextAction || null
+      nextAction: signoffPacket?.nextAction || productionSignoff.nextAction || null
     };
-    nextAction = signoffPacket.nextAction
+    nextAction = signoffPacket?.nextAction
       || "Archive production sign-off and move into launch-day watch."
       ;
   } else if (canRunFullTestWindow) {
@@ -2824,7 +2834,8 @@ function buildFullTestSignoffFocus(result, { outputFiles = [] } = {}) {
     missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
     missingSignoffKeys: productionSignoff.missingSignoffKeys || [],
     missingReceiptVisibilityKeys: productionSignoff.missingReceiptVisibilityKeys || [],
-    signoffBackfillDraftStatus: signoffPacket.signoffBackfillDraft?.status || null,
+    signoffBackfillDraftStatus: signoffPacket?.signoffBackfillDraft?.status
+      || (canSignoffProduction ? "already_filled" : canRunFullTestWindow ? "ready_for_operator_backfill" : "blocked_until_full_test_window"),
     nextAction
   };
 }
@@ -2972,6 +2983,24 @@ function buildLaunchDutyCurrentAction({
     ],
     nextAction: current.nextAction || realStagingRunFocus?.nextAction || null
   };
+}
+
+function buildLaunchDutyCurrentActionFromResult(result, { outputFiles = [], launchDutyPacketFocus = null } = {}) {
+  const realStagingRunFocus = result.operatorExecutionPlan?.realStagingRunFocus
+    || buildRealStagingRunFocus(result, { outputFiles });
+  const closeoutBackfillFocus = result.operatorExecutionPlan?.closeoutBackfillFocus
+    || buildCloseoutBackfillFocus(result, { outputFiles });
+  const fullTestSignoffFocus = result.operatorExecutionPlan?.fullTestSignoffFocus
+    || buildFullTestSignoffFocus(result, { outputFiles });
+  const packetFocus = launchDutyPacketFocus
+    || result.operatorExecutionPlan?.launchDutyPacketFocus
+    || (result.stagingLaunchDutyArchiveIndex ? buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus }) : null);
+  return buildLaunchDutyCurrentAction({
+    realStagingRunFocus,
+    closeoutBackfillFocus,
+    fullTestSignoffFocus,
+    launchDutyPacketFocus: packetFocus
+  });
 }
 
 function findLaunchDutyFocusItem(items) {
@@ -3977,6 +4006,27 @@ function buildFinalRehearsalPacket(result) {
       summary: "Hand off stabilization records, incidents, receipt snapshots, and rollback signals."
     }
   ];
+  const localFiles = [
+    finalLocalFile("handoff_file", result.handoffFile),
+    finalLocalFile("closeout_file", result.closeoutFile),
+    finalLocalFile("run_record_index", result.runRecordFile),
+    finalLocalFile("artifact_manifest", result.artifactManifestFile),
+    finalLocalFile("backup_restore_packet", result.backupRestorePacketFile),
+    finalLocalFile("closeout_reload_packet", result.closeoutReloadPacketFile),
+    finalLocalFile("readiness_review_packet", result.readinessReviewPacketFile),
+    finalLocalFile("production_signoff_packet", result.productionSignoffPacketFile),
+    finalLocalFile("launch_duty_archive_index", result.launchDutyArchiveIndexFile),
+    finalLocalFile("filled_closeout_input", null, filledCloseoutInputPath, "operator_copy_from_example"),
+    finalLocalFile(
+      "filled_closeout_draft",
+      result.filledCloseoutDraftFile,
+      result.filledCloseoutInputDraft?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.draft.json"),
+      "example_only"
+    ),
+    finalLocalFile("filled_closeout_input_example", null, filledExample.saveAs || null, "example_only"),
+    finalLocalFile("artifact_archive_root", null, archiveRoot, "operator_archive")
+  ];
+  const launchDutyCurrentAction = buildLaunchDutyCurrentActionFromResult(result, { outputFiles: localFiles });
   return {
     status: readyForLaunchDayWatch ? "ready_for_launch_day_watch" : "ready_for_operator_rehearsal",
     willModifyData: false,
@@ -3991,6 +4041,7 @@ function buildFinalRehearsalPacket(result) {
     goLiveCurrentBlocker: goLiveProgress.currentBlocker,
     goLiveActionQueue: goLiveProgress.operatorActionQueue,
     goLiveOperatorActionPlan: goLiveProgress.operatorActionPlan,
+    launchDutyCurrentAction,
     commands: {
       stagingRehearsalDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
       routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
@@ -3998,26 +4049,7 @@ function buildFinalRehearsalPacket(result) {
       closeoutReload: filledExample.reloadCommand || null,
       fullTestWindow: closeout.fullTestWindowEntry?.command || "npm.cmd test"
     },
-    localFiles: [
-      finalLocalFile("handoff_file", result.handoffFile),
-      finalLocalFile("closeout_file", result.closeoutFile),
-      finalLocalFile("run_record_index", result.runRecordFile),
-      finalLocalFile("artifact_manifest", result.artifactManifestFile),
-      finalLocalFile("backup_restore_packet", result.backupRestorePacketFile),
-      finalLocalFile("closeout_reload_packet", result.closeoutReloadPacketFile),
-      finalLocalFile("readiness_review_packet", result.readinessReviewPacketFile),
-      finalLocalFile("production_signoff_packet", result.productionSignoffPacketFile),
-      finalLocalFile("launch_duty_archive_index", result.launchDutyArchiveIndexFile),
-      finalLocalFile("filled_closeout_input", null, filledCloseoutInputPath, "operator_copy_from_example"),
-      finalLocalFile(
-        "filled_closeout_draft",
-        result.filledCloseoutDraftFile,
-        result.filledCloseoutInputDraft?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.draft.json"),
-        "example_only"
-      ),
-      finalLocalFile("filled_closeout_input_example", null, filledExample.saveAs || null, "example_only"),
-      finalLocalFile("artifact_archive_root", null, archiveRoot, "operator_archive")
-    ],
+    localFiles,
     postSignoffActionChecklist: buildPostSignoffActionChecklist(result, { archiveRoot }),
     orderedSteps,
     nextAction: readyForLaunchDayWatch
@@ -5082,6 +5114,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
   const goLiveAction = goLiveProgress.currentBlocker?.operatorAction || {};
   const closure = focus.launchReadinessClosure || {};
   const launchDutyFocus = focus.launchDutyFocus || {};
+  const launchDutyCurrentAction = focus.launchDutyCurrentAction || {};
   const statuses = summary.sourceStatuses || {};
   const lines = [
     `- Execution summary status: ${summary.status || "-"}`,
@@ -5102,6 +5135,8 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Go-live operator current action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
+    `- Execution launch-duty current action: ${launchDutyCurrentAction.key || "-"} (stage=${launchDutyCurrentAction.stage || "-"}, source=${launchDutyCurrentAction.sourceFocus || "-"})`,
+    `- Execution launch-duty current packet: ${launchDutyCurrentAction.packetPath || "-"}`,
     `- Real staging input next action: ${realInputClosure.nextAction || "-"}`,
     `- Go-live next action: ${goLiveProgress.nextAction || "-"}`,
     `- Launch closure next plan: ${(closure.nextPlan || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
@@ -6040,6 +6075,7 @@ function renderFinalRehearsalPacket(packet) {
   const review = packet.closeoutInputReview || {};
   const goLiveActionQueue = Array.isArray(packet.goLiveActionQueue) ? packet.goLiveActionQueue : [];
   const goLiveActionPlan = packet.goLiveOperatorActionPlan || {};
+  const launchDutyCurrentAction = packet.launchDutyCurrentAction || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
@@ -6063,6 +6099,8 @@ function renderFinalRehearsalPacket(packet) {
     `- Final packet go-live current blocker: ${packet.goLiveCurrentBlocker?.key || "-"}`,
     `- Final packet go-live operator action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
     `- Current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
+    `- Final packet launch-duty current action: ${launchDutyCurrentAction.key || "-"} (stage=${launchDutyCurrentAction.stage || "-"}, source=${launchDutyCurrentAction.sourceFocus || "-"})`,
+    `- Final packet launch-duty current packet: ${launchDutyCurrentAction.packetPath || "-"}`,
     `- Next action: ${packet.nextAction || "-"}`
   ];
   if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {

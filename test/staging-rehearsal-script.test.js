@@ -2491,6 +2491,12 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.stagingRehearsalExecutionSummary.status, "ready_for_full_test_window");
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.closeoutMissingFieldCount, 0);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.canEnterFullTestWindow, true);
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.mode, "launch-duty-current-action");
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.stage, "full_test_signoff");
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.key, "backfill_production_signoff");
+    assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.mode, "launch-duty-current-action");
+    assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.stage, "full_test_signoff");
+    assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.key, "backfill_production_signoff");
     assert.deepEqual(
       output.stagingRehearsalExecutionSummary.operatorFocus.realStagingInputClosure.checks.map((item) => [item.key, item.status]),
       [
@@ -2814,6 +2820,8 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.match(handoff, /Full-test signoff focus: ready_for_launch_day_watch \(fullTest=yes, signoff=yes\)/);
     assert.match(handoff, /Full-test signoff action: archive_production_signoff \(ready_for_launch_day_watch\)/);
     assert.match(handoff, /Full-test signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(handoff, /Execution launch-duty current action: archive_production_signoff \(stage=launch_day_watch_entry, source=launchDutyPacketFocus\)/);
+    assert.match(handoff, /Final packet launch-duty current action: archive_production_signoff \(stage=launch_day_watch_entry, source=launchDutyPacketFocus\)/);
     assert.match(handoff, /Launch-duty current action: archive_production_signoff \(stage=launch_day_watch_entry, source=launchDutyPacketFocus\)/);
     assert.match(handoff, /Launch-duty current packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(handoff, /Launch-duty packet focus: launch_duty_archive_index \(awaiting_archive_review\)/);
@@ -2997,6 +3005,12 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       firstPostSignoffAction: "production_signoff_packet",
       nextAction: "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."
     });
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.mode, "launch-duty-current-action");
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.stage, "launch_day_watch_entry");
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.key, "archive_production_signoff");
+    assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.mode, "launch-duty-current-action");
+    assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.stage, "launch_day_watch_entry");
+    assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.key, "archive_production_signoff");
     assert.deepEqual(output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure, {
       status: "ready_for_launch_day_watch",
       remainingBlockerCount: 0,

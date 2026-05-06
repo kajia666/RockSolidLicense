@@ -10819,6 +10819,32 @@ test("developer license quickstart first-batch setup can create recommended laun
       postLaunchOperationsAction.receipt?.postLaunchLifecycleSummary?.nextAction?.setupAction?.operation,
       "record_post_launch_ops_sweep"
     );
+    assert.deepEqual(
+      {
+        status: postLaunchOperationsAction.receipt?.firstLaunchOperatingChain?.status,
+        currentPhaseKey: postLaunchOperationsAction.receipt?.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: postLaunchOperationsAction.receipt?.firstLaunchOperatingChain?.readyPhaseCount,
+        nextActionKey: postLaunchOperationsAction.receipt?.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionOperation: postLaunchOperationsAction.receipt?.firstLaunchOperatingChain?.nextAction?.operation,
+        nextActionBody: postLaunchOperationsAction.receipt?.firstLaunchOperatingChain?.nextAction?.body,
+        primaryDownloadKey: postLaunchOperationsAction.receipt?.firstLaunchOperatingChain?.primaryDownload?.key
+      },
+      {
+        status: "pending_post_launch_lifecycle",
+        currentPhaseKey: "post_launch_lifecycle",
+        readyPhaseCount: 4,
+        nextActionKey: "production_post_launch_ops_sweep_recent",
+        nextActionOperation: "record_post_launch_ops_sweep",
+        nextActionBody: {
+          productCode: "FIRSTBATCH",
+          channel: "stable",
+          operation: "record_post_launch_ops_sweep",
+          actionKey: "production_post_launch_ops_sweep_recent",
+          downloadKey: "launch_mainline_post_launch_sweep_handoff"
+        },
+        primaryDownloadKey: "launch_mainline_post_launch_sweep_handoff"
+      }
+    );
 
     const afterOperationsLifecycleOpsSnapshot = await getJson(
       baseUrl,
@@ -10857,6 +10883,40 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(afterOperationsLifecycleOpsSnapshot.summaryText, /First Launch Operating Chain:/);
     assert.match(afterOperationsLifecycleOpsSnapshot.summaryText, /next=production_post_launch_ops_sweep_recent \| phase=post_launch_lifecycle \| operation=record_post_launch_ops_sweep/);
+
+    const postLaunchSweepAction = await postJson(
+      baseUrl,
+      postLaunchOperationsAction.receipt.firstLaunchOperatingChain.nextAction.endpoint,
+      postLaunchOperationsAction.receipt.firstLaunchOperatingChain.nextAction.body,
+      ownerSession.token
+    );
+    assert.equal(postLaunchSweepAction.operation, "record_post_launch_ops_sweep");
+    assert.deepEqual(
+      {
+        status: postLaunchSweepAction.receipt?.firstLaunchOperatingChain?.status,
+        currentPhaseKey: postLaunchSweepAction.receipt?.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: postLaunchSweepAction.receipt?.firstLaunchOperatingChain?.readyPhaseCount,
+        nextActionKey: postLaunchSweepAction.receipt?.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionOperation: postLaunchSweepAction.receipt?.firstLaunchOperatingChain?.nextAction?.operation,
+        nextActionBody: postLaunchSweepAction.receipt?.firstLaunchOperatingChain?.nextAction?.body,
+        primaryDownloadKey: postLaunchSweepAction.receipt?.firstLaunchOperatingChain?.primaryDownload?.key
+      },
+      {
+        status: "pending_post_launch_lifecycle",
+        currentPhaseKey: "post_launch_lifecycle",
+        readyPhaseCount: 4,
+        nextActionKey: "production_launch_closeout_review_recent",
+        nextActionOperation: "record_launch_closeout_review",
+        nextActionBody: {
+          productCode: "FIRSTBATCH",
+          channel: "stable",
+          operation: "record_launch_closeout_review",
+          actionKey: "production_launch_closeout_review_recent",
+          downloadKey: "launch_mainline_closeout_handoff"
+        },
+        primaryDownloadKey: "launch_mainline_closeout_handoff"
+      }
+    );
 
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,

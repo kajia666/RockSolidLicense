@@ -4873,6 +4873,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
   firstLaunchHandoffDownload = null,
   firstLaunchDutySummary = null,
   postLaunchLifecycleSummary = null,
+  firstLaunchOperatingChain = null,
   initialLaunchOperatorActionReceipt = null,
   visibility = null,
   mainlineRecapCards = [],
@@ -4968,6 +4969,10 @@ function buildLaunchMainlineActionReceiptHandoffText({
     lines.push(`- summary: ${postLaunchLifecycleSummary.summary || "-"}`);
     lines.push(`- nextAction: ${postLaunchLifecycleSummary.nextAction?.title || postLaunchLifecycleSummary.nextAction?.label || postLaunchLifecycleSummary.nextAction?.key || "-"}`);
     lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(postLaunchLifecycleSummary.primaryRecommendedDownload, { fileSeparator: " | " })}`);
+  }
+
+  if (firstLaunchOperatingChain) {
+    appendDeveloperOpsFirstLaunchOperatingChainLines(lines, firstLaunchOperatingChain);
   }
 
   if (firstLaunchInventoryQueue) {
@@ -5676,6 +5681,15 @@ function buildLaunchMainlineActionReceipt({
         controls: postLaunchLifecycleControls
       }
     : null;
+  const baseFirstLaunchOperatingChain = launchMainline?.opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstLaunchOperatingChain
+    && typeof launchMainline.opsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain === "object"
+      ? launchMainline.opsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain
+      : null;
+  const firstLaunchOperatingChain = refreshFirstLaunchOperatingChainPostLaunchAction(baseFirstLaunchOperatingChain, {
+    productCode: result?.productCode || launchMainline?.manifest?.project?.code || mainlineSummary.form?.productCode || "",
+    channel: result?.channel || launchMainline?.manifest?.channel || mainlineSummary.form?.channel || "stable",
+    postLaunchLifecycleSummary
+  });
   const mainlineOverviewCards = (Array.isArray(mainlineSummary.overviewCards) ? mainlineSummary.overviewCards : [])
     .slice(0, 3)
     .map((item) => ({
@@ -6832,6 +6846,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     firstLaunchHandoffDownload,
     firstLaunchDutySummary,
     postLaunchLifecycleSummary,
+    firstLaunchOperatingChain,
     initialLaunchOperatorActionReceipt,
     visibility,
     mainlineRecapCards,
@@ -6865,6 +6880,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
     firstLaunchHandoffDownload,
     firstLaunchDutySummary,
     postLaunchLifecycleSummary,
+    firstLaunchOperatingChain,
     initialLaunchOperatorActionManifest,
     initialLaunchOperatorActionReceipt,
     mainlineRecapCards,
@@ -26676,6 +26692,71 @@ function buildFirstLaunchOperatingChainAction(phase = null, {
   }
 
   return null;
+}
+
+function refreshFirstLaunchOperatingChainPostLaunchAction(chain = null, {
+  productCode = "",
+  channel = "stable",
+  postLaunchLifecycleSummary = null
+} = {}) {
+  if (!chain || typeof chain !== "object" || !postLaunchLifecycleSummary || typeof postLaunchLifecycleSummary !== "object") {
+    return chain;
+  }
+  const rawNextAction = postLaunchLifecycleSummary.nextAction && typeof postLaunchLifecycleSummary.nextAction === "object"
+    ? postLaunchLifecycleSummary.nextAction
+    : null;
+  const primaryDownload = normalizeFirstLaunchOperatingChainDownload(
+    postLaunchLifecycleSummary.primaryRecommendedDownload
+  );
+  const postLaunchLifecycleHandoff = {
+    status: postLaunchLifecycleSummary.status || "review",
+    phaseState: {
+      totalCount: Number(postLaunchLifecycleSummary.phaseCount || 0),
+      readyCount: Number(postLaunchLifecycleSummary.readyCount || 0),
+      holdCount: Number(postLaunchLifecycleSummary.holdCount || 0),
+      reviewCount: Number(postLaunchLifecycleSummary.reviewCount || 0)
+    },
+    nextAction: rawNextAction
+      ? {
+          key: rawNextAction.key || rawNextAction.actionKey || rawNextAction.setupAction?.key || null,
+          operation: rawNextAction.operation || rawNextAction.setupAction?.operation || null,
+          downloadKey: rawNextAction.downloadKey || rawNextAction.recommendedDownload?.key || primaryDownload?.key || null
+        }
+      : null,
+    primaryDownload
+  };
+  const nextAction = buildFirstLaunchOperatingChainAction(
+    { key: "post_launch_lifecycle" },
+    {
+      productCode: productCode || chain.productCode || "",
+      channel: channel || chain.channel || "stable",
+      postLaunchLifecycleHandoff
+    }
+  );
+  const phases = (Array.isArray(chain.phases) ? chain.phases : []).map((phase) =>
+    phase?.key === "post_launch_lifecycle"
+      ? {
+          ...phase,
+          status: postLaunchLifecycleHandoff.status,
+          ready: postLaunchLifecycleHandoff.status === "ready",
+          operation: postLaunchLifecycleHandoff.nextAction?.operation || null,
+          summary: `Post-launch lifecycle is ${postLaunchLifecycleHandoff.status}.`,
+          download: primaryDownload
+        }
+      : phase
+  );
+  const readyPhaseCount = phases.filter((phase) => phase?.ready === true).length;
+  return {
+    ...chain,
+    status: postLaunchLifecycleHandoff.status === "ready" ? "ready" : "pending_post_launch_lifecycle",
+    ready: postLaunchLifecycleHandoff.status === "ready",
+    readyPhaseCount,
+    remainingPhaseCount: Math.max(0, Number(chain.phaseCount || phases.length || 0) - readyPhaseCount),
+    currentPhaseKey: postLaunchLifecycleHandoff.status === "ready" ? "ready" : "post_launch_lifecycle",
+    nextAction: postLaunchLifecycleHandoff.status === "ready" ? null : nextAction,
+    primaryDownload: primaryDownload || nextAction?.recommendedDownload || chain.primaryDownload || null,
+    phases
+  };
 }
 
 function buildDeveloperOpsFirstLaunchOperatingChainPayload({

@@ -15335,6 +15335,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         const productionSignoffPacket = launchRunway?.productionSignoffPacket
           || stagingArchiveNextOperations?.productionSignoffPacket
           || null;
+        const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(launchRunway);
         const watchReceiptDownload = buildDeveloperOpsLaunchReceiptNextFollowUpDownload(params, launchReceiptNextFollowUp);
         const watchCheckInAction = {
           key: "launch_mainline_record_post_launch_ops_sweep",
@@ -15501,6 +15502,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             ? "Runway evidence is complete. Enter launch-day watch after production sign-off and keep the first-wave checkpoints close."
             : "Record the remaining runway evidence before entering launch-day watch on production sign-off.",
           launchDayWatchReady,
+          ...launchReadinessNextGateCarry,
           watchEntry: launchRunway?.launchDayWatchEntry || launchRunway?.heroStatus?.launchDayWatchEntry || "enter_after_production_signoff",
           productionSignoffPacket,
           pendingEvidenceCount,
@@ -17470,6 +17472,16 @@ function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = nu
     + ` | pendingEvidence=${Number(launchDayWatchPanel.pendingEvidenceCount || 0)}`
     + ` | pendingEvidenceOperations=${Number(launchDayWatchPanel.pendingEvidenceOperationCount || 0)}`
   );
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(launchDayWatchPanel);
+  if (launchReadinessNextGate) {
+    lines.push(
+      `- launchReadinessNextGate: ${launchReadinessNextGate.status || "-"}`
+      + ` | decision=${launchReadinessNextGate.decision || "-"}`
+      + ` | canEnterInitialLaunch=${launchReadinessNextGate.canEnterInitialLaunch === true}`
+      + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
+    );
+    lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+  }
   if (launchDayWatchPanel.productionSignoffPacket) {
     lines.push(`- productionSignoffPacket: ${launchDayWatchPanel.productionSignoffPacket}`);
   }

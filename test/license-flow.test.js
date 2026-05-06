@@ -6744,6 +6744,19 @@ test("developer release package export bundles integration, versions, and notice
         pendingEvidenceOperationCount: launchMainline.mainlineSummary.launchDayWatchPanel?.pendingEvidenceOperationCount,
         nextActionKey: launchMainline.mainlineSummary.launchDayWatchPanel?.nextActionKey,
         nextActionOperation: launchMainline.mainlineSummary.launchDayWatchPanel?.nextActionOperation,
+        launchReadinessNextGate: launchMainline.mainlineSummary.launchDayWatchPanel?.launchReadinessNextGate
+          ? {
+              status: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.status,
+              decision: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.decision,
+              canEnterInitialLaunch: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.canEnterInitialLaunch,
+              currentGate: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.currentGate,
+              fullTestWindowCommand: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.fullTestWindowCommand,
+              productionSignoffPacket: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.productionSignoffPacket
+            }
+          : null,
+        launchReadinessNextGateStatus: launchMainline.mainlineSummary.launchDayWatchPanel?.launchReadinessNextGateStatus,
+        launchReadinessNextGateDecision: launchMainline.mainlineSummary.launchDayWatchPanel?.launchReadinessNextGateDecision,
+        launchReadinessNextGateCurrentGate: launchMainline.mainlineSummary.launchDayWatchPanel?.launchReadinessNextGateCurrentGate,
         watchCheckIn: launchMainline.mainlineSummary.launchDayWatchPanel?.watchCheckIn
           ? {
               status: launchMainline.mainlineSummary.launchDayWatchPanel.watchCheckIn.status,
@@ -6813,6 +6826,17 @@ test("developer release package export bundles integration, versions, and notice
         pendingEvidenceOperationCount: 3,
         nextActionKey: "launch_mainline_record_launch_rehearsal_run",
         nextActionOperation: "record_launch_rehearsal_run",
+        launchReadinessNextGate: {
+          status: "awaiting_launch_readiness",
+          decision: "no_go",
+          canEnterInitialLaunch: false,
+          currentGate: "ready_for_closeout_reload",
+          fullTestWindowCommand: "npm.cmd test",
+          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json"
+        },
+        launchReadinessNextGateStatus: "awaiting_launch_readiness",
+        launchReadinessNextGateDecision: "no_go",
+        launchReadinessNextGateCurrentGate: "ready_for_closeout_reload",
         watchCheckIn: {
           status: "waiting_for_runway_evidence",
           actionKey: "launch_mainline_record_post_launch_ops_sweep",
@@ -7128,6 +7152,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Launch-Day Watch Panel:/);
       assert.match(launchMainline.summaryText, /- status: blocked_by_runway_evidence/);
       assert.match(launchMainline.summaryText, /- ready: false \| watchEntry=enter_after_production_signoff \| pendingEvidence=6 \| pendingEvidenceOperations=3/);
+      assert.match(launchMainline.summaryText, /Launch-Day Watch Panel:[\s\S]*- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
+      assert.match(launchMainline.summaryText, /Launch-Day Watch Panel:[\s\S]*- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
       assert.match(launchMainline.summaryText, /- productionSignoffPacket: artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchMainline.summaryText, /- nextAction: launch_mainline_record_launch_rehearsal_run \| operation=record_launch_rehearsal_run/);
       assert.match(launchMainline.summaryText, /- watchCheckIn: status=waiting_for_runway_evidence \| action=launch_mainline_record_post_launch_ops_sweep \| operation=record_post_launch_ops_sweep \| evidence=post_launch_ops_sweep \| recordedAt=-/);
@@ -7231,6 +7257,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Mainline Launch Runway:/);
       assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGateFullTestWindow: npm\.cmd test/);
+      assert.match(launchMainlineSummaryDownload.body, /Launch-Day Watch Panel:[\s\S]*launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Closeout Reload/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Full Test Window/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Sign-off Packet/);

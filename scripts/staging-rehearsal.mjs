@@ -2917,6 +2917,35 @@ function buildLaunchDutyCurrentAction({
   if (fullTestSignoffFocus?.canSignoffProduction === true) {
     const current = fullTestSignoffFocus.currentAction || {};
     const target = launchDutyPacketFocus?.currentPostSignoffTarget || {};
+    const watch = launchDutyPacketFocus?.currentWatchArtifact || {};
+    const stabilization = launchDutyPacketFocus?.currentStabilizationWindow || {};
+    const stabilizationPath = stabilization.path
+      || (launchDutyPacketFocus?.archiveRoot ? path.posix.join(launchDutyPacketFocus.archiveRoot, "stabilization-owner-handoff.md") : null);
+    const evidenceInputs = [
+      {
+        key: "production_signoff_packet",
+        kind: "packet",
+        status: target.status || current.status || "archive_before_cutover",
+        path: current.packetPath || target.path || launchDutyPacketFocus?.controlPaths?.productionSignoffPacket || null
+      },
+      {
+        key: watch.key || "launch_day_watch_summary",
+        kind: "artifact",
+        status: watch.status || "pending_operator_entry",
+        path: watch.path || null
+      },
+      {
+        key: stabilization.key || "stabilization_owner_handoff",
+        kind: "artifact",
+        status: stabilization.status || "operator_handoff",
+        path: stabilizationPath
+      }
+    ];
+    const confirmationPoints = evidenceInputs.map((item) => ({
+      key: item.key,
+      status: item.status,
+      path: item.path || null
+    }));
     return {
       mode,
       stage: "launch_day_watch_entry",
@@ -2928,11 +2957,50 @@ function buildLaunchDutyCurrentAction({
       artifactPath: target.path || null,
       envKeys: current.envKeys || [],
       missingKeys: [],
+      evidenceInputs,
+      confirmationPoints,
       nextAction: launchDutyPacketFocus?.nextAction || current.nextAction || fullTestSignoffFocus.nextAction || null
     };
   }
   if (fullTestSignoffFocus?.canRunFullTestWindow === true) {
     const current = fullTestSignoffFocus.currentAction || {};
+    const evidenceInputs = [
+      {
+        key: "full_test_window",
+        kind: "command",
+        status: "ready_for_full_test_window",
+        command: current.command || fullTestSignoffFocus.commands?.fullTestWindow || null
+      },
+      {
+        key: "production_signoff_packet",
+        kind: "packet",
+        status: fullTestSignoffFocus.signoffBackfillDraftStatus || "ready_for_operator_backfill",
+        path: current.packetPath || fullTestSignoffFocus.paths?.productionSignoffPacketFile || null
+      },
+      {
+        key: "filled_closeout_input",
+        kind: "file",
+        status: fullTestSignoffFocus.closeoutInputStatus || "missing",
+        path: fullTestSignoffFocus.paths?.filledCloseoutInputFile || null
+      }
+    ];
+    const confirmationPoints = [
+      {
+        key: "production_signoff_conditions",
+        status: (fullTestSignoffFocus.missingSignoffKeys || []).length ? "missing" : "ready",
+        missingKeys: fullTestSignoffFocus.missingSignoffKeys || []
+      },
+      {
+        key: "receipt_visibility",
+        status: (fullTestSignoffFocus.missingReceiptVisibilityKeys || []).length ? "missing" : "ready",
+        missingKeys: fullTestSignoffFocus.missingReceiptVisibilityKeys || []
+      },
+      {
+        key: "reload_closeout_input",
+        status: "operator_execute",
+        command: fullTestSignoffFocus.commands?.closeoutReload || null
+      }
+    ];
     return {
       mode,
       stage: "full_test_signoff",
@@ -2947,11 +3015,44 @@ function buildLaunchDutyCurrentAction({
         ...(fullTestSignoffFocus.missingSignoffKeys || []),
         ...(fullTestSignoffFocus.missingReceiptVisibilityKeys || [])
       ],
+      evidenceInputs,
+      confirmationPoints,
       nextAction: fullTestSignoffFocus.nextAction || current.nextAction || null
     };
   }
   if (closeoutBackfillFocus) {
     const current = closeoutBackfillFocus.currentBackfillTarget || {};
+    const evidenceInputs = [
+      {
+        key: current.key || "closeout_backfill_target",
+        kind: "artifact",
+        status: closeoutBackfillFocus.status || "awaiting_closeout_backfill",
+        path: current.artifactPath || null
+      },
+      {
+        key: "filled_closeout_input",
+        kind: "file",
+        status: closeoutBackfillFocus.closeoutReviewStatus || "not_loaded",
+        path: closeoutBackfillFocus.paths?.filledCloseoutInputFile || null
+      },
+      {
+        key: "closeout_reload_packet",
+        kind: "packet",
+        status: closeoutBackfillFocus.status || "awaiting_closeout_backfill",
+        path: launchDutyPacketFocus?.controlPaths?.closeoutReloadPacket || closeoutBackfillFocus.paths?.closeoutReloadPacketFile || null
+      }
+    ];
+    const confirmationPoints = [
+      {
+        key: current.key || "closeout_backfill_target",
+        status: current.key ? "missing" : closeoutBackfillFocus.status || "ready"
+      },
+      {
+        key: "reload_closeout_input",
+        status: "operator_execute",
+        command: closeoutBackfillFocus.reloadCommand || null
+      }
+    ];
     return {
       mode,
       stage: "closeout_backfill",
@@ -2963,10 +3064,44 @@ function buildLaunchDutyCurrentAction({
       artifactPath: current.artifactPath || null,
       envKeys: current.envKeys || [],
       missingKeys: closeoutBackfillFocus.missingBackfillKeys || [],
+      evidenceInputs,
+      confirmationPoints,
       nextAction: current.nextAction || closeoutBackfillFocus.nextAction || null
     };
   }
   const current = realStagingRunFocus?.currentAction || {};
+  const evidenceInputs = [
+    {
+      key: "staging_profile",
+      kind: "file",
+      status: realStagingRunFocus?.paths?.profileFile ? "ready" : "missing",
+      path: realStagingRunFocus?.paths?.profileFile || null
+    },
+    {
+      key: "staging_dry_run",
+      kind: "command",
+      status: current.status || realStagingRunFocus?.status || "blocked",
+      command: current.command || realStagingRunFocus?.commands?.stagingDryRun || null
+    },
+    {
+      key: "artifact_archive_root",
+      kind: "directory",
+      status: realStagingRunFocus?.paths?.artifactArchiveRoot ? "ready" : "missing",
+      path: realStagingRunFocus?.paths?.artifactArchiveRoot || null
+    }
+  ];
+  const confirmationPoints = [
+    {
+      key: "required_secret_env",
+      status: (realStagingRunFocus?.missingSecretEnv || []).length ? "missing" : "ready",
+      missingKeys: realStagingRunFocus?.missingSecretEnv || []
+    },
+    {
+      key: "artifact_output_paths",
+      status: (realStagingRunFocus?.missingOutputFiles || []).length ? "missing" : "ready",
+      missingKeys: realStagingRunFocus?.missingOutputFiles || []
+    }
+  ];
   return {
     mode,
     stage: "real_staging_inputs",
@@ -2981,6 +3116,8 @@ function buildLaunchDutyCurrentAction({
       ...(realStagingRunFocus?.missingOutputFiles || []),
       ...(realStagingRunFocus?.missingSecretEnv || [])
     ],
+    evidenceInputs,
+    confirmationPoints,
     nextAction: current.nextAction || realStagingRunFocus?.nextAction || null
   };
 }
@@ -5137,6 +5274,8 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
     `- Execution launch-duty current action: ${launchDutyCurrentAction.key || "-"} (stage=${launchDutyCurrentAction.stage || "-"}, source=${launchDutyCurrentAction.sourceFocus || "-"})`,
     `- Execution launch-duty current packet: ${launchDutyCurrentAction.packetPath || "-"}`,
+    `- Execution launch-duty evidence inputs: ${renderLaunchDutyActionInputList(launchDutyCurrentAction.evidenceInputs)}`,
+    `- Execution launch-duty confirmation points: ${renderLaunchDutyActionConfirmationList(launchDutyCurrentAction.confirmationPoints)}`,
     `- Real staging input next action: ${realInputClosure.nextAction || "-"}`,
     `- Go-live next action: ${goLiveProgress.nextAction || "-"}`,
     `- Launch closure next plan: ${(closure.nextPlan || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
@@ -5246,6 +5385,18 @@ function appendPostSignoffActionChecklist(lines, checklist) {
   }
 }
 
+function renderLaunchDutyActionInputList(items = []) {
+  return items
+    .map((item) => `${item.key || "-"}=${item.path || item.command || item.status || "-"}`)
+    .join("; ") || "-";
+}
+
+function renderLaunchDutyActionConfirmationList(items = []) {
+  return items
+    .map((item) => `${item.key || "-"}=${item.status || item.path || item.command || "-"}`)
+    .join("; ") || "-";
+}
+
 function renderOperatorExecutionPlan(plan) {
   if (!plan) {
     return "- Not available";
@@ -5270,6 +5421,8 @@ function renderOperatorExecutionPlan(plan) {
     `- Launch-duty current action: ${currentLaunchDutyAction.key || "-"} (stage=${currentLaunchDutyAction.stage || "-"}, source=${currentLaunchDutyAction.sourceFocus || "-"})`,
     `- Launch-duty current command: \`${currentLaunchDutyAction.command || "-"}\``,
     `- Launch-duty current packet: ${currentLaunchDutyAction.packetPath || "-"}`,
+    `- Launch-duty evidence inputs: ${renderLaunchDutyActionInputList(currentLaunchDutyAction.evidenceInputs)}`,
+    `- Launch-duty confirmation points: ${renderLaunchDutyActionConfirmationList(currentLaunchDutyAction.confirmationPoints)}`,
     `- Launch-duty current next action: ${currentLaunchDutyAction.nextAction || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
   ];
@@ -6101,6 +6254,8 @@ function renderFinalRehearsalPacket(packet) {
     `- Current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Final packet launch-duty current action: ${launchDutyCurrentAction.key || "-"} (stage=${launchDutyCurrentAction.stage || "-"}, source=${launchDutyCurrentAction.sourceFocus || "-"})`,
     `- Final packet launch-duty current packet: ${launchDutyCurrentAction.packetPath || "-"}`,
+    `- Final packet launch-duty evidence inputs: ${renderLaunchDutyActionInputList(launchDutyCurrentAction.evidenceInputs)}`,
+    `- Final packet launch-duty confirmation points: ${renderLaunchDutyActionConfirmationList(launchDutyCurrentAction.confirmationPoints)}`,
     `- Next action: ${packet.nextAction || "-"}`
   ];
   if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {

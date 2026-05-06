@@ -25038,6 +25038,7 @@ function buildDeveloperOpsInitialLaunchOperatorActionReceipts(latestLaunchReceip
       continue;
     }
     const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(item.launchOpsOverviewContext);
+    const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(item);
     receipts.push({
       source: "developer_ops_audit_log",
       auditLogId: item.auditLogId || null,
@@ -25063,7 +25064,8 @@ function buildDeveloperOpsInitialLaunchOperatorActionReceipts(latestLaunchReceip
       launchOpsOverviewContext,
       handoffFileName: item.handoffFileName || null,
       handoffGeneratedAt: item.handoffGeneratedAt || null,
-      createdAt: item.createdAt || item.handoffGeneratedAt || null
+      createdAt: item.createdAt || item.handoffGeneratedAt || null,
+      ...launchReadinessNextGateCarry
     });
   }
   return receipts
@@ -26190,6 +26192,9 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
     launchReceiptNextFollowUp?.launchOpsOverviewContext
     || latestReceipt?.launchOpsOverviewContext
   );
+  const latestOperatorActionReceiptGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+    latestOperatorActionReceipt || latestReceipt
+  );
   const checklist = [
     `Confirm latest operator action receipt: ${latestOperatorActionReceipt?.operation || latestReceipt?.operation || "-"}.`,
     `Review post-launch lifecycle status before stabilization handoff: ${postLaunchLifecycleStatus || "unknown"}.`,
@@ -26227,7 +26232,8 @@ function buildDeveloperOpsInitialLaunchStabilizationHandoff({
           decision: latestOperatorActionReceipt.decision || null,
           nextOperation: latestOperatorActionReceipt.nextOperation || null,
           nextDownloadFileName: latestOperatorActionReceipt.nextDownloadFileName || null,
-          launchOpsOverviewContext: latestOperatorActionReceipt.launchOpsOverviewContext || null
+          launchOpsOverviewContext: latestOperatorActionReceipt.launchOpsOverviewContext || null,
+          ...latestOperatorActionReceiptGateCarry
         }
       : null,
     confirmation,
@@ -31934,6 +31940,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("Initial Launch Operator Action Receipts:");
       for (const item of initialLaunchOpsReadiness.operatorActionReceipts) {
         const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(item.launchOpsOverviewContext);
+        const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(item);
         lines.push(
           `- source=${item.source || "-"}`
           + ` | audit=${item.auditLogId || "-"}`
@@ -31945,6 +31952,14 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | href=${item.nextDownloadHref || "-"}`
           + (launchOpsOverviewContext ? ` | ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}` : "")
         );
+        if (launchReadinessNextGate) {
+          lines.push(
+            `  - launchReadinessNextGate=${launchReadinessNextGate.status || "-"}`
+            + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
+            + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
+            + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+          );
+        }
       }
     }
     const firstWaveHandoffConfirmation = initialLaunchOpsReadiness.firstWaveHandoffConfirmation || null;
@@ -31979,6 +31994,17 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | audit=${stabilizationHandoff.latestOperatorActionReceipt?.auditLogId || "-"}`
         + ` | next=${stabilizationHandoff.latestOperatorActionReceipt?.nextOperation || "-"}`
       );
+      const latestOperatorLaunchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(
+        stabilizationHandoff.latestOperatorActionReceipt
+      );
+      if (latestOperatorLaunchReadinessNextGate) {
+        lines.push(
+          `- launchReadinessNextGate=${latestOperatorLaunchReadinessNextGate.status || "-"}`
+          + ` | goLiveCurrentGate=${latestOperatorLaunchReadinessNextGate.currentGate || "-"}`
+          + ` | goLiveFullTestWindow=${latestOperatorLaunchReadinessNextGate.fullTestWindowCommand || "-"}`
+          + ` | productionSignoffPacket=${latestOperatorLaunchReadinessNextGate.productionSignoffPacket || "-"}`
+        );
+      }
       lines.push(
         `- nextAction=${stabilizationHandoff.nextAction?.operation || "-"}`
         + ` | download=${stabilizationHandoff.nextAction?.downloadFileName || stabilizationHandoff.nextAction?.downloadKey || "-"}`
@@ -32635,11 +32661,22 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   const stabilizationHandoff = readiness.stabilizationHandoff || null;
   if (stabilizationHandoff) {
     lines.push("Stabilization Handoff:");
+    const latestOperatorLaunchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(
+      stabilizationHandoff.latestOperatorActionReceipt
+    );
     lines.push(`- Version: ${stabilizationHandoff.version || "-"}`);
     lines.push(`- Status: ${stabilizationHandoff.status || "-"} | decision=${stabilizationHandoff.decision || "-"}`);
     lines.push(`- Latest Receipt: ${stabilizationHandoff.latestLaunchReceipt?.operation || "-"} | handoff=${stabilizationHandoff.latestLaunchReceipt?.handoffFileName || "-"}`);
     lines.push(`- Post-Launch: status=${stabilizationHandoff.latestLaunchReceipt?.postLaunchLifecycleStatus || "-"} | next=${stabilizationHandoff.latestLaunchReceipt?.postLaunchLifecycleNextOperation || "-"}`);
     lines.push(`- Latest Operator: ${stabilizationHandoff.latestOperatorActionReceipt?.operation || "-"} | audit=${stabilizationHandoff.latestOperatorActionReceipt?.auditLogId || "-"} | next=${stabilizationHandoff.latestOperatorActionReceipt?.nextOperation || "-"}`);
+    if (latestOperatorLaunchReadinessNextGate) {
+      lines.push(
+        `- Launch Readiness Next Gate: ${latestOperatorLaunchReadinessNextGate.status || "-"}`
+        + ` | currentGate=${latestOperatorLaunchReadinessNextGate.currentGate || "-"}`
+        + ` | fullTestWindow=${latestOperatorLaunchReadinessNextGate.fullTestWindowCommand || "-"}`
+        + ` | productionSignoffPacket=${latestOperatorLaunchReadinessNextGate.productionSignoffPacket || "-"}`
+      );
+    }
     lines.push(`- Next Action: ${stabilizationHandoff.nextAction?.operation || "-"} | download=${stabilizationHandoff.nextAction?.downloadFileName || stabilizationHandoff.nextAction?.downloadKey || "-"} | href=${stabilizationHandoff.nextAction?.downloadHref || "-"} | workspace=${stabilizationHandoff.nextAction?.workspaceHref || "-"}`);
     lines.push(`- Files: readiness=${stabilizationHandoff.files?.readiness || "-"} | handoffIndex=${stabilizationHandoff.files?.handoffIndex || "-"} | nextFollowUp=${stabilizationHandoff.files?.nextFollowUp || "-"} | postLaunchIndex=${stabilizationHandoff.files?.postLaunchIndex || "-"}`);
     const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(stabilizationHandoff.launchOpsOverviewContext);
@@ -33262,6 +33299,7 @@ function buildDeveloperOpsStabilizationHandoffText(payload = {}) {
   const latestOperator = handoff.latestOperatorActionReceipt || {};
   const nextAction = handoff.nextAction || {};
   const files = handoff.files || {};
+  const latestOperatorLaunchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(latestOperator);
   lines.push(`Version: ${handoff.version || "-"}`);
   lines.push(`Generated For: ${handoff.generatedFor || "-"}`);
   lines.push(`Project Code: ${handoff.projectCode || scope.productCode || "-"}`);
@@ -33269,6 +33307,14 @@ function buildDeveloperOpsStabilizationHandoffText(payload = {}) {
   lines.push(`Latest Receipt: ${latestReceipt.operation || "-"} | handoff=${latestReceipt.handoffFileName || "-"} | gate=${latestReceipt.mainlineGateStatus || "-"}`);
   lines.push(`Post-Launch: status=${latestReceipt.postLaunchLifecycleStatus || "-"} | next=${latestReceipt.postLaunchLifecycleNextOperation || "-"}`);
   lines.push(`Latest Operator: ${latestOperator.operation || "-"} | audit=${latestOperator.auditLogId || "-"} | next=${latestOperator.nextOperation || "-"}`);
+  if (latestOperatorLaunchReadinessNextGate) {
+    lines.push(
+      `Launch Readiness Next Gate: status=${latestOperatorLaunchReadinessNextGate.status || "-"}`
+      + ` | currentGate=${latestOperatorLaunchReadinessNextGate.currentGate || "-"}`
+      + ` | fullTestWindow=${latestOperatorLaunchReadinessNextGate.fullTestWindowCommand || "-"}`
+      + ` | productionSignoffPacket=${latestOperatorLaunchReadinessNextGate.productionSignoffPacket || "-"}`
+    );
+  }
   lines.push(`Next Action: ${nextAction.operation || "-"} | stage=${nextAction.stage || "-"} | action=${nextAction.actionKey || "-"} | priority=${nextAction.priority || "-"}`);
   lines.push(`Download: ${nextAction.downloadFileName || nextAction.downloadKey || "-"} | key=${nextAction.downloadKey || "-"} | href=${nextAction.downloadHref || "-"}`);
   lines.push(`Workspace Href: ${nextAction.workspaceHref || "-"}`);

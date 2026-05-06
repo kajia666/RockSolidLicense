@@ -11194,6 +11194,29 @@ test("developer license quickstart first-batch setup can create recommended laun
       stabilizationGateOperatorActionManifest.actions?.[0]?.launchReadinessNextGatePrimaryDownloadFormat,
       "launch-receipt-next-follow-up"
     );
+    const stabilizationGateLatestOperatorActionReceipt = stabilizationGateInitialOps?.latestOperatorActionReceipt;
+    assert.ok(stabilizationGateLatestOperatorActionReceipt);
+    assertGoLiveNextGatePayload(stabilizationGateLatestOperatorActionReceipt.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateLatestOperatorActionReceipt.launchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    const stabilizationGateOperatorActionReceiptEvidence = stabilizationGateInitialOps?.operatorActionReceipts?.[0];
+    assert.ok(stabilizationGateOperatorActionReceiptEvidence);
+    assertGoLiveNextGatePayload(stabilizationGateOperatorActionReceiptEvidence.launchReadinessNextGate);
+    assert.equal(
+      stabilizationGateOperatorActionReceiptEvidence.launchReadinessNextGatePrimaryDownloadFormat,
+      "launch-receipt-next-follow-up"
+    );
+    const stabilizationGateStabilizationHandoff = stabilizationGateInitialOps?.stabilizationHandoff;
+    assert.ok(stabilizationGateStabilizationHandoff);
+    assertGoLiveNextGatePayload(
+      stabilizationGateStabilizationHandoff.latestOperatorActionReceipt?.launchReadinessNextGate
+    );
+    assert.equal(
+      stabilizationGateStabilizationHandoff.latestOperatorActionReceipt?.launchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
     assertGoLiveNextGatePayload(stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGate);
     assert.equal(
       stabilizationGateInitialOps?.launchDayWatchReceipt?.launchReadinessNextGateStatus,
@@ -11310,6 +11333,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Next Action:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Action Manifest:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Action Manifest:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Operator Action Receipts:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
+    assert.match(stabilizationGateOpsSnapshot.summaryText, /Initial Launch Stabilization Handoff:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch-Day Watch Receipt:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Launch-Day Watch Receipt:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Stabilization Status Receipt:[\s\S]*launchReadinessNextGate=awaiting_launch_readiness/);

@@ -2450,6 +2450,22 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.missingFieldCount, 0);
     assert.deepEqual(output.operatorExecutionPlan.closeoutBackfillFocus.missingBackfillKeys, []);
     assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget, null);
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.mode, "full-test-signoff-focus");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.status, "ready_for_full_test_window");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.canRunFullTestWindow, true);
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.canSignoffProduction, false);
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.key, "backfill_production_signoff");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.status, "ready_for_full_test_window");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.commands.fullTestWindow, "npm.cmd test");
+    assert.deepEqual(output.operatorExecutionPlan.fullTestSignoffFocus.missingCloseoutKeys, []);
+    assert.deepEqual(
+      output.operatorExecutionPlan.fullTestSignoffFocus.missingSignoffKeys,
+      expectedProductionSignoffConditionKeys
+    );
+    assert.deepEqual(
+      output.operatorExecutionPlan.fullTestSignoffFocus.missingReceiptVisibilityKeys,
+      expectedReceiptVisibilityKeys
+    );
     assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.key, "readiness_review_packet");
     assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.status, "ready_for_full_test_window");
     assert.equal(output.fullTestWindowReadiness.status, "ready");
@@ -2780,6 +2796,9 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       ]
     );
     const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, /Full-test signoff focus: ready_for_launch_day_watch \(fullTest=yes, signoff=yes\)/);
+    assert.match(handoff, /Full-test signoff action: archive_production_signoff \(ready_for_launch_day_watch\)/);
+    assert.match(handoff, /Full-test signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(handoff, /Launch-duty packet focus: launch_duty_archive_index \(awaiting_archive_review\)/);
     assert.match(handoff, /Launch-duty post-signoff target: production_signoff_packet \(archive_before_cutover\)/);
     assert.match(handoff, /Launch-duty watch artifact: launch_day_watch_summary \(pending_operator_entry\)/);
@@ -2891,6 +2910,15 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentWatchArtifact.status, "pending_operator_entry");
     assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentStabilizationWindow.key, "stabilization_owner_handoff");
     assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentStabilizationWindow.status, "operator_handoff");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.mode, "full-test-signoff-focus");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.status, "ready_for_launch_day_watch");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.canRunFullTestWindow, true);
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.canSignoffProduction, true);
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.key, "archive_production_signoff");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.status, "ready_for_launch_day_watch");
+    assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.signoffBackfillDraftStatus, "already_filled");
+    assert.deepEqual(output.operatorExecutionPlan.fullTestSignoffFocus.missingSignoffKeys, []);
+    assert.deepEqual(output.operatorExecutionPlan.fullTestSignoffFocus.missingReceiptVisibilityKeys, []);
     assert.equal(
       output.operatorExecutionPlan.launchDutyPacketFocus.nextAction,
       "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."

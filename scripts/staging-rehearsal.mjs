@@ -2750,6 +2750,85 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
   };
 }
 
+function buildFullTestSignoffFocus(result, { outputFiles = [] } = {}) {
+  const fullTestWindow = result.fullTestWindowReadiness || buildFullTestWindowReadiness(result);
+  const productionSignoff = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
+  const signoffPacket = result.stagingProductionSignoffPacket || buildStagingProductionSignoffPacket(result);
+  const closeoutReview = result.closeoutInput?.backfillReview
+    || buildCloseoutInputBackfillReview(null, result.stagingAcceptanceCloseout || {});
+  const bindingFiles = result.stagingEnvironmentBinding?.recommendedOutputFiles || [];
+  const productionSignoffPacketFile = keyedPath(outputFiles, "production_signoff_packet")
+    || keyedPath(bindingFiles, "production_signoff_packet")
+    || signoffPacket.packetFile
+    || null;
+  const readinessReviewPacketFile = keyedPath(outputFiles, "readiness_review_packet")
+    || keyedPath(bindingFiles, "readiness_review_packet")
+    || result.stagingReadinessReviewPacket?.packetFile
+    || null;
+  const filledCloseoutInputFile = keyedPath(outputFiles, "filled_closeout_input")
+    || keyedPath(bindingFiles, "filled_closeout_input")
+    || signoffPacket.closeoutInputPath
+    || null;
+  const canRunFullTestWindow = fullTestWindow.canRun === true;
+  const canSignoffProduction = productionSignoff.canSignoff === true;
+  let status = "blocked_until_closeout_reload";
+  let currentAction = {
+    key: "reload_closeout_input",
+    status,
+    command: fullTestWindow.reloadCommand || productionSignoff.reloadCommand || null
+  };
+  let nextAction = fullTestWindow.nextAction || "Backfill and reload the closeout input before the full test window.";
+  if (canSignoffProduction) {
+    status = "ready_for_launch_day_watch";
+    currentAction = {
+      key: "archive_production_signoff",
+      status,
+      packetPath: productionSignoffPacketFile,
+      nextAction: signoffPacket.nextAction || productionSignoff.nextAction || null
+    };
+    nextAction = signoffPacket.nextAction
+      || "Archive production sign-off and move into launch-day watch."
+      ;
+  } else if (canRunFullTestWindow) {
+    status = "ready_for_full_test_window";
+    currentAction = {
+      key: "backfill_production_signoff",
+      status,
+      command: fullTestWindow.command || "npm.cmd test",
+      packetPath: productionSignoffPacketFile,
+      nextAction: productionSignoff.nextAction || null
+    };
+    nextAction = "Run the full test window, then backfill production sign-off evidence, receipt visibility, and reload closeout input.";
+  } else if (result.closeoutInput?.status === "loaded") {
+    status = "blocked_until_closeout_reload";
+    currentAction.status = status;
+  }
+  return {
+    mode: "full-test-signoff-focus",
+    status,
+    willModifyData: false,
+    canRunFullTestWindow,
+    canSignoffProduction,
+    closeoutReviewStatus: closeoutReview.status || "not_loaded",
+    closeoutInputStatus: result.closeoutInput?.status || "missing",
+    currentAction,
+    commands: {
+      fullTestWindow: fullTestWindow.command || "npm.cmd test",
+      closeoutReload: fullTestWindow.reloadCommand || productionSignoff.reloadCommand || null
+    },
+    paths: {
+      readinessReviewPacketFile,
+      productionSignoffPacketFile,
+      filledCloseoutInputFile
+    },
+    missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
+    missingSignoffKeys: productionSignoff.missingSignoffKeys || [],
+    missingReceiptVisibilityKeys: productionSignoff.missingReceiptVisibilityKeys || [],
+    signoffBackfillDraftStatus: signoffPacket.signoffBackfillDraft?.status || null,
+    nextAction
+  };
+}
+
 function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {}) {
   const archiveIndex = result.stagingLaunchDutyArchiveIndex || buildStagingLaunchDutyArchiveIndex(result);
   const packetSequence = Array.isArray(archiveIndex.packets) ? archiveIndex.packets : [];
@@ -4146,6 +4225,7 @@ function buildStagingOperatorExecutionPlan(result) {
   const readinessGaps = buildOperatorReadinessGaps(result, { closeout, outputFiles });
   const realStagingRunFocus = buildRealStagingRunFocus(result, { outputFiles });
   const closeoutBackfillFocus = buildCloseoutBackfillFocus(result, { outputFiles });
+  const fullTestSignoffFocus = buildFullTestSignoffFocus(result, { outputFiles });
   const launchDutyPacketFocus = buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus });
   return {
     status: "ready_for_staging_execution",
@@ -4165,6 +4245,7 @@ function buildStagingOperatorExecutionPlan(result) {
     realStagingRunFocus,
     goLiveOperatorActionPlan,
     closeoutBackfillFocus,
+    fullTestSignoffFocus,
     launchDutyPacketFocus,
     orderedSteps: [
       {
@@ -5095,6 +5176,18 @@ function renderOperatorExecutionPlan(plan) {
     lines.push(`- Full test focus: ${focus.fullTestWindow?.status || "-"} (canRun=${focus.fullTestWindow?.canRun ? "yes" : "no"}, command=${focus.fullTestWindow?.command || "-"})`);
     lines.push(`- Production sign-off focus: ${focus.productionSignoff?.status || "-"} (canSignoff=${focus.productionSignoff?.canSignoff ? "yes" : "no"})`);
     lines.push(`- Closeout focus next action: ${focus.nextAction || "-"}`);
+  }
+  if (plan.fullTestSignoffFocus) {
+    const focus = plan.fullTestSignoffFocus;
+    const current = focus.currentAction || {};
+    lines.push(`- Full-test signoff focus: ${focus.status || "-"} (fullTest=${focus.canRunFullTestWindow ? "yes" : "no"}, signoff=${focus.canSignoffProduction ? "yes" : "no"})`);
+    lines.push(`- Full-test signoff action: ${current.key || "-"} (${current.status || "-"})`);
+    lines.push(`- Full-test command: \`${focus.commands?.fullTestWindow || "-"}\``);
+    lines.push(`- Full-test signoff reload: \`${focus.commands?.closeoutReload || "-"}\``);
+    lines.push(`- Full-test signoff packet: ${focus.paths?.productionSignoffPacketFile || "-"}`);
+    lines.push(`- Full-test signoff missing signoff keys: ${(focus.missingSignoffKeys || []).join(", ") || "-"}`);
+    lines.push(`- Full-test signoff missing receipt visibility: ${(focus.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
+    lines.push(`- Full-test signoff next action: ${focus.nextAction || "-"}`);
   }
   if (plan.launchDutyPacketFocus) {
     const focus = plan.launchDutyPacketFocus;

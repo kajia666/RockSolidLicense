@@ -10656,6 +10656,39 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.key, "ops_first_wave_runtime_evidence");
     assert.equal(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.format, "first-wave-runtime-evidence");
     assert.match(runtimeEvidenceFirstWaveRecommendations.firstUserValidationHandoff.primaryDownload.href || "", /\/api\/developer\/ops\/export\/download\?.*format=first-wave-runtime-evidence/i);
+    assert.deepEqual(
+      {
+        status: runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain?.status,
+        ready: runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain?.ready,
+        currentPhaseKey: runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain?.readyPhaseCount,
+        phaseCount: runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain?.phaseCount,
+        nextActionKey: runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionOperation: runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain?.nextAction?.operation,
+        primaryDownloadKey: runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain?.primaryDownload?.key
+      },
+      {
+        status: "ready_for_handoff_confirmation",
+        ready: false,
+        currentPhaseKey: "handoff_review",
+        readyPhaseCount: 3,
+        phaseCount: 5,
+        nextActionKey: "confirm_first_wave_handoff",
+        nextActionOperation: "confirm_first_wave_handoff",
+        primaryDownloadKey: "first_wave_recommendations_summary"
+      }
+    );
+    assert.equal(runtimeEvidenceFirstWaveRecommendations.launchReadinessBridge.operatingChain.status, "ready_for_handoff_confirmation");
+    assert.deepEqual(
+      runtimeEvidenceFirstWaveRecommendations.firstLaunchOperatingChain.phases.map((item) => [item.key, item.status, item.ready]),
+      [
+        ["inventory", "ready", true],
+        ["delivery", "ready", true],
+        ["handoff_review", "ready_for_first_wave_handoff", false],
+        ["first_user_validation", "evidence_recorded", true],
+        ["post_launch_lifecycle", "hold", false]
+      ]
+    );
     assert.equal(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.status, "hold");
     assert.equal(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.nextAction.key, "production_operations_walkthrough_recent");
     assert.equal(runtimeEvidenceFirstWaveRecommendations.postLaunchLifecycleHandoff.nextAction.operation, "record_operations_walkthrough");
@@ -10685,6 +10718,9 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceFirstWaveSummary.body, /next=runtime_evidence_review \| stage=runtime_evidence_review \| owner=ops/);
     assert.match(runtimeEvidenceFirstWaveSummary.body, /runtimeEvidence=evidence_recorded \| ready=true \| activeSessions=1 \| heartbeatSeen=1/);
     assert.match(runtimeEvidenceFirstWaveSummary.body, /download=ops_first_wave_runtime_evidence[\s\S]*format=first-wave-runtime-evidence/i);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /First Launch Operating Chain:/);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /status=ready_for_handoff_confirmation \| ready=false \| current=handoff_review \| phases=3\/5/);
+    assert.match(runtimeEvidenceFirstWaveSummary.body, /next=confirm_first_wave_handoff \| phase=handoff_review \| operation=confirm_first_wave_handoff/);
     assert.match(runtimeEvidenceFirstWaveSummary.body, /Post Launch Lifecycle Handoff:/);
     assert.match(runtimeEvidenceFirstWaveSummary.body, /status=hold \| next=production_operations_walkthrough_recent \| operation=record_operations_walkthrough/);
     assert.match(runtimeEvidenceFirstWaveSummary.body, /download=launch_mainline_operations_handoff[\s\S]*format=operations-handoff/i);
@@ -14842,6 +14878,43 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(afterSetup.deliveryHandoff.usageStatus, "unused");
     assert.equal(afterSetup.deliveryHandoff.primaryDownload.key, "developer_cards_first_launch_csv");
     assert.match(afterSetup.deliveryHandoff.primaryDownload.href, /\/api\/developer\/cards\/export\/download\?.*usageStatus=unused.*format=csv/i);
+    assert.deepEqual(
+      {
+        version: afterSetup.firstLaunchOperatingChain?.version,
+        status: afterSetup.firstLaunchOperatingChain?.status,
+        ready: afterSetup.firstLaunchOperatingChain?.ready,
+        currentPhaseKey: afterSetup.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: afterSetup.firstLaunchOperatingChain?.readyPhaseCount,
+        phaseCount: afterSetup.firstLaunchOperatingChain?.phaseCount,
+        nextActionKey: afterSetup.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionStage: afterSetup.firstLaunchOperatingChain?.nextAction?.stage,
+        nextActionEndpoint: afterSetup.firstLaunchOperatingChain?.nextAction?.confirmation?.endpoint,
+        primaryDownloadKey: afterSetup.firstLaunchOperatingChain?.primaryDownload?.key
+      },
+      {
+        version: "developer-ops-first-launch-operating-chain/v1",
+        status: "ready_for_handoff_confirmation",
+        ready: false,
+        currentPhaseKey: "handoff_review",
+        readyPhaseCount: 2,
+        phaseCount: 5,
+        nextActionKey: "confirm_first_wave_handoff",
+        nextActionStage: "handoff_review",
+        nextActionEndpoint: "/api/developer/ops/first-wave/recommendations/confirm",
+        primaryDownloadKey: "first_wave_recommendations_summary"
+      }
+    );
+    assert.deepEqual(
+      afterSetup.firstLaunchOperatingChain.phases.map((item) => [item.key, item.status, item.ready]),
+      [
+        ["inventory", "ready", true],
+        ["delivery", "ready", true],
+        ["handoff_review", "ready_for_first_wave_handoff", false],
+        ["first_user_validation", "pending_validation", false],
+        ["post_launch_lifecycle", "hold", false]
+      ]
+    );
+    assert.equal(afterSetup.launchReadinessBridge.operatingChain.status, "ready_for_handoff_confirmation");
     assert.equal(afterSetup.firstUserValidationHandoff.status, "pending_validation");
     assert.equal(afterSetup.firstUserValidationHandoff.actionCount, 4);
     assert.equal(afterSetup.firstUserValidationHandoff.remainingCount, 4);
@@ -14867,6 +14940,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(latestReadinessBridge.currentGate, "first_round_ops");
     assert.equal(latestReadinessBridge.nextAction.key, "first_launch_handoff");
     assert.equal(latestReadinessBridge.downloads.summary.href, "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=summary");
+    assert.equal(latestReadinessBridge.operatingChain.status, "ready_for_handoff_confirmation");
+    assert.equal(latestReadinessBridge.operatingChain.currentPhaseKey, "handoff_review");
+    assert.equal(latestReadinessBridge.operatingChain.nextAction.key, "confirm_first_wave_handoff");
     assert.equal(
       preConfirmOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveReadinessBridge.auditLogId,
       afterSetup.auditLogId
@@ -14877,6 +14953,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     );
     assert.match(preConfirmOpsSnapshot.summaryText, /First-Wave Readiness Bridge:/);
     assert.match(preConfirmOpsSnapshot.summaryText, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
+    assert.match(preConfirmOpsSnapshot.summaryText, /First Launch Operating Chain:/);
+    assert.match(preConfirmOpsSnapshot.summaryText, /status=ready_for_handoff_confirmation \| ready=false \| current=handoff_review \| phases=2\/5/);
     assert.match(preConfirmOpsSnapshot.summaryText, /download=.*format=summary/);
 
     const preConfirmInitialReadinessDownload = await getText(
@@ -14907,6 +14985,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(handoffDownload.body, /status=pending_validation \| actions=4 \| remaining=4/);
     assert.match(handoffDownload.body, /next=card_redemption_watch \| stage=first_sale_watch \| owner=support/);
     assert.match(handoffDownload.body, /download=launch_mainline_first_launch_handoff[\s\S]*format=first-launch-handoff/i);
+    assert.match(handoffDownload.body, /First Launch Operating Chain:/);
+    assert.match(handoffDownload.body, /status=ready_for_handoff_confirmation \| ready=false \| current=handoff_review \| phases=2\/5/);
+    assert.match(handoffDownload.body, /next=confirm_first_wave_handoff \| phase=handoff_review \| operation=confirm_first_wave_handoff/);
     assert.match(handoffDownload.body, /First Round Ops Actions:/);
     assert.match(handoffDownload.body, /Launch Readiness Bridge:/);
     assert.match(handoffDownload.body, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);

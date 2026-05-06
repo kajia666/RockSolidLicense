@@ -20953,6 +20953,76 @@ function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
       : segments.filter((segment) => segment.ready === true).length
   );
   const nextActionKey = metadata.launchReadinessBridgeNextActionKey || null;
+  const operatingChain = metadata.firstLaunchOperatingChainStatus || metadata.firstLaunchOperatingChainCurrentPhaseKey
+    ? {
+        version: "developer-ops-first-launch-operating-chain/v1",
+        productCode,
+        channel,
+        status: normalizeDeveloperOpsConfirmationToken(metadata.firstLaunchOperatingChainStatus, "unknown"),
+        ready: metadata.firstLaunchOperatingChainReady === true,
+        phaseCount: Number(metadata.firstLaunchOperatingChainPhaseCount ?? 0),
+        readyPhaseCount: Number(metadata.firstLaunchOperatingChainReadyPhaseCount ?? 0),
+        remainingPhaseCount: Math.max(
+          0,
+          Number(metadata.firstLaunchOperatingChainPhaseCount ?? 0)
+            - Number(metadata.firstLaunchOperatingChainReadyPhaseCount ?? 0)
+        ),
+        currentPhaseKey: normalizeDeveloperOpsConfirmationToken(metadata.firstLaunchOperatingChainCurrentPhaseKey, "unknown"),
+        nextAction: metadata.firstLaunchOperatingChainNextActionKey
+          ? {
+              key: metadata.firstLaunchOperatingChainNextActionKey,
+              stage: metadata.firstLaunchOperatingChainNextActionStage || null,
+              operation: metadata.firstLaunchOperatingChainNextOperation || null
+            }
+          : null,
+        primaryDownload: metadata.firstLaunchOperatingChainPrimaryDownloadKey || metadata.firstLaunchOperatingChainPrimaryDownloadHref
+          ? {
+              key: metadata.firstLaunchOperatingChainPrimaryDownloadKey || null,
+              fileName: metadata.firstLaunchOperatingChainPrimaryDownloadFileName || null,
+              format: metadata.firstLaunchOperatingChainPrimaryDownloadFormat || null,
+              href: metadata.firstLaunchOperatingChainPrimaryDownloadHref || null,
+              source: metadata.firstLaunchOperatingChainPrimaryDownloadSource || null
+            }
+          : null,
+        phases: [
+          {
+            key: "inventory",
+            label: "First batch inventory",
+            status: inventoryStatus,
+            ready: inventoryStatus === "ready" || inventoryStatus === "not_applicable",
+            operation: metadata.firstLaunchInventoryOperation || null
+          },
+          {
+            key: "delivery",
+            label: "First card delivery export",
+            status: normalizeDeveloperOpsConfirmationToken(metadata.firstLaunchDeliveryStatus, "unknown"),
+            ready: normalizeDeveloperOpsConfirmationToken(metadata.firstLaunchDeliveryStatus, "unknown") === "ready",
+            operation: "download_first_launch_delivery_export"
+          },
+          {
+            key: "handoff_review",
+            label: "First-wave handoff confirmation",
+            status: normalizeDeveloperOpsConfirmationToken(metadata.firstLaunchHandoffReviewStatus, metadata.launchReadinessBridgeStatus || "unknown"),
+            ready: metadata.firstLaunchHandoffConfirmed === true,
+            operation: "confirm_first_wave_handoff"
+          },
+          {
+            key: "first_user_validation",
+            label: "First-user runtime validation",
+            status: normalizeDeveloperOpsConfirmationToken(metadata.firstLaunchFirstUserValidationStatus, "unknown"),
+            ready: metadata.firstLaunchFirstUserValidationReady === true,
+            operation: metadata.firstLaunchFirstUserValidationOperation || null
+          },
+          {
+            key: "post_launch_lifecycle",
+            label: "Post-launch lifecycle handoff",
+            status: normalizeDeveloperOpsConfirmationToken(metadata.firstLaunchPostLaunchLifecycleStatus, "unknown"),
+            ready: metadata.firstLaunchPostLaunchLifecycleReady === true,
+            operation: metadata.firstLaunchPostLaunchLifecycleOperation || null
+          }
+        ]
+      }
+    : null;
   const confirmationPayloadTemplate = {
     productCode,
     channel,
@@ -20979,6 +21049,7 @@ function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
     readySegmentCount,
     pendingSegmentCount: Math.max(0, segmentCount - readySegmentCount),
     segments,
+    operatingChain,
     nextAction: nextActionKey
       ? {
           key: nextActionKey,
@@ -26476,6 +26547,294 @@ function buildDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
   });
 }
 
+function normalizeFirstLaunchOperatingChainDownload(download = null) {
+  return normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(download);
+}
+
+function buildFirstLaunchOperatingChainAction(phase = null, {
+  inventory = {},
+  deliveryHandoff = null,
+  firstUserValidationHandoff = null,
+  postLaunchLifecycleHandoff = null,
+  launchReadinessBridge = null
+} = {}) {
+  if (!phase || typeof phase !== "object") {
+    return null;
+  }
+
+  if (phase.key === "inventory") {
+    const action = inventory.action && typeof inventory.action === "object"
+      ? inventory.action
+      : null;
+    return action
+      ? {
+          key: action.operation || action.key || "first_launch_inventory",
+          stage: "inventory",
+          operation: action.operation || null,
+          label: action.label || "Review first-launch inventory",
+          method: action.method || null,
+          endpoint: action.endpoint || null,
+          body: action.body || null,
+          query: action.query || null,
+          workspaceAction: action.workspaceAction || null
+        }
+      : null;
+  }
+
+  if (phase.key === "delivery") {
+    const download = normalizeFirstLaunchOperatingChainDownload(deliveryHandoff?.primaryDownload);
+    return {
+      key: "download_first_launch_delivery_export",
+      stage: "first_launch_delivery",
+      operation: "download_first_launch_delivery_export",
+      label: deliveryHandoff?.title || "Download First-Launch Card Export",
+      recommendedDownload: download
+    };
+  }
+
+  if (phase.key === "handoff_review") {
+    const confirmation = launchReadinessBridge?.confirmation && typeof launchReadinessBridge.confirmation === "object"
+      ? launchReadinessBridge.confirmation
+      : null;
+    const summaryDownload = normalizeFirstLaunchOperatingChainDownload(launchReadinessBridge?.downloads?.summary);
+    return {
+      key: "confirm_first_wave_handoff",
+      stage: "handoff_review",
+      operation: "confirm_first_wave_handoff",
+      label: "Confirm First-Wave Handoff",
+      method: confirmation?.method || "POST",
+      endpoint: confirmation?.endpoint || "/api/developer/ops/first-wave/recommendations/confirm",
+      confirmation,
+      recommendedDownload: summaryDownload
+    };
+  }
+
+  if (phase.key === "first_user_validation") {
+    const nextAction = firstUserValidationHandoff?.nextAction && typeof firstUserValidationHandoff.nextAction === "object"
+      ? firstUserValidationHandoff.nextAction
+      : {};
+    const download = normalizeFirstLaunchOperatingChainDownload(firstUserValidationHandoff?.primaryDownload);
+    return {
+      key: nextAction.key || "first_user_validation",
+      stage: nextAction.stage || firstUserValidationHandoff?.stage || "first_user_validation",
+      operation: nextAction.operation || "first_user_validation",
+      label: firstUserValidationHandoff?.title || "Run First-User Validation",
+      ownerRole: nextAction.ownerRole || null,
+      recommendedDownload: download
+    };
+  }
+
+  if (phase.key === "post_launch_lifecycle") {
+    const nextAction = postLaunchLifecycleHandoff?.nextAction && typeof postLaunchLifecycleHandoff.nextAction === "object"
+      ? postLaunchLifecycleHandoff.nextAction
+      : {};
+    const download = normalizeFirstLaunchOperatingChainDownload(postLaunchLifecycleHandoff?.primaryDownload);
+    return {
+      key: nextAction.key || "post_launch_lifecycle",
+      stage: "post_launch_lifecycle",
+      operation: nextAction.operation || null,
+      label: "Continue Post-Launch Lifecycle",
+      recommendedDownload: download
+    };
+  }
+
+  return null;
+}
+
+function buildDeveloperOpsFirstLaunchOperatingChainPayload({
+  productCode = "",
+  channel = "stable",
+  inventory = {},
+  firstCards = {},
+  deliveryHandoff = null,
+  firstUserValidationHandoff = null,
+  postLaunchLifecycleHandoff = null,
+  launchReadinessBridge = null,
+  firstWaveConfirmationChain = null
+} = {}) {
+  const inventoryStatus = normalizeDeveloperOpsConfirmationToken(inventory.status, "unknown");
+  const inventoryReady = inventoryStatus === "ready" || inventoryStatus === "not_applicable";
+  const deliveryStatus = deliveryHandoff?.status
+    ? normalizeDeveloperOpsConfirmationToken(deliveryHandoff.status, "unknown")
+    : inventoryReady ? "missing" : "blocked_by_inventory";
+  const deliveryReady = deliveryStatus === "ready";
+  const firstWaveHandoffConfirmed = firstWaveConfirmationChain?.allSegmentsConfirmed === true
+    || normalizeDeveloperOpsConfirmationToken(firstWaveConfirmationChain?.status, "") === "confirmed";
+  const handoffStatus = firstWaveHandoffConfirmed
+    ? "confirmed"
+    : normalizeDeveloperOpsConfirmationToken(launchReadinessBridge?.status, "blocked");
+  const handoffReady = firstWaveHandoffConfirmed;
+  const runtimeEvidenceReady = firstUserValidationHandoff?.runtimeEvidence?.ready === true;
+  const validationStatus = runtimeEvidenceReady
+    ? "evidence_recorded"
+    : firstUserValidationHandoff?.status
+      ? normalizeDeveloperOpsConfirmationToken(firstUserValidationHandoff.status, "pending_validation")
+      : handoffReady ? "pending_validation" : "blocked_by_handoff";
+  const validationReady = runtimeEvidenceReady
+    || validationStatus === "evidence_recorded"
+    || (Number(firstUserValidationHandoff?.remainingCount ?? 1) === 0 && validationStatus !== "pending_validation");
+  const lifecycleStatus = postLaunchLifecycleHandoff?.status
+    ? normalizeDeveloperOpsConfirmationToken(postLaunchLifecycleHandoff.status, "review")
+    : validationReady ? "review" : "blocked_by_validation";
+  const lifecycleReady = lifecycleStatus === "ready"
+    || postLaunchLifecycleHandoff?.closeoutReadiness?.canClose === true;
+
+  const phases = [
+    {
+      key: "inventory",
+      label: "First batch inventory",
+      status: inventoryStatus,
+      ready: inventoryReady,
+      operation: inventory.action?.operation || null,
+      summary: inventory.action?.reason || null,
+      targetCardCount: Number(inventory.targetCardCount ?? 0),
+      freshCardCount: Number(inventory.freshCardCount ?? 0),
+      refillCardCount: Number(inventory.refillCardCount ?? 0)
+    },
+    {
+      key: "delivery",
+      label: "First card delivery export",
+      status: deliveryStatus,
+      ready: deliveryReady,
+      operation: "download_first_launch_delivery_export",
+      summary: deliveryHandoff?.summary || null,
+      cardCount: Number(deliveryHandoff?.cardCount ?? firstCards.issuedFreshCardCount ?? 0),
+      download: normalizeFirstLaunchOperatingChainDownload(deliveryHandoff?.primaryDownload)
+    },
+    {
+      key: "handoff_review",
+      label: "First-wave handoff confirmation",
+      status: handoffStatus,
+      ready: handoffReady,
+      operation: "confirm_first_wave_handoff",
+      summary: launchReadinessBridge?.status
+        ? `First-wave bridge is ${launchReadinessBridge.status} at ${launchReadinessBridge.currentGate || "unknown"}.`
+        : null,
+      download: normalizeFirstLaunchOperatingChainDownload(launchReadinessBridge?.downloads?.summary),
+      confirmation: launchReadinessBridge?.confirmation || null
+    },
+    {
+      key: "first_user_validation",
+      label: "First-user runtime validation",
+      status: validationStatus,
+      ready: validationReady,
+      operation: firstUserValidationHandoff?.nextAction?.operation || null,
+      summary: firstUserValidationHandoff?.summary || null,
+      remainingCount: Number(firstUserValidationHandoff?.remainingCount ?? 0),
+      download: normalizeFirstLaunchOperatingChainDownload(firstUserValidationHandoff?.primaryDownload)
+    },
+    {
+      key: "post_launch_lifecycle",
+      label: "Post-launch lifecycle handoff",
+      status: lifecycleStatus,
+      ready: lifecycleReady,
+      operation: postLaunchLifecycleHandoff?.nextAction?.operation || null,
+      summary: postLaunchLifecycleHandoff?.status
+        ? `Post-launch lifecycle is ${postLaunchLifecycleHandoff.status}.`
+        : null,
+      download: normalizeFirstLaunchOperatingChainDownload(postLaunchLifecycleHandoff?.primaryDownload)
+    }
+  ];
+  const currentPhase = phases.find((item) => item.ready !== true) || null;
+  const readyPhaseCount = phases.filter((item) => item.ready === true).length;
+  const nextAction = currentPhase
+    ? buildFirstLaunchOperatingChainAction(currentPhase, {
+        inventory,
+        deliveryHandoff,
+        firstUserValidationHandoff,
+        postLaunchLifecycleHandoff,
+        launchReadinessBridge
+      })
+    : null;
+  const primaryDownload = normalizeFirstLaunchOperatingChainDownload(
+    nextAction?.recommendedDownload || currentPhase?.download || launchReadinessBridge?.downloads?.summary
+  );
+  const status = !currentPhase
+    ? "ready"
+    : currentPhase.key === "inventory"
+      ? (inventoryStatus === "low" ? "ready_for_inventory_refill" : "blocked_by_inventory")
+      : currentPhase.key === "delivery"
+        ? "ready_for_first_card_delivery"
+        : currentPhase.key === "handoff_review"
+          ? (handoffStatus === "blocked" ? "blocked_by_handoff_review" : "ready_for_handoff_confirmation")
+          : currentPhase.key === "first_user_validation"
+            ? "pending_first_user_validation"
+            : "pending_post_launch_lifecycle";
+
+  return {
+    version: "developer-ops-first-launch-operating-chain/v1",
+    productCode,
+    channel,
+    status,
+    ready: !currentPhase,
+    phaseCount: phases.length,
+    readyPhaseCount,
+    remainingPhaseCount: phases.length - readyPhaseCount,
+    currentPhaseKey: currentPhase?.key || "ready",
+    nextAction,
+    primaryDownload,
+    handoffConfirmed: firstWaveHandoffConfirmed,
+    handoffConfirmation: firstWaveConfirmationChain
+      ? {
+          status: firstWaveConfirmationChain.status || null,
+          auditLogId: firstWaveConfirmationChain.auditLogId || null,
+          allSegmentsConfirmed: firstWaveConfirmationChain.allSegmentsConfirmed === true
+        }
+      : null,
+    phases,
+    summary: currentPhase
+      ? `${currentPhase.label} is the current first-launch operating phase for ${productCode || "this project"}.`
+      : `First-launch operating chain is ready for ${productCode || "this project"}.`
+  };
+}
+
+function appendDeveloperOpsFirstLaunchOperatingChainLines(lines = [], chain = null, {
+  title = "First Launch Operating Chain:"
+} = {}) {
+  if (!Array.isArray(lines) || !chain || typeof chain !== "object") {
+    return;
+  }
+  const phases = Array.isArray(chain.phases) ? chain.phases : [];
+  const nextAction = chain.nextAction && typeof chain.nextAction === "object"
+    ? chain.nextAction
+    : null;
+  const primaryDownload = chain.primaryDownload && typeof chain.primaryDownload === "object"
+    ? chain.primaryDownload
+    : nextAction?.recommendedDownload && typeof nextAction.recommendedDownload === "object"
+      ? nextAction.recommendedDownload
+      : null;
+  lines.push(title);
+  lines.push(
+    `- status=${chain.status || "-"}`
+    + ` | ready=${chain.ready === true}`
+    + ` | current=${chain.currentPhaseKey || "-"}`
+    + ` | phases=${chain.readyPhaseCount ?? 0}/${chain.phaseCount ?? phases.length}`
+  );
+  lines.push(
+    `- next=${nextAction?.key || "-"}`
+    + ` | phase=${nextAction?.stage || chain.currentPhaseKey || "-"}`
+    + ` | operation=${nextAction?.operation || "-"}`
+    + ` | download=${primaryDownload?.key || "-"}`
+    + ` | href=${primaryDownload?.href || "-"}`
+  );
+  if (chain.handoffConfirmation) {
+    lines.push(
+      `- handoffConfirmed=${chain.handoffConfirmed === true}`
+      + ` | confirmation=${chain.handoffConfirmation.status || "-"}`
+      + ` | audit=${chain.handoffConfirmation.auditLogId || "-"}`
+    );
+  }
+  for (const phase of phases) {
+    lines.push(
+      `  - ${phase.key || "-"}`
+      + ` | status=${phase.status || "-"}`
+      + ` | ready=${phase.ready === true ? "yes" : "no"}`
+      + ` | operation=${phase.operation || "-"}`
+      + ` | download=${phase.download?.key || "-"}`
+    );
+  }
+}
+
 function buildDeveloperOpsFirstWaveRecommendationsPayload({
   generatedAt = nowIso(),
   product = {},
@@ -26764,7 +27123,7 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     closeoutReadinessStatus: closeoutReadinessPayload?.status || null,
     firstLaunchHandoffDownload: readiness.firstLaunchHandoffDownload || opsSnapshot?.mainlineHandoff?.downloads?.firstLaunchHandoff || null
   };
-  const launchReadinessBridge = buildDeveloperOpsFirstWaveReadinessBridgePayload({
+  const launchReadinessBridgeBase = buildDeveloperOpsFirstWaveReadinessBridgePayload({
     productCode,
     channel,
     inventoryStatus,
@@ -26777,6 +27136,50 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     latestLaunchReceipt: traceabilityPayload.latestLaunchReceipt,
     postLaunchLifecycleHandoff
   });
+  const inventoryPayload = {
+    status: inventoryStatus,
+    readyCount: readyStates.length,
+    lowCount: lowStates.length,
+    missingCount: missingStates.length,
+    recommendedBatchCount: states.length,
+    targetCardCount,
+    freshCardCount,
+    refillCardCount,
+    action: inventoryAction,
+    states
+  };
+  const firstCardsPayload = {
+    status: firstCardsStatus,
+    recommendedBatchCount: states.length,
+    recommendedCardCount: targetCardCount,
+    issuedBatchCount: issuedBatchCodes.size,
+    issuedFreshCardCount: freshCardCount,
+    action: inventoryAction,
+    batches: states.map((item) => ({
+      key: item.key,
+      mode: item.mode,
+      label: item.label,
+      prefix: item.prefix,
+      targetCount: item.targetCount,
+      freshCount: item.freshCount,
+      status: item.status
+    }))
+  };
+  const firstLaunchOperatingChain = buildDeveloperOpsFirstLaunchOperatingChainPayload({
+    productCode,
+    channel,
+    inventory: inventoryPayload,
+    firstCards: firstCardsPayload,
+    deliveryHandoff,
+    firstUserValidationHandoff,
+    postLaunchLifecycleHandoff,
+    launchReadinessBridge: launchReadinessBridgeBase,
+    firstWaveConfirmationChain: readiness.firstWaveConfirmationChain || null
+  });
+  const launchReadinessBridge = {
+    ...launchReadinessBridgeBase,
+    operatingChain: firstLaunchOperatingChain
+  };
 
   return {
     version: "developer-ops-first-wave-recommendations/v1",
@@ -26786,37 +27189,11 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     productName: product?.name || "",
     channel,
     status: inventoryStatus === "ready" && firstRoundStatus === "ready" ? "ready" : "review",
-    inventory: {
-      status: inventoryStatus,
-      readyCount: readyStates.length,
-      lowCount: lowStates.length,
-      missingCount: missingStates.length,
-      recommendedBatchCount: states.length,
-      targetCardCount,
-      freshCardCount,
-      refillCardCount,
-      action: inventoryAction,
-      states
-    },
-    firstCards: {
-      status: firstCardsStatus,
-      recommendedBatchCount: states.length,
-      recommendedCardCount: targetCardCount,
-      issuedBatchCount: issuedBatchCodes.size,
-      issuedFreshCardCount: freshCardCount,
-      action: inventoryAction,
-      batches: states.map((item) => ({
-        key: item.key,
-        mode: item.mode,
-        label: item.label,
-        prefix: item.prefix,
-        targetCount: item.targetCount,
-        freshCount: item.freshCount,
-        status: item.status
-      }))
-    },
+    inventory: inventoryPayload,
+    firstCards: firstCardsPayload,
     deliveryHandoff,
     firstUserValidationHandoff,
+    firstLaunchOperatingChain,
     postLaunchLifecycleHandoff,
     firstRoundOps: firstRoundOpsPayload,
     launchReadinessBridge,
@@ -27036,6 +27413,10 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
     if (firstUserValidationHandoff.summary) {
       lines.push(`- summary=${firstUserValidationHandoff.summary}`);
     }
+  }
+  if (payload.firstLaunchOperatingChain && typeof payload.firstLaunchOperatingChain === "object") {
+    lines.push("");
+    appendDeveloperOpsFirstLaunchOperatingChainLines(lines, payload.firstLaunchOperatingChain);
   }
   if (payload.postLaunchLifecycleHandoff && typeof payload.postLaunchLifecycleHandoff === "object") {
     lines.push(
@@ -30106,6 +30487,9 @@ function appendDeveloperOpsFirstWaveReadinessBridgeLines(lines = [], bridge = nu
     + ` | json=${bridge.downloads?.json?.href || "-"}`
     + ` | checksums=${bridge.downloads?.checksums?.href || "-"}`
   );
+  if (bridge.operatingChain) {
+    appendDeveloperOpsFirstLaunchOperatingChainLines(lines, bridge.operatingChain);
+  }
   for (const segment of segments) {
     lines.push(`  - ${segment.key || "-"} | status=${segment.status || "-"} | ready=${segment.ready === true ? "yes" : "no"}`);
   }
@@ -46072,7 +46456,30 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessBridgeCurrentGate: payload.launchReadinessBridge?.currentGate || null,
           launchReadinessBridgeNextActionKey: payload.launchReadinessBridge?.nextAction?.key || null,
           launchReadinessBridgeReadySegmentCount: payload.launchReadinessBridge?.readySegmentCount ?? null,
-          launchReadinessBridgeSegmentCount: payload.launchReadinessBridge?.segmentCount ?? null
+          launchReadinessBridgeSegmentCount: payload.launchReadinessBridge?.segmentCount ?? null,
+          firstLaunchOperatingChainStatus: payload.firstLaunchOperatingChain?.status || null,
+          firstLaunchOperatingChainReady: payload.firstLaunchOperatingChain?.ready === true,
+          firstLaunchOperatingChainCurrentPhaseKey: payload.firstLaunchOperatingChain?.currentPhaseKey || null,
+          firstLaunchOperatingChainReadyPhaseCount: payload.firstLaunchOperatingChain?.readyPhaseCount ?? null,
+          firstLaunchOperatingChainPhaseCount: payload.firstLaunchOperatingChain?.phaseCount ?? null,
+          firstLaunchOperatingChainNextActionKey: payload.firstLaunchOperatingChain?.nextAction?.key || null,
+          firstLaunchOperatingChainNextActionStage: payload.firstLaunchOperatingChain?.nextAction?.stage || null,
+          firstLaunchOperatingChainNextOperation: payload.firstLaunchOperatingChain?.nextAction?.operation || null,
+          firstLaunchOperatingChainPrimaryDownloadKey: payload.firstLaunchOperatingChain?.primaryDownload?.key || null,
+          firstLaunchOperatingChainPrimaryDownloadFileName: payload.firstLaunchOperatingChain?.primaryDownload?.fileName || null,
+          firstLaunchOperatingChainPrimaryDownloadFormat: payload.firstLaunchOperatingChain?.primaryDownload?.format || null,
+          firstLaunchOperatingChainPrimaryDownloadHref: payload.firstLaunchOperatingChain?.primaryDownload?.href || null,
+          firstLaunchOperatingChainPrimaryDownloadSource: payload.firstLaunchOperatingChain?.primaryDownload?.source || null,
+          firstLaunchInventoryOperation: payload.inventory?.action?.operation || null,
+          firstLaunchDeliveryStatus: payload.deliveryHandoff?.status || null,
+          firstLaunchHandoffReviewStatus: payload.launchReadinessBridge?.status || null,
+          firstLaunchHandoffConfirmed: payload.firstLaunchOperatingChain?.handoffConfirmed === true,
+          firstLaunchFirstUserValidationStatus: payload.firstUserValidationHandoff?.status || null,
+          firstLaunchFirstUserValidationReady: payload.firstUserValidationHandoff?.runtimeEvidence?.ready === true,
+          firstLaunchFirstUserValidationOperation: payload.firstUserValidationHandoff?.nextAction?.operation || null,
+          firstLaunchPostLaunchLifecycleStatus: payload.postLaunchLifecycleHandoff?.status || null,
+          firstLaunchPostLaunchLifecycleReady: payload.postLaunchLifecycleHandoff?.closeoutReadiness?.canClose === true,
+          firstLaunchPostLaunchLifecycleOperation: payload.postLaunchLifecycleHandoff?.nextAction?.operation || null
         }
       );
 

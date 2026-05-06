@@ -18214,6 +18214,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || stagingArchiveNextOperations?.launchRunway?.launchDayWatchEntry
     || null;
   const nextFollowUp = traceability.nextFollowUp || {};
+  const launchReadinessNextGateSource = normalizeLaunchReadinessNextGateForHandoff(traceability.latestLaunchReceipt)
+    ? traceability.latestLaunchReceipt
+    : findLaunchReadinessNextGateReceipt(payload.opsSnapshot?.overview?.latestLaunchReceipts || [], nextFollowUp);
   const nextFollowUpDownload = nextFollowUp.recommendedDownload && typeof nextFollowUp.recommendedDownload === "object"
     ? nextFollowUp.recommendedDownload
     : {};
@@ -18354,6 +18357,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   }
   if (firstWaveConfirmationChain) {
     appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
+    lines.push("");
+  }
+  if (appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource, { leadingBlank: false })) {
     lines.push("");
   }
   lines.push("Critical Handoff Routes:");
@@ -19792,7 +19798,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           postLaunchLifecyclePrimaryDownloadKey: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey || null,
           postLaunchLifecyclePrimaryDownloadFormat: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat || null,
           postLaunchLifecyclePrimaryDownloadFileName: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFileName || null,
-          postLaunchLifecyclePrimaryDownloadHref: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref || null
+          postLaunchLifecyclePrimaryDownloadHref: latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadHref || null,
+          launchReadinessNextGate: normalizeLaunchReadinessNextGateForHandoff(latestLaunchReceipt)
         }
       : null,
     nextFollowUp: launchReceiptNextFollowUp
@@ -19859,6 +19866,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const traceability = payload.postLaunchHandoffTraceability || buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   const latestLaunchReceipt = traceability.latestLaunchReceipt || null;
   const launchReceiptNextFollowUp = traceability.nextFollowUp || null;
+  const launchReadinessNextGateSource = normalizeLaunchReadinessNextGateForHandoff(latestLaunchReceipt)
+    ? latestLaunchReceipt
+    : findLaunchReadinessNextGateReceipt(payload.opsSnapshot?.overview?.latestLaunchReceipts || [], launchReceiptNextFollowUp);
   const opsFiles = traceability.opsFiles || {};
   const launchReceiptAuditBackfill = Number(traceability.launchReceiptAuditBackfill || 0);
   const launchReceiptAuditBackfillStatus = traceability.launchReceiptAuditBackfillStatus
@@ -19972,6 +19982,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | productionSignoffPacket=${launchOpsOverviewProductionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${launchOpsOverviewWatchEntry || "-"}`
   );
+  if (appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource)) {
+    lines.push("");
+  }
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"}`);
   if (stabilizationConfirmation) {
     const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(stabilizationConfirmation.launchOpsOverviewContext);
@@ -20800,10 +20813,18 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         launchReadinessNextGateFullTestWindowCommand: receipt.launchReadinessNextGate?.fullTestWindowCommand || null,
         launchReadinessNextGateProductionSignoffPacket: receipt.launchReadinessNextGate?.productionSignoffPacket || null,
         launchReadinessNextGateLaunchDayWatchEntry: receipt.launchReadinessNextGate?.launchDayWatchEntry || null,
-        launchReadinessNextGatePrimaryDownloadKey: receipt.launchReadinessNextGate?.primaryDownloadKey || null,
-        launchReadinessNextGatePrimaryDownloadFormat: receipt.launchReadinessNextGate?.primaryDownloadFormat || null,
-        launchReadinessNextGatePrimaryDownloadFileName: receipt.launchReadinessNextGate?.primaryDownloadFileName || null,
-        launchReadinessNextGatePrimaryDownloadHref: receipt.launchReadinessNextGate?.primaryDownloadHref || null,
+        launchReadinessNextGatePrimaryDownloadKey: receipt.launchReadinessNextGate?.primaryDownload?.key
+          || receipt.launchReadinessNextGate?.primaryDownloadKey
+          || null,
+        launchReadinessNextGatePrimaryDownloadFormat: receipt.launchReadinessNextGate?.primaryDownload?.format
+          || receipt.launchReadinessNextGate?.primaryDownloadFormat
+          || null,
+        launchReadinessNextGatePrimaryDownloadFileName: receipt.launchReadinessNextGate?.primaryDownload?.fileName
+          || receipt.launchReadinessNextGate?.primaryDownloadFileName
+          || null,
+        launchReadinessNextGatePrimaryDownloadHref: receipt.launchReadinessNextGate?.primaryDownload?.href
+          || receipt.launchReadinessNextGate?.primaryDownloadHref
+          || null,
         receiptVisibility: receipt.visibility || null,
         createdAt: item.createdAt || null
       };
@@ -30093,6 +30114,111 @@ function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
   }
 }
 
+function normalizeLaunchReadinessNextGateForHandoff(source = null) {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+  const gate = source.launchReadinessNextGate && typeof source.launchReadinessNextGate === "object"
+    ? source.launchReadinessNextGate
+    : null;
+  const primaryDownload = gate?.primaryDownload && typeof gate.primaryDownload === "object"
+    ? gate.primaryDownload
+    : null;
+  const normalized = {
+    key: gate?.key || source.launchReadinessNextGateKey || null,
+    status: gate?.status || source.launchReadinessNextGateStatus || null,
+    decision: gate?.decision || source.launchReadinessNextGateDecision || null,
+    label: gate?.label || source.launchReadinessNextGateLabel || null,
+    canEnterInitialLaunch: gate
+      ? gate.canEnterInitialLaunch === true
+      : source.launchReadinessNextGateCanEnterInitialLaunch === true,
+    firstLaunchOperatingChainReady: gate
+      ? gate.firstLaunchOperatingChainReady === true
+      : source.launchReadinessNextGateFirstLaunchOperatingChainReady === true,
+    firstLaunchOperatingChainStatus: gate?.firstLaunchOperatingChainStatus
+      || source.launchReadinessNextGateFirstLaunchOperatingChainStatus
+      || null,
+    currentGate: gate?.currentGate || source.launchReadinessNextGateCurrentGate || null,
+    nextAction: gate?.nextAction || source.launchReadinessNextGateNextAction || null,
+    closeoutReloadCommand: gate?.closeoutReloadCommand || source.launchReadinessNextGateCloseoutReloadCommand || null,
+    fullTestWindowCommand: gate?.fullTestWindowCommand || source.launchReadinessNextGateFullTestWindowCommand || null,
+    productionSignoffPacket: gate?.productionSignoffPacket || source.launchReadinessNextGateProductionSignoffPacket || null,
+    launchDayWatchEntry: gate?.launchDayWatchEntry || source.launchReadinessNextGateLaunchDayWatchEntry || null,
+    primaryDownloadKey: primaryDownload?.key || gate?.primaryDownloadKey || source.launchReadinessNextGatePrimaryDownloadKey || null,
+    primaryDownloadFormat: primaryDownload?.format || gate?.primaryDownloadFormat || source.launchReadinessNextGatePrimaryDownloadFormat || null,
+    primaryDownloadFileName: primaryDownload?.fileName || gate?.primaryDownloadFileName || source.launchReadinessNextGatePrimaryDownloadFileName || null,
+    primaryDownloadHref: primaryDownload?.href || gate?.primaryDownloadHref || source.launchReadinessNextGatePrimaryDownloadHref || null
+  };
+  const hasGate = [
+    normalized.key,
+    normalized.status,
+    normalized.decision,
+    normalized.currentGate,
+    normalized.nextAction,
+    normalized.closeoutReloadCommand,
+    normalized.fullTestWindowCommand,
+    normalized.productionSignoffPacket,
+    normalized.launchDayWatchEntry
+  ].some(Boolean);
+  return hasGate ? normalized : null;
+}
+
+function findLaunchReadinessNextGateReceipt(latestLaunchReceipts = [], item = null) {
+  const receipts = (Array.isArray(latestLaunchReceipts) ? latestLaunchReceipts : [])
+    .filter((receipt) => normalizeLaunchReadinessNextGateForHandoff(receipt));
+  if (!receipts.length) {
+    return null;
+  }
+  return receipts.find((receipt) => (
+    item?.handoffFileName
+      && receipt?.handoffFileName
+      && receipt.handoffFileName === item.handoffFileName
+  )) || receipts.find((receipt) => (
+    (!item?.operation || receipt?.operation === item.operation)
+      && (!item?.productCode || receipt?.productCode === item.productCode)
+      && (!item?.channel || receipt?.channel === item.channel)
+  )) || receipts[0];
+}
+
+function appendLaunchReadinessNextGateHandoffText(lines = [], source = null, {
+  leadingBlank = true,
+  heading = "Launch Readiness Next Gate:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const gate = normalizeLaunchReadinessNextGateForHandoff(source);
+  if (!gate) {
+    return false;
+  }
+  if (leadingBlank) {
+    lines.push("");
+  }
+  lines.push(heading);
+  lines.push(
+    `- status=${gate.status || "-"}`
+    + ` | decision=${gate.decision || "-"}`
+    + ` | canEnterInitialLaunch=${gate.canEnterInitialLaunch === true}`
+    + ` | currentGate=${gate.currentGate || "-"}`
+  );
+  lines.push(`- closeoutReload=${gate.closeoutReloadCommand || "-"}`);
+  lines.push(`- fullTestWindow=${gate.fullTestWindowCommand || "-"}`);
+  lines.push(
+    `- productionSignoffPacket=${gate.productionSignoffPacket || "-"}`
+    + ` | launchDayWatchEntry=${gate.launchDayWatchEntry || "-"}`
+  );
+  if (gate.primaryDownloadKey || gate.primaryDownloadFormat || gate.primaryDownloadFileName || gate.primaryDownloadHref) {
+    lines.push(
+      `- primaryDownload=${gate.primaryDownloadKey || "-"}`
+      + ` | file=${gate.primaryDownloadFileName || "-"}`
+      + ` | format=${gate.primaryDownloadFormat || "-"}`
+      + ` | href=${gate.primaryDownloadHref || "-"}`
+    );
+  }
+  lines.push(`- nextAction=${gate.nextAction || "-"}`);
+  return true;
+}
+
 function appendLaunchDutyReceiptVisibilityText(lines = [], latestLaunchReceipts = [], heading = "Launch Duty Receipt Visibility:") {
   if (!Array.isArray(lines)) {
     return;
@@ -31564,16 +31690,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
       && (!item?.productCode || receipt.productCode === item.productCode)
       && (!item?.channel || receipt.channel === item.channel)
   )) || latestLaunchReceipts.find((receipt) => receipt?.receiptVisibility);
-  const launchReadinessNextGateSource = latestLaunchReceipts.find((receipt) => (
-    receipt?.launchReadinessNextGateKey
-      && item?.handoffFileName
-      && receipt.handoffFileName === item.handoffFileName
-  )) || latestLaunchReceipts.find((receipt) => (
-    receipt?.launchReadinessNextGateKey
-      && (!item?.operation || receipt.operation === item.operation)
-      && (!item?.productCode || receipt.productCode === item.productCode)
-      && (!item?.channel || receipt.channel === item.channel)
-  )) || latestLaunchReceipts.find((receipt) => receipt?.launchReadinessNextGateKey);
+  const launchReadinessNextGateSource = findLaunchReadinessNextGateReceipt(latestLaunchReceipts, item);
   const lines = [
     "RockSolid Developer Ops Launch Receipt Next Follow-up",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -31624,23 +31741,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
     lines.push(`- download: ${formatLaunchHandoffDownloadText(launchOpsOverviewDownload, { fileSeparator: " | " })}`);
   }
-  if (launchReadinessNextGateSource) {
-    lines.push("");
-    lines.push("Launch Readiness Next Gate:");
-    lines.push(
-      `- status=${launchReadinessNextGateSource.launchReadinessNextGateStatus || "-"}`
-      + ` | decision=${launchReadinessNextGateSource.launchReadinessNextGateDecision || "-"}`
-      + ` | canEnterInitialLaunch=${launchReadinessNextGateSource.launchReadinessNextGateCanEnterInitialLaunch === true}`
-      + ` | currentGate=${launchReadinessNextGateSource.launchReadinessNextGateCurrentGate || "-"}`
-    );
-    lines.push(`- closeoutReload=${launchReadinessNextGateSource.launchReadinessNextGateCloseoutReloadCommand || "-"}`);
-    lines.push(`- fullTestWindow=${launchReadinessNextGateSource.launchReadinessNextGateFullTestWindowCommand || "-"}`);
-    lines.push(
-      `- productionSignoffPacket=${launchReadinessNextGateSource.launchReadinessNextGateProductionSignoffPacket || "-"}`
-      + ` | launchDayWatchEntry=${launchReadinessNextGateSource.launchReadinessNextGateLaunchDayWatchEntry || "-"}`
-    );
-    lines.push(`- nextAction=${launchReadinessNextGateSource.launchReadinessNextGateNextAction || "-"}`);
-  }
+  appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
   if (receiptVisibilitySource) {
     lines.push("");
     appendDeveloperOpsReceiptVisibilityText(lines, receiptVisibilitySource);
@@ -32512,6 +32613,12 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       launchOpsOverviewDownload
     ]);
   }
+  const latestLaunchReceipts = Array.isArray(payload.overview?.latestLaunchReceipts)
+    ? payload.overview.latestLaunchReceipts
+    : [];
+  const launchReadinessNextGateSource = normalizeLaunchReadinessNextGateForHandoff(latestLaunchReceipt)
+    ? latestLaunchReceipt
+    : findLaunchReadinessNextGateReceipt(latestLaunchReceipts, readiness.nextFollowUp || latestLaunchReceipt);
   const lines = [
     "RockSolid Developer Ops Launch Mainline Handoff Routes",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -32519,10 +32626,9 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     `Channel: ${scope.channel || latestLaunchReceipt.channel || "stable"}`
   ];
   appendLaunchReceiptAuditBackfillStatusText(lines, payload);
-  lines.push(
-    "",
-    "Launch Mainline Direct Downloads:"
-  );
+  appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
+  lines.push("");
+  lines.push("Launch Mainline Direct Downloads:");
   for (const [key, download] of downloads) {
     lines.push(`- ${key}: ${formatLaunchHandoffDownloadText(download, { fileSeparator: " | " })}`);
   }
@@ -33118,6 +33224,13 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     && typeof launchOperationsOverviewStatus.receiptVisibilitySummary.failureRecovery.payload === "object"
     ? launchOperationsOverviewStatus.receiptVisibilitySummary.failureRecovery.payload
     : {};
+  const latestLaunchReceipts = Array.isArray(payload.overview?.latestLaunchReceipts)
+    ? payload.overview.latestLaunchReceipts
+    : [];
+  const launchReadinessNextGateSource = findLaunchReadinessNextGateReceipt(
+    latestLaunchReceipts,
+    readiness.nextFollowUp || summary.launchReceiptNextFollowUp || null
+  );
   const includedFiles = [
     payload.fileName || "developer-ops.json",
     payload.summaryFileName || "developer-ops-summary.txt",
@@ -33184,6 +33297,10 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     ""
   ];
 
+  if (appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource, { leadingBlank: false })) {
+    lines.push("");
+  }
+
   if (readiness.launchDutyActionOrder) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, readiness.launchDutyActionOrder);
     lines.push("");
@@ -33198,9 +33315,6 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     lines.push("- none");
   }
 
-  const latestLaunchReceipts = Array.isArray(payload.overview?.latestLaunchReceipts)
-    ? payload.overview.latestLaunchReceipts
-    : [];
   const visibleReceipts = latestLaunchReceipts.filter((item) => item?.receiptVisibility);
   if (visibleReceipts.length) {
     lines.push("");

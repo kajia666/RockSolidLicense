@@ -11082,6 +11082,47 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateNextFollowUpDownload.body, /fullTestWindow=npm\.cmd test/);
     assert.match(stabilizationGateNextFollowUpDownload.body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
 
+    const assertGoLiveNextGateHandoffText = (body) => {
+      assert.match(body, /Launch Readiness Next Gate:/);
+      assert.match(body, /status=awaiting_launch_readiness/);
+      assert.match(body, /decision=no_go/);
+      assert.match(body, /canEnterInitialLaunch=false/);
+      assert.match(body, /currentGate=ready_for_closeout_reload/);
+      assert.match(body, /closeoutReload=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code FIRSTBATCH --channel stable --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json/);
+      assert.match(body, /fullTestWindow=npm\.cmd test/);
+      assert.match(body, /productionSignoffPacket=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+      assert.match(body, /launchDayWatchEntry=enter_after_production_signoff/);
+      assert.match(body, /nextAction=Run closeout reload with the filled closeout input, then reserve the guarded full-test-window and review production sign-off\./);
+    };
+    const stabilizationGateOpsHandoffIndex = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=handoff-index&limit=40",
+      ownerSession.token
+    );
+    assert.equal(stabilizationGateOpsHandoffIndex.contentType, "text/plain; charset=utf-8");
+    assertGoLiveNextGateHandoffText(stabilizationGateOpsHandoffIndex.body);
+    const stabilizationGateOpsMainlineRoutes = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTBATCH&channel=stable&format=launch-mainline-handoff-routes&limit=40",
+      ownerSession.token
+    );
+    assert.equal(stabilizationGateOpsMainlineRoutes.contentType, "text/plain; charset=utf-8");
+    assertGoLiveNextGateHandoffText(stabilizationGateOpsMainlineRoutes.body);
+    const stabilizationGateMainlinePostLaunchIndex = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(stabilizationGateMainlinePostLaunchIndex.contentType || "", /^text\/plain/);
+    assertGoLiveNextGateHandoffText(stabilizationGateMainlinePostLaunchIndex.body);
+    const stabilizationGateMainlineRouteMap = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(stabilizationGateMainlineRouteMap.contentType || "", /^text\/plain/);
+    assertGoLiveNextGateHandoffText(stabilizationGateMainlineRouteMap.body);
+
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,
       "/api/developer/launch-mainline?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",

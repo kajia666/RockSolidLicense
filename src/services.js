@@ -16021,6 +16021,72 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(
+    findLaunchReadinessNextGateReceipt(
+      opsOverview.latestLaunchReceipts || [],
+      opsSnapshot?.summary?.launchReceiptNextFollowUp
+        || opsSnapshot?.summary?.initialLaunchOpsReadiness?.nextFollowUp
+        || null
+    )
+  )
+    || (reviewSummary.launchReadinessNextGate && typeof reviewSummary.launchReadinessNextGate === "object"
+      ? { ...reviewSummary.launchReadinessNextGate }
+      : null)
+    || (smokeSummary.launchReadinessNextGate && typeof smokeSummary.launchReadinessNextGate === "object"
+      ? { ...smokeSummary.launchReadinessNextGate }
+      : null);
+  const launchReadinessNextGateDownload = launchReadinessNextGate?.primaryDownloadKey
+    ? {
+        key: launchReadinessNextGate.primaryDownloadKey,
+        label: "Launch readiness next gate handoff",
+        fileName: launchReadinessNextGate.primaryDownloadFileName || null,
+        format: launchReadinessNextGate.primaryDownloadFormat || null,
+        source: "developer-ops",
+        href: launchReadinessNextGate.primaryDownloadHref || null
+      }
+    : null;
+  const launchReadinessNextGateCard = launchReadinessNextGate
+    ? {
+        key: "launch_readiness_next_gate",
+        title: "Launch Readiness Next Gate",
+        summary: launchReadinessNextGate.nextAction
+          || "Review the go-live readiness gate before entering initial launch.",
+        tags: [
+          {
+            label: "status",
+            value: launchReadinessNextGate.status || "unknown",
+            strong: true
+          },
+          {
+            label: "decision",
+            value: launchReadinessNextGate.decision || "unknown",
+            strong: true
+          },
+          {
+            label: "currentGate",
+            value: launchReadinessNextGate.currentGate || "unknown",
+            strong: true
+          },
+          {
+            label: "canEnterInitialLaunch",
+            value: launchReadinessNextGate.canEnterInitialLaunch === true,
+            strong: launchReadinessNextGate.canEnterInitialLaunch === true
+          }
+        ],
+        details: [
+          `Full test window: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`,
+          `Production sign-off packet: ${launchReadinessNextGate.productionSignoffPacket || "-"}`,
+          `Launch-day watch entry: ${launchReadinessNextGate.launchDayWatchEntry || "-"}`
+        ],
+        controls: [
+          launchReadinessNextGateDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Download Launch Readiness Next Gate",
+            recommendedDownload: launchReadinessNextGateDownload
+          }, params) : null
+        ].filter((item) => item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -16106,6 +16172,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveReadinessBridgeCard,
     firstWaveHandoffConfirmationCard,
     firstWaveRuntimeEvidenceCard,
+    launchReadinessNextGateCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -17009,6 +17076,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
     initialLaunchOpsOverviewStatusDownload,
+    launchReadinessNextGate,
     launchRunway,
     operationalReadiness,
     launchDayWatchPanel: ensuredLaunchDayWatchPanel,
@@ -17664,6 +17732,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines,
     mainlineSummary.initialLaunchOpsReadiness,
     mainlineSummary.initialLaunchOpsReadinessDownload
+  );
+  appendLaunchReadinessNextGateHandoffText(
+    lines,
+    mainlineSummary.launchReadinessNextGate
+      ? { launchReadinessNextGate: mainlineSummary.launchReadinessNextGate }
+      : null
   );
   if (mainlineSummary.firstWaveReadinessBridge) {
     lines.push("");

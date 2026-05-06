@@ -11197,6 +11197,15 @@ test("developer license quickstart first-batch setup can create recommended laun
       "/api/developer/launch-mainline?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",
       ownerSession.token
     );
+    assertGoLiveNextGatePayload(runtimeEvidenceLaunchMainline.mainlineSummary?.launchReadinessNextGate);
+    assert.ok(
+      runtimeEvidenceLaunchMainline.mainlineSummary.overviewCards.some((item) =>
+        item.key === "launch_readiness_next_gate"
+          && item.tags.some((tag) => tag.label === "status" && tag.value === "awaiting_launch_readiness")
+          && item.tags.some((tag) => tag.label === "currentGate" && tag.value === "ready_for_closeout_reload")
+      )
+    );
+    assertGoLiveNextGateHandoffText(runtimeEvidenceLaunchMainline.summaryText);
     assert.deepEqual(
       runtimeEvidenceLaunchMainline.mainlineSummary?.firstWaveRuntimeEvidence
         ? {

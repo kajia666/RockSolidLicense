@@ -2896,6 +2896,84 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
   };
 }
 
+function buildLaunchDutyCurrentAction({
+  realStagingRunFocus = null,
+  closeoutBackfillFocus = null,
+  fullTestSignoffFocus = null,
+  launchDutyPacketFocus = null
+} = {}) {
+  const mode = "launch-duty-current-action";
+  if (fullTestSignoffFocus?.canSignoffProduction === true) {
+    const current = fullTestSignoffFocus.currentAction || {};
+    const target = launchDutyPacketFocus?.currentPostSignoffTarget || {};
+    return {
+      mode,
+      stage: "launch_day_watch_entry",
+      sourceFocus: "launchDutyPacketFocus",
+      key: current.key || "archive_production_signoff",
+      status: current.status || fullTestSignoffFocus.status || target.status || "ready_for_launch_day_watch",
+      command: current.command || null,
+      packetPath: current.packetPath || target.path || launchDutyPacketFocus?.controlPaths?.productionSignoffPacket || null,
+      artifactPath: target.path || null,
+      envKeys: current.envKeys || [],
+      missingKeys: [],
+      nextAction: launchDutyPacketFocus?.nextAction || current.nextAction || fullTestSignoffFocus.nextAction || null
+    };
+  }
+  if (fullTestSignoffFocus?.canRunFullTestWindow === true) {
+    const current = fullTestSignoffFocus.currentAction || {};
+    return {
+      mode,
+      stage: "full_test_signoff",
+      sourceFocus: "fullTestSignoffFocus",
+      key: current.key || "backfill_production_signoff",
+      status: current.status || fullTestSignoffFocus.status || "ready_for_full_test_window",
+      command: current.command || fullTestSignoffFocus.commands?.fullTestWindow || null,
+      packetPath: current.packetPath || fullTestSignoffFocus.paths?.productionSignoffPacketFile || null,
+      artifactPath: null,
+      envKeys: current.envKeys || [],
+      missingKeys: [
+        ...(fullTestSignoffFocus.missingSignoffKeys || []),
+        ...(fullTestSignoffFocus.missingReceiptVisibilityKeys || [])
+      ],
+      nextAction: fullTestSignoffFocus.nextAction || current.nextAction || null
+    };
+  }
+  if (closeoutBackfillFocus) {
+    const current = closeoutBackfillFocus.currentBackfillTarget || {};
+    return {
+      mode,
+      stage: "closeout_backfill",
+      sourceFocus: "closeoutBackfillFocus",
+      key: current.key || "reload_closeout_input",
+      status: closeoutBackfillFocus.status || "awaiting_closeout_backfill",
+      command: closeoutBackfillFocus.reloadCommand || null,
+      packetPath: launchDutyPacketFocus?.controlPaths?.closeoutReloadPacket || closeoutBackfillFocus.paths?.closeoutReloadPacketFile || null,
+      artifactPath: current.artifactPath || null,
+      envKeys: current.envKeys || [],
+      missingKeys: closeoutBackfillFocus.missingBackfillKeys || [],
+      nextAction: current.nextAction || closeoutBackfillFocus.nextAction || null
+    };
+  }
+  const current = realStagingRunFocus?.currentAction || {};
+  return {
+    mode,
+    stage: "real_staging_inputs",
+    sourceFocus: "realStagingRunFocus",
+    key: current.key || "load_staging_profile",
+    status: current.status || realStagingRunFocus?.status || "blocked",
+    command: current.command || realStagingRunFocus?.commands?.stagingDryRun || null,
+    packetPath: realStagingRunFocus?.paths?.launchDutyArchiveIndexFile || null,
+    artifactPath: realStagingRunFocus?.paths?.artifactArchiveRoot || null,
+    envKeys: current.envKeys || realStagingRunFocus?.missingSecretEnv || [],
+    missingKeys: [
+      ...(realStagingRunFocus?.missingOutputFiles || []),
+      ...(realStagingRunFocus?.missingSecretEnv || [])
+    ],
+    nextAction: current.nextAction || realStagingRunFocus?.nextAction || null
+  };
+}
+
 function findLaunchDutyFocusItem(items) {
   if (!Array.isArray(items) || items.length === 0) {
     return null;
@@ -4227,6 +4305,12 @@ function buildStagingOperatorExecutionPlan(result) {
   const closeoutBackfillFocus = buildCloseoutBackfillFocus(result, { outputFiles });
   const fullTestSignoffFocus = buildFullTestSignoffFocus(result, { outputFiles });
   const launchDutyPacketFocus = buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus });
+  const launchDutyCurrentAction = buildLaunchDutyCurrentAction({
+    realStagingRunFocus,
+    closeoutBackfillFocus,
+    fullTestSignoffFocus,
+    launchDutyPacketFocus
+  });
   return {
     status: "ready_for_staging_execution",
     willModifyData: false,
@@ -4247,6 +4331,7 @@ function buildStagingOperatorExecutionPlan(result) {
     closeoutBackfillFocus,
     fullTestSignoffFocus,
     launchDutyPacketFocus,
+    launchDutyCurrentAction,
     orderedSteps: [
       {
         key: "review_generated_bundle",
@@ -5132,6 +5217,7 @@ function renderOperatorExecutionPlan(plan) {
   }
   const realClosure = plan.realStagingInputClosure || {};
   const goLiveActionPlan = plan.goLiveOperatorActionPlan || {};
+  const currentLaunchDutyAction = plan.launchDutyCurrentAction || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Writes data: ${plan.willModifyData ? "yes" : "no"}`,
@@ -5146,6 +5232,10 @@ function renderOperatorExecutionPlan(plan) {
     `- Operator real staging input closure: ${realClosure.status || "-"} (ready=${realClosure.readyCheckCount ?? "-"}, blocked=${realClosure.blockedCheckCount ?? "-"})`,
     `- Operator go-live action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
     `- Operator current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
+    `- Launch-duty current action: ${currentLaunchDutyAction.key || "-"} (stage=${currentLaunchDutyAction.stage || "-"}, source=${currentLaunchDutyAction.sourceFocus || "-"})`,
+    `- Launch-duty current command: \`${currentLaunchDutyAction.command || "-"}\``,
+    `- Launch-duty current packet: ${currentLaunchDutyAction.packetPath || "-"}`,
+    `- Launch-duty current next action: ${currentLaunchDutyAction.nextAction || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
   ];
   if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {

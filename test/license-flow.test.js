@@ -6926,6 +6926,19 @@ test("developer release package export bundles integration, versions, and notice
         latestOperatorOperation: stabilizationHandoffPanel?.latestOperatorOperation,
         nextActionOperation: stabilizationHandoffPanel?.nextActionOperation,
         nextActionKey: stabilizationHandoffPanel?.nextActionKey,
+        launchReadinessNextGate: stabilizationHandoffPanel?.launchReadinessNextGate
+          ? {
+              status: stabilizationHandoffPanel.launchReadinessNextGate.status,
+              decision: stabilizationHandoffPanel.launchReadinessNextGate.decision,
+              canEnterInitialLaunch: stabilizationHandoffPanel.launchReadinessNextGate.canEnterInitialLaunch,
+              currentGate: stabilizationHandoffPanel.launchReadinessNextGate.currentGate,
+              fullTestWindowCommand: stabilizationHandoffPanel.launchReadinessNextGate.fullTestWindowCommand,
+              productionSignoffPacket: stabilizationHandoffPanel.launchReadinessNextGate.productionSignoffPacket
+            }
+          : null,
+        launchReadinessNextGateStatus: stabilizationHandoffPanel?.launchReadinessNextGateStatus,
+        launchReadinessNextGateDecision: stabilizationHandoffPanel?.launchReadinessNextGateDecision,
+        launchReadinessNextGateCurrentGate: stabilizationHandoffPanel?.launchReadinessNextGateCurrentGate,
         primaryWorkspaceAction: stabilizationHandoffPanel?.primaryWorkspaceAction
           ? {
               key: stabilizationHandoffPanel.primaryWorkspaceAction.key,
@@ -6978,6 +6991,17 @@ test("developer release package export bundles integration, versions, and notice
           || stabilizationPanelNextAction?.setupAction?.key
           || stabilizationPanelNextAction?.key
           || null,
+        launchReadinessNextGate: {
+          status: "awaiting_launch_readiness",
+          decision: "no_go",
+          canEnterInitialLaunch: false,
+          currentGate: "ready_for_closeout_reload",
+          fullTestWindowCommand: "npm.cmd test",
+          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json"
+        },
+        launchReadinessNextGateStatus: "awaiting_launch_readiness",
+        launchReadinessNextGateDecision: "no_go",
+        launchReadinessNextGateCurrentGate: "ready_for_closeout_reload",
         primaryWorkspaceAction: stabilizationPanelWorkspaceAction
           ? {
               key: stabilizationPanelWorkspaceAction.key,
@@ -7163,6 +7187,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- firstWaveCheckpoints: confirm_runtime_alerting, review_first_wave_sessions, record_post_launch_ops_sweep/);
       assert.match(launchMainline.summaryText, /Stabilization Handoff Panel:/);
       assert.match(launchMainline.summaryText, /- status: pending_next_action/);
+      assert.match(launchMainline.summaryText, /Stabilization Handoff Panel:[\s\S]*- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
+      assert.match(launchMainline.summaryText, /Stabilization Handoff Panel:[\s\S]*- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
       assert.match(launchMainline.summaryText, /- primaryDownload: Launch mainline stabilization handoff/);
       assert.match(launchMainline.summaryText, /- indexDownload: Launch Mainline post-launch handoff index/);
       assert.match(launchMainline.summaryText, /- routeMapDownload: Launch Mainline handoff download routes/);
@@ -7258,6 +7284,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGateFullTestWindow: npm\.cmd test/);
       assert.match(launchMainlineSummaryDownload.body, /Launch-Day Watch Panel:[\s\S]*launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
+      assert.match(launchMainlineSummaryDownload.body, /Stabilization Handoff Panel:[\s\S]*launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Closeout Reload/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Full Test Window/);
       assert.match(launchMainlineSummaryDownload.body, /Copy Sign-off Packet/);

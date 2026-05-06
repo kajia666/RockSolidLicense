@@ -15584,6 +15584,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           || initialLaunchOpsReadiness?.launchOpsOverviewContext
           || initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.launchOpsOverviewContext
         );
+        const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(
+          launchRunway || launchDayWatchPanel || initialLaunchOpsReadiness
+        );
         const nextAction = [
           stabilizationHandoff?.nextAction && typeof stabilizationHandoff.nextAction === "object"
             ? stabilizationHandoff.nextAction
@@ -15700,6 +15703,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             : nextActionOperation
               ? `${nextAction?.title || nextAction?.label || nextActionOperation} is still queued before stabilization handoff can be confirmed.`
               : "Launch Mainline is aligned for steady monitoring. Confirm the stabilization handoff in Developer Ops before handing off the lane.",
+          ...launchReadinessNextGateCarry,
           decision: stabilizationHandoff?.decision || null,
           lifecycleStatus: stabilizationHandoff?.latestLaunchReceipt?.postLaunchLifecycleStatus
             || stabilizationLifecyclePhase?.status
@@ -17585,6 +17589,16 @@ function appendStabilizationHandoffPanelTextLines(lines = [], stabilizationHando
     `- latestReceipt: ${stabilizationHandoffPanel.latestReceiptOperation || "-"}`
     + ` | latestOperator=${stabilizationHandoffPanel.latestOperatorOperation || "-"}`
   );
+  const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(stabilizationHandoffPanel);
+  if (launchReadinessNextGate) {
+    lines.push(
+      `- launchReadinessNextGate: ${launchReadinessNextGate.status || "-"}`
+      + ` | decision=${launchReadinessNextGate.decision || "-"}`
+      + ` | canEnterInitialLaunch=${launchReadinessNextGate.canEnterInitialLaunch === true}`
+      + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
+    );
+    lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+  }
   if (stabilizationHandoffPanel.nextActionKey || stabilizationHandoffPanel.nextActionOperation) {
     lines.push(`- nextAction: ${stabilizationHandoffPanel.nextActionKey || "-"} | operation=${stabilizationHandoffPanel.nextActionOperation || "-"}`);
   }

@@ -2685,6 +2685,13 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
     ...currentPacket,
     nextAction: packetNextActions.get(currentPacketKey) || archiveIndex.nextAction || focus.nextAction || null
   };
+  const currentPostSignoffTarget = findLaunchDutyFocusItem(archiveIndex.signoffTargets);
+  const currentWatchArtifact = findLaunchDutyFocusItem(archiveIndex.watchArtifacts);
+  const currentStabilizationWindow = findLaunchDutyFocusItem(archiveIndex.stabilizationHandoff?.handoffWindows);
+  const readyForCutoverWatch = result.launchDayWatchPlan?.canStartCutoverWatch === true;
+  const launchWatchNextAction = readyForCutoverWatch && currentPostSignoffTarget
+    ? `Archive ${currentPostSignoffTarget.key}, then record launch-day watch artifacts and prepare stabilization handoff.`
+    : enrichedCurrentPacket.nextAction || null;
   return {
     mode: "launch-duty-packet-focus",
     status: enrichedCurrentPacket.status || "not_available",
@@ -2693,6 +2700,9 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
     archiveIndexPath: archiveIndex.indexFile || null,
     currentPacket: enrichedCurrentPacket,
     packetSequence,
+    currentPostSignoffTarget: readyForCutoverWatch ? currentPostSignoffTarget : null,
+    currentWatchArtifact: readyForCutoverWatch ? currentWatchArtifact : null,
+    currentStabilizationWindow: readyForCutoverWatch ? currentStabilizationWindow : null,
     controlPaths: {
       runRecordIndex: keyedPath(packetSequence, "run_record_index"),
       closeoutReloadPacket: keyedPath(packetSequence, "closeout_reload_packet"),
@@ -2705,8 +2715,15 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
       closeoutReload: archiveIndex.commands?.closeoutReload || focus.reloadCommand || null,
       fullTestWindow: archiveIndex.commands?.fullTestWindow || focus.fullTestWindow?.command || "npm.cmd test"
     },
-    nextAction: enrichedCurrentPacket.nextAction || null
+    nextAction: launchWatchNextAction
   };
+}
+
+function findLaunchDutyFocusItem(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return null;
+  }
+  return items.find((item) => item?.status && !["ready", "complete"].includes(item.status)) || items[0];
 }
 
 function buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch = false, routes = {} } = {}) {
@@ -4976,6 +4993,15 @@ function renderOperatorExecutionPlan(plan) {
     lines.push(`- Launch-duty current packet path: ${current.path || "-"}`);
     lines.push(`- Launch-duty archive index: ${focus.archiveIndexPath || "-"}`);
     lines.push(`- Launch-duty packet sequence: ${packetKeys.join(" -> ")}`);
+    if (focus.currentPostSignoffTarget) {
+      lines.push(`- Launch-duty post-signoff target: ${focus.currentPostSignoffTarget.key || "-"} (${focus.currentPostSignoffTarget.status || "-"})`);
+    }
+    if (focus.currentWatchArtifact) {
+      lines.push(`- Launch-duty watch artifact: ${focus.currentWatchArtifact.key || "-"} (${focus.currentWatchArtifact.status || "-"})`);
+    }
+    if (focus.currentStabilizationWindow) {
+      lines.push(`- Launch-duty stabilization window: ${focus.currentStabilizationWindow.key || "-"} (${focus.currentStabilizationWindow.status || "-"})`);
+    }
     lines.push(`- Launch-duty packet next action: ${focus.nextAction || "-"}`);
   }
   if (Array.isArray(realClosure.checks) && realClosure.checks.length) {

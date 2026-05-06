@@ -2607,6 +2607,7 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-signoff-input-"));
   try {
     const closeoutInputFile = join(tempDir, "filled-signoff-closeout.json");
+    const handoffFile = join(tempDir, "signoff-ready-handoff.md");
     const acceptanceFields = [
       "route_map_gate_result",
       "backup_restore_drill_result",
@@ -2654,7 +2655,9 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     const result = runRehearsal([
       ...validArgs,
       "--closeout-input-file",
-      closeoutInputFile
+      closeoutInputFile,
+      "--handoff-file",
+      handoffFile
     ]);
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -2673,10 +2676,15 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.deepEqual(
       output.operatorExecutionPlan.readinessGaps.map((item) => item.key),
       [
-        "handoff_file_not_requested",
         "closeout_file_not_requested"
       ]
     );
+    const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, /Launch-duty packet focus: launch_duty_archive_index \(awaiting_archive_review\)/);
+    assert.match(handoff, /Launch-duty post-signoff target: production_signoff_packet \(archive_before_cutover\)/);
+    assert.match(handoff, /Launch-duty watch artifact: launch_day_watch_summary \(pending_operator_entry\)/);
+    assert.match(handoff, /Launch-duty stabilization window: stabilization_owner_handoff \(operator_handoff\)/);
+    assert.match(handoff, /Launch-duty packet next action: Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff\./);
     assert.equal(output.operatorExecutionPlan.readinessSummary.canRunFullTestWindow, true);
     assert.equal(output.operatorExecutionPlan.readinessSummary.canSignoffProduction, true);
     assert.equal(output.productionSignoffReadiness.status, "ready");
@@ -2775,6 +2783,18 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       ]
     );
     assert.equal(output.stagingProductionSignoffPacket.nextAction, "Archive production sign-off packet, then start launch-day watch and stabilization handoff.");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.key, "launch_duty_archive_index");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.status, "awaiting_archive_review");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPostSignoffTarget.key, "production_signoff_packet");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPostSignoffTarget.status, "archive_before_cutover");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentWatchArtifact.key, "launch_day_watch_summary");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentWatchArtifact.status, "pending_operator_entry");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentStabilizationWindow.key, "stabilization_owner_handoff");
+    assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentStabilizationWindow.status, "operator_handoff");
+    assert.equal(
+      output.operatorExecutionPlan.launchDutyPacketFocus.nextAction,
+      "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."
+    );
     assert.equal(output.stagingLaunchDutyArchiveIndex.sourceStatuses.launchDayWatch, "ready");
     assert.equal(output.stagingLaunchDutyArchiveIndex.sourceStatuses.stabilizationHandoff, "ready");
     assert.deepEqual(
@@ -2877,7 +2897,7 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
         ["launch_day_watch_and_stabilization", "ready_for_launch_day_watch"]
       ]
     );
-    assert.equal(output.operatorExecutionPlan.readinessSummary.gapCount, 2);
+    assert.equal(output.operatorExecutionPlan.readinessSummary.gapCount, 1);
     assert.equal(
       output.operatorExecutionPlan.readinessGaps.some((item) => item.key === "production_signoff_blocked"),
       false

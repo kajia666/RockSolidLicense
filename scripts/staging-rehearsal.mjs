@@ -1009,6 +1009,76 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
   };
 }
 
+function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
+  const preflight = result.stagingProfileOperatorPreflight || {};
+  const recommendedFiles = Array.isArray(preflight.recommendedFiles)
+    ? preflight.recommendedFiles
+    : (result.stagingEnvironmentBinding?.recommendedOutputFiles || []);
+  const missingSecretEnv = Array.isArray(preflight.missingSecretEnv) ? preflight.missingSecretEnv : [];
+  const missingOutputFiles = Array.isArray(preflight.missingOutputFiles) ? preflight.missingOutputFiles : [];
+  const commandSequence = Array.isArray(preflight.commandSequence) ? preflight.commandSequence : [];
+  const pathFor = (key) => keyedPath(recommendedFiles, key) || keyedPath(outputFiles, key);
+  const commands = {
+    profileDrivenRehearsal: preflight.commands?.profileDrivenRehearsal || result.stagingProfileLaunchPlan?.recommendedCommand || null,
+    stagingDryRun: preflight.commands?.stagingDryRun || result.stagingEnvironmentBinding?.dryRunCommand || null,
+    routeMapGate: preflight.commands?.routeMapGate || result.nextCommands?.launchRouteMapGate?.command || null,
+    liveWriteSmoke: preflight.commands?.liveWriteSmoke || result.nextCommands?.launchSmoke || null,
+    closeoutReload: preflight.commands?.closeoutReload || result.finalRehearsalPacket?.commands?.closeoutReload || null
+  };
+  let currentAction = {
+    key: "run_staging_dry_run",
+    status: preflight.canRunDryRun === true ? "ready" : "blocked",
+    command: commands.stagingDryRun,
+    nextAction: "Run the profile-driven staging dry run and archive generated launch-duty artifacts."
+  };
+  if (!preflight.profileFile || preflight.status === "profile_not_loaded") {
+    currentAction = {
+      key: "load_staging_profile",
+      status: "blocked",
+      path: preflight.profileFile || null,
+      nextAction: "Load a secret-free staging profile before the real staging rehearsal."
+    };
+  } else if (missingOutputFiles.length) {
+    currentAction = {
+      key: "provide_output_paths",
+      status: "blocked",
+      missingOutputFiles,
+      nextAction: "Provide all launch-duty output file paths before the real staging rehearsal."
+    };
+  } else if (missingSecretEnv.length) {
+    currentAction = {
+      key: "set_required_secret_env",
+      status: "blocked",
+      envKeys: missingSecretEnv,
+      nextAction: "Set the missing secret environment variables before evidence recording or live-write duty continues."
+    };
+  }
+  return {
+    mode: "real-staging-run-focus",
+    status: preflight.status || "not_available",
+    willModifyData: false,
+    canRunDryRun: preflight.canRunDryRun === true,
+    canRunLiveWriteSmoke: preflight.canRunLiveWriteSmoke === true,
+    canRecordEvidence: preflight.canRecordEvidence === true,
+    missingSecretEnv,
+    missingOutputFiles,
+    currentAction,
+    commandSequence,
+    commands,
+    paths: {
+      profileFile: preflight.profileFile || null,
+      handoffFile: pathFor("handoff_file"),
+      closeoutFile: pathFor("closeout_file"),
+      artifactManifestFile: pathFor("artifact_manifest"),
+      closeoutReloadPacketFile: pathFor("closeout_reload_packet"),
+      launchDutyArchiveIndexFile: pathFor("launch_duty_archive_index"),
+      filledCloseoutInputFile: pathFor("filled_closeout_input"),
+      artifactArchiveRoot: pathFor("artifact_archive_root")
+    },
+    nextAction: currentAction.nextAction
+  };
+}
+
 function buildStagingRehearsalRunRecordIndex(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const runTemplate = result.stagingRunRecordTemplate || buildStagingRunRecordTemplate(result);
@@ -4046,6 +4116,7 @@ function buildStagingOperatorExecutionPlan(result) {
     }
   ];
   const readinessGaps = buildOperatorReadinessGaps(result, { closeout, outputFiles });
+  const realStagingRunFocus = buildRealStagingRunFocus(result, { outputFiles });
   const closeoutBackfillFocus = buildCloseoutBackfillFocus(result, { outputFiles });
   const launchDutyPacketFocus = buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus });
   return {
@@ -4063,6 +4134,7 @@ function buildStagingOperatorExecutionPlan(result) {
     },
     readinessGaps,
     realStagingInputClosure,
+    realStagingRunFocus,
     goLiveOperatorActionPlan,
     closeoutBackfillFocus,
     launchDutyPacketFocus,
@@ -4972,6 +5044,15 @@ function renderOperatorExecutionPlan(plan) {
     for (const phase of goLiveActionPlan.phaseSummary) {
       lines.push(`  - Operator phase ${phase.phase || "-"}: ready=${phase.readyCount ?? 0}, blocked=${phase.blockedCount ?? 0}`);
     }
+  }
+  if (plan.realStagingRunFocus) {
+    const focus = plan.realStagingRunFocus;
+    const current = focus.currentAction || {};
+    lines.push(`- Real staging run focus: ${focus.status || "-"} (dryRun=${focus.canRunDryRun ? "yes" : "no"}, liveWriteSmoke=${focus.canRunLiveWriteSmoke ? "yes" : "no"}, evidence=${focus.canRecordEvidence ? "yes" : "no"})`);
+    lines.push(`- Real staging current action: ${current.key || "-"} (env=${(current.envKeys || []).join(", ") || "-"})`);
+    lines.push(`- Real staging archive root: ${focus.paths?.artifactArchiveRoot || "-"}`);
+    lines.push(`- Real staging dry-run command: \`${focus.commands?.stagingDryRun || "-"}\``);
+    lines.push(`- Real staging closeout reload: \`${focus.commands?.closeoutReload || "-"}\``);
   }
   if (plan.closeoutBackfillFocus) {
     const focus = plan.closeoutBackfillFocus;

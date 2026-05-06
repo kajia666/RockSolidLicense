@@ -1438,6 +1438,17 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.stagingProfileOperatorPreflight.commands.stagingDryRun, output.stagingEnvironmentBinding.dryRunCommand);
     assert.equal(output.stagingProfileOperatorPreflight.commands.routeMapGate, "npm.cmd run launch:route-map-gate");
     assert.equal(output.stagingProfileOperatorPreflight.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.mode, "real-staging-run-focus");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.status, "blocked_until_secret_env");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.canRunDryRun, true);
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.canRunLiveWriteSmoke, true);
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.canRecordEvidence, false);
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.currentAction.key, "set_required_secret_env");
+    assert.deepEqual(output.operatorExecutionPlan.realStagingRunFocus.currentAction.envKeys, ["RSL_DEVELOPER_BEARER_TOKEN"]);
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.paths.artifactArchiveRoot, "artifacts/staging/PROFILE_PRODUCT/stable");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.paths.filledCloseoutInputFile, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.commands.stagingDryRun, output.stagingEnvironmentBinding.dryRunCommand);
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.commands.closeoutReload, output.stagingProfileOperatorPreflight.commands.closeoutReload);
     assert.equal(output.stagingRehearsalExecutionSummary.mode, "staging-rehearsal-execution-summary");
     assert.equal(output.stagingRehearsalExecutionSummary.status, "blocked_until_secret_env");
     assert.deepEqual(output.stagingRehearsalExecutionSummary.sourceStatuses, {
@@ -1616,6 +1627,10 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Missing secret env: RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(handoff, /Can run dry run: yes/);
     assert.match(handoff, /Can record evidence: no/);
+    assert.match(handoff, /Real staging run focus: blocked_until_secret_env \(dryRun=yes, liveWriteSmoke=yes, evidence=no\)/);
+    assert.match(handoff, /Real staging current action: set_required_secret_env \(env=RSL_DEVELOPER_BEARER_TOKEN\)/);
+    assert.match(handoff, /Real staging archive root: artifacts\/staging\/PROFILE_PRODUCT\/stable/);
+    assert.match(handoff, /Real staging closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json`/);
     assert.match(handoff, /## Staging Rehearsal Execution Summary/);
     assert.match(handoff, /Execution summary status: blocked_until_secret_env/);
     assert.match(handoff, /Closeout review: not_loaded \(missing=7\)/);
@@ -1627,6 +1642,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.deepEqual(template.stagingProfileLaunchPlan, output.stagingProfileLaunchPlan);
     assert.deepEqual(template.stagingProfileOperatorPreflight, output.stagingProfileOperatorPreflight);
     assert.deepEqual(template.stagingRehearsalExecutionSummary, output.stagingRehearsalExecutionSummary);
+    assert.equal(template.operatorExecutionPlan.realStagingRunFocus.currentAction.key, "set_required_secret_env");
+    assert.equal(template.operatorExecutionPlan.realStagingRunFocus.canRunDryRun, true);
     assert.deepEqual(template.stagingRehearsalRunRecordIndex, output.stagingRehearsalRunRecordIndex);
     assert.equal(output.runRecordFile.path, runRecordFile);
     assert.equal(output.runRecordFile.written, true);

@@ -27112,7 +27112,31 @@ function buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
           downloads: deliveryPhase?.download ? [normalizeFirstLaunchOperatingChainDownload(deliveryPhase.download)] : []
         }
       : null);
-  const firstUserValidationHandoff = buildFirstUserValidationHandoffFromFollowUps(followUpQueue, latestReceipt);
+  const validationPhase = bridgePhase("first_user_validation");
+  const firstUserValidationHandoffFromFollowUps = buildFirstUserValidationHandoffFromFollowUps(followUpQueue, latestReceipt);
+  const firstUserValidationHandoff = firstUserValidationHandoffFromFollowUps
+    || (validationPhase?.ready === true
+      ? {
+          status: validationPhase.status || "evidence_recorded",
+          stage: "first_user_validation",
+          priority: "primary",
+          title: "Review first-user runtime evidence",
+          summary: "First-user runtime evidence was already confirmed in the first-launch operating chain.",
+          actionCount: 0,
+          remainingCount: 0,
+          nextAction: {
+            key: validationPhase.operation || null,
+            stage: "first_user_validation",
+            ownerRole: "ops",
+            operation: validationPhase.operation || null
+          },
+          runtimeEvidence: {
+            status: validationPhase.status || "evidence_recorded",
+            ready: true
+          },
+          primaryDownload: normalizeFirstLaunchOperatingChainDownload(validationPhase?.download)
+        }
+      : null);
   const latestPostLaunchLifecycleHandoff = buildDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
     latestLaunchReceipt: latestReceipt
   });

@@ -10918,6 +10918,68 @@ test("developer license quickstart first-batch setup can create recommended laun
       }
     );
 
+    const launchCloseoutAction = await postJson(
+      baseUrl,
+      postLaunchSweepAction.receipt.firstLaunchOperatingChain.nextAction.endpoint,
+      postLaunchSweepAction.receipt.firstLaunchOperatingChain.nextAction.body,
+      ownerSession.token
+    );
+    assert.equal(launchCloseoutAction.operation, "record_launch_closeout_review");
+    assert.deepEqual(
+      {
+        status: launchCloseoutAction.receipt?.firstLaunchOperatingChain?.status,
+        currentPhaseKey: launchCloseoutAction.receipt?.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: launchCloseoutAction.receipt?.firstLaunchOperatingChain?.readyPhaseCount,
+        nextActionKey: launchCloseoutAction.receipt?.firstLaunchOperatingChain?.nextAction?.key,
+        nextActionOperation: launchCloseoutAction.receipt?.firstLaunchOperatingChain?.nextAction?.operation,
+        nextActionBody: launchCloseoutAction.receipt?.firstLaunchOperatingChain?.nextAction?.body,
+        primaryDownloadKey: launchCloseoutAction.receipt?.firstLaunchOperatingChain?.primaryDownload?.key
+      },
+      {
+        status: "pending_post_launch_lifecycle",
+        currentPhaseKey: "post_launch_lifecycle",
+        readyPhaseCount: 4,
+        nextActionKey: "production_launch_stabilization_review_recent",
+        nextActionOperation: "record_launch_stabilization_review",
+        nextActionBody: {
+          productCode: "FIRSTBATCH",
+          channel: "stable",
+          operation: "record_launch_stabilization_review",
+          actionKey: "production_launch_stabilization_review_recent",
+          downloadKey: "launch_mainline_stabilization_handoff"
+        },
+        primaryDownloadKey: "launch_mainline_stabilization_handoff"
+      }
+    );
+
+    const launchStabilizationAction = await postJson(
+      baseUrl,
+      launchCloseoutAction.receipt.firstLaunchOperatingChain.nextAction.endpoint,
+      launchCloseoutAction.receipt.firstLaunchOperatingChain.nextAction.body,
+      ownerSession.token
+    );
+    assert.equal(launchStabilizationAction.operation, "record_launch_stabilization_review");
+    assert.deepEqual(
+      {
+        status: launchStabilizationAction.receipt?.firstLaunchOperatingChain?.status,
+        ready: launchStabilizationAction.receipt?.firstLaunchOperatingChain?.ready,
+        currentPhaseKey: launchStabilizationAction.receipt?.firstLaunchOperatingChain?.currentPhaseKey,
+        readyPhaseCount: launchStabilizationAction.receipt?.firstLaunchOperatingChain?.readyPhaseCount,
+        phaseCount: launchStabilizationAction.receipt?.firstLaunchOperatingChain?.phaseCount,
+        remainingPhaseCount: launchStabilizationAction.receipt?.firstLaunchOperatingChain?.remainingPhaseCount,
+        nextAction: launchStabilizationAction.receipt?.firstLaunchOperatingChain?.nextAction
+      },
+      {
+        status: "ready",
+        ready: true,
+        currentPhaseKey: "ready",
+        readyPhaseCount: 5,
+        phaseCount: 5,
+        remainingPhaseCount: 0,
+        nextAction: null
+      }
+    );
+
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,
       "/api/developer/launch-mainline?productCode=FIRSTBATCH&channel=stable&reviewMode=matched",

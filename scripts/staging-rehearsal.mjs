@@ -1610,12 +1610,14 @@ function buildStagingCloseoutReloadPacket(result) {
     || runRecordIndex.closeoutProgress?.reloadCommand
     || result.filledCloseoutInputDraft?.reloadCommand
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${filledCloseoutInputFile}`;
+  const closeoutBackfillFocus = result.operatorExecutionPlan?.closeoutBackfillFocus
+    || buildCloseoutBackfillFocus(result);
   const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
     || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
     || finalPacket.goLiveExecutionEntry
     || buildGoLiveExecutionEntry({
       realStagingRunFocus: buildRealStagingRunFocus(result),
-      closeoutBackfillFocus: buildCloseoutBackfillFocus(result),
+      closeoutBackfillFocus,
       fullTestSignoffFocus: buildFullTestSignoffFocus(result),
       launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null
     });
@@ -1682,6 +1684,7 @@ function buildStagingCloseoutReloadPacket(result) {
         ? "Backup/restore evidence is backfilled; continue closeout reload and full-test readiness review."
         : "Backfill backup_restore_drill_result before treating closeout reload as full-test ready."
     },
+    reloadExecutionEntry: closeoutBackfillFocus.reloadExecutionEntry,
     requiredCloseoutKeys,
     missingCloseoutKeys,
     closeoutReview,
@@ -3409,6 +3412,66 @@ function keyedPath(items, key) {
   return findKeyedItem(items, key)?.path || null;
 }
 
+function buildCloseoutReloadExecutionEntry({
+  status,
+  missingBackfillKeys = [],
+  runbookTargets = [],
+  missingFields = [],
+  filledCloseoutDraftFile = null,
+  filledCloseoutInputFile = null,
+  closeoutReloadPacketFile = null,
+  reloadCommand = null,
+  fullTestWindow = {}
+} = {}) {
+  const missingKeySet = new Set(missingBackfillKeys);
+  const targetRows = runbookTargets.length ? runbookTargets : missingFields;
+  const backfillQueue = targetRows
+    .filter((item) => item?.key)
+    .map((item) => ({
+      key: item.key,
+      status: missingKeySet.has(item.key) ? "missing" : "filled",
+      sourceStep: item.sourceStep || CLOSEOUT_SOURCE_STEPS[item.key] || "operator_backfill",
+      artifactPath: item.artifactPath || null,
+      receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+      expectedEvidence: item.expectedEvidence || null
+    }));
+  const currentQueueItem = backfillQueue.find((item) => item.status === "missing") || null;
+  const canRunFullTestWindow = fullTestWindow.canRun === true;
+  const entryStatus = canRunFullTestWindow
+    ? "ready_for_full_test_window"
+    : currentQueueItem
+      ? "awaiting_backfill"
+      : status === "reload_needs_backfill"
+        ? "ready_to_reload"
+        : status || "awaiting_backfill";
+  return {
+    mode: "closeout-reload-execution-entry",
+    status: entryStatus,
+    willModifyData: false,
+    currentBackfillKey: currentQueueItem?.key || null,
+    backfillQueueCount: backfillQueue.length,
+    missingBackfillCount: backfillQueue.filter((item) => item.status === "missing").length,
+    filledCloseoutDraftFile,
+    filledCloseoutInputFile,
+    closeoutReloadPacketFile,
+    reloadCommand,
+    backfillQueue,
+    postReloadReview: {
+      key: "readiness_review_packet",
+      status: fullTestWindow.status || "blocked",
+      canRunFullTestWindow,
+      command: fullTestWindow.command || "npm.cmd test",
+      missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
+      nextAction: canRunFullTestWindow
+        ? "Run the reserved full test window, then backfill production sign-off evidence."
+        : "Backfill missing staging closeout fields, reload the closeout input, then re-check this gate before running the full test suite."
+    },
+    nextAction: currentQueueItem
+      ? `Backfill ${currentQueueItem.key}, save ${filledCloseoutInputFile || "filled-closeout-input.json"}, then reload closeout readiness.`
+      : `Reload ${filledCloseoutInputFile || "filled-closeout-input.json"} before reviewing full-test readiness.`
+  };
+}
+
 function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const runbook = result.stagingExecutionRunbook || {};
@@ -3463,6 +3526,23 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
     operatorNote: currentTarget.operatorNote || null,
     nextAction: `Backfill ${currentTarget.key} into ${filledCloseoutInputFile || "filled-closeout-input.json"}, then reload closeout input.`
   } : null;
+  const reloadExecutionEntry = buildCloseoutReloadExecutionEntry({
+    status,
+    missingBackfillKeys,
+    runbookTargets,
+    missingFields,
+    filledCloseoutDraftFile,
+    filledCloseoutInputFile,
+    closeoutReloadPacketFile,
+    reloadCommand,
+    fullTestWindow: {
+      status: fullTestWindow.status || "blocked",
+      canRun: fullTestWindow.canRun === true,
+      command: fullTestWindow.command || "npm.cmd test",
+      missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
+      nextAction: fullTestWindow.nextAction || null
+    }
+  });
   return {
     mode: "closeout-backfill-focus",
     status,
@@ -3471,6 +3551,7 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
     missingFieldCount: closeoutReview.missingFieldCount ?? missingBackfillKeys.length,
     missingBackfillKeys,
     currentBackfillTarget,
+    reloadExecutionEntry,
     paths: {
       closeoutTemplateFile,
       filledCloseoutDraftFile,
@@ -6875,7 +6956,15 @@ function renderOperatorExecutionPlan(plan) {
   if (plan.closeoutBackfillFocus) {
     const focus = plan.closeoutBackfillFocus;
     const current = focus.currentBackfillTarget || {};
+    const reloadExecutionEntry = focus.reloadExecutionEntry || {};
+    const reloadQueueItem = Array.isArray(reloadExecutionEntry.backfillQueue)
+      ? reloadExecutionEntry.backfillQueue.find((item) => item.status === "missing") || reloadExecutionEntry.backfillQueue[0]
+      : null;
+    const postReloadReview = reloadExecutionEntry.postReloadReview || {};
     lines.push(`- Closeout backfill focus: ${focus.status || "-"} (missing=${focus.missingFieldCount ?? "-"}, current=${current.key || "-"})`);
+    lines.push(`- Closeout reload execution entry: ${reloadExecutionEntry.status || "-"} (current=${reloadExecutionEntry.currentBackfillKey || "-"}, queue=${reloadExecutionEntry.missingBackfillCount ?? 0}/${reloadExecutionEntry.backfillQueueCount ?? 0})`);
+    lines.push(`- Closeout reload first queue item: ${reloadQueueItem?.key || "-"} -> ${reloadQueueItem?.artifactPath || "-"}`);
+    lines.push(`- Closeout reload post-reload review: ${postReloadReview.key || "-"} (fullTest=${postReloadReview.canRunFullTestWindow ? "yes" : "no"}, command=${postReloadReview.command || "-"})`);
     lines.push(`- Closeout reload command: \`${focus.reloadCommand || "-"}\``);
     lines.push(`- Current closeout source step: ${current.sourceStep || "-"}`);
     lines.push(`- Current closeout artifact: ${current.artifactPath || "-"}`);
@@ -7282,6 +7371,11 @@ function renderStagingCloseoutReloadPacket(packet) {
   const paths = packet.paths || {};
   const review = packet.closeoutReview || {};
   const backupRestoreGate = packet.backupRestoreGate || {};
+  const reloadExecutionEntry = packet.reloadExecutionEntry || {};
+  const reloadQueueItem = Array.isArray(reloadExecutionEntry.backfillQueue)
+    ? reloadExecutionEntry.backfillQueue.find((item) => item.status === "missing") || reloadExecutionEntry.backfillQueue[0]
+    : null;
+  const postReloadReview = reloadExecutionEntry.postReloadReview || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -7295,6 +7389,9 @@ function renderStagingCloseoutReloadPacket(packet) {
     `- Backup/restore artifact: ${backupRestoreGate.artifactPath || "-"}`,
     `- Backup/restore closeout input: ${backupRestoreGate.closeoutInputPath || "-"}`,
     `- Backup/restore next action: ${backupRestoreGate.nextAction || "-"}`,
+    `- Reload execution entry: ${reloadExecutionEntry.status || "-"} (current=${reloadExecutionEntry.currentBackfillKey || "-"}, queue=${reloadExecutionEntry.missingBackfillCount ?? 0}/${reloadExecutionEntry.backfillQueueCount ?? 0})`,
+    `- Reload execution first queue item: ${reloadQueueItem?.key || "-"} -> ${reloadQueueItem?.artifactPath || "-"}`,
+    `- Reload execution post-reload review: ${postReloadReview.key || "-"} (fullTest=${postReloadReview.canRunFullTestWindow ? "yes" : "no"}, command=${postReloadReview.command || "-"})`,
     `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`

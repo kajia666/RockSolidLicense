@@ -3968,6 +3968,14 @@ function buildLaunchDayWatchPlan(result) {
 function buildStabilizationHandoffPlan(result) {
   const watchPlan = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
   const canStartStabilizationHandoff = watchPlan?.canStartCutoverWatch === true;
+  const archiveRoot = watchPlan?.watchRecordDraft?.archiveRoot
+    || result.stagingAcceptanceCloseout?.artifactReceiptLedger?.archiveRoot
+    || path.posix.join(
+      "artifacts",
+      "staging",
+      sanitizeArtifactPathSegment(result.summary?.productCode, "product"),
+      sanitizeArtifactPathSegment(result.summary?.channel || "stable", "stable")
+    );
   const requiredEvidenceKeys = [
     "launch_day_watch_summary",
     "first_wave_incident_log",
@@ -3975,6 +3983,89 @@ function buildStabilizationHandoffPlan(result) {
     "rollback_signal_review",
     "stabilization_owner_handoff"
   ];
+  const fallbackWatchEvidence = new Map([
+    ["launch_day_watch_summary", {
+      fileName: "launch-day-watch-summary.md",
+      receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+      expectedEvidence: "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions."
+    }],
+    ["first_wave_incident_log", {
+      fileName: "first-wave-incident-log.md",
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      expectedEvidence: "Record first-wave incidents, customer impact, mitigation, owner, and status."
+    }],
+    ["receipt_visibility_snapshot", {
+      fileName: "receipt-visibility-snapshot.txt",
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      expectedEvidence: "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."
+    }],
+    ["rollback_signal_review", {
+      fileName: "rollback-signal-review.md",
+      receiptOperations: ["record_rollback_walkthrough", "record_launch_stabilization_review"],
+      expectedEvidence: "Record whether rollback signals were observed, dismissed, or escalated."
+    }],
+    ["stabilization_owner_handoff", {
+      fileName: "stabilization-owner-handoff.md",
+      receiptOperations: ["record_launch_stabilization_review"],
+      expectedEvidence: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."
+    }]
+  ]);
+  const watchRecordByKey = new Map((watchPlan?.watchRecordDraft?.records || []).map((item) => [item.key, item]));
+  const sourceWatchRecords = requiredEvidenceKeys.map((key) => {
+    const record = watchRecordByKey.get(key) || {};
+    const fallback = fallbackWatchEvidence.get(key) || {};
+    return {
+      key,
+      status: record.status || (canStartStabilizationHandoff ? "pending_operator_entry" : "blocked_until_production_signoff"),
+      path: record.artifactPath || path.posix.join(archiveRoot, fallback.fileName || `${key}.md`),
+      receiptOperations: Array.isArray(record.receiptOperations) ? record.receiptOperations : fallback.receiptOperations || [],
+      expectedEvidence: record.expectedEvidence || fallback.expectedEvidence || null,
+      operatorNote: record.operatorNote || "Backfill only redacted watch results, artifact paths, receipt IDs, incident summaries, and owner handoff notes."
+    };
+  });
+  const sourceRecordByKey = new Map(sourceWatchRecords.map((item) => [item.key, item]));
+  const handoffWindow = ({
+    key,
+    label,
+    status,
+    path: artifactPath,
+    summary,
+    receiptOperations,
+    expectedEvidence,
+    sourceRecordKeys
+  }) => ({
+    key,
+    label,
+    status,
+    path: artifactPath,
+    summary,
+    receiptOperations,
+    expectedEvidence,
+    sourceRecordKeys
+  });
+  const handoffWindows = [
+    handoffWindow({
+      key: "stabilization_owner_handoff",
+      label: "T+2h stabilization owner handoff",
+      status: canStartStabilizationHandoff ? "operator_handoff" : "blocked_until_cutover_watch",
+      path: sourceRecordByKey.get("stabilization_owner_handoff")?.path || path.posix.join(archiveRoot, "stabilization-owner-handoff.md"),
+      summary: "Hand off launch-day watch summary, incidents, receipt snapshots, and rollback signals to the stabilization owner.",
+      receiptOperations: ["record_launch_stabilization_review"],
+      expectedEvidence: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up.",
+      sourceRecordKeys: requiredEvidenceKeys
+    }),
+    handoffWindow({
+      key: "first_wave_closeout",
+      label: "T+24h first-wave closeout",
+      status: canStartStabilizationHandoff ? "operator_closeout" : "blocked_until_stabilization_owner_handoff",
+      path: path.posix.join(archiveRoot, "first-wave-closeout.md"),
+      summary: "Close first-wave stabilization with unresolved incident list, customer impact notes, and next-duty owner.",
+      receiptOperations: ["record_launch_closeout_review"],
+      expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp.",
+      sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+    })
+  ];
+  const currentHandoffTarget = findLaunchDutyFocusItem(handoffWindows);
   return {
     status: canStartStabilizationHandoff ? "ready" : "blocked",
     canStartStabilizationHandoff,
@@ -3982,6 +4073,15 @@ function buildStabilizationHandoffPlan(result) {
     sourceWatchStatus: watchPlan?.status || "not_available",
     requiredWatchWindows: (watchPlan?.watchWindows || []).map((item) => item.key).filter(Boolean),
     requiredEvidenceKeys,
+    currentHandoffTarget,
+    sourceWatchRecords,
+    handoffEvidenceInputs: sourceWatchRecords.map((item) => ({
+      key: item.key,
+      status: item.status,
+      path: item.path,
+      receiptOperations: item.receiptOperations,
+      expectedEvidence: item.expectedEvidence
+    })),
     routes: {
       launchMainline: watchPlan?.routes?.launchMainline || result.nextCommands?.launchMainline || null,
       developerOps: watchPlan?.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
@@ -3989,24 +4089,35 @@ function buildStabilizationHandoffPlan(result) {
       launchSmokeSummary: watchPlan?.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
       launchOpsOverviewStatus: watchPlan?.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
     },
-    handoffWindows: [
+    operatorSteps: [
       {
-        key: "stabilization_owner_handoff",
-        label: "T+2h stabilization owner handoff",
-        status: canStartStabilizationHandoff ? "operator_handoff" : "blocked_until_cutover_watch",
-        summary: "Hand off launch-day watch summary, incidents, receipt snapshots, and rollback signals to the stabilization owner.",
-        receiptOperations: ["record_launch_stabilization_review"],
-        expectedEvidence: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."
+        key: "verify_cutover_watch_records",
+        status: canStartStabilizationHandoff ? "operator_review" : "blocked_until_cutover_watch",
+        sourceRecordKeys: requiredEvidenceKeys,
+        artifactPaths: sourceWatchRecords.map((item) => item.path).filter(Boolean),
+        receiptOperations: [...new Set(sourceWatchRecords.flatMap((item) => item.receiptOperations || []))],
+        expectedEvidence: "Confirm launch-day watch summary, first-wave incident log, receipt visibility snapshot, rollback signal review, and stabilization owner handoff before owner transfer."
       },
       {
-        key: "first_wave_closeout",
-        label: "T+24h first-wave closeout",
-        status: canStartStabilizationHandoff ? "operator_closeout" : "blocked_until_stabilization_owner_handoff",
-        summary: "Close first-wave stabilization with unresolved incident list, customer impact notes, and next-duty owner.",
-        receiptOperations: ["record_launch_closeout_review"],
-        expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp."
+        key: "handoff_stabilization_owner",
+        status: handoffWindows[0].status,
+        artifactPath: handoffWindows[0].path,
+        sourceRecordKeys: handoffWindows[0].sourceRecordKeys,
+        receiptOperations: handoffWindows[0].receiptOperations,
+        nextAction: "Record the stabilization owner, unresolved items, first-wave incidents, rollback signals, and next-duty follow-up.",
+        expectedEvidence: handoffWindows[0].expectedEvidence
+      },
+      {
+        key: "close_first_wave",
+        status: handoffWindows[1].status,
+        artifactPath: handoffWindows[1].path,
+        sourceRecordKeys: handoffWindows[1].sourceRecordKeys,
+        receiptOperations: handoffWindows[1].receiptOperations,
+        nextAction: "Close the first-wave stabilization period after owner handoff and incident review are recorded.",
+        expectedEvidence: handoffWindows[1].expectedEvidence
       }
     ],
+    handoffWindows,
     escalationTriggers: [
       ...new Set([
         ...(watchPlan?.escalationTriggers || []),
@@ -6161,6 +6272,9 @@ function appendOperatorStepList(lines, heading, steps) {
     if (Array.isArray(step.missingCloseoutKeys) && step.missingCloseoutKeys.length) {
       lines.push(`    - missingCloseoutKeys: ${step.missingCloseoutKeys.join(", ")}`);
     }
+    if (Array.isArray(step.sourceRecordKeys) && step.sourceRecordKeys.length) {
+      lines.push(`    - sourceRecordKeys: ${step.sourceRecordKeys.join(", ")}`);
+    }
     if (step.artifactPath) {
       lines.push(`    - artifactPath: ${step.artifactPath}`);
     }
@@ -7048,12 +7162,15 @@ function renderStabilizationHandoffPlan(plan) {
   }
   const routes = plan.routes || {};
   const handoffWindows = Array.isArray(plan.handoffWindows) ? plan.handoffWindows : [];
+  const currentTarget = plan.currentHandoffTarget || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Can start stabilization handoff: ${plan.canStartStabilizationHandoff ? "yes" : "no"}`,
     `- Source watch status: ${plan.sourceWatchStatus || "-"}`,
     `- Required watch windows: ${(plan.requiredWatchWindows || []).join(", ") || "-"}`,
     `- Required evidence keys: ${(plan.requiredEvidenceKeys || []).join(", ") || "-"}`,
+    `- Current handoff target: ${currentTarget.key || "-"} (${currentTarget.status || "-"}) -> ${currentTarget.path || "-"}`,
+    `- Handoff evidence inputs: ${renderLaunchDutyRecordUpdates(plan.handoffEvidenceInputs || [])}`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
@@ -7063,10 +7180,21 @@ function renderStabilizationHandoffPlan(plan) {
     `- Escalation triggers: ${(plan.escalationTriggers || []).join(", ") || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
   ];
+  appendOperatorStepList(lines, "- Operator steps:", plan.operatorSteps || []);
+  if (Array.isArray(plan.sourceWatchRecords) && plan.sourceWatchRecords.length) {
+    lines.push("- Source watch records:");
+    for (const record of plan.sourceWatchRecords) {
+      lines.push(`  - ${record.key || "-"}: ${record.status || "-"} -> ${record.path || "-"}`);
+      lines.push(`    - receiptOperations: ${(record.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - expectedEvidence: ${record.expectedEvidence || "-"}`);
+      lines.push(`    - operatorNote: ${record.operatorNote || "-"}`);
+    }
+  }
   for (const item of handoffWindows) {
-    lines.push(`  - ${item.key || "-"}: ${item.status || "-"}`);
+    lines.push(`  - ${item.key || "-"}: ${item.status || "-"} -> ${item.path || "-"}`);
     lines.push(`    - label: ${item.label || "-"}`);
     lines.push(`    - summary: ${item.summary || "-"}`);
+    lines.push(`    - sourceRecordKeys: ${(item.sourceRecordKeys || []).join(", ") || "-"}`);
     lines.push(`    - receiptOperations: ${(item.receiptOperations || []).join(", ") || "-"}`);
     lines.push(`    - expectedEvidence: ${item.expectedEvidence || "-"}`);
   }

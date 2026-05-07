@@ -1340,6 +1340,15 @@ function buildStagingCloseoutReloadPacket(result) {
     || runRecordIndex.closeoutProgress?.reloadCommand
     || result.filledCloseoutInputDraft?.reloadCommand
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${filledCloseoutInputFile}`;
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
+    || finalPacket.goLiveExecutionEntry
+    || buildGoLiveExecutionEntry({
+      realStagingRunFocus: buildRealStagingRunFocus(result),
+      closeoutBackfillFocus: buildCloseoutBackfillFocus(result),
+      fullTestSignoffFocus: buildFullTestSignoffFocus(result),
+      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null
+    });
   let status = "awaiting_closeout_backfill";
   if (result.closeoutInput?.readyForFullTestWindow === true) {
     status = "ready_for_full_test_window";
@@ -1376,6 +1385,7 @@ function buildStagingCloseoutReloadPacket(result) {
       closeoutReload,
       fullTestWindow: finalPacket.commands?.fullTestWindow || closeout.fullTestWindowEntry?.command || "npm.cmd test"
     },
+    goLiveExecutionEntry,
     operatorSteps: [
       {
         key: "promote_filled_closeout_draft",
@@ -6112,6 +6122,7 @@ function renderStagingCloseoutReloadPacket(packet) {
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`
   ];
+  appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
   if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
     lines.push("- Operator steps:");
     for (const step of packet.operatorSteps) {
@@ -6160,6 +6171,7 @@ function renderStagingProductionSignoffPacket(packet) {
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`
   ];
+  appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
   if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
     lines.push("- Operator steps:");
     for (const step of packet.operatorSteps) {
@@ -6367,6 +6379,7 @@ function renderStagingLaunchDutyArchiveIndex(index) {
     `- Full test window: \`${index.commands?.fullTestWindow || "-"}\``,
     "- Packets:"
   ];
+  appendGoLiveExecutionEntry(lines, index.goLiveExecutionEntry || {});
   for (const packet of index.packets || []) {
     lines.push(`  - ${packet.key || "-"}: ${packet.status || "-"} -> ${packet.path || "-"}`);
   }

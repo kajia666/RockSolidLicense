@@ -2094,6 +2094,16 @@ function buildLaunchReadinessClosure(result, { status = null, profilePreflight =
     addBlocker("profile_not_loaded", "Load a secret-free staging profile before the real rehearsal.");
     nextPlan.push(planStep("load_staging_profile", "operator_prepare", "Load a secret-free staging profile before the real rehearsal."));
   }
+  if (Array.isArray(profilePreflight.unsafeCliSecretOverrides) && profilePreflight.unsafeCliSecretOverrides.length) {
+    addBlocker("unsafe_cli_secret_overrides", "Remove CLI password flags and rely on the required secret environment variables before evidence recording.", {
+      unsafeCliSecretOverrides: profilePreflight.unsafeCliSecretOverrides
+    });
+    nextPlan.push(planStep(
+      "move_cli_secret_overrides_to_env",
+      "operator_prepare",
+      "Remove CLI password flags and rely on the required secret environment variables before evidence recording."
+    ));
+  }
   if (Array.isArray(profilePreflight.missingSecretEnv) && profilePreflight.missingSecretEnv.length) {
     addBlocker("missing_secret_env", "Set missing secret environment variables before evidence recording.", {
       missing: profilePreflight.missingSecretEnv
@@ -2122,7 +2132,9 @@ function buildLaunchReadinessClosure(result, { status = null, profilePreflight =
     remainingBlockerCount: remainingBlockers.length,
     remainingBlockers,
     nextPlan,
-    nextAction: "Set missing secret env, reload filled closeout input, then continue toward production sign-off."
+    nextAction: remainingBlockers.some((item) => item.key === "unsafe_cli_secret_overrides")
+      ? "Remove CLI password flags, reload filled closeout input, then continue toward production sign-off."
+      : "Set missing secret env, reload filled closeout input, then continue toward production sign-off."
   };
 }
 
@@ -6318,6 +6330,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Go-live operator action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
     `- Go-live operator current action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
+    `- Launch closure remaining blockers: ${(closure.remainingBlockers || []).map((item) => item.key).filter(Boolean).join(", ") || "-"}`,
     `- Launch duty focus: ${launchDutyFocus.status || "-"} (postSignoffBlocked=${launchDutyFocus.blockedPostSignoffActionCount ?? "-"}, watchPending=${launchDutyFocus.pendingWatchArtifactCount ?? "-"})`,
     `- Execution launch-duty current action: ${launchDutyCurrentAction.key || "-"} (stage=${launchDutyCurrentAction.stage || "-"}, source=${launchDutyCurrentAction.sourceFocus || "-"})`,
     `- Execution launch-duty current packet: ${launchDutyCurrentAction.packetPath || "-"}`,

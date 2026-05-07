@@ -2545,8 +2545,23 @@ test("staging rehearsal profile gate keeps cli secret overrides visible after en
       output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.currentBlocker.operatorAction.unsafeCliSecretOverrides,
       ["--admin-password", "--developer-password"]
     );
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.remainingBlockers
+        .filter((item) => item.key === "unsafe_cli_secret_overrides")
+        .map((item) => [item.key, item.unsafeCliSecretOverrides]),
+      [["unsafe_cli_secret_overrides", ["--admin-password", "--developer-password"]]]
+    );
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure.nextPlan.slice(0, 1),
+      [{
+        key: "move_cli_secret_overrides_to_env",
+        status: "operator_prepare",
+        nextAction: "Remove CLI password flags and rely on the required secret environment variables before evidence recording."
+      }]
+    );
     const handoff = readFileSync(handoffFile, "utf8");
     assert.match(handoff, /Unsafe CLI secret overrides: --admin-password, --developer-password/);
+    assert.match(handoff, /Launch closure remaining blockers: unsafe_cli_secret_overrides/);
     assert.match(handoff, /Operator real input required_secret_env: unsafe_cli_override/);
     assert.match(handoff, /unsafeCliSecretOverrides: --admin-password, --developer-password/);
     assert.doesNotMatch(result.stdout, /CliAdminShouldStayFlagOnly123!|CliDeveloperShouldStayFlagOnly123!/);

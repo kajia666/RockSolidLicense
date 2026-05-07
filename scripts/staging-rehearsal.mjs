@@ -6590,6 +6590,7 @@ function renderStagingLaunchDutyArchiveIndex(index) {
       if (Array.isArray(artifact.receiptOperations) && artifact.receiptOperations.length) {
         lines.push(`    - receiptOperations: ${artifact.receiptOperations.join(", ")}`);
       }
+      lines.push(`    - expectedEvidence: ${artifact.expectedEvidence || "-"}`);
     }
   }
   if (Array.isArray(stabilization.handoffWindows) && stabilization.handoffWindows.length) {

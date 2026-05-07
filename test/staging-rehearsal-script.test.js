@@ -814,6 +814,16 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ]
   );
   assert.deepEqual(
+    output.stagingLaunchDutyArchiveIndex.watchArtifacts.map((item) => [item.key, item.expectedEvidence]),
+    [
+      ["launch_day_watch_summary", "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions."],
+      ["receipt_visibility_snapshot", "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."],
+      ["first_wave_incident_log", "Record first-wave incidents, customer impact, mitigation, owner, and status."],
+      ["rollback_signal_review", "Record whether rollback signals were observed, dismissed, or escalated."],
+      ["stabilization_owner_handoff", "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."]
+    ]
+  );
+  assert.deepEqual(
     output.stagingLaunchDutyArchiveIndex.signoffTargets.map((item) => [item.key, item.status, item.path]),
     [
       ["production_signoff_packet", "blocked_until_signoff_ready", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"],
@@ -2131,6 +2141,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /launch_day_watch_summary: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\./);
     assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Launch-duty signoff targets:[\s\S]*production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json[\s\S]*expectedEvidence: Archive the signed production sign-off packet with full-test status, GO\/NO-GO decision, and receipt visibility lanes\.[\s\S]*launch_day_watch_summary: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\.[\s\S]*## Staging Environment Binding/);
+    assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Watch artifacts:[\s\S]*launch_day_watch_summary: blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\.[\s\S]*rollback_signal_review: blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md[\s\S]*expectedEvidence: Record whether rollback signals were observed, dismissed, or escalated\.[\s\S]*## Staging Environment Binding/);
     assert.match(handoff, /## Artifact \/ Receipt Ledger/);
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);

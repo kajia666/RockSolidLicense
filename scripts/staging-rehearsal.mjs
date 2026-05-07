@@ -2147,7 +2147,10 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       handoffWindows: (stabilizationHandoff.handoffWindows || []).map((item) => ({
         key: item.key || null,
         label: item.label || null,
-        status: item.status || "not_available"
+        status: item.status || "not_available",
+        summary: item.summary || null,
+        receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+        expectedEvidence: item.expectedEvidence || null
       }))
     },
     commands: {
@@ -3690,13 +3693,17 @@ function buildStabilizationHandoffPlan(result) {
         key: "stabilization_owner_handoff",
         label: "T+2h stabilization owner handoff",
         status: canStartStabilizationHandoff ? "operator_handoff" : "blocked_until_cutover_watch",
-        summary: "Hand off launch-day watch summary, incidents, receipt snapshots, and rollback signals to the stabilization owner."
+        summary: "Hand off launch-day watch summary, incidents, receipt snapshots, and rollback signals to the stabilization owner.",
+        receiptOperations: ["record_launch_stabilization_review"],
+        expectedEvidence: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."
       },
       {
         key: "first_wave_closeout",
         label: "T+24h first-wave closeout",
         status: canStartStabilizationHandoff ? "operator_closeout" : "blocked_until_stabilization_owner_handoff",
-        summary: "Close first-wave stabilization with unresolved incident list, customer impact notes, and next-duty owner."
+        summary: "Close first-wave stabilization with unresolved incident list, customer impact notes, and next-duty owner.",
+        receiptOperations: ["record_launch_closeout_review"],
+        expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp."
       }
     ],
     escalationTriggers: [
@@ -6432,6 +6439,8 @@ function renderStabilizationHandoffPlan(plan) {
     lines.push(`  - ${item.key || "-"}: ${item.status || "-"}`);
     lines.push(`    - label: ${item.label || "-"}`);
     lines.push(`    - summary: ${item.summary || "-"}`);
+    lines.push(`    - receiptOperations: ${(item.receiptOperations || []).join(", ") || "-"}`);
+    lines.push(`    - expectedEvidence: ${item.expectedEvidence || "-"}`);
   }
   return lines.join("\n");
 }
@@ -6597,6 +6606,9 @@ function renderStagingLaunchDutyArchiveIndex(index) {
     lines.push("- Stabilization handoff windows:");
     for (const window of stabilization.handoffWindows) {
       lines.push(`  - ${window.key || "-"}: ${window.status || "-"} (${window.label || "-"})`);
+      lines.push(`    - summary: ${window.summary || "-"}`);
+      lines.push(`    - receiptOperations: ${(window.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - expectedEvidence: ${window.expectedEvidence || "-"}`);
     }
   }
   lines.push(`- Required stabilization evidence: ${(stabilization.requiredEvidenceKeys || []).join(", ") || "-"}`);

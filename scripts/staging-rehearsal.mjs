@@ -3105,7 +3105,9 @@ function buildGoLiveExecutionEntry({
       kind: item.kind || null,
       status: item.status || null,
       path: item.path || item.artifactPath || null,
-      command: item.command || null
+      command: item.command || null,
+      receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+      expectedEvidence: item.expectedEvidence || null
     }
     : null;
   const evidenceInputs = Array.isArray(launchDutyCurrentAction?.evidenceInputs)
@@ -5804,6 +5806,12 @@ function renderLaunchDutyRecordUpdates(items = []) {
     .join("; ") || "-";
 }
 
+function renderLaunchDutyReceiptOperationList(items = []) {
+  return items
+    .map((item) => `${item.key || "-"}=${(item.receiptOperations || []).join(", ") || "-"}`)
+    .join("; ") || "-";
+}
+
 function appendGoLiveExecutionEntry(lines, entry = {}) {
   const blockers = entry.blockerSummary || {};
   const launchDayWatchEntry = entry.launchDayWatchEntry || null;
@@ -5817,6 +5825,7 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
     lines.push(`- Go-live launch-day watch entry: ${launchDayWatchEntry.status || "-"} (target=${launchDayWatchEntry.currentPostSignoffTarget?.key || "-"}, watch=${launchDayWatchEntry.currentWatchArtifact?.key || "-"}, stabilization=${launchDayWatchEntry.currentStabilizationWindow?.key || "-"})`);
     lines.push(`- Go-live launch-day evidence inputs: ${renderLaunchDutyActionInputList(launchDayWatchEntry.evidenceInputs)}`);
     lines.push(`- Go-live launch-day watch records: ${renderLaunchDutyRecordUpdates(launchDayWatchEntry.watchRecordQueue)}`);
+    lines.push(`- Go-live launch-day receipt operations: ${renderLaunchDutyReceiptOperationList(launchDayWatchEntry.watchRecordQueue)}`);
     lines.push(`- Go-live launch-day confirmation points: ${renderLaunchDutyActionConfirmationList(launchDayWatchEntry.confirmationPoints)}`);
     lines.push(`- Go-live launch-day archive trace: ${renderLaunchDutyArchiveTrace(launchDayWatchEntry.archiveTrace)}`);
   }

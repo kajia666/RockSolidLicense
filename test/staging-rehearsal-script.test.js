@@ -1036,6 +1036,10 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.deepEqual(runbookSteps.generate_rehearsal_outputs.outputs, ["handoff_file", "closeout_file"]);
   assert.equal(runbookSteps.run_route_map_gate.command, "npm.cmd run launch:route-map-gate");
   assert.match(runbookSteps.run_route_map_gate.summary, /first-batch runtime evidence/);
+  assert.equal(
+    runbookSteps.run_route_map_gate.expectedEvidence,
+    "Record the targeted gate exit status, pass count, and redacted output artifact path."
+  );
   assert.deepEqual(runbookSteps.run_backup_restore_drill.commandKeys, [
     "appBackup",
     "postgresBackup",
@@ -1043,11 +1047,39 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "restoreDrillReminder",
     "healthcheck"
   ]);
+  assert.equal(
+    runbookSteps.approve_live_write_smoke.expectedEvidence,
+    "Record launch-duty approval owner, timestamp, and confirmation that backup/restore drill evidence is archived before staging writes."
+  );
   assert.equal(runbookSteps.run_live_write_smoke.willModifyData, true);
   assert.match(runbookSteps.run_live_write_smoke.command, /launch:smoke:staging/);
+  assert.equal(
+    runbookSteps.run_live_write_smoke.expectedEvidence,
+    "Record smoke exit status, created test project/account/card identifiers, and the redacted smoke output artifact path."
+  );
+  assert.equal(
+    runbookSteps.archive_launch_smoke_handoff.expectedEvidence,
+    "Save the launch smoke handoff JSON or Markdown path with passwords and bearer tokens redacted."
+  );
   assert.equal(runbookSteps.record_launch_mainline_evidence.endpoint, output.evidenceActionPlan.endpoint);
+  assert.equal(
+    runbookSteps.record_launch_mainline_evidence.expectedEvidence,
+    "Record the Launch Mainline receipt IDs or handoff file names produced by each evidence action."
+  );
+  assert.equal(
+    runbookSteps.verify_receipt_visibility.expectedEvidence,
+    "Verify Launch Review, Launch Smoke, and Launch Ops Overview Status receipt-visibility summaries show the recorded first-wave receipt."
+  );
   assert.equal(runbookSteps.backfill_filled_closeout_input.closeoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(
+    runbookSteps.backfill_filled_closeout_input.expectedEvidence,
+    "Record ready-for-full-test-window, hold, or rollback-follow-up with the operator name and timestamp."
+  );
   assert.equal(runbookSteps.reload_closeout_input.command, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(
+    runbookSteps.reload_closeout_input.expectedEvidence,
+    "Confirm the reloaded closeout input status, remaining missing fields, and whether the full test window can start."
+  );
   assert.deepEqual(
     output.stagingExecutionRunbook.closeoutBackfillTargets.map((item) => [item.key, item.sourceStep, item.artifactPath]),
     [
@@ -2156,7 +2188,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Contains live-write step: yes/);
     assert.match(handoff, /Command sequence: prepare_secret_env, generate_rehearsal_outputs, run_route_map_gate, run_backup_restore_drill, approve_live_write_smoke, run_live_write_smoke, archive_launch_smoke_handoff, record_launch_mainline_evidence, verify_receipt_visibility, backfill_filled_closeout_input, reload_closeout_input/);
     assert.match(handoff, /Closeout review: not_loaded \(missing=7, safeForFullTest=no\)/);
+    assert.match(handoff, /Execution steps:[\s\S]*approve_live_write_smoke: operator_confirm \(writes=no\)[\s\S]*expectedEvidence: Record launch-duty approval owner, timestamp, and confirmation that backup\/restore drill evidence is archived before staging writes\.[\s\S]*run_live_write_smoke: operator_execute \(writes=yes\)[\s\S]*expectedEvidence: Record smoke exit status, created test project\/account\/card identifiers, and the redacted smoke output artifact path\.[\s\S]*archive_launch_smoke_handoff: operator_archive \(writes=no\)[\s\S]*expectedEvidence: Save the launch smoke handoff JSON or Markdown path with passwords and bearer tokens redacted\.[\s\S]*record_launch_mainline_evidence: operator_execute \(writes=yes\)[\s\S]*expectedEvidence: Record the Launch Mainline receipt IDs or handoff file names produced by each evidence action\.[\s\S]*verify_receipt_visibility: operator_review \(writes=no\)[\s\S]*expectedEvidence: Verify Launch Review, Launch Smoke, and Launch Ops Overview Status receipt-visibility summaries show the recorded first-wave receipt\.[\s\S]*reload_closeout_input: operator_execute \(writes=no\)[\s\S]*expectedEvidence: Confirm the reloaded closeout input status, remaining missing fields, and whether the full test window can start\./);
     assert.match(handoff, /route_map_gate_result: run_route_map_gate -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
+    assert.match(handoff, /live_write_smoke_result: run_live_write_smoke -> artifacts\/staging\/PILOT_ALPHA\/stable\/live-write-smoke-output\.json[\s\S]*expectedEvidence: Record smoke exit status, created test project\/account\/card identifiers, and the redacted smoke output artifact path\./);
     assert.match(handoff, /operator_go_no_go: backfill_filled_closeout_input -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md/);
     assert.match(handoff, /## Staging Closeout Reload Packet/);
     assert.match(handoff, /Packet file: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-closeout-reload-packet\.json/);

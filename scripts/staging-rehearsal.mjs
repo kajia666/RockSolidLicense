@@ -4118,6 +4118,8 @@ function buildStagingExecutionRunbook(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const ledger = closeout.artifactReceiptLedger || {};
   const ledgerRowsByKey = new Map((ledger.rows || []).map((row) => [row.checkKey, row]));
+  const acceptanceChecksByKey = new Map((closeout.acceptanceChecks || []).map((check) => [check.key, check]));
+  const expectedEvidenceFor = (closeoutKey) => acceptanceChecksByKey.get(closeoutKey)?.expectedEvidence || null;
   const outputFileByKey = new Map((binding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
   const archiveRoot = outputFileByKey.get("artifact_archive_root")?.path
     || ledger.archiveRoot
@@ -4137,6 +4139,7 @@ function buildStagingExecutionRunbook(result) {
         binding?.credentialEnv?.developerPassword || DEVELOPER_PASSWORD_ENV,
         binding?.credentialEnv?.developerBearerToken || DEVELOPER_BEARER_TOKEN_ENV
       ],
+      expectedEvidence: "Confirm required secret environment variables are set without printing raw password or bearer-token values.",
       summary: "Set smoke password env vars and developer bearer token before copying generated commands."
     },
     {
@@ -4145,6 +4148,7 @@ function buildStagingExecutionRunbook(result) {
       willModifyData: false,
       command: binding?.dryRunCommand || null,
       outputs: ["handoff_file", "closeout_file"],
+      expectedEvidence: "Archive the generated redacted staging handoff and closeout template paths under the staging artifact root.",
       summary: "Generate the redacted handoff and closeout template from the real staging binding."
     },
     {
@@ -4154,6 +4158,7 @@ function buildStagingExecutionRunbook(result) {
       command: result.nextCommands?.launchRouteMapGate?.command || null,
       closeoutKey: "route_map_gate_result",
       artifactPath: ledgerRowsByKey.get("route_map_gate_result")?.artifactPath || null,
+      expectedEvidence: expectedEvidenceFor("route_map_gate_result"),
       summary: "Run targeted route, first-batch runtime evidence, and download visibility tests before staging writes."
     },
     {
@@ -4163,12 +4168,14 @@ function buildStagingExecutionRunbook(result) {
       commandKeys: Object.keys(result.nextCommands?.recovery || {}),
       closeoutKey: "backup_restore_drill_result",
       artifactPath: ledgerRowsByKey.get("backup_restore_drill_result")?.artifactPath || null,
+      expectedEvidence: expectedEvidenceFor("backup_restore_drill_result"),
       summary: "Run backup, restore dry-run, and healthcheck commands on a separate restore target."
     },
     {
       key: "approve_live_write_smoke",
       status: "operator_confirm",
       willModifyData: false,
+      expectedEvidence: "Record launch-duty approval owner, timestamp, and confirmation that backup/restore drill evidence is archived before staging writes.",
       summary: "Confirm launch duty accepts staging writes before running launch:smoke:staging."
     },
     {
@@ -4178,6 +4185,7 @@ function buildStagingExecutionRunbook(result) {
       command: result.nextCommands?.launchSmoke || null,
       closeoutKey: "live_write_smoke_result",
       artifactPath: ledgerRowsByKey.get("live_write_smoke_result")?.artifactPath || null,
+      expectedEvidence: expectedEvidenceFor("live_write_smoke_result"),
       summary: "Run the HTTPS staging smoke command after approval and archive the redacted output."
     },
     {
@@ -4186,6 +4194,7 @@ function buildStagingExecutionRunbook(result) {
       willModifyData: false,
       closeoutKey: "launch_smoke_handoff",
       artifactPath: ledgerRowsByKey.get("launch_smoke_handoff")?.artifactPath || null,
+      expectedEvidence: expectedEvidenceFor("launch_smoke_handoff"),
       summary: "Save the Launch Smoke handoff consumed by Launch Review, Developer Ops, and Launch Mainline."
     },
     {
@@ -4196,6 +4205,7 @@ function buildStagingExecutionRunbook(result) {
       bearerTokenEnv: result.evidenceReadiness?.tokenEnv || DEVELOPER_BEARER_TOKEN_ENV,
       closeoutKey: "launch_mainline_evidence_receipts",
       artifactPath: ledgerRowsByKey.get("launch_mainline_evidence_receipts")?.artifactPath || null,
+      expectedEvidence: expectedEvidenceFor("launch_mainline_evidence_receipts"),
       summary: "Record Launch Mainline evidence receipts and attach receipt IDs to closeout."
     },
     {
@@ -4205,6 +4215,7 @@ function buildStagingExecutionRunbook(result) {
       downloads: result.nextCommands?.receiptVisibilitySummaries || null,
       closeoutKey: "receipt_visibility_review",
       artifactPath: ledgerRowsByKey.get("receipt_visibility_review")?.artifactPath || null,
+      expectedEvidence: expectedEvidenceFor("receipt_visibility_review"),
       summary: "Verify Launch Mainline, Launch Review, Launch Smoke, Developer Ops receipt visibility, and the Launch Ops overview status."
     },
     {
@@ -4215,6 +4226,7 @@ function buildStagingExecutionRunbook(result) {
       examplePath: outputFileByKey.get("filled_closeout_input_example")?.path || filledExample.saveAs || null,
       closeoutKey: "operator_go_no_go",
       artifactPath: ledgerRowsByKey.get("operator_go_no_go")?.artifactPath || null,
+      expectedEvidence: expectedEvidenceFor("operator_go_no_go"),
       summary: "Copy the example closeout input, replace placeholders with redacted evidence, and record go/no-go."
     },
     {
@@ -4223,6 +4235,7 @@ function buildStagingExecutionRunbook(result) {
       willModifyData: false,
       command: filledExample.reloadCommand || null,
       closeoutInputReview,
+      expectedEvidence: "Confirm the reloaded closeout input status, remaining missing fields, and whether the full test window can start.",
       summary: "Reload the filled closeout input and confirm readiness gaps narrow before the full test window."
     }
   ];
@@ -6717,11 +6730,47 @@ function renderStagingExecutionRunbook(runbook) {
   if (Array.isArray(review.placeholderKeys) && review.placeholderKeys.length) {
     lines.push(`- Closeout placeholders: ${review.placeholderKeys.join(", ")}`);
   }
+  if (Array.isArray(runbook.commandSequence) && runbook.commandSequence.length) {
+    lines.push("- Execution steps:");
+    for (const step of runbook.commandSequence) {
+      lines.push(`  - ${step.key || "-"}: ${step.status || "-"} (writes=${step.willModifyData ? "yes" : "no"})`);
+      if (step.command) {
+        lines.push(`    - command: ${step.command}`);
+      }
+      if (Array.isArray(step.commandKeys) && step.commandKeys.length) {
+        lines.push(`    - commandKeys: ${step.commandKeys.join(", ")}`);
+      }
+      if (Array.isArray(step.env) && step.env.length) {
+        lines.push(`    - env: ${step.env.join(", ")}`);
+      }
+      if (Array.isArray(step.outputs) && step.outputs.length) {
+        lines.push(`    - outputs: ${step.outputs.join(", ")}`);
+      }
+      if (step.endpoint) {
+        lines.push(`    - endpoint: ${step.endpoint}`);
+      }
+      if (step.bearerTokenEnv) {
+        lines.push(`    - bearerTokenEnv: ${step.bearerTokenEnv}`);
+      }
+      if (step.closeoutKey) {
+        lines.push(`    - closeoutKey: ${step.closeoutKey}`);
+      }
+      if (step.artifactPath) {
+        lines.push(`    - artifactPath: ${step.artifactPath}`);
+      }
+      if (step.closeoutInputPath) {
+        lines.push(`    - closeoutInputPath: ${step.closeoutInputPath}`);
+      }
+      lines.push(`    - expectedEvidence: ${step.expectedEvidence || "-"}`);
+      lines.push(`    - summary: ${step.summary || "-"}`);
+    }
+  }
   if (Array.isArray(runbook.closeoutBackfillTargets) && runbook.closeoutBackfillTargets.length) {
     lines.push("- Closeout backfill targets:");
     for (const target of runbook.closeoutBackfillTargets) {
       lines.push(`  - ${target.key || "-"}: ${target.sourceStep || "-"} -> ${target.artifactPath || "-"}`);
       lines.push(`    - receiptOperations: ${(target.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
     }
   }
   return lines.join("\n");

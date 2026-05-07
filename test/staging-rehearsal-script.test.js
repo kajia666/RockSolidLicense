@@ -2128,6 +2128,41 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.filledCloseoutInputDraft.source, "stagingProfileLaunchPlan.backfillManifest");
     assert.equal(output.filledCloseoutInputDraft.copyTo, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
     assert.equal(output.filledCloseoutInputDraft.saveAs, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.draft.json");
+    assert.deepEqual(output.operatorExecutionPlan.outputWriteSummary, {
+      status: "written",
+      willModifyData: false,
+      outputFileCount: 10,
+      writtenFileCount: 10,
+      pendingWriteCount: 0,
+      missingPathCount: 0,
+      archiveEntrypoint: {
+        key: "launch_duty_archive_index",
+        status: "written",
+        path: launchDutyArchiveIndexFile
+      },
+      currentReviewTarget: {
+        key: "launch_duty_archive_index",
+        status: "written",
+        path: launchDutyArchiveIndexFile
+      },
+      files: [
+        ["handoff_file", "written", handoffFile],
+        ["closeout_file", "written", closeoutFile],
+        ["run_record_index", "written", runRecordFile],
+        ["artifact_manifest", "written", artifactManifestFile],
+        ["backup_restore_packet", "written", backupRestorePacketFile],
+        ["closeout_reload_packet", "written", closeoutReloadPacketFile],
+        ["readiness_review_packet", "written", readinessReviewPacketFile],
+        ["production_signoff_packet", "written", productionSignoffPacketFile],
+        ["launch_duty_archive_index", "written", launchDutyArchiveIndexFile],
+        ["filled_closeout_draft", "written", filledCloseoutDraftFile]
+      ],
+      nextAction: "Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff."
+    });
+    assert.deepEqual(output.stagingOutputWriteSummary, output.operatorExecutionPlan.outputWriteSummary);
+    assert.match(handoff, /Output write summary: written \(written=10\/10, pending=0\)/);
+    assert.match(handoff, new RegExp(`Output archive entrypoint: launch_duty_archive_index \\(written\\) -> ${launchDutyArchiveIndexFile.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}`));
+    assert.match(handoff, /Output write next action: Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff\./);
     assert.deepEqual(
       output.filledCloseoutInputDraft.operatorSteps.map((item) => [item.key, item.status]),
       [

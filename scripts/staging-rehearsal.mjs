@@ -122,6 +122,19 @@ const STAGING_PROFILE_OUTPUT_FILE_KEYS = [
   "filledCloseoutDraftFile"
 ];
 
+const STAGING_OUTPUT_ARCHIVE_FILE_KEYS = [
+  "handoff_file",
+  "closeout_file",
+  "run_record_index",
+  "artifact_manifest",
+  "backup_restore_packet",
+  "closeout_reload_packet",
+  "readiness_review_packet",
+  "production_signoff_packet",
+  "launch_duty_archive_index",
+  "filled_closeout_draft"
+];
+
 const CLOSEOUT_SOURCE_STEPS = {
   route_map_gate_result: "run_route_map_gate",
   backup_restore_drill_result: "run_backup_restore_drill",
@@ -3006,6 +3019,59 @@ function fileOutputStatus(file) {
   return file.written ? "written" : "pending_write";
 }
 
+function buildStagingOutputWriteSummary(result, { outputFiles = [] } = {}) {
+  const sourceOutputFiles = Array.isArray(outputFiles) && outputFiles.length
+    ? outputFiles
+    : result.operatorExecutionPlan?.outputFiles || [];
+  const filesByKey = new Map(sourceOutputFiles
+    .filter((item) => item?.key)
+    .map((item) => [item.key, item]));
+  const files = STAGING_OUTPUT_ARCHIVE_FILE_KEYS
+    .map((key) => {
+      const file = filesByKey.get(key);
+      return file
+        ? [key, file.status || "not_requested", file.path || null]
+        : [key, "not_requested", null];
+    })
+    .filter(([, status, filePath]) => status !== "not_requested" || filePath);
+  const writtenFileCount = files.filter(([, status]) => status === "written").length;
+  const pendingWriteCount = files.filter(([, status]) => status === "pending_write").length;
+  const missingPathCount = files.filter(([, , filePath]) => !filePath).length;
+  const archiveEntrypointRow = files.find(([key]) => key === "launch_duty_archive_index")
+    || files.find(([key]) => key === "production_signoff_packet")
+    || files.find(([key]) => key === "handoff_file")
+    || null;
+  const currentReviewTargetRow = files.find(([, status]) => status === "pending_write")
+    || archiveEntrypointRow;
+  const rowToTarget = (row) => row
+    ? {
+      key: row[0],
+      status: row[1],
+      path: row[2]
+    }
+    : null;
+  const outputFileCount = files.length;
+  const status = outputFileCount > 0 && writtenFileCount === outputFileCount && pendingWriteCount === 0 && missingPathCount === 0
+    ? "written"
+    : outputFileCount > 0
+      ? "pending_writes"
+      : "not_requested";
+  return {
+    status,
+    willModifyData: false,
+    outputFileCount,
+    writtenFileCount,
+    pendingWriteCount,
+    missingPathCount,
+    archiveEntrypoint: rowToTarget(archiveEntrypointRow),
+    currentReviewTarget: rowToTarget(currentReviewTargetRow),
+    files,
+    nextAction: status === "written"
+      ? "Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff."
+      : "Write every requested staging output file before starting live-write rehearsal or closeout reload."
+  };
+}
+
 function isFilledCloseoutField(field) {
   if (!field || field.status === "pending_operator_entry") {
     return false;
@@ -5618,6 +5684,7 @@ function buildStagingOperatorExecutionPlan(result) {
     launchDutyPacketFocus,
     archiveContext: launchDutyArchiveContext
   });
+  const outputWriteSummary = buildStagingOutputWriteSummary(result, { outputFiles });
   const goLiveExecutionEntry = buildGoLiveExecutionEntry({
     realStagingRunFocus,
     closeoutBackfillFocus,
@@ -5630,6 +5697,7 @@ function buildStagingOperatorExecutionPlan(result) {
     willModifyData: false,
     trigger: "no-write-rehearsal-gates-passed",
     outputFiles,
+    outputWriteSummary,
     readinessSummary: {
       status: readinessGaps.length ? "needs_operator_input" : "ready",
       gapCount: readinessGaps.length,
@@ -6691,10 +6759,14 @@ function renderOperatorExecutionPlan(plan) {
   const goLiveActionPlan = plan.goLiveOperatorActionPlan || {};
   const currentLaunchDutyAction = plan.launchDutyCurrentAction || {};
   const goLiveExecutionEntry = plan.goLiveExecutionEntry || {};
+  const outputWriteSummary = plan.outputWriteSummary || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Writes data: ${plan.willModifyData ? "yes" : "no"}`,
     `- Trigger: ${plan.trigger || "-"}`,
+    `- Output write summary: ${outputWriteSummary.status || "-"} (written=${outputWriteSummary.writtenFileCount ?? 0}/${outputWriteSummary.outputFileCount ?? 0}, pending=${outputWriteSummary.pendingWriteCount ?? 0})`,
+    `- Output archive entrypoint: ${outputWriteSummary.archiveEntrypoint?.key || "-"} (${outputWriteSummary.archiveEntrypoint?.status || "-"}) -> ${outputWriteSummary.archiveEntrypoint?.path || "-"}`,
+    `- Output write next action: ${outputWriteSummary.nextAction || "-"}`,
     `- Artifact archive root: ${plan.artifactArchiveRoot || "-"}`,
     `- Required closeout keys: ${(plan.requiredCloseoutKeys || []).join(", ")}`,
     `- Evidence operations: ${(plan.evidenceOperations || []).join(", ")}`,
@@ -8401,34 +8473,28 @@ function refreshOperatorExecutionPlan(result) {
   if (!result.operatorExecutionPlan) {
     return result;
   }
+  const nextOperatorExecutionPlan = buildStagingOperatorExecutionPlan(result);
   return {
     ...result,
-    operatorExecutionPlan: buildStagingOperatorExecutionPlan(result)
+    stagingOutputWriteSummary: nextOperatorExecutionPlan.outputWriteSummary,
+    operatorExecutionPlan: nextOperatorExecutionPlan
   };
 }
 
 function writeOutputFiles(result) {
-  return refreshOperatorExecutionPlan(
-    writeLaunchDutyArchiveIndexFile(
-      writeProductionSignoffPacketFile(
-        writeReadinessReviewPacketFile(
-          writeCloseoutReloadPacketFile(
-            writeBackupRestorePacketFile(
-              writeArtifactManifestFile(
-                writeFilledCloseoutDraftFile(
-                  writeRunRecordFile(
-                    writeCloseoutFile(
-                      writeHandoffFile(result)
-                    )
-                  )
-                )
-              )
-            )
-          )
-        )
-      )
-    )
-  );
+  let nextResult = result;
+  nextResult = writeCloseoutFile(nextResult);
+  nextResult = writeRunRecordFile(nextResult);
+  nextResult = writeFilledCloseoutDraftFile(nextResult);
+  nextResult = writeArtifactManifestFile(nextResult);
+  nextResult = writeBackupRestorePacketFile(nextResult);
+  nextResult = writeCloseoutReloadPacketFile(nextResult);
+  nextResult = writeReadinessReviewPacketFile(nextResult);
+  nextResult = writeProductionSignoffPacketFile(nextResult);
+  nextResult = writeLaunchDutyArchiveIndexFile(nextResult);
+  nextResult = refreshOperatorExecutionPlan(nextResult);
+  nextResult = writeHandoffFile(nextResult);
+  return refreshOperatorExecutionPlan(nextResult);
 }
 
 function writeResult(result, json) {

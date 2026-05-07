@@ -5811,6 +5811,7 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
     lines.push(`- Go-live launch-day watch entry: ${launchDayWatchEntry.status || "-"} (target=${launchDayWatchEntry.currentPostSignoffTarget?.key || "-"}, watch=${launchDayWatchEntry.currentWatchArtifact?.key || "-"}, stabilization=${launchDayWatchEntry.currentStabilizationWindow?.key || "-"})`);
     lines.push(`- Go-live launch-day evidence inputs: ${renderLaunchDutyActionInputList(launchDayWatchEntry.evidenceInputs)}`);
     lines.push(`- Go-live launch-day confirmation points: ${renderLaunchDutyActionConfirmationList(launchDayWatchEntry.confirmationPoints)}`);
+    lines.push(`- Go-live launch-day archive trace: ${renderLaunchDutyArchiveTrace(launchDayWatchEntry.archiveTrace)}`);
   }
   lines.push(`- Go-live execution next action: ${entry.nextAction || "-"}`);
 }

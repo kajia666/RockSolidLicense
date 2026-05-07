@@ -651,8 +651,25 @@ function buildStagingRehearsalExecutionSummary(result) {
   }
   const realStagingInputClosure = buildRealStagingInputClosure({ profilePreflight, closeoutReview });
   const goLiveProgress = buildGoLiveProgress(result, { realStagingInputClosure });
+  const realStagingRunFocus = result.operatorExecutionPlan?.realStagingRunFocus
+    || buildRealStagingRunFocus(result);
+  const closeoutBackfillFocus = result.operatorExecutionPlan?.closeoutBackfillFocus
+    || buildCloseoutBackfillFocus(result);
+  const fullTestSignoffFocus = result.operatorExecutionPlan?.fullTestSignoffFocus
+    || buildFullTestSignoffFocus(result);
+  const launchDutyPacketFocus = result.operatorExecutionPlan?.launchDutyPacketFocus
+    || (result.stagingLaunchDutyArchiveIndex ? buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus }) : null);
   const launchDutyCurrentAction = result.finalRehearsalPacket?.launchDutyCurrentAction
-    || buildLaunchDutyCurrentActionFromResult(result);
+    || buildLaunchDutyCurrentActionFromResult(result, { launchDutyPacketFocus });
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || result.finalRehearsalPacket?.goLiveExecutionEntry
+    || buildGoLiveExecutionEntry({
+      realStagingRunFocus,
+      closeoutBackfillFocus,
+      fullTestSignoffFocus,
+      launchDutyPacketFocus,
+      launchDutyCurrentAction
+    });
   return {
     mode: "staging-rehearsal-execution-summary",
     status,
@@ -674,7 +691,8 @@ function buildStagingRehearsalExecutionSummary(result) {
         closeoutReview
       }),
       launchDutyFocus: buildLaunchDutyOperatorFocus(result, { status, finalPacket }),
-      launchDutyCurrentAction
+      launchDutyCurrentAction,
+      goLiveExecutionEntry
     },
     blockingReasons,
     orderedNextActions,
@@ -2907,6 +2925,137 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
   };
 }
 
+function buildGoLiveExecutionEntry({
+  realStagingRunFocus = null,
+  closeoutBackfillFocus = null,
+  fullTestSignoffFocus = null,
+  launchDutyPacketFocus = null,
+  launchDutyCurrentAction = null
+} = {}) {
+  const uniq = (items = []) => [...new Set((Array.isArray(items) ? items : []).filter(Boolean))];
+  const fullTestCommand = fullTestSignoffFocus?.commands?.fullTestWindow
+    || closeoutBackfillFocus?.fullTestWindow?.command
+    || realStagingRunFocus?.fullTestEntry?.command
+    || launchDutyPacketFocus?.commands?.fullTestWindow
+    || "npm.cmd test";
+  const closeoutReloadCommand = closeoutBackfillFocus?.reloadCommand
+    || realStagingRunFocus?.commands?.closeoutReload
+    || launchDutyPacketFocus?.commands?.closeoutReload
+    || fullTestSignoffFocus?.commands?.closeoutReload
+    || null;
+  const currentPacket = launchDutyPacketFocus?.currentPacket || {};
+  const paths = {
+    filledCloseoutInputFile: fullTestSignoffFocus?.paths?.filledCloseoutInputFile
+      || closeoutBackfillFocus?.paths?.filledCloseoutInputFile
+      || realStagingRunFocus?.paths?.filledCloseoutInputFile
+      || null,
+    closeoutReloadPacketFile: launchDutyPacketFocus?.controlPaths?.closeoutReloadPacket
+      || closeoutBackfillFocus?.paths?.closeoutReloadPacketFile
+      || realStagingRunFocus?.paths?.closeoutReloadPacketFile
+      || null,
+    readinessReviewPacketFile: fullTestSignoffFocus?.paths?.readinessReviewPacketFile
+      || launchDutyPacketFocus?.controlPaths?.readinessReviewPacket
+      || null,
+    productionSignoffPacketFile: fullTestSignoffFocus?.paths?.productionSignoffPacketFile
+      || launchDutyPacketFocus?.controlPaths?.productionSignoffPacket
+      || null,
+    launchDutyArchiveIndexFile: launchDutyPacketFocus?.archiveIndexPath
+      || realStagingRunFocus?.paths?.launchDutyArchiveIndexFile
+      || null,
+    artifactArchiveRoot: realStagingRunFocus?.paths?.artifactArchiveRoot
+      || launchDutyPacketFocus?.archiveRoot
+      || null
+  };
+  const blockerSummary = {
+    missingCloseoutKeys: uniq([
+      ...(fullTestSignoffFocus?.missingCloseoutKeys || []),
+      ...(closeoutBackfillFocus?.missingBackfillKeys || []),
+      ...(closeoutBackfillFocus?.fullTestWindow?.missingCloseoutKeys || []),
+      ...(realStagingRunFocus?.fullTestEntry?.missingCloseoutKeys || [])
+    ]),
+    missingSignoffKeys: uniq(fullTestSignoffFocus?.missingSignoffKeys || closeoutBackfillFocus?.productionSignoff?.missingSignoffKeys || []),
+    missingReceiptVisibilityKeys: uniq(fullTestSignoffFocus?.missingReceiptVisibilityKeys || closeoutBackfillFocus?.productionSignoff?.missingReceiptVisibilityKeys || []),
+    missingSecretEnv: uniq(realStagingRunFocus?.missingSecretEnv || []),
+    missingOutputFiles: uniq(realStagingRunFocus?.missingOutputFiles || [])
+  };
+  const canRunFullTestWindow = fullTestSignoffFocus?.canRunFullTestWindow === true
+    || closeoutBackfillFocus?.fullTestWindow?.canRun === true
+    || realStagingRunFocus?.fullTestEntry?.canRun === true;
+  const canSignoffProduction = fullTestSignoffFocus?.canSignoffProduction === true
+    || closeoutBackfillFocus?.productionSignoff?.canSignoff === true;
+  let currentPhase = "full_test_window_entry";
+  let sourceFocus = "closeoutBackfillFocus";
+  let currentActionKey = closeoutBackfillFocus?.currentBackfillTarget?.key || "reload_closeout_input";
+  let status = closeoutBackfillFocus?.status || launchDutyCurrentAction?.status || "blocked_until_closeout_reload";
+  let currentCommand = closeoutReloadCommand;
+  let nextAction = closeoutBackfillFocus?.currentBackfillTarget?.nextAction
+    || closeoutBackfillFocus?.nextAction
+    || launchDutyCurrentAction?.nextAction
+    || null;
+
+  if (canSignoffProduction) {
+    currentPhase = "launch_watch_and_stabilization";
+    sourceFocus = "launchDutyPacketFocus";
+    currentActionKey = launchDutyCurrentAction?.key || "archive_production_signoff";
+    status = fullTestSignoffFocus?.status || launchDutyCurrentAction?.status || "ready_for_launch_day_watch";
+    currentCommand = launchDutyCurrentAction?.command || null;
+    nextAction = launchDutyPacketFocus?.nextAction || fullTestSignoffFocus?.nextAction || launchDutyCurrentAction?.nextAction || null;
+  } else if (canRunFullTestWindow) {
+    currentPhase = "full_test_window_entry";
+    sourceFocus = "fullTestSignoffFocus";
+    currentActionKey = "run_full_test_window";
+    status = "ready_for_full_test_window";
+    currentCommand = fullTestCommand;
+    nextAction = fullTestSignoffFocus?.nextAction
+      || "Run the full test window, then backfill production sign-off evidence and reload closeout input.";
+  } else if (
+    realStagingRunFocus?.currentAction?.key === "run_staging_dry_run"
+    && realStagingRunFocus?.canRunDryRun === true
+  ) {
+    currentPhase = "real_staging_inputs";
+    sourceFocus = "realStagingRunFocus";
+    currentActionKey = "run_staging_dry_run";
+    status = realStagingRunFocus.status || "ready_for_real_staging_rehearsal";
+    currentCommand = realStagingRunFocus.currentAction.command || realStagingRunFocus.commands?.stagingDryRun || null;
+    nextAction = realStagingRunFocus.currentAction.nextAction || realStagingRunFocus.nextAction || null;
+  } else if (!closeoutBackfillFocus && realStagingRunFocus) {
+    const current = realStagingRunFocus.currentAction || {};
+    currentPhase = "real_staging_inputs";
+    sourceFocus = "realStagingRunFocus";
+    currentActionKey = current.key || "load_staging_profile";
+    status = current.status || realStagingRunFocus.status || "blocked";
+    currentCommand = current.command || realStagingRunFocus.commands?.stagingDryRun || null;
+    nextAction = current.nextAction || realStagingRunFocus.nextAction || null;
+  }
+
+  return {
+    mode: "go-live-execution-entry",
+    status,
+    willModifyData: false,
+    currentPhase,
+    sourceFocus,
+    currentActionKey,
+    currentCommand,
+    canRunFullTestWindow,
+    canSignoffProduction,
+    commands: {
+      stagingDryRun: realStagingRunFocus?.commands?.stagingDryRun || null,
+      closeoutReload: closeoutReloadCommand,
+      fullTestWindow: fullTestCommand
+    },
+    paths,
+    packetFocus: {
+      currentPacketKey: currentPacket.key || null,
+      currentPacketStatus: currentPacket.status || null,
+      currentPacketPath: currentPacket.path || null,
+      archiveIndexPath: launchDutyPacketFocus?.archiveIndexPath || null
+    },
+    blockerSummary,
+    launchDutyCurrentActionKey: launchDutyCurrentAction?.key || null,
+    nextAction
+  };
+}
+
 function buildLaunchDutyCurrentAction({
   realStagingRunFocus = null,
   closeoutBackfillFocus = null,
@@ -4242,7 +4391,23 @@ function buildFinalRehearsalPacket(result) {
     finalLocalFile("filled_closeout_input_example", null, filledExample.saveAs || null, "example_only"),
     finalLocalFile("artifact_archive_root", null, archiveRoot, "operator_archive")
   ];
-  const launchDutyCurrentAction = buildLaunchDutyCurrentActionFromResult(result, { outputFiles: localFiles });
+  const realStagingRunFocus = buildRealStagingRunFocus(result, { outputFiles: localFiles });
+  const closeoutBackfillFocus = buildCloseoutBackfillFocus(result, { outputFiles: localFiles });
+  const fullTestSignoffFocus = buildFullTestSignoffFocus(result, { outputFiles: localFiles });
+  const launchDutyCurrentAction = buildLaunchDutyCurrentAction({
+    realStagingRunFocus,
+    closeoutBackfillFocus,
+    fullTestSignoffFocus,
+    launchDutyPacketFocus: null,
+    archiveContext: buildLaunchDutyArchiveTraceContext(result, { outputFiles: localFiles })
+  });
+  const goLiveExecutionEntry = buildGoLiveExecutionEntry({
+    realStagingRunFocus,
+    closeoutBackfillFocus,
+    fullTestSignoffFocus,
+    launchDutyPacketFocus: null,
+    launchDutyCurrentAction
+  });
   return {
     status: readyForLaunchDayWatch ? "ready_for_launch_day_watch" : "ready_for_operator_rehearsal",
     willModifyData: false,
@@ -4258,6 +4423,7 @@ function buildFinalRehearsalPacket(result) {
     goLiveActionQueue: goLiveProgress.operatorActionQueue,
     goLiveOperatorActionPlan: goLiveProgress.operatorActionPlan,
     launchDutyCurrentAction,
+    goLiveExecutionEntry,
     commands: {
       stagingRehearsalDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
       routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
@@ -4561,6 +4727,13 @@ function buildStagingOperatorExecutionPlan(result) {
     launchDutyPacketFocus,
     archiveContext: launchDutyArchiveContext
   });
+  const goLiveExecutionEntry = buildGoLiveExecutionEntry({
+    realStagingRunFocus,
+    closeoutBackfillFocus,
+    fullTestSignoffFocus,
+    launchDutyPacketFocus,
+    launchDutyCurrentAction
+  });
   return {
     status: "ready_for_staging_execution",
     willModifyData: false,
@@ -4582,6 +4755,7 @@ function buildStagingOperatorExecutionPlan(result) {
     fullTestSignoffFocus,
     launchDutyPacketFocus,
     launchDutyCurrentAction,
+    goLiveExecutionEntry,
     orderedSteps: [
       {
         key: "review_generated_bundle",
@@ -5333,6 +5507,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
   const closure = focus.launchReadinessClosure || {};
   const launchDutyFocus = focus.launchDutyFocus || {};
   const launchDutyCurrentAction = focus.launchDutyCurrentAction || {};
+  const goLiveExecutionEntry = focus.goLiveExecutionEntry || {};
   const statuses = summary.sourceStatuses || {};
   const lines = [
     `- Execution summary status: ${summary.status || "-"}`,
@@ -5369,6 +5544,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Closeout reload: \`${summary.commands?.closeoutReload || "-"}\``,
     `- Next action: ${summary.nextAction || "-"}`
   ];
+  appendGoLiveExecutionEntry(lines, goLiveExecutionEntry);
   if (Array.isArray(summary.blockingReasons) && summary.blockingReasons.length) {
     if (Array.isArray(goLiveProgress.operatorActionQueue) && goLiveProgress.operatorActionQueue.length) {
       lines.push("- Go-live action queue:");
@@ -5490,6 +5666,17 @@ function renderLaunchDutyRecordUpdates(items = []) {
     .join("; ") || "-";
 }
 
+function appendGoLiveExecutionEntry(lines, entry = {}) {
+  const blockers = entry.blockerSummary || {};
+  lines.push(`- Go-live execution entry: ${entry.status || "-"} (phase=${entry.currentPhase || "-"}, source=${entry.sourceFocus || "-"}, action=${entry.currentActionKey || "-"})`);
+  lines.push(`- Go-live execution command: \`${entry.currentCommand || "-"}\``);
+  lines.push(`- Go-live execution closeout reload: \`${entry.commands?.closeoutReload || "-"}\``);
+  lines.push(`- Go-live execution full-test command: \`${entry.commands?.fullTestWindow || "-"}\``);
+  lines.push(`- Go-live execution packets: current=${entry.packetFocus?.currentPacketKey || "-"} -> ${entry.packetFocus?.currentPacketPath || "-"}, closeout=${entry.paths?.closeoutReloadPacketFile || "-"}, readiness=${entry.paths?.readinessReviewPacketFile || "-"}, signoff=${entry.paths?.productionSignoffPacketFile || "-"}`);
+  lines.push(`- Go-live execution blockers: closeout=${(blockers.missingCloseoutKeys || []).join(", ") || "-"}, signoff=${(blockers.missingSignoffKeys || []).join(", ") || "-"}, receipts=${(blockers.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
+  lines.push(`- Go-live execution next action: ${entry.nextAction || "-"}`);
+}
+
 function renderOperatorExecutionPlan(plan) {
   if (!plan) {
     return "- Not available";
@@ -5497,6 +5684,7 @@ function renderOperatorExecutionPlan(plan) {
   const realClosure = plan.realStagingInputClosure || {};
   const goLiveActionPlan = plan.goLiveOperatorActionPlan || {};
   const currentLaunchDutyAction = plan.launchDutyCurrentAction || {};
+  const goLiveExecutionEntry = plan.goLiveExecutionEntry || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Writes data: ${plan.willModifyData ? "yes" : "no"}`,
@@ -5521,6 +5709,7 @@ function renderOperatorExecutionPlan(plan) {
     `- Launch-duty current next action: ${currentLaunchDutyAction.nextAction || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
   ];
+  appendGoLiveExecutionEntry(lines, goLiveExecutionEntry);
   if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
     lines.push("- Operator go-live phases:");
     for (const phase of goLiveActionPlan.phaseSummary) {
@@ -6324,6 +6513,7 @@ function renderFinalRehearsalPacket(packet) {
   const goLiveActionQueue = Array.isArray(packet.goLiveActionQueue) ? packet.goLiveActionQueue : [];
   const goLiveActionPlan = packet.goLiveOperatorActionPlan || {};
   const launchDutyCurrentAction = packet.launchDutyCurrentAction || {};
+  const goLiveExecutionEntry = packet.goLiveExecutionEntry || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data: ${packet.willModifyData ? "yes" : "no"}`,
@@ -6355,6 +6545,7 @@ function renderFinalRehearsalPacket(packet) {
     `- Final packet launch-duty record updates: ${renderLaunchDutyRecordUpdates(launchDutyCurrentAction.recordUpdates)}`,
     `- Next action: ${packet.nextAction || "-"}`
   ];
+  appendGoLiveExecutionEntry(lines, goLiveExecutionEntry);
   if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
     lines.push("- Final packet go-live operator phases:");
     for (const phase of goLiveActionPlan.phaseSummary) {

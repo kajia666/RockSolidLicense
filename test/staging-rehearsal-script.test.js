@@ -342,6 +342,23 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     output.operatorExecutionPlan.launchDutyPacketFocus.commands.closeoutReload,
     "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
   );
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.mode, "go-live-execution-entry");
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.status, "awaiting_closeout_backfill");
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentPhase, "full_test_window_entry");
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.sourceFocus, "closeoutBackfillFocus");
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentActionKey, "route_map_gate_result");
+  assert.equal(
+    output.operatorExecutionPlan.goLiveExecutionEntry.commands.closeoutReload,
+    "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+  );
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.commands.fullTestWindow, "npm.cmd test");
+  assert.equal(
+    output.operatorExecutionPlan.goLiveExecutionEntry.paths.filledCloseoutInputFile,
+    "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+  );
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.packetFocus.currentPacketKey, "closeout_reload_packet");
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.blockerSummary.missingCloseoutKeys.length, 7);
+  assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.canRunFullTestWindow, false);
   assert.equal(output.operatorExecutionPlan.fullTestWindow.command, "npm.cmd test");
   assert.equal(output.operatorExecutionPlan.productionSignoff.requiredDecision, "ready-for-production-signoff");
   assert.deepEqual(output.fullTestWindowReadiness, {
@@ -1796,8 +1813,21 @@ test("staging rehearsal runner focuses closeout reload after real staging inputs
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.status, "blocked_until_closeout_reload");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.command, "npm.cmd test");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.missingCloseoutKeys.length, 7);
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.status, "ready_for_real_staging_rehearsal");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentPhase, "real_staging_inputs");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.sourceFocus, "realStagingRunFocus");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentActionKey, "run_staging_dry_run");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentCommand, output.stagingEnvironmentBinding.dryRunCommand);
+    assert.equal(
+      output.operatorExecutionPlan.goLiveExecutionEntry.commands.closeoutReload,
+      "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json"
+    );
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.paths.filledCloseoutInputFile, "artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.blockerSummary.missingCloseoutKeys.length, 7);
     const handoff = readFileSync(handoffFile, "utf8");
     assert.match(handoff, /Real staging run focus: ready_for_real_staging_rehearsal \(dryRun=yes, liveWriteSmoke=yes, evidence=yes\)/);
+    assert.match(handoff, /Go-live execution entry: ready_for_real_staging_rehearsal \(phase=real_staging_inputs, source=realStagingRunFocus, action=run_staging_dry_run\)/);
+    assert.match(handoff, /Go-live execution command: `npm\.cmd run staging:rehearsal -- --json --base-url https:\/\/ready-staging\.example\.com/);
     assert.match(handoff, /Real staging current action: run_staging_dry_run \(env=-\)/);
     assert.match(handoff, /Real staging post-dry-run action: backfill_and_reload_closeout_input \(blocked_until_closeout_reload\)/);
     assert.match(handoff, /Real staging full-test entry: blocked_until_closeout_reload \(command=npm\.cmd test\)/);
@@ -2462,6 +2492,26 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.key, "backfill_production_signoff");
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.status, "ready_for_full_test_window");
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.commands.fullTestWindow, "npm.cmd test");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.status, "ready_for_full_test_window");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentPhase, "full_test_window_entry");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.sourceFocus, "fullTestSignoffFocus");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentActionKey, "run_full_test_window");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentCommand, "npm.cmd test");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.canRunFullTestWindow, true);
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.canSignoffProduction, false);
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.blockerSummary.missingCloseoutKeys.length, 0);
+    assert.deepEqual(
+      output.operatorExecutionPlan.goLiveExecutionEntry.blockerSummary.missingSignoffKeys,
+      expectedProductionSignoffConditionKeys
+    );
+    assert.deepEqual(
+      output.operatorExecutionPlan.goLiveExecutionEntry.blockerSummary.missingReceiptVisibilityKeys,
+      expectedReceiptVisibilityKeys
+    );
+    assert.equal(
+      output.operatorExecutionPlan.goLiveExecutionEntry.paths.productionSignoffPacketFile,
+      "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"
+    );
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.mode, "launch-duty-current-action");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.stage, "full_test_signoff");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.sourceFocus, "fullTestSignoffFocus");

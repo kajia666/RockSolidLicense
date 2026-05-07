@@ -1744,6 +1744,9 @@ function buildStagingReadinessReviewPacket(result) {
   const packetFile = result.readinessReviewPacketFile?.path
     || bindingFiles.get("readiness_review_packet")?.path
     || path.posix.join(archiveRoot, "staging-readiness-review-packet.json");
+  const productionSignoffPacketFile = result.productionSignoffPacketFile?.path
+    || bindingFiles.get("production_signoff_packet")?.path
+    || path.posix.join(archiveRoot, "staging-production-signoff-packet.json");
   const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
     || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
     || finalPacket.goLiveExecutionEntry
@@ -1767,6 +1770,17 @@ function buildStagingReadinessReviewPacket(result) {
   }
   const closeoutReloadCommand = closeoutReloadPacket.commands?.closeoutReload || finalPacket.commands?.closeoutReload || null;
   const fullTestWindowCommand = fullTestWindow.command || finalPacket.commands?.fullTestWindow || "npm.cmd test";
+  const fullTestEntryExecution = buildFullTestEntryExecution({
+    fullTestWindow: {
+      ...fullTestWindow,
+      command: fullTestWindowCommand
+    },
+    productionSignoff,
+    closeoutReloadPacket,
+    closeoutReloadCommand,
+    fullTestWindowCommand,
+    productionSignoffPacketFile
+  });
   return {
     mode: "staging-readiness-review-packet",
     status,
@@ -1825,6 +1839,7 @@ function buildStagingReadinessReviewPacket(result) {
       closeoutReload: closeoutReloadCommand,
       fullTestWindow: fullTestWindowCommand
     },
+    fullTestEntryExecution,
     goLiveExecutionEntry,
     operatorSteps: [
       {
@@ -3469,6 +3484,47 @@ function buildCloseoutReloadExecutionEntry({
     nextAction: currentQueueItem
       ? `Backfill ${currentQueueItem.key}, save ${filledCloseoutInputFile || "filled-closeout-input.json"}, then reload closeout readiness.`
       : `Reload ${filledCloseoutInputFile || "filled-closeout-input.json"} before reviewing full-test readiness.`
+  };
+}
+
+function buildFullTestEntryExecution({
+  fullTestWindow = {},
+  productionSignoff = {},
+  closeoutReloadPacket = {},
+  closeoutReloadCommand = null,
+  fullTestWindowCommand = "npm.cmd test",
+  productionSignoffPacketFile = null
+} = {}) {
+  const canRunFullTestWindow = fullTestWindow.canRun === true;
+  const missingCloseoutKeys = fullTestWindow.missingCloseoutKeys || [];
+  return {
+    mode: "full-test-entry-execution",
+    status: canRunFullTestWindow ? "ready_for_full_test_window" : "blocked_until_closeout_reload",
+    willModifyData: false,
+    currentActionKey: canRunFullTestWindow ? "run_full_test_window" : "reload_closeout_input",
+    currentCommand: canRunFullTestWindow ? fullTestWindowCommand : closeoutReloadCommand,
+    closeoutReload: {
+      status: closeoutReloadPacket.status || "not_available",
+      command: closeoutReloadCommand,
+      packetFile: closeoutReloadPacket.paths?.packetFile || null,
+      missingCloseoutKeys
+    },
+    fullTestWindow: {
+      status: fullTestWindow.status || "blocked",
+      canRun: canRunFullTestWindow,
+      command: fullTestWindowCommand,
+      missingCloseoutKeys
+    },
+    postFullTest: {
+      targetPacketKey: "production_signoff_packet",
+      packetFile: productionSignoffPacketFile,
+      requiredDecision: productionSignoff.requiredDecision || "ready-for-production-signoff",
+      missingSignoffKeys: productionSignoff.missingSignoffKeys || [],
+      missingReceiptVisibilityKeys: productionSignoff.missingReceiptVisibilityKeys || []
+    },
+    nextAction: canRunFullTestWindow
+      ? `Run ${fullTestWindowCommand}, then backfill production sign-off evidence into the production sign-off packet.`
+      : `Reload the filled closeout input, confirm missing closeout keys are empty, then run ${fullTestWindowCommand}.`
   };
 }
 
@@ -7423,6 +7479,7 @@ function renderStagingReadinessReviewPacket(packet) {
   if (!packet) {
     return "- Not available";
   }
+  const fullTestEntryExecution = packet.fullTestEntryExecution || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -7430,6 +7487,9 @@ function renderStagingReadinessReviewPacket(packet) {
     `- Packet file: ${packet.packetFile || "-"}`,
     `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
+    `- Full-test entry execution: ${fullTestEntryExecution.status || "-"} (action=${fullTestEntryExecution.currentActionKey || "-"}, fullTest=${fullTestEntryExecution.fullTestWindow?.canRun ? "yes" : "no"})`,
+    `- Full-test entry current command: \`${fullTestEntryExecution.currentCommand || "-"}\``,
+    `- Full-test entry signoff packet: ${fullTestEntryExecution.postFullTest?.packetFile || "-"}`,
     `- Next action: ${packet.nextAction || "-"}`
   ];
   appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});

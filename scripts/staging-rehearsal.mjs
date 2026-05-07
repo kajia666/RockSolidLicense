@@ -2013,6 +2013,7 @@ function buildStagingProductionSignoffPacket(result) {
   const readinessReviewPacket = result.stagingReadinessReviewPacket || buildStagingReadinessReviewPacket(result);
   const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
   const launchDayWatch = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
+  const stabilizationHandoff = result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result);
   const archiveRoot = readinessReviewPacket.archiveRoot
     || runRecordIndex.archiveRoot
     || result.finalRehearsalPacket?.archiveRoot
@@ -2095,6 +2096,111 @@ function buildStagingProductionSignoffPacket(result) {
     receiptVisibility: receiptVisibilityBackfillDraft,
     operatorNote: "Merge only redacted full-test results, sign-off decisions, and receipt visibility evidence into filled-closeout-input.json before reloading."
   };
+  const routes = {
+    launchMainline: launchDayWatch.routes?.launchMainline || result.nextCommands?.launchMainline || null,
+    developerOps: launchDayWatch.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
+    launchReviewSummary: launchDayWatch.routes?.launchReviewSummary || result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
+    launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
+    launchOpsOverviewStatus: launchDayWatch.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
+  };
+  const postSignoffTargets = buildPostSignoffActionChecklist(result, {
+    archiveRoot,
+    productionSignoffPacketPath: packetFile,
+    launchDutyArchiveIndexPath
+  });
+  const watchRecordQueue = (launchDayWatch.watchRecordDraft?.records || []).map((item) => ({
+    key: item.key || null,
+    status: item.status || "not_available",
+    path: item.artifactPath || null,
+    receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+    expectedEvidence: item.expectedEvidence || null,
+    operatorNote: item.operatorNote || null
+  }));
+  const stabilizationWindows = (stabilizationHandoff.handoffWindows || []).map((item) => ({
+    key: item.key || null,
+    label: item.label || null,
+    status: item.status || "not_available",
+    path: item.key === "stabilization_owner_handoff"
+      ? watchRecordQueue.find((record) => record.key === "stabilization_owner_handoff")?.path || path.posix.join(archiveRoot, "stabilization-owner-handoff.md")
+      : item.key === "first_wave_closeout"
+        ? path.posix.join(archiveRoot, "first-wave-closeout.md")
+        : null,
+    summary: item.summary || null,
+    receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+    expectedEvidence: item.expectedEvidence || null
+  }));
+  const currentPostSignoffTarget = findLaunchDutyFocusItem(postSignoffTargets);
+  const currentWatchArtifact = findLaunchDutyFocusItem(watchRecordQueue);
+  const currentStabilizationWindow = findLaunchDutyFocusItem(stabilizationWindows);
+  const watchEvidenceInputs = [
+    {
+      key: "production_signoff_packet",
+      kind: "packet",
+      status: currentPostSignoffTarget?.status || (canSignoff ? "archive_before_cutover" : "blocked_until_signoff_ready"),
+      path: currentPostSignoffTarget?.path || packetFile
+    },
+    {
+      key: currentWatchArtifact?.key || "launch_day_watch_summary",
+      kind: "artifact",
+      status: currentWatchArtifact?.status || (launchDayWatch.canStartCutoverWatch === true ? "pending_operator_entry" : "blocked_until_production_signoff"),
+      path: currentWatchArtifact?.path || path.posix.join(archiveRoot, "launch-day-watch-summary.md")
+    },
+    {
+      key: currentStabilizationWindow?.key || "stabilization_owner_handoff",
+      kind: "artifact",
+      status: currentStabilizationWindow?.status || (launchDayWatch.canStartCutoverWatch === true ? "operator_handoff" : "blocked_until_cutover_watch"),
+      path: currentStabilizationWindow?.path || path.posix.join(archiveRoot, "stabilization-owner-handoff.md")
+    }
+  ];
+  const launchDayWatchBridge = {
+    status: launchDayWatch.canStartCutoverWatch === true ? "ready_for_launch_day_watch" : "blocked_until_signoff_ready",
+    sourceStatus: launchDayWatch.status || "not_available",
+    watchRecordDraftStatus: launchDayWatch.watchRecordDraft?.status || "not_available",
+    archiveRoot,
+    launchDutyArchiveIndexPath,
+    watchStartGate: launchDayWatch.watchStartGate || "production_signoff_readiness",
+    requiredDecision: launchDayWatch.requiredDecision || productionSignoff.requiredDecision || "ready-for-production-signoff",
+    productionDecision: launchDayWatch.productionDecision || productionSignoff.productionDecision || null,
+    closeoutInputStatus: launchDayWatch.closeoutInputStatus || productionSignoff.closeoutInputStatus || "missing",
+    routes,
+    escalationTriggers: Array.isArray(launchDayWatch.escalationTriggers) ? launchDayWatch.escalationTriggers : [],
+    currentPostSignoffTarget: currentPostSignoffTarget ? {
+      key: currentPostSignoffTarget.key || null,
+      status: currentPostSignoffTarget.status || "not_available",
+      path: currentPostSignoffTarget.path || null,
+      receiptOperations: Array.isArray(currentPostSignoffTarget.receiptOperations) ? currentPostSignoffTarget.receiptOperations : [],
+      expectedEvidence: currentPostSignoffTarget.expectedEvidence || null
+    } : null,
+    currentWatchArtifact: currentWatchArtifact ? {
+      key: currentWatchArtifact.key || null,
+      status: currentWatchArtifact.status || "not_available",
+      path: currentWatchArtifact.path || null,
+      receiptOperations: Array.isArray(currentWatchArtifact.receiptOperations) ? currentWatchArtifact.receiptOperations : [],
+      expectedEvidence: currentWatchArtifact.expectedEvidence || null,
+      operatorNote: currentWatchArtifact.operatorNote || null
+    } : null,
+    currentStabilizationWindow: currentStabilizationWindow ? {
+      key: currentStabilizationWindow.key || null,
+      label: currentStabilizationWindow.label || null,
+      status: currentStabilizationWindow.status || "not_available",
+      path: currentStabilizationWindow.path || null,
+      summary: currentStabilizationWindow.summary || null,
+      receiptOperations: Array.isArray(currentStabilizationWindow.receiptOperations) ? currentStabilizationWindow.receiptOperations : [],
+      expectedEvidence: currentStabilizationWindow.expectedEvidence || null
+    } : null,
+    evidenceInputs: watchEvidenceInputs,
+    watchWindows: (launchDayWatch.watchWindows || []).map((item) => ({
+      key: item.key || null,
+      status: item.status || "not_available",
+      window: item.window || null,
+      summary: item.summary || null
+    })),
+    watchRecordQueue,
+    stabilizationWindows,
+    nextAction: launchDayWatch.canStartCutoverWatch === true
+      ? `Archive ${currentPostSignoffTarget?.key || "production_signoff_packet"}, then record launch-day watch artifacts and prepare stabilization handoff.`
+      : launchDayWatch.nextAction || "Complete production sign-off before starting launch-day watch."
+  };
   return {
     mode: "staging-production-signoff-operator-packet",
     status,
@@ -2123,18 +2229,9 @@ function buildStagingProductionSignoffPacket(result) {
     signoffConditions,
     receiptVisibilityEvidenceTargets,
     signoffBackfillDraft,
-    routes: {
-      launchMainline: launchDayWatch.routes?.launchMainline || result.nextCommands?.launchMainline || null,
-      developerOps: launchDayWatch.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
-      launchReviewSummary: launchDayWatch.routes?.launchReviewSummary || result.nextCommands?.receiptVisibilitySummaries?.launchReviewSummary || null,
-      launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
-      launchOpsOverviewStatus: launchDayWatch.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
-    },
-    postSignoffTargets: buildPostSignoffActionChecklist(result, {
-      archiveRoot,
-      productionSignoffPacketPath: packetFile,
-      launchDutyArchiveIndexPath
-    }),
+    routes,
+    postSignoffTargets,
+    launchDayWatchBridge,
     commands: {
       closeoutReload,
       fullTestWindow: fullTestWindow.command || readinessReviewPacket.commands?.fullTestWindow || "npm.cmd test"
@@ -2171,12 +2268,16 @@ function buildStagingProductionSignoffPacket(result) {
         key: "archive_production_signoff",
         status: canSignoff ? "ready" : "blocked_until_signoff_ready",
         packetFile,
+        nextAction: canSignoff ? "Archive this packet and refresh the launch-duty archive index before cutover." : null,
         expectedEvidence: "Archive the signed production sign-off packet with full-test status, GO/NO-GO decision, and receipt visibility lanes."
       },
       {
         key: "start_launch_day_watch",
         status: launchDayWatch.canStartCutoverWatch === true ? "ready" : "blocked_until_signoff_ready",
-        routes: launchDayWatch.routes || {},
+        requiredDecision: launchDayWatchBridge.requiredDecision,
+        productionDecision: launchDayWatchBridge.productionDecision,
+        artifactPaths: watchRecordQueue.map((item) => item.path).filter(Boolean),
+        nextAction: launchDayWatchBridge.nextAction,
         expectedEvidence: "Start launch-day watch only after production sign-off and receipt visibility are ready."
       }
     ],
@@ -6042,6 +6143,18 @@ function appendOperatorStepList(lines, heading, steps) {
     if (Array.isArray(step.missingKeys) && step.missingKeys.length) {
       lines.push(`    - missingKeys: ${step.missingKeys.join(", ")}`);
     }
+    if (Array.isArray(step.requiredSignoffKeys) && step.requiredSignoffKeys.length) {
+      lines.push(`    - requiredSignoffKeys: ${step.requiredSignoffKeys.join(", ")}`);
+    }
+    if (Array.isArray(step.missingSignoffKeys) && step.missingSignoffKeys.length) {
+      lines.push(`    - missingSignoffKeys: ${step.missingSignoffKeys.join(", ")}`);
+    }
+    if (Array.isArray(step.requiredReceiptVisibilityKeys) && step.requiredReceiptVisibilityKeys.length) {
+      lines.push(`    - requiredReceiptVisibilityKeys: ${step.requiredReceiptVisibilityKeys.join(", ")}`);
+    }
+    if (Array.isArray(step.missingReceiptVisibilityKeys) && step.missingReceiptVisibilityKeys.length) {
+      lines.push(`    - missingReceiptVisibilityKeys: ${step.missingReceiptVisibilityKeys.join(", ")}`);
+    }
     if (Array.isArray(step.artifactPaths) && step.artifactPaths.length) {
       lines.push(`    - artifactPaths: ${step.artifactPaths.join(", ")}`);
     }
@@ -6051,11 +6164,35 @@ function appendOperatorStepList(lines, heading, steps) {
     if (step.artifactPath) {
       lines.push(`    - artifactPath: ${step.artifactPath}`);
     }
+    if (step.packetFile) {
+      lines.push(`    - packetFile: ${step.packetFile}`);
+    }
+    if (step.path) {
+      lines.push(`    - path: ${step.path}`);
+    }
     if (step.draftPath) {
       lines.push(`    - draftPath: ${step.draftPath}`);
     }
     if (step.from || step.to) {
       lines.push(`    - paths: ${step.from || "-"} -> ${step.to || "-"}`);
+    }
+    if (step.requiredDecision) {
+      lines.push(`    - requiredDecision: ${step.requiredDecision}`);
+    }
+    if (step.productionDecision) {
+      lines.push(`    - productionDecision: ${step.productionDecision}`);
+    }
+    if (step.label) {
+      lines.push(`    - label: ${step.label}`);
+    }
+    if (step.summary) {
+      lines.push(`    - summary: ${step.summary}`);
+    }
+    if (Array.isArray(step.receiptOperations) && step.receiptOperations.length) {
+      lines.push(`    - receiptOperations: ${step.receiptOperations.join(", ")}`);
+    }
+    if (step.nextAction) {
+      lines.push(`    - nextAction: ${step.nextAction}`);
     }
     if (step.expectedEvidence) {
       lines.push(`    - expectedEvidence: ${step.expectedEvidence}`);
@@ -6770,6 +6907,7 @@ function renderStagingProductionSignoffPacket(packet) {
   const decision = packet.decision || {};
   const routes = packet.routes || {};
   const signoffDraft = packet.signoffBackfillDraft || {};
+  const launchDayWatchBridge = packet.launchDayWatchBridge || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -6808,23 +6946,52 @@ function renderStagingProductionSignoffPacket(packet) {
       lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
     }
   }
-  if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
-    lines.push("- Operator steps:");
-    for (const step of packet.operatorSteps) {
-      lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
-      if (step.expectedEvidence) {
-        lines.push(`    - expectedEvidence: ${step.expectedEvidence}`);
-      }
-    }
-  }
+  appendOperatorStepList(lines, "- Operator steps:", packet.operatorSteps || []);
   if (Array.isArray(packet.postSignoffTargets) && packet.postSignoffTargets.length) {
     lines.push("- Post-signoff targets:");
     for (const target of packet.postSignoffTargets) {
       lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
-      if (target.expectedEvidence) {
-        lines.push(`    - expectedEvidence: ${target.expectedEvidence}`);
+      lines.push(`    - receiptOperations: ${(target.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
+    }
+  }
+  if (launchDayWatchBridge.status || launchDayWatchBridge.watchRecordDraftStatus || launchDayWatchBridge.currentPostSignoffTarget) {
+    lines.push(`- Launch-day watch bridge: ${launchDayWatchBridge.status || "-"} (source=${launchDayWatchBridge.sourceStatus || "-"}, watchDraft=${launchDayWatchBridge.watchRecordDraftStatus || "-"}, target=${launchDayWatchBridge.currentPostSignoffTarget?.key || "-"})`);
+    lines.push(`- Launch-day watch bridge decision: ${launchDayWatchBridge.requiredDecision || "-"} -> ${launchDayWatchBridge.productionDecision || "-"}`);
+    lines.push(`- Launch-day watch bridge closeout input: ${launchDayWatchBridge.closeoutInputStatus || "-"}`);
+    lines.push(`- Launch-day watch bridge archive index: ${launchDayWatchBridge.launchDutyArchiveIndexPath || "-"}`);
+    lines.push(`- Launch-day watch evidence inputs: ${renderLaunchDutyRecordUpdates(launchDayWatchBridge.evidenceInputs || [])}`);
+    if (Array.isArray(launchDayWatchBridge.escalationTriggers) && launchDayWatchBridge.escalationTriggers.length) {
+      lines.push(`- Launch-day watch escalation triggers: ${launchDayWatchBridge.escalationTriggers.join(", ")}`);
+    }
+    if (Array.isArray(launchDayWatchBridge.watchWindows) && launchDayWatchBridge.watchWindows.length) {
+      lines.push("- Launch-day watch windows:");
+      for (const window of launchDayWatchBridge.watchWindows) {
+        lines.push(`  - ${window.key || "-"}: ${window.status || "-"}`);
+        lines.push(`    - window: ${window.window || "-"}`);
+        lines.push(`    - summary: ${window.summary || "-"}`);
       }
     }
+    if (Array.isArray(launchDayWatchBridge.watchRecordQueue) && launchDayWatchBridge.watchRecordQueue.length) {
+      lines.push("- Launch-day watch record queue:");
+      for (const record of launchDayWatchBridge.watchRecordQueue) {
+        lines.push(`  - ${record.key || "-"}: ${record.status || "-"} -> ${record.path || "-"}`);
+        lines.push(`    - receiptOperations: ${(record.receiptOperations || []).join(", ") || "-"}`);
+        lines.push(`    - expectedEvidence: ${record.expectedEvidence || "-"}`);
+        lines.push(`    - operatorNote: ${record.operatorNote || "-"}`);
+      }
+    }
+    if (Array.isArray(launchDayWatchBridge.stabilizationWindows) && launchDayWatchBridge.stabilizationWindows.length) {
+      lines.push("- Launch-day watch stabilization windows:");
+      for (const window of launchDayWatchBridge.stabilizationWindows) {
+        lines.push(`  - ${window.key || "-"}: ${window.status || "-"} -> ${window.path || "-"}`);
+        lines.push(`    - label: ${window.label || "-"}`);
+        lines.push(`    - summary: ${window.summary || "-"}`);
+        lines.push(`    - receiptOperations: ${(window.receiptOperations || []).join(", ") || "-"}`);
+        lines.push(`    - expectedEvidence: ${window.expectedEvidence || "-"}`);
+      }
+    }
+    lines.push(`- Launch-day watch bridge next action: ${launchDayWatchBridge.nextAction || "-"}`);
   }
   return lines.join("\n");
 }
@@ -6847,6 +7014,8 @@ function renderLaunchDayWatchPlan(plan) {
     `- Missing receipt visibility keys: ${(plan.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
     `- Watch record draft: ${watchRecordDraft.status || "-"}`,
     `- Watch draft records: ${(watchRecordDraft.records || []).map((item) => item.key).filter(Boolean).join(", ") || "-"}`,
+    `- Watch draft closeout input: ${watchRecordDraft.closeoutInputPath || "-"}`,
+    `- Watch draft next action: ${watchRecordDraft.nextAction || "-"}`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,
@@ -6860,6 +7029,15 @@ function renderLaunchDayWatchPlan(plan) {
     lines.push(`  - ${item.key || "-"}: ${item.status || "-"}`);
     lines.push(`    - window: ${item.window || "-"}`);
     lines.push(`    - summary: ${item.summary || "-"}`);
+  }
+  if (Array.isArray(watchRecordDraft.records) && watchRecordDraft.records.length) {
+    lines.push("- Watch record queue:");
+    for (const record of watchRecordDraft.records) {
+      lines.push(`  - ${record.key || "-"}: ${record.status || "-"} -> ${record.artifactPath || "-"}`);
+      lines.push(`    - receiptOperations: ${(record.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - expectedEvidence: ${record.expectedEvidence || "-"}`);
+      lines.push(`    - operatorNote: ${record.operatorNote || "-"}`);
+    }
   }
   return lines.join("\n");
 }

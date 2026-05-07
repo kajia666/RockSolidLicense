@@ -2607,7 +2607,8 @@ function buildStagingLaunchDutyArchiveIndex(result) {
         summary: item.summary || null,
         receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
         expectedEvidence: item.expectedEvidence || null
-      }))
+      })),
+      firstWaveCloseoutGate: stabilizationHandoff.firstWaveCloseoutGate || null
     },
     commands: {
       stagingDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
@@ -4274,6 +4275,23 @@ function buildStabilizationHandoffPlan(result) {
     })
   ];
   const currentHandoffTarget = findLaunchDutyFocusItem(handoffWindows);
+  const firstWaveCloseoutWindow = handoffWindows.find((item) => item.key === "first_wave_closeout") || {};
+  const firstWaveCloseoutSourceRecords = (firstWaveCloseoutWindow.sourceRecordKeys || [])
+    .map((key) => sourceRecordByKey.get(key))
+    .filter(Boolean);
+  const firstWaveCloseoutGate = {
+    status: canStartStabilizationHandoff ? "ready_for_first_wave_closeout" : "blocked_until_stabilization_handoff",
+    currentHandoffTargetKey: currentHandoffTarget?.key || null,
+    ownerHandoffPath: sourceRecordByKey.get("stabilization_owner_handoff")?.path || handoffWindows[0]?.path || null,
+    firstWaveCloseoutPath: firstWaveCloseoutWindow.path || path.posix.join(archiveRoot, "first-wave-closeout.md"),
+    requiredSourceRecordKeys: firstWaveCloseoutWindow.sourceRecordKeys || [],
+    sourceRecords: firstWaveCloseoutSourceRecords.map((item) => [item.key, item.status, item.path]),
+    receiptOperations: Array.isArray(firstWaveCloseoutWindow.receiptOperations) ? firstWaveCloseoutWindow.receiptOperations : [],
+    expectedEvidence: firstWaveCloseoutWindow.expectedEvidence || null,
+    nextAction: canStartStabilizationHandoff
+      ? "Record stabilization owner handoff, then close first-wave stabilization with incident, rollback, and next-duty evidence."
+      : "Start launch-day watch and stabilization handoff before first-wave closeout."
+  };
   return {
     status: canStartStabilizationHandoff ? "ready" : "blocked",
     canStartStabilizationHandoff,
@@ -4282,6 +4300,7 @@ function buildStabilizationHandoffPlan(result) {
     requiredWatchWindows: (watchPlan?.watchWindows || []).map((item) => item.key).filter(Boolean),
     requiredEvidenceKeys,
     currentHandoffTarget,
+    firstWaveCloseoutGate,
     sourceWatchRecords,
     handoffEvidenceInputs: sourceWatchRecords.map((item) => ({
       key: item.key,
@@ -7410,6 +7429,7 @@ function renderStabilizationHandoffPlan(plan) {
   const routes = plan.routes || {};
   const handoffWindows = Array.isArray(plan.handoffWindows) ? plan.handoffWindows : [];
   const currentTarget = plan.currentHandoffTarget || {};
+  const firstWaveCloseoutGate = plan.firstWaveCloseoutGate || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Can start stabilization handoff: ${plan.canStartStabilizationHandoff ? "yes" : "no"}`,
@@ -7417,6 +7437,10 @@ function renderStabilizationHandoffPlan(plan) {
     `- Required watch windows: ${(plan.requiredWatchWindows || []).join(", ") || "-"}`,
     `- Required evidence keys: ${(plan.requiredEvidenceKeys || []).join(", ") || "-"}`,
     `- Current handoff target: ${currentTarget.key || "-"} (${currentTarget.status || "-"}) -> ${currentTarget.path || "-"}`,
+    `- First-wave closeout gate: ${firstWaveCloseoutGate.status || "-"} (owner=${firstWaveCloseoutGate.ownerHandoffPath || "-"}, closeout=${firstWaveCloseoutGate.firstWaveCloseoutPath || "-"})`,
+    `- First-wave closeout sources: ${(firstWaveCloseoutGate.sourceRecords || []).map((item) => `${item[0]}=${item[1]} -> ${item[2]}`).join("; ") || "-"}`,
+    `- First-wave closeout receipt operations: ${(firstWaveCloseoutGate.receiptOperations || []).join(", ") || "-"}`,
+    `- First-wave closeout expected evidence: ${firstWaveCloseoutGate.expectedEvidence || "-"}`,
     `- Handoff evidence inputs: ${renderLaunchDutyRecordUpdates(plan.handoffEvidenceInputs || [])}`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,
@@ -7627,6 +7651,13 @@ function renderStagingLaunchDutyArchiveIndex(index) {
       lines.push(`    - receiptOperations: ${(window.receiptOperations || []).join(", ") || "-"}`);
       lines.push(`    - expectedEvidence: ${window.expectedEvidence || "-"}`);
     }
+  }
+  if (stabilization.firstWaveCloseoutGate?.status) {
+    const gate = stabilization.firstWaveCloseoutGate;
+    lines.push(`- Archive first-wave closeout gate: ${gate.status || "-"} (owner=${gate.ownerHandoffPath || "-"}, closeout=${gate.firstWaveCloseoutPath || "-"})`);
+    lines.push(`- Archive first-wave closeout sources: ${(gate.sourceRecords || []).map((item) => `${item[0]}=${item[1]} -> ${item[2]}`).join("; ") || "-"}`);
+    lines.push(`- Archive first-wave closeout receipt operations: ${(gate.receiptOperations || []).join(", ") || "-"}`);
+    lines.push(`- Archive first-wave closeout expected evidence: ${gate.expectedEvidence || "-"}`);
   }
   lines.push(`- Required stabilization evidence: ${(stabilization.requiredEvidenceKeys || []).join(", ") || "-"}`);
   lines.push(`- Next action: ${index.nextAction || "-"}`);

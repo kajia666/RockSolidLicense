@@ -1152,7 +1152,26 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
         receiptOperations: ["record_launch_closeout_review"],
         expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp."
       }
-    ]
+    ],
+    firstWaveCloseoutGate: {
+      status: "blocked_until_stabilization_handoff",
+      currentHandoffTargetKey: "stabilization_owner_handoff",
+      ownerHandoffPath: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
+      firstWaveCloseoutPath: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md",
+      requiredSourceRecordKeys: [
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff"
+      ],
+      sourceRecords: [
+        ["first_wave_incident_log", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md"],
+        ["rollback_signal_review", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+        ["stabilization_owner_handoff", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+      ],
+      receiptOperations: ["record_launch_closeout_review"],
+      expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp.",
+      nextAction: "Start launch-day watch and stabilization handoff before first-wave closeout."
+    }
   });
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.fullTestWindow, "npm.cmd test");
@@ -2736,6 +2755,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Required evidence keys: launch_day_watch_summary, first_wave_incident_log, receipt_visibility_snapshot, rollback_signal_review, stabilization_owner_handoff/);
     assert.match(handoff, /Handoff windows: T\+2h stabilization owner handoff, T\+24h first-wave closeout/);
     assert.match(handoff, /Current handoff target: stabilization_owner_handoff \(blocked_until_cutover_watch\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+    assert.match(handoff, /First-wave closeout gate: blocked_until_stabilization_handoff \(owner=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md, closeout=artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md\)/);
     assert.match(handoff, /Handoff evidence inputs: launch_day_watch_summary=blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; first_wave_incident_log=blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-incident-log\.md; receipt_visibility_snapshot=blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-snapshot\.txt; rollback_signal_review=blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md; stabilization_owner_handoff=blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /## Stabilization Handoff Plan[\s\S]*Operator steps:[\s\S]*verify_cutover_watch_records: blocked_until_cutover_watch[\s\S]*artifactPaths: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md, artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-incident-log\.md, artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-snapshot\.txt, artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md, artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md[\s\S]*handoff_stabilization_owner: blocked_until_cutover_watch[\s\S]*artifactPath: artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md[\s\S]*close_first_wave: blocked_until_stabilization_owner_handoff[\s\S]*artifactPath: artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
     assert.match(handoff, /## Stabilization Handoff Plan[\s\S]*Source watch records:[\s\S]*rollback_signal_review: blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md[\s\S]*receiptOperations: record_rollback_walkthrough, record_launch_stabilization_review[\s\S]*expectedEvidence: Record whether rollback signals were observed, dismissed, or escalated\./);
@@ -2767,6 +2787,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Launch-duty signoff targets:/);
     assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(handoff, /Archive first-wave closeout gate: blocked_until_stabilization_handoff \(owner=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md, closeout=artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md\)/);
     assert.match(handoff, /stabilization_owner_handoff: blocked_until_cutover_watch \(T\+2h stabilization owner handoff\)/);
     assert.match(handoff, /## Staging Environment Binding/);
     assert.match(handoff, /Binding status: ready_for_real_staging_binding/);
@@ -4045,6 +4066,29 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
         ["first_wave_closeout", ["record_launch_closeout_review"], "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp."]
       ]
     );
+    assert.deepEqual(output.stabilizationHandoffPlan.firstWaveCloseoutGate, {
+      status: "ready_for_first_wave_closeout",
+      currentHandoffTargetKey: "stabilization_owner_handoff",
+      ownerHandoffPath: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
+      firstWaveCloseoutPath: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md",
+      requiredSourceRecordKeys: [
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff"
+      ],
+      sourceRecords: [
+        ["first_wave_incident_log", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md"],
+        ["rollback_signal_review", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+        ["stabilization_owner_handoff", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+      ],
+      receiptOperations: ["record_launch_closeout_review"],
+      expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp.",
+      nextAction: "Record stabilization owner handoff, then close first-wave stabilization with incident, rollback, and next-duty evidence."
+    });
+    assert.deepEqual(
+      output.stagingLaunchDutyArchiveIndex.stabilizationHandoff.firstWaveCloseoutGate,
+      output.stabilizationHandoffPlan.firstWaveCloseoutGate
+    );
     assert.equal(output.stabilizationHandoffPlan.currentHandoffTarget.key, "stabilization_owner_handoff");
     assert.equal(output.stabilizationHandoffPlan.currentHandoffTarget.status, "operator_handoff");
     assert.equal(output.stabilizationHandoffPlan.currentHandoffTarget.path, "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md");
@@ -4068,6 +4112,14 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     );
     assert.equal(output.stabilizationHandoffPlan.operatorSteps[1].artifactPath, "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md");
     assert.equal(output.stabilizationHandoffPlan.operatorSteps[2].artifactPath, "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md");
+    assert.match(
+      handoff,
+      /First-wave closeout gate: ready_for_first_wave_closeout \(owner=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md, closeout=artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md\)/
+    );
+    assert.match(
+      handoff,
+      /Archive first-wave closeout gate: ready_for_first_wave_closeout \(owner=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md, closeout=artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md\)/
+    );
     assert.deepEqual(
       output.stagingLaunchDutyArchiveIndex.signoffTargets.map((item) => [item.key, item.status]),
       [

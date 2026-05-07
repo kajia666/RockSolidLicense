@@ -2130,7 +2130,9 @@ function buildStagingLaunchDutyArchiveIndex(result) {
     signoffTargets: (productionSignoffPacket.postSignoffTargets || []).map((item) => ({
       key: item.key || null,
       status: item.status || "not_available",
-      path: item.path || null
+      path: item.path || null,
+      receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+      expectedEvidence: item.expectedEvidence || null
     })),
     watchArtifacts: (launchDayWatch.watchRecordDraft?.records || []).map((item) => ({
       key: item.key || null,
@@ -6577,6 +6579,8 @@ function renderStagingLaunchDutyArchiveIndex(index) {
     lines.push("- Launch-duty signoff targets:");
     for (const target of index.signoffTargets) {
       lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
+      lines.push(`    - receiptOperations: ${(target.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
     }
   }
   if (Array.isArray(index.watchArtifacts) && index.watchArtifacts.length) {

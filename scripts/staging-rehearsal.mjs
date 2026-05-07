@@ -270,12 +270,24 @@ function parseArgs(argv) {
 
   const profileFile = readOptionOrEnv(options.profileFile, "RSL_REHEARSAL_PROFILE_FILE");
   const stagingProfile = loadStagingProfile(profileFile);
+  const secretEnvPresence = {
+    [ADMIN_PASSWORD_ENV]: hasEnvValue(ADMIN_PASSWORD_ENV),
+    [DEVELOPER_PASSWORD_ENV]: hasEnvValue(DEVELOPER_PASSWORD_ENV),
+    [DEVELOPER_BEARER_TOKEN_ENV]: hasEnvValue(DEVELOPER_BEARER_TOKEN_ENV)
+  };
+  const secretCliPresence = {
+    [ADMIN_PASSWORD_ENV]: Boolean(options.adminPassword),
+    [DEVELOPER_PASSWORD_ENV]: Boolean(options.developerPassword),
+    [DEVELOPER_BEARER_TOKEN_ENV]: false
+  };
 
   return {
     ...options,
     profileFile,
     stagingProfile: summarizeStagingProfile(stagingProfile),
     profileCliOverrideKeys: PROFILE_ALLOWED_FIELDS.filter((key) => options[key] !== null && options[key] !== undefined),
+    secretEnvPresence,
+    secretCliPresence,
     baseUrl: resolveProfileOption(options.baseUrl, "RSL_STAGING_BASE_URL", stagingProfile, "baseUrl"),
     productCode: resolveProfileOption(options.productCode, "RSL_SMOKE_PRODUCT_CODE", stagingProfile, "productCode"),
     channel: resolveProfileOption(options.channel, "RSL_SMOKE_CHANNEL", stagingProfile, "channel", "stable"),
@@ -316,6 +328,10 @@ function requireArgValue(name, value, inlineValue) {
 function readOptionOrEnv(value, envName) {
   const resolved = value ?? process.env[envName] ?? null;
   return resolved === null ? null : String(resolved).trim();
+}
+
+function hasEnvValue(envName) {
+  return Boolean(readOptionOrEnv(null, envName));
 }
 
 function resolveProfileOption(value, envName, stagingProfile, key, fallback = null) {
@@ -439,22 +455,40 @@ function buildStagingProfileLaunchPlan(options) {
   const outputFiles = STAGING_PROFILE_OUTPUT_FILE_KEYS;
   const missingRequiredInputs = requiredInputs.filter((key) => !options[key]);
   const missingOutputFiles = outputFiles.filter((key) => !options[key]);
+  const secretStatus = ({ key, phase, resolvedValue }) => {
+    const envPresent = options.secretEnvPresence?.[key] === true;
+    const cliPresent = options.secretCliPresence?.[key] === true;
+    const profileRequiresEnv = profileLoaded && (key === ADMIN_PASSWORD_ENV || key === DEVELOPER_PASSWORD_ENV);
+    const present = profileRequiresEnv ? envPresent : Boolean(resolvedValue);
+    return {
+      key,
+      phase,
+      present,
+      source: envPresent
+        ? "env"
+        : profileRequiresEnv
+          ? "missing_env"
+          : cliPresent
+            ? "cli"
+            : "missing_env"
+    };
+  };
   const requiredSecretEnv = [
-    {
+    secretStatus({
       key: ADMIN_PASSWORD_ENV,
       phase: "before_live_write_smoke",
-      present: Boolean(options.adminPassword)
-    },
-    {
+      resolvedValue: options.adminPassword
+    }),
+    secretStatus({
       key: DEVELOPER_PASSWORD_ENV,
       phase: "before_live_write_smoke",
-      present: Boolean(options.developerPassword)
-    },
-    {
+      resolvedValue: options.developerPassword
+    }),
+    secretStatus({
       key: DEVELOPER_BEARER_TOKEN_ENV,
       phase: "before_evidence_recording",
-      present: Boolean(process.env[DEVELOPER_BEARER_TOKEN_ENV])
-    }
+      resolvedValue: process.env[DEVELOPER_BEARER_TOKEN_ENV]
+    })
   ];
   const status = !profileLoaded
     ? "profile_not_loaded"
@@ -6128,7 +6162,7 @@ function renderStagingProfileLaunchPlan(plan) {
   if (Array.isArray(plan.requiredSecretEnv) && plan.requiredSecretEnv.length) {
     lines.push("- Required secret env:");
     for (const item of plan.requiredSecretEnv) {
-      lines.push(`  - ${item.key || "-"}: ${item.present ? "set" : "missing"} ${item.phase || "-"}`);
+      lines.push(`  - ${item.key || "-"}: ${item.present ? "set" : "missing"} ${item.phase || "-"} (source=${item.source || "-"})`);
     }
   }
   if (plan.backfillManifest) {

@@ -2348,6 +2348,97 @@ test("staging rehearsal profile gate requires launch-critical packet output path
   }
 });
 
+test("staging rehearsal profile gate requires password secrets to come from environment variables", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-profile-secret-env-gate-"));
+  const profileFile = join(tempDir, "staging-profile.json");
+  try {
+    const handoffFile = join(tempDir, "profile-handoff.md");
+    const closeoutFile = join(tempDir, "profile-closeout.json");
+    const runRecordFile = join(tempDir, "profile-run-record-index.json");
+    const artifactManifestFile = join(tempDir, "profile-artifact-manifest.json");
+    const backupRestorePacketFile = join(tempDir, "profile-backup-restore-drill-packet.json");
+    const closeoutReloadPacketFile = join(tempDir, "profile-closeout-reload-packet.json");
+    const readinessReviewPacketFile = join(tempDir, "profile-readiness-review-packet.json");
+    const productionSignoffPacketFile = join(tempDir, "profile-production-signoff-packet.json");
+    const launchDutyArchiveIndexFile = join(tempDir, "profile-launch-duty-archive-index.json");
+    const filledCloseoutDraftFile = join(tempDir, "profile-filled-closeout-input.draft.json");
+    writeFileSync(profileFile, JSON.stringify({
+      baseUrl: "https://profile-staging.example.com",
+      productCode: "PROFILE_PRODUCT",
+      channel: "stable",
+      adminUsername: "profile-admin@example.com",
+      developerUsername: "profile.developer",
+      targetOs: "linux",
+      storageProfile: "postgres-preview",
+      targetEnvFile: "/etc/rocksolidlicense/profile.env",
+      appBackupDir: "/var/lib/rocksolid/profile-backups",
+      postgresBackupDir: "/var/lib/rocksolid/profile-postgres-backups"
+    }, null, 2));
+
+    const result = runRehearsal([
+      "--profile-file",
+      profileFile,
+      "--admin-password",
+      "CliAdminShouldNotClearProfileGate123!",
+      "--developer-password",
+      "CliDeveloperShouldNotClearProfileGate123!",
+      "--handoff-file",
+      handoffFile,
+      "--closeout-file",
+      closeoutFile,
+      "--run-record-file",
+      runRecordFile,
+      "--artifact-manifest-file",
+      artifactManifestFile,
+      "--backup-restore-packet-file",
+      backupRestorePacketFile,
+      "--closeout-reload-packet-file",
+      closeoutReloadPacketFile,
+      "--readiness-review-packet-file",
+      readinessReviewPacketFile,
+      "--production-signoff-packet-file",
+      productionSignoffPacketFile,
+      "--launch-duty-archive-index-file",
+      launchDutyArchiveIndexFile,
+      "--filled-closeout-draft-file",
+      filledCloseoutDraftFile
+    ], {
+      RSL_DEVELOPER_BEARER_TOKEN: "developer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.stagingProfileLaunchPlan.status, "ready_for_profile_driven_rehearsal");
+    assert.deepEqual(
+      output.stagingProfileLaunchPlan.requiredSecretEnv.map((item) => [item.key, item.present, item.source]),
+      [
+        ["RSL_SMOKE_ADMIN_PASSWORD", false, "missing_env"],
+        ["RSL_SMOKE_DEVELOPER_PASSWORD", false, "missing_env"],
+        ["RSL_DEVELOPER_BEARER_TOKEN", true, "env"]
+      ]
+    );
+    assert.equal(output.stagingProfileOperatorPreflight.status, "blocked_until_secret_env");
+    assert.deepEqual(output.stagingProfileOperatorPreflight.missingSecretEnv, [
+      "RSL_SMOKE_ADMIN_PASSWORD",
+      "RSL_SMOKE_DEVELOPER_PASSWORD"
+    ]);
+    assert.equal(output.stagingProfileOperatorPreflight.canRunDryRun, true);
+    assert.equal(output.stagingProfileOperatorPreflight.canRunLiveWriteSmoke, false);
+    assert.equal(output.operatorExecutionPlan.realStagingRunFocus.currentAction.key, "set_required_secret_env");
+    assert.deepEqual(output.operatorExecutionPlan.realStagingRunFocus.currentAction.envKeys, [
+      "RSL_SMOKE_ADMIN_PASSWORD",
+      "RSL_SMOKE_DEVELOPER_PASSWORD"
+    ]);
+    const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, /RSL_SMOKE_ADMIN_PASSWORD: missing before_live_write_smoke \(source=missing_env\)/);
+    assert.match(handoff, /RSL_SMOKE_DEVELOPER_PASSWORD: missing before_live_write_smoke \(source=missing_env\)/);
+    assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: set before_evidence_recording \(source=env\)/);
+    assert.doesNotMatch(result.stdout, /CliAdminShouldNotClearProfileGate123!|CliDeveloperShouldNotClearProfileGate123!/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("staging rehearsal runner refuses staging profile files containing secret values", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-profile-secret-"));
   const profileFile = join(tempDir, "staging-profile.json");

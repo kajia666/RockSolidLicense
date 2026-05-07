@@ -318,6 +318,22 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["filled_closeout_input", "not_loaded"]
     ]
   );
+  assert.deepEqual(
+    output.operatorExecutionPlan.realStagingInputClosure.operatorSteps.map((item) => [item.key, item.status]),
+    [
+      ["load_staging_profile", "operator_execute"],
+      ["set_required_secret_env", "blocked_until_profile"],
+      ["confirm_artifact_output_paths", "operator_prepare"],
+      ["confirm_artifact_archive_root", "ready"],
+      ["backfill_filled_closeout_input", "blocked_until_profile"]
+    ]
+  );
+  assert.match(output.operatorExecutionPlan.realStagingInputClosure.operatorSteps[0].command, /--profile-file <staging-profile\.json>/);
+  assert.equal(output.operatorExecutionPlan.realStagingInputClosure.operatorSteps[3].artifactPath, "artifacts/staging/PILOT_ALPHA/stable");
+  assert.match(
+    output.operatorExecutionPlan.realStagingInputClosure.operatorSteps[4].expectedEvidence,
+    /Reload the filled closeout input and confirm the remaining missing closeout keys are empty before the full test window\./
+  );
   assert.equal(output.operatorExecutionPlan.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
   assert.equal(output.operatorExecutionPlan.goLiveOperatorActionPlan.remainingActionCount, 8);
   assert.deepEqual(
@@ -1999,6 +2015,16 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.filledCloseoutInputDraft.copyTo, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
     assert.equal(output.filledCloseoutInputDraft.saveAs, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.draft.json");
     assert.deepEqual(
+      output.filledCloseoutInputDraft.operatorSteps.map((item) => [item.key, item.status]),
+      [
+        ["review_draft_field_sources", "operator_review"],
+        ["copy_draft_to_filled_closeout_input", "operator_execute"],
+        ["replace_placeholder_values", "operator_backfill"],
+        ["remove_example_only_and_reload", "operator_execute"],
+        ["review_full_test_window_gate", "blocked_until_closeout_reload"]
+      ]
+    );
+    assert.deepEqual(
       output.filledCloseoutInputDraft.acceptanceFields.map((item) => [item.key, item.sourceStep, item.artifactPath, item.value]),
       [
         ["route_map_gate_result", "run_route_map_gate", "artifacts/staging/PROFILE_PRODUCT/stable/route-map-gate-output.txt", null],
@@ -2086,6 +2112,34 @@ test("staging rehearsal runner focuses closeout reload after real staging inputs
       output.operatorExecutionPlan.realStagingRunFocus.postDryRunAction.command,
       "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json"
     );
+    assert.deepEqual(
+      output.operatorExecutionPlan.realStagingInputClosure.operatorSteps.map((item) => [item.key, item.status]),
+      [
+        ["load_staging_profile", "ready"],
+        ["set_required_secret_env", "ready"],
+        ["confirm_artifact_output_paths", "ready"],
+        ["confirm_artifact_archive_root", "ready"],
+        ["backfill_filled_closeout_input", "operator_backfill"]
+      ]
+    );
+    assert.deepEqual(
+      output.filledCloseoutInputDraft.operatorSteps.map((item) => [item.key, item.status]),
+      [
+        ["review_draft_field_sources", "operator_review"],
+        ["copy_draft_to_filled_closeout_input", "operator_execute"],
+        ["replace_placeholder_values", "operator_backfill"],
+        ["remove_example_only_and_reload", "operator_execute"],
+        ["review_full_test_window_gate", "blocked_until_closeout_reload"]
+      ]
+    );
+    assert.equal(
+      output.filledCloseoutInputDraft.acceptanceFields.find((item) => item.key === "launch_mainline_evidence_receipts")?.receiptOperations.includes("record_launch_rehearsal_run"),
+      true
+    );
+    assert.match(
+      output.filledCloseoutInputDraft.acceptanceFields.find((item) => item.key === "launch_mainline_evidence_receipts")?.expectedEvidence || "",
+      /Launch Mainline receipt IDs/
+    );
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.status, "blocked_until_closeout_reload");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.command, "npm.cmd test");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.missingCloseoutKeys.length, 7);
@@ -2107,6 +2161,11 @@ test("staging rehearsal runner focuses closeout reload after real staging inputs
     assert.match(handoff, /Real staging current action: run_staging_dry_run \(env=-\)/);
     assert.match(handoff, /Real staging post-dry-run action: backfill_and_reload_closeout_input \(blocked_until_closeout_reload\)/);
     assert.match(handoff, /Real staging full-test entry: blocked_until_closeout_reload \(command=npm\.cmd test\)/);
+    assert.match(handoff, /Operator real staging steps:[\s\S]*load_staging_profile: ready[\s\S]*confirm_artifact_archive_root: ready[\s\S]*backfill_filled_closeout_input: operator_backfill/);
+    assert.match(handoff, /Operator real staging steps:[\s\S]*expectedEvidence: Reload the filled closeout input and confirm the remaining missing closeout keys are empty before the full test window\./);
+    assert.match(handoff, /## Filled Closeout Input Draft[\s\S]*Draft operator steps:[\s\S]*copy_draft_to_filled_closeout_input: operator_execute[\s\S]*remove_example_only_and_reload: operator_execute/);
+    assert.match(handoff, /## Filled Closeout Input Draft[\s\S]*live_write_smoke_result: run_live_write_smoke -> artifacts\/staging\/READY_PRODUCT\/stable\/live-write-smoke-output\.json[\s\S]*receiptOperations: record_launch_rehearsal_run[\s\S]*expectedEvidence: Record smoke exit status, created test project\/account\/card identifiers, and the redacted smoke output artifact path\./);
+    assert.match(handoff, /## Filled Closeout Input Draft[\s\S]*launch_mainline_evidence_receipts: record_launch_mainline_evidence -> artifacts\/staging\/READY_PRODUCT\/stable\/launch-mainline-evidence-receipts\.json[\s\S]*receiptOperations: record_launch_rehearsal_run, record_recovery_drill, record_backup_verification/);
     assert.doesNotMatch(result.stdout, /ReadyAdmin123!|ReadyDeveloper123!|ready-developer-token/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

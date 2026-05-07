@@ -955,6 +955,8 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
   const missingOutputFiles = Array.isArray(profilePreflight.missingOutputFiles) ? profilePreflight.missingOutputFiles : [];
   const recommendedFiles = Array.isArray(profilePreflight.recommendedFiles) ? profilePreflight.recommendedFiles : [];
   const artifactArchiveRoot = recommendedFiles.find((item) => item.key === "artifact_archive_root")?.path || null;
+  const filledCloseoutInputFile = keyedPath(recommendedFiles, "filled_closeout_input") || null;
+  const filledCloseoutDraftFile = keyedPath(recommendedFiles, "filled_closeout_draft") || null;
   const profileReady = Boolean(profilePreflight.profileFile) && profilePreflight.status !== "profile_not_loaded";
   const closeoutReady = closeoutReview.safeToEnterFullTestWindow === true;
   const closeoutStatus = closeoutReady
@@ -1021,11 +1023,57 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
       : status === "blocked_until_secret_env"
         ? "Set missing secret env, then reload filled closeout input before full-test/sign-off."
         : "Backfill and reload filled closeout input before full-test/sign-off.";
+  const operatorSteps = [
+    {
+      key: "load_staging_profile",
+      status: profileReady ? "ready" : "operator_execute",
+      command: profilePreflight.commands?.profileDrivenRehearsal || null,
+      artifactPath: profilePreflight.profileFile || null,
+      expectedEvidence: "Record the loaded secret-free staging profile path and the redacted baseUrl/productCode/channel bundle before rehearsal."
+    },
+    {
+      key: "set_required_secret_env",
+      status: missingSecretEnv.length === 0 ? "ready" : (profileReady ? "operator_execute" : "blocked_until_profile"),
+      envKeys: missingSecretEnv,
+      expectedEvidence: "Record which required secret environment variables are loaded in the shell used for route-map, evidence, and live-write duty."
+    },
+    {
+      key: "confirm_artifact_output_paths",
+      status: missingOutputFiles.length === 0 ? "ready" : "operator_prepare",
+      missingKeys: missingOutputFiles,
+      artifactPaths: recommendedFiles
+        .filter((item) => item.key !== "artifact_archive_root" && item.path)
+        .map((item) => item.path),
+      expectedEvidence: "Record the handoff, closeout, packet, and draft paths that will receive redacted launch-duty artifacts."
+    },
+    {
+      key: "confirm_artifact_archive_root",
+      status: artifactArchiveRoot ? "ready" : "operator_prepare",
+      artifactPath: artifactArchiveRoot,
+      expectedEvidence: "Record the shared artifact archive root used for generated handoff, packet, and closeout files."
+    },
+    {
+      key: "backfill_filled_closeout_input",
+      status: closeoutReady
+        ? "ready"
+        : !profileReady
+          ? "blocked_until_profile"
+          : missingOutputFiles.length
+            ? "blocked_until_paths"
+            : "operator_backfill",
+      command: profilePreflight.commands?.closeoutReload || null,
+      artifactPath: filledCloseoutInputFile,
+      draftPath: filledCloseoutDraftFile,
+      missingCloseoutKeys: closeoutReview.missingKeys || [],
+      expectedEvidence: "Reload the filled closeout input and confirm the remaining missing closeout keys are empty before the full test window."
+    }
+  ];
   return {
     status,
     readyCheckCount,
     blockedCheckCount,
     checks,
+    operatorSteps,
     nextAction
   };
 }
@@ -3990,6 +4038,19 @@ function buildFilledCloseoutInputDraft(result) {
       saveAs: null,
       copyTo: null,
       reloadCommand: null,
+      operatorSteps: [
+        {
+          key: "load_staging_profile",
+          status: "operator_execute",
+          command: result.stagingProfileLaunchPlan?.recommendedCommand || null,
+          expectedEvidence: "Load a secret-free staging profile so the draft lands under the correct archive root and product/channel context."
+        },
+        {
+          key: "generate_profile_driven_closeout_draft",
+          status: "blocked_until_profile",
+          expectedEvidence: "Generate the profile-driven draft, then review every artifact source before promoting it to the real filled closeout input."
+        }
+      ],
       acceptanceFields: [],
       receiptVisibility: buildReceiptVisibilityTemplate(),
       productionSignoff: buildProductionSignoffInputTemplate(result.stagingAcceptanceCloseout?.productionSignoffConditions || {}),
@@ -4011,6 +4072,41 @@ function buildFilledCloseoutInputDraft(result) {
       : null,
     doNotSubmitWithoutReplacingPlaceholders: true,
     decision: null,
+    operatorSteps: [
+      {
+        key: "review_draft_field_sources",
+        status: "operator_review",
+        artifactPath: path.posix.join(manifest.archiveRoot, "filled-closeout-input.draft.json"),
+        expectedEvidence: "Review each draft field sourceStep, artifact path, and receipt operation before promoting the draft."
+      },
+      {
+        key: "copy_draft_to_filled_closeout_input",
+        status: "operator_execute",
+        from: path.posix.join(manifest.archiveRoot, "filled-closeout-input.draft.json"),
+        to: manifest.closeoutInputPath,
+        expectedEvidence: "Promote the draft into the real filled closeout input path that will be reloaded for closeout review."
+      },
+      {
+        key: "replace_placeholder_values",
+        status: "operator_backfill",
+        artifactPath: manifest.closeoutInputPath,
+        expectedEvidence: "Replace every null acceptance field with redacted evidence, receipt IDs, and operator decisions from the real staging rehearsal."
+      },
+      {
+        key: "remove_example_only_and_reload",
+        status: "operator_execute",
+        command: manifest.closeoutInputPath
+          ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${manifest.closeoutInputPath}`
+          : null,
+        expectedEvidence: "Remove exampleOnly before reload, then confirm the reloaded closeout review reflects the latest redacted evidence."
+      },
+      {
+        key: "review_full_test_window_gate",
+        status: "blocked_until_closeout_reload",
+        command: "npm.cmd test",
+        expectedEvidence: "Do not run the full repository test window until the reloaded closeout review shows no remaining missing closeout keys."
+      }
+    ],
     acceptanceFields: manifest.rows.map((row) => {
       const check = checkByKey.get(row.closeoutKey) || {};
       return {
@@ -5886,6 +5982,43 @@ function renderStagingRehearsalExecutionSummary(summary) {
   return lines.join("\n");
 }
 
+function appendOperatorStepList(lines, heading, steps) {
+  if (!Array.isArray(steps) || steps.length === 0) {
+    return;
+  }
+  lines.push(heading);
+  for (const step of steps) {
+    lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+    if (step.command) {
+      lines.push(`    - command: \`${step.command}\``);
+    }
+    if (Array.isArray(step.envKeys) && step.envKeys.length) {
+      lines.push(`    - envKeys: ${step.envKeys.join(", ")}`);
+    }
+    if (Array.isArray(step.missingKeys) && step.missingKeys.length) {
+      lines.push(`    - missingKeys: ${step.missingKeys.join(", ")}`);
+    }
+    if (Array.isArray(step.artifactPaths) && step.artifactPaths.length) {
+      lines.push(`    - artifactPaths: ${step.artifactPaths.join(", ")}`);
+    }
+    if (Array.isArray(step.missingCloseoutKeys) && step.missingCloseoutKeys.length) {
+      lines.push(`    - missingCloseoutKeys: ${step.missingCloseoutKeys.join(", ")}`);
+    }
+    if (step.artifactPath) {
+      lines.push(`    - artifactPath: ${step.artifactPath}`);
+    }
+    if (step.draftPath) {
+      lines.push(`    - draftPath: ${step.draftPath}`);
+    }
+    if (step.from || step.to) {
+      lines.push(`    - paths: ${step.from || "-"} -> ${step.to || "-"}`);
+    }
+    if (step.expectedEvidence) {
+      lines.push(`    - expectedEvidence: ${step.expectedEvidence}`);
+    }
+  }
+}
+
 function renderStagingEnvironmentReadiness(readiness) {
   if (!readiness) {
     return "- Not available";
@@ -6046,6 +6179,7 @@ function renderOperatorExecutionPlan(plan) {
     `- Next action: ${plan.nextAction || "-"}`
   ];
   appendGoLiveExecutionEntry(lines, goLiveExecutionEntry);
+  appendOperatorStepList(lines, "- Operator real staging steps:", realClosure.operatorSteps || []);
   if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
     lines.push("- Operator go-live phases:");
     for (const phase of goLiveActionPlan.phaseSummary) {
@@ -6770,10 +6904,14 @@ function renderFilledCloseoutInputDraft(draft) {
     `- Do not submit without replacing placeholders: ${draft.doNotSubmitWithoutReplacingPlaceholders ? "yes" : "no"}`,
     `- Next action: ${draft.nextAction || "-"}`
   ];
+  appendOperatorStepList(lines, "- Draft operator steps:", draft.operatorSteps || []);
   if (Array.isArray(draft.acceptanceFields) && draft.acceptanceFields.length) {
     lines.push("- Draft fields:");
     for (const field of draft.acceptanceFields) {
       lines.push(`  - ${field.key || "-"}: ${field.sourceStep || "-"} -> ${field.artifactPath || "-"}`);
+      lines.push(`    - receiptOperations: ${(field.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - expectedEvidence: ${field.expectedEvidence || "-"}`);
+      lines.push(`    - operatorNote: ${field.operatorNote || "-"}`);
     }
   }
   return lines.join("\n");

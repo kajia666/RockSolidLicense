@@ -1466,6 +1466,8 @@ function buildStagingReadinessReviewPacket(result) {
   } else if (closeoutReloadPacket.status === "reload_needs_backfill") {
     status = "reload_needs_backfill";
   }
+  const closeoutReloadCommand = closeoutReloadPacket.commands?.closeoutReload || finalPacket.commands?.closeoutReload || null;
+  const fullTestWindowCommand = fullTestWindow.command || finalPacket.commands?.fullTestWindow || "npm.cmd test";
   return {
     mode: "staging-readiness-review-packet",
     status,
@@ -1521,10 +1523,39 @@ function buildStagingReadinessReviewPacket(result) {
       }
     ],
     commands: {
-      closeoutReload: closeoutReloadPacket.commands?.closeoutReload || finalPacket.commands?.closeoutReload || null,
-      fullTestWindow: fullTestWindow.command || finalPacket.commands?.fullTestWindow || "npm.cmd test"
+      closeoutReload: closeoutReloadCommand,
+      fullTestWindow: fullTestWindowCommand
     },
     goLiveExecutionEntry,
+    operatorSteps: [
+      {
+        key: "confirm_closeout_reload",
+        status: fullTestWindow.closeoutInputStatus === "loaded" ? "complete" : "operator_execute",
+        command: closeoutReloadCommand,
+        expectedEvidence: "Reload the filled closeout input and confirm the closeout evidence targets are filled before entering the full test window."
+      },
+      {
+        key: "review_full_test_window_gate",
+        status: fullTestWindow.canRun === true ? "ready" : "blocked",
+        command: fullTestWindowCommand,
+        expectedEvidence: "Verify missing closeout keys are empty, then run npm.cmd test in the reserved full-test window."
+      },
+      {
+        key: "review_production_signoff_gate",
+        status: productionSignoff.canSignoff === true ? "ready" : "blocked",
+        expectedEvidence: "Verify every production sign-off condition and all receipt-visibility lanes have redacted evidence before cutover."
+      },
+      {
+        key: "review_launch_day_watch_gate",
+        status: launchDayWatch.canStartCutoverWatch === true ? "ready" : "blocked",
+        expectedEvidence: "Confirm production sign-off is ready before starting launch-day watch records."
+      },
+      {
+        key: "review_stabilization_handoff_gate",
+        status: stabilizationHandoff.canStartStabilizationHandoff === true ? "ready" : "blocked",
+        expectedEvidence: "Confirm launch-day watch records are ready before handing off stabilization ownership."
+      }
+    ],
     nextAction: status === "ready_for_stabilization_handoff"
       ? "Start stabilization handoff from the launch-day watch and receipt visibility records."
       : status === "ready_for_launch_day_watch"
@@ -6470,6 +6501,86 @@ function renderStagingCloseoutReloadPacket(packet) {
   return lines.join("\n");
 }
 
+function renderStagingReadinessReviewPacket(packet) {
+  if (!packet) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Packet status: ${packet.status || "-"}`,
+    `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${packet.archiveRoot || "-"}`,
+    `- Packet file: ${packet.packetFile || "-"}`,
+    `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
+    `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
+    `- Next action: ${packet.nextAction || "-"}`
+  ];
+  appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
+  if (Array.isArray(packet.gates) && packet.gates.length) {
+    lines.push("- Readiness gates:");
+    for (const gate of packet.gates) {
+      lines.push(`  - ${gate.key || "-"}: ${gate.status || "-"} (canProceed=${gate.canProceed ? "yes" : "no"})`);
+      if (gate.command) {
+        lines.push(`    - command: \`${gate.command}\``);
+      }
+      if (gate.requiredDecision) {
+        lines.push(`    - requiredDecision: ${gate.requiredDecision}`);
+      }
+      if (gate.productionDecision) {
+        lines.push(`    - productionDecision: ${gate.productionDecision}`);
+      }
+      if (Array.isArray(gate.missingCloseoutKeys) && gate.missingCloseoutKeys.length) {
+        lines.push(`    - missingCloseoutKeys: ${gate.missingCloseoutKeys.join(", ")}`);
+      }
+      if (Array.isArray(gate.missingSignoffKeys) && gate.missingSignoffKeys.length) {
+        lines.push(`    - missingSignoffKeys: ${gate.missingSignoffKeys.join(", ")}`);
+      }
+      if (Array.isArray(gate.missingReceiptVisibilityKeys) && gate.missingReceiptVisibilityKeys.length) {
+        lines.push(`    - missingReceiptVisibilityKeys: ${gate.missingReceiptVisibilityKeys.join(", ")}`);
+      }
+      if (Array.isArray(gate.requiredEvidenceKeys) && gate.requiredEvidenceKeys.length) {
+        lines.push(`    - requiredEvidenceKeys: ${gate.requiredEvidenceKeys.join(", ")}`);
+      }
+      if (Array.isArray(gate.closeoutEvidenceTargets) && gate.closeoutEvidenceTargets.length) {
+        lines.push("    - closeoutEvidenceTargets:");
+        for (const target of gate.closeoutEvidenceTargets) {
+          lines.push(`      - ${target.key || "-"}: ${target.status || "-"} (${target.sourceStep || "-"})`);
+          lines.push(`        - expectedEvidence: ${target.expectedEvidence || "-"}`);
+        }
+      }
+      if (Array.isArray(gate.signoffEvidenceTargets) && gate.signoffEvidenceTargets.length) {
+        lines.push("    - signoffEvidenceTargets:");
+        for (const target of gate.signoffEvidenceTargets) {
+          lines.push(`      - ${target.key || "-"}: ${target.status || "-"}`);
+          lines.push(`        - expectedEvidence: ${target.expectedEvidence || "-"}`);
+        }
+      }
+      if (Array.isArray(gate.receiptVisibilityEvidenceTargets) && gate.receiptVisibilityEvidenceTargets.length) {
+        lines.push("    - receiptVisibilityEvidenceTargets:");
+        for (const target of gate.receiptVisibilityEvidenceTargets) {
+          lines.push(`      - ${target.key || "-"}: ${target.status || "-"}`);
+          lines.push(`        - expectedEvidence: ${target.expectedEvidence || "-"}`);
+        }
+      }
+      if (gate.nextAction) {
+        lines.push(`    - nextAction: ${gate.nextAction}`);
+      }
+    }
+  }
+  if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
+    lines.push("- Operator review steps:");
+    for (const step of packet.operatorSteps) {
+      lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+      if (step.command) {
+        lines.push(`    - command: \`${step.command}\``);
+      }
+      if (step.expectedEvidence) {
+        lines.push(`    - expectedEvidence: ${step.expectedEvidence}`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
 function renderStagingProductionSignoffPacket(packet) {
   if (!packet) {
     return "- Not available";
@@ -7143,6 +7254,10 @@ function renderHandoffFile(result) {
     "## Staging Closeout Reload Packet",
     "",
     renderStagingCloseoutReloadPacket(result.stagingCloseoutReloadPacket),
+    "",
+    "## Staging Readiness Review Packet",
+    "",
+    renderStagingReadinessReviewPacket(result.stagingReadinessReviewPacket),
     "",
     "## Staging Production Sign-Off Packet",
     "",

@@ -9,6 +9,10 @@ const repoRoot = path.resolve(__dirname, "..");
 const ADMIN_PASSWORD_ENV = "RSL_SMOKE_ADMIN_PASSWORD";
 const DEVELOPER_PASSWORD_ENV = "RSL_SMOKE_DEVELOPER_PASSWORD";
 const DEVELOPER_BEARER_TOKEN_ENV = "RSL_DEVELOPER_BEARER_TOKEN";
+const PROFILE_SECRET_CLI_FLAGS = [
+  [ADMIN_PASSWORD_ENV, "--admin-password"],
+  [DEVELOPER_PASSWORD_ENV, "--developer-password"]
+];
 
 const EVIDENCE_ORDER = [
   "Record Launch Rehearsal Run",
@@ -455,6 +459,11 @@ function buildStagingProfileLaunchPlan(options) {
   const outputFiles = STAGING_PROFILE_OUTPUT_FILE_KEYS;
   const missingRequiredInputs = requiredInputs.filter((key) => !options[key]);
   const missingOutputFiles = outputFiles.filter((key) => !options[key]);
+  const unsafeCliSecretOverrides = profileLoaded
+    ? PROFILE_SECRET_CLI_FLAGS
+      .filter(([envKey]) => options.secretCliPresence?.[envKey] === true)
+      .map(([, flag]) => flag)
+    : [];
   const secretStatus = ({ key, phase, resolvedValue }) => {
     const envPresent = options.secretEnvPresence?.[key] === true;
     const cliPresent = options.secretCliPresence?.[key] === true;
@@ -510,6 +519,7 @@ function buildStagingProfileLaunchPlan(options) {
     outputFiles,
     missingRequiredInputs,
     missingOutputFiles,
+    unsafeCliSecretOverrides,
     requiredSecretEnv,
     recommendedCommand: buildProfileDrivenCommand(options),
     backfillManifest: buildProfileBackfillManifest(options),
@@ -528,6 +538,7 @@ function buildStagingProfileOperatorPreflight(result) {
     .filter(Boolean);
   const missingRequiredInputs = Array.isArray(plan.missingRequiredInputs) ? plan.missingRequiredInputs : [];
   const missingOutputFiles = Array.isArray(plan.missingOutputFiles) ? plan.missingOutputFiles : [];
+  const unsafeCliSecretOverrides = Array.isArray(plan.unsafeCliSecretOverrides) ? plan.unsafeCliSecretOverrides : [];
   const commandSequence = Array.isArray(runbook.commandSequence)
     ? runbook.commandSequence.map((item) => item.key).filter(Boolean)
     : [];
@@ -548,6 +559,7 @@ function buildStagingProfileOperatorPreflight(result) {
     && Boolean(commands.profileDrivenRehearsal)
     && Boolean(commands.stagingDryRun);
   const canRunLiveWriteSmoke = canRunDryRun
+    && unsafeCliSecretOverrides.length === 0
     && !missingSecretEnv.includes(ADMIN_PASSWORD_ENV)
     && !missingSecretEnv.includes(DEVELOPER_PASSWORD_ENV);
   const canRecordEvidence = canRunDryRun && !missingSecretEnv.includes(DEVELOPER_BEARER_TOKEN_ENV);
@@ -556,7 +568,7 @@ function buildStagingProfileOperatorPreflight(result) {
     status = "profile_not_loaded";
   } else if (missingRequiredInputs.length || missingOutputFiles.length) {
     status = "missing_profile_inputs";
-  } else if (missingSecretEnv.length) {
+  } else if (missingSecretEnv.length || unsafeCliSecretOverrides.length) {
     status = "blocked_until_secret_env";
   }
   return {
@@ -567,6 +579,7 @@ function buildStagingProfileOperatorPreflight(result) {
     profileFile: plan.profileFile || null,
     missingRequiredInputs,
     missingOutputFiles,
+    unsafeCliSecretOverrides,
     requiredSecretEnv,
     missingSecretEnv,
     canRunDryRun,
@@ -601,10 +614,13 @@ function buildStagingProfileOperatorPreflight(result) {
       },
       {
         key: "secret_env",
-        status: missingSecretEnv.length === 0 ? "ready" : "missing",
+        status: missingSecretEnv.length === 0 && unsafeCliSecretOverrides.length === 0 ? "ready" : "missing",
         missing: missingSecretEnv,
+        unsafeCliSecretOverrides,
         nextAction: missingSecretEnv.length === 0
-          ? "Required secret environment variables are present."
+          ? unsafeCliSecretOverrides.length === 0
+            ? "Required secret environment variables are present."
+            : "Move CLI password values into environment variables before live-write smoke and evidence recording."
           : "Set missing secret environment variables before live-write smoke and evidence recording."
       },
       {
@@ -618,7 +634,9 @@ function buildStagingProfileOperatorPreflight(result) {
     nextAction: status === "ready_for_real_staging_rehearsal"
       ? "Run the staging dry run, route-map gate, recovery drill, live-write smoke, evidence recording, and closeout reload in the generated sequence."
       : status === "blocked_until_secret_env"
-        ? "Set missing secret env vars, then run the profile-driven rehearsal sequence."
+        ? unsafeCliSecretOverrides.length
+          ? "Move CLI password values into the required secret env vars, then rerun the profile-driven rehearsal sequence."
+          : "Set missing secret env vars, then run the profile-driven rehearsal sequence."
         : "Complete the staging profile and output paths before the real profile-driven rehearsal."
   };
 }
@@ -6153,6 +6171,7 @@ function renderStagingProfileLaunchPlan(plan) {
     `- Writes data by itself: ${plan.willModifyData ? "yes" : "no"}`,
     `- Profile file: ${plan.profileFile || "-"}`,
     `- CLI override keys: ${(plan.cliOverrideKeys || []).join(", ") || "-"}`,
+    `- Unsafe CLI secret overrides: ${(plan.unsafeCliSecretOverrides || []).join(", ") || "-"}`,
     `- Missing required inputs: ${(plan.missingRequiredInputs || []).join(", ") || "-"}`,
     `- Required output files: ${(plan.outputFiles || []).join(", ") || "-"}`,
     `- Missing output files: ${(plan.missingOutputFiles || []).join(", ") || "-"}`,
@@ -6190,6 +6209,7 @@ function renderStagingProfileOperatorPreflight(preflight) {
     `- Profile file: ${preflight.profileFile || "-"}`,
     `- Missing required inputs: ${(preflight.missingRequiredInputs || []).join(", ") || "-"}`,
     `- Missing output files: ${(preflight.missingOutputFiles || []).join(", ") || "-"}`,
+    `- Unsafe CLI secret overrides: ${(preflight.unsafeCliSecretOverrides || []).join(", ") || "-"}`,
     `- Missing secret env: ${(preflight.missingSecretEnv || []).join(", ") || "-"}`,
     `- Can run dry run: ${preflight.canRunDryRun ? "yes" : "no"}`,
     `- Can run live-write smoke: ${preflight.canRunLiveWriteSmoke ? "yes" : "no"}`,

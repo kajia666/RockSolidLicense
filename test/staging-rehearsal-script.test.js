@@ -2409,6 +2409,10 @@ test("staging rehearsal profile gate requires password secrets to come from envi
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const output = JSON.parse(result.stdout);
     assert.equal(output.stagingProfileLaunchPlan.status, "ready_for_profile_driven_rehearsal");
+    assert.deepEqual(output.stagingProfileLaunchPlan.unsafeCliSecretOverrides, [
+      "--admin-password",
+      "--developer-password"
+    ]);
     assert.deepEqual(
       output.stagingProfileLaunchPlan.requiredSecretEnv.map((item) => [item.key, item.present, item.source]),
       [
@@ -2418,6 +2422,10 @@ test("staging rehearsal profile gate requires password secrets to come from envi
       ]
     );
     assert.equal(output.stagingProfileOperatorPreflight.status, "blocked_until_secret_env");
+    assert.deepEqual(output.stagingProfileOperatorPreflight.unsafeCliSecretOverrides, [
+      "--admin-password",
+      "--developer-password"
+    ]);
     assert.deepEqual(output.stagingProfileOperatorPreflight.missingSecretEnv, [
       "RSL_SMOKE_ADMIN_PASSWORD",
       "RSL_SMOKE_DEVELOPER_PASSWORD"
@@ -2430,6 +2438,7 @@ test("staging rehearsal profile gate requires password secrets to come from envi
       "RSL_SMOKE_DEVELOPER_PASSWORD"
     ]);
     const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, /Unsafe CLI secret overrides: --admin-password, --developer-password/);
     assert.match(handoff, /RSL_SMOKE_ADMIN_PASSWORD: missing before_live_write_smoke \(source=missing_env\)/);
     assert.match(handoff, /RSL_SMOKE_DEVELOPER_PASSWORD: missing before_live_write_smoke \(source=missing_env\)/);
     assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: set before_evidence_recording \(source=env\)/);

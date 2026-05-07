@@ -3731,6 +3731,22 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.match(handoff, /Launch-duty stabilization window: stabilization_owner_handoff \(operator_handoff\)/);
     assert.match(handoff, /Launch-duty packet next action: Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff\./);
     assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Next action: Archive production sign-off packet, record launch-day watch artifacts, and hand off stabilization owner records\./);
+    assert.match(
+      handoff,
+      new RegExp(`Production signoff closeout gate: ready_for_launch_day_watch \\(loaded=${closeoutInputFile.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}, archive=artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input\\.json\\)`)
+    );
+    assert.match(
+      handoff,
+      new RegExp(`Launch-day watch bridge loaded closeout input: ${closeoutInputFile.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}`)
+    );
+    assert.match(
+      handoff,
+      new RegExp(`Launch-day watch loaded closeout input: ${closeoutInputFile.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}`)
+    );
+    assert.match(
+      handoff,
+      new RegExp(`Watch draft loaded closeout input: ${closeoutInputFile.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}`)
+    );
     assert.equal(output.operatorExecutionPlan.readinessSummary.canRunFullTestWindow, true);
     assert.equal(output.operatorExecutionPlan.readinessSummary.canSignoffProduction, true);
     assert.equal(output.productionSignoffReadiness.status, "ready");
@@ -3741,10 +3757,14 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.equal(output.productionSignoffReadiness.nextAction, "Production sign-off is ready; keep the closeout artifact with release evidence before cutover.");
     assert.equal(output.launchDayWatchPlan.status, "ready");
     assert.equal(output.launchDayWatchPlan.canStartCutoverWatch, true);
+    assert.equal(output.launchDayWatchPlan.loadedCloseoutInputPath, closeoutInputFile);
+    assert.equal(output.launchDayWatchPlan.archiveCloseoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
     assert.deepEqual(output.launchDayWatchPlan.missingSignoffKeys, []);
     assert.deepEqual(output.launchDayWatchPlan.missingReceiptVisibilityKeys, []);
     assert.equal(output.launchDayWatchPlan.watchRecordDraft.status, "ready_for_operator_watch");
     assert.equal(output.launchDayWatchPlan.watchRecordDraft.closeoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+    assert.equal(output.launchDayWatchPlan.watchRecordDraft.loadedCloseoutInputPath, closeoutInputFile);
+    assert.equal(output.launchDayWatchPlan.watchRecordDraft.archiveCloseoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
     assert.equal(output.launchDayWatchPlan.watchRecordDraft.routes.launchMainline, output.nextCommands.launchMainline);
     assert.deepEqual(
       output.launchDayWatchPlan.watchRecordDraft.records.map((item) => [item.key, item.status, item.artifactPath]),
@@ -3815,6 +3835,20 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       readyForFullTestWindow: true,
       closeoutInputStatus: "loaded"
     });
+    assert.deepEqual(output.stagingProductionSignoffPacket.productionSignoffCloseoutGate, {
+      status: "ready_for_launch_day_watch",
+      closeoutInputStatus: "loaded",
+      loadedCloseoutInputPath: closeoutInputFile,
+      archiveCloseoutInputPath: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+      reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+      requiredDecision: "ready-for-production-signoff",
+      productionDecision: "ready-for-production-signoff",
+      readyForFullTestWindow: true,
+      readyForReceiptVisibility: true,
+      missingSignoffKeys: [],
+      missingReceiptVisibilityKeys: [],
+      nextAction: "Production sign-off evidence is loaded from the actual closeout input; archive the sign-off packet and start launch-day watch."
+    });
     assert.deepEqual(output.stagingProductionSignoffPacket.missingSignoffKeys, []);
     assert.deepEqual(output.stagingProductionSignoffPacket.missingReceiptVisibilityKeys, []);
     assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.status, "already_filled");
@@ -3852,6 +3886,15 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.sourceStatus, "ready");
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.watchRecordDraftStatus, "ready_for_operator_watch");
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.productionDecision, "ready-for-production-signoff");
+    assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.loadedCloseoutInputPath, closeoutInputFile);
+    assert.equal(
+      output.stagingProductionSignoffPacket.launchDayWatchBridge.archiveCloseoutInputPath,
+      "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+    );
+    assert.equal(
+      output.stagingProductionSignoffPacket.launchDayWatchBridge.productionSignoffCloseoutGate.status,
+      "ready_for_launch_day_watch"
+    );
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.currentPostSignoffTarget.key, "production_signoff_packet");
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.currentWatchArtifact.key, "launch_day_watch_summary");
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.currentStabilizationWindow.key, "stabilization_owner_handoff");

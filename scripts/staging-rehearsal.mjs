@@ -2221,6 +2221,27 @@ function buildStagingProductionSignoffPacket(result) {
   }
   const missingSignoffKeys = productionSignoff.missingSignoffKeys || [];
   const missingReceiptVisibilityKeys = productionSignoff.missingReceiptVisibilityKeys || [];
+  const loadedCloseoutInputPath = closeoutInput?.path || null;
+  const archiveCloseoutInputPath = closeoutInputPath;
+  const readyForReceiptVisibility = missingReceiptVisibilityKeys.length === 0;
+  const productionSignoffCloseoutGate = {
+    status,
+    closeoutInputStatus: productionSignoff.closeoutInputStatus || closeoutInput?.status || "missing",
+    loadedCloseoutInputPath,
+    archiveCloseoutInputPath,
+    reloadCommand: closeoutReload,
+    requiredDecision: productionSignoff.requiredDecision || "ready-for-production-signoff",
+    productionDecision: productionSignoff.productionDecision || null,
+    readyForFullTestWindow: productionSignoff.readyForFullTestWindow === true,
+    readyForReceiptVisibility,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys,
+    nextAction: canSignoff
+      ? "Production sign-off evidence is loaded from the actual closeout input; archive the sign-off packet and start launch-day watch."
+      : canRunFullTestWindow
+        ? "Run the full test window, backfill production sign-off evidence, then reload the actual closeout input."
+        : "Reload the filled closeout input before production sign-off can enter launch-day watch."
+  };
   const requiredSignoffKeys = (closeout.productionSignoffConditions?.conditions || [])
     .map((item) => item.key)
     .filter(Boolean);
@@ -2330,6 +2351,17 @@ function buildStagingProductionSignoffPacket(result) {
     requiredDecision: launchDayWatch.requiredDecision || productionSignoff.requiredDecision || "ready-for-production-signoff",
     productionDecision: launchDayWatch.productionDecision || productionSignoff.productionDecision || null,
     closeoutInputStatus: launchDayWatch.closeoutInputStatus || productionSignoff.closeoutInputStatus || "missing",
+    loadedCloseoutInputPath,
+    archiveCloseoutInputPath,
+    productionSignoffCloseoutGate: {
+      status: productionSignoffCloseoutGate.status,
+      closeoutInputStatus: productionSignoffCloseoutGate.closeoutInputStatus,
+      loadedCloseoutInputPath: productionSignoffCloseoutGate.loadedCloseoutInputPath,
+      archiveCloseoutInputPath: productionSignoffCloseoutGate.archiveCloseoutInputPath,
+      missingSignoffKeys: productionSignoffCloseoutGate.missingSignoffKeys,
+      missingReceiptVisibilityKeys: productionSignoffCloseoutGate.missingReceiptVisibilityKeys,
+      nextAction: productionSignoffCloseoutGate.nextAction
+    },
     routes,
     escalationTriggers: Array.isArray(launchDayWatch.escalationTriggers) ? launchDayWatch.escalationTriggers : [],
     currentPostSignoffTarget: currentPostSignoffTarget ? {
@@ -2396,6 +2428,7 @@ function buildStagingProductionSignoffPacket(result) {
     missingReceiptVisibilityKeys,
     signoffConditions,
     receiptVisibilityEvidenceTargets,
+    productionSignoffCloseoutGate,
     signoffBackfillDraft,
     routes,
     postSignoffTargets,
@@ -4031,6 +4064,8 @@ function buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch = false, 
     sanitizeArtifactPathSegment(result.summary?.productCode, "product"),
     sanitizeArtifactPathSegment(result.summary?.channel || "stable", "stable")
   );
+  const archiveCloseoutInputPath = path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const loadedCloseoutInputPath = result.closeoutInput?.path || null;
   const recordStatus = canStartCutoverWatch ? "pending_operator_entry" : "blocked_until_production_signoff";
   const records = [
     {
@@ -4075,7 +4110,9 @@ function buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch = false, 
     status: canStartCutoverWatch ? "ready_for_operator_watch" : "blocked_until_production_signoff",
     willModifyData: false,
     archiveRoot,
-    closeoutInputPath: path.posix.join(archiveRoot, "filled-closeout-input.json"),
+    closeoutInputPath: archiveCloseoutInputPath,
+    loadedCloseoutInputPath,
+    archiveCloseoutInputPath,
     routes,
     records,
     nextAction: canStartCutoverWatch
@@ -4094,6 +4131,7 @@ function buildLaunchDayWatchPlan(result) {
     launchSmokeSummary: result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
     launchOpsOverviewStatus: result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
   };
+  const watchRecordDraft = buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch, routes });
   return {
     status: canStartCutoverWatch ? "ready" : "blocked",
     canStartCutoverWatch,
@@ -4102,10 +4140,12 @@ function buildLaunchDayWatchPlan(result) {
     requiredDecision: readiness?.requiredDecision || "ready-for-production-signoff",
     productionDecision: readiness?.productionDecision || null,
     closeoutInputStatus: readiness?.closeoutInputStatus || "missing",
+    loadedCloseoutInputPath: watchRecordDraft.loadedCloseoutInputPath || null,
+    archiveCloseoutInputPath: watchRecordDraft.archiveCloseoutInputPath || watchRecordDraft.closeoutInputPath || null,
     missingSignoffKeys: readiness?.missingSignoffKeys || [],
     missingReceiptVisibilityKeys: readiness?.missingReceiptVisibilityKeys || [],
     routes,
-    watchRecordDraft: buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch, routes }),
+    watchRecordDraft,
     watchWindows: [
       {
         key: "cutover_watch",
@@ -7213,6 +7253,7 @@ function renderStagingProductionSignoffPacket(packet) {
   const decision = packet.decision || {};
   const routes = packet.routes || {};
   const signoffDraft = packet.signoffBackfillDraft || {};
+  const productionSignoffCloseoutGate = packet.productionSignoffCloseoutGate || {};
   const launchDayWatchBridge = packet.launchDayWatchBridge || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
@@ -7220,6 +7261,7 @@ function renderStagingProductionSignoffPacket(packet) {
     `- Archive root: ${packet.archiveRoot || "-"}`,
     `- Packet file: ${packet.packetFile || "-"}`,
     `- Closeout input: ${packet.closeoutInputPath || "-"}`,
+    `- Loaded closeout input: ${productionSignoffCloseoutGate.loadedCloseoutInputPath || "-"}`,
     `- Required decision: ${decision.requiredDecision || "-"}`,
     `- Production decision: ${decision.productionDecision || "-"}`,
     `- Can sign off: ${decision.canSignoff ? "yes" : "no"}`,
@@ -7237,6 +7279,13 @@ function renderStagingProductionSignoffPacket(packet) {
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`
   ];
+  if (productionSignoffCloseoutGate.status) {
+    lines.push(`- Production signoff closeout gate: ${productionSignoffCloseoutGate.status} (loaded=${productionSignoffCloseoutGate.loadedCloseoutInputPath || "-"}, archive=${productionSignoffCloseoutGate.archiveCloseoutInputPath || "-"})`);
+    lines.push(`- Production signoff closeout gate decision: ${productionSignoffCloseoutGate.requiredDecision || "-"} -> ${productionSignoffCloseoutGate.productionDecision || "-"}`);
+    lines.push(`- Production signoff closeout gate missing signoff keys: ${(productionSignoffCloseoutGate.missingSignoffKeys || []).join(", ") || "-"}`);
+    lines.push(`- Production signoff closeout gate missing receipt visibility keys: ${(productionSignoffCloseoutGate.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
+    lines.push(`- Production signoff closeout gate next action: ${productionSignoffCloseoutGate.nextAction || "-"}`);
+  }
   appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
   if (Array.isArray(packet.signoffConditions) && packet.signoffConditions.length) {
     lines.push("- Sign-off conditions:");
@@ -7265,6 +7314,8 @@ function renderStagingProductionSignoffPacket(packet) {
     lines.push(`- Launch-day watch bridge: ${launchDayWatchBridge.status || "-"} (source=${launchDayWatchBridge.sourceStatus || "-"}, watchDraft=${launchDayWatchBridge.watchRecordDraftStatus || "-"}, target=${launchDayWatchBridge.currentPostSignoffTarget?.key || "-"})`);
     lines.push(`- Launch-day watch bridge decision: ${launchDayWatchBridge.requiredDecision || "-"} -> ${launchDayWatchBridge.productionDecision || "-"}`);
     lines.push(`- Launch-day watch bridge closeout input: ${launchDayWatchBridge.closeoutInputStatus || "-"}`);
+    lines.push(`- Launch-day watch bridge loaded closeout input: ${launchDayWatchBridge.loadedCloseoutInputPath || "-"}`);
+    lines.push(`- Launch-day watch bridge archive closeout input: ${launchDayWatchBridge.archiveCloseoutInputPath || "-"}`);
     lines.push(`- Launch-day watch bridge archive index: ${launchDayWatchBridge.launchDutyArchiveIndexPath || "-"}`);
     lines.push(`- Launch-day watch evidence inputs: ${renderLaunchDutyRecordUpdates(launchDayWatchBridge.evidenceInputs || [])}`);
     if (Array.isArray(launchDayWatchBridge.escalationTriggers) && launchDayWatchBridge.escalationTriggers.length) {
@@ -7316,11 +7367,15 @@ function renderLaunchDayWatchPlan(plan) {
     `- Required decision: ${plan.requiredDecision || "-"}`,
     `- Production decision: ${plan.productionDecision || "-"}`,
     `- Closeout input status: ${plan.closeoutInputStatus || "-"}`,
+    `- Launch-day watch loaded closeout input: ${plan.loadedCloseoutInputPath || "-"}`,
+    `- Launch-day watch archive closeout input: ${plan.archiveCloseoutInputPath || "-"}`,
     `- Missing sign-off keys: ${(plan.missingSignoffKeys || []).join(", ") || "-"}`,
     `- Missing receipt visibility keys: ${(plan.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
     `- Watch record draft: ${watchRecordDraft.status || "-"}`,
     `- Watch draft records: ${(watchRecordDraft.records || []).map((item) => item.key).filter(Boolean).join(", ") || "-"}`,
     `- Watch draft closeout input: ${watchRecordDraft.closeoutInputPath || "-"}`,
+    `- Watch draft loaded closeout input: ${watchRecordDraft.loadedCloseoutInputPath || "-"}`,
+    `- Watch draft archive closeout input: ${watchRecordDraft.archiveCloseoutInputPath || "-"}`,
     `- Watch draft next action: ${watchRecordDraft.nextAction || "-"}`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,

@@ -1545,7 +1545,10 @@ function buildStagingBackupRestoreDrillPacket(result) {
     || closeout.artifactReceiptLedger?.archiveRoot
     || "artifacts/staging/product/stable";
   const ledgerRowsByKey = new Map((closeout.artifactReceiptLedger?.rows || []).map((row) => [row.checkKey, row]));
+  const acceptanceChecksByKey = new Map((closeout.acceptanceChecks || []).map((check) => [check.key, check]));
   const ledgerRow = ledgerRowsByKey.get("backup_restore_drill_result") || {};
+  const expectedEvidence = acceptanceChecksByKey.get("backup_restore_drill_result")?.expectedEvidence
+    || "Record backup artifact path, restore dry-run result, and post-restore healthcheck result.";
   const packetFile = result.backupRestorePacketFile?.path
     || bindingFiles.get("backup_restore_packet")?.path
     || path.posix.join(archiveRoot, "staging-backup-restore-drill-packet.json");
@@ -1571,6 +1574,7 @@ function buildStagingBackupRestoreDrillPacket(result) {
     closeoutKey: "backup_restore_drill_result",
     artifactPath,
     receiptOperations: ledgerRow.receiptOperations || ["record_recovery_drill", "record_backup_verification"],
+    expectedEvidence,
     commandKeys,
     commands,
     environment: {
@@ -1591,35 +1595,47 @@ function buildStagingBackupRestoreDrillPacket(result) {
       {
         key: "run_app_backup",
         status: commands.appBackup ? "operator_execute" : "not_available",
-        command: commands.appBackup || null
+        command: commands.appBackup || null,
+        expectedEvidence: commands.appBackup
+          ? "Capture app backup command exit status and backup artifact path."
+          : null
       },
       {
         key: "run_postgres_backup",
         status: commands.postgresBackup ? "operator_execute" : "not_available",
-        command: commands.postgresBackup || null
+        command: commands.postgresBackup || null,
+        expectedEvidence: commands.postgresBackup
+          ? "Capture Postgres backup command exit status and backup artifact path for postgres-preview storage."
+          : null
       },
       {
         key: "run_postgres_restore_dry_run",
         status: commands.postgresRestoreDryRun ? "operator_execute" : "not_available",
-        command: commands.postgresRestoreDryRun || null
+        command: commands.postgresRestoreDryRun || null,
+        expectedEvidence: commands.postgresRestoreDryRun
+          ? "Capture restore dry-run exit status and separate restore-target healthcheck result."
+          : null
       },
       {
         key: "record_recovery_drill_receipt",
         status: "operator_execute",
         receiptOperation: "record_recovery_drill",
-        endpoint: result.evidenceActionPlan?.endpoint || null
+        endpoint: result.evidenceActionPlan?.endpoint || null,
+        expectedEvidence: "Record the recovery drill receipt ID for the restore dry-run and healthcheck evidence."
       },
       {
         key: "record_backup_verification_receipt",
         status: "operator_execute",
         receiptOperation: "record_backup_verification",
-        endpoint: result.evidenceActionPlan?.endpoint || null
+        endpoint: result.evidenceActionPlan?.endpoint || null,
+        expectedEvidence: "Record the backup verification receipt ID for the app/Postgres backup artifacts."
       },
       {
         key: "backfill_closeout_key",
         status: "operator_backfill",
         closeoutKey: "backup_restore_drill_result",
-        artifactPath
+        artifactPath,
+        expectedEvidence: "Backfill backup_restore_drill_result with the backup artifact path, restore dry-run result, healthcheck result, and receipt IDs."
       }
     ],
     closeoutReloadCommand,
@@ -6259,6 +6275,7 @@ function renderStagingBackupRestoreDrillPacket(packet) {
     `- Closeout key: ${packet.closeoutKey || "-"}`,
     `- Artifact path: ${packet.artifactPath || "-"}`,
     `- Receipt operations: ${(packet.receiptOperations || []).join(", ") || "-"}`,
+    `- Expected evidence: ${packet.expectedEvidence || "-"}`,
     `- Command keys: ${(packet.commandKeys || []).join(", ") || "-"}`,
     `- Target OS: ${environment.targetOs || "-"}`,
     `- Storage profile: ${environment.storageProfile || "-"}`,
@@ -6273,6 +6290,22 @@ function renderStagingBackupRestoreDrillPacket(packet) {
     lines.push("- Operator steps:");
     for (const step of packet.operatorSteps) {
       lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+      if (step.command) {
+        lines.push(`    - command: ${step.command}`);
+      }
+      if (step.receiptOperation) {
+        lines.push(`    - receiptOperation: ${step.receiptOperation}`);
+      }
+      if (step.endpoint) {
+        lines.push(`    - endpoint: ${step.endpoint}`);
+      }
+      if (step.closeoutKey) {
+        lines.push(`    - closeoutKey: ${step.closeoutKey}`);
+      }
+      if (step.artifactPath) {
+        lines.push(`    - artifactPath: ${step.artifactPath}`);
+      }
+      lines.push(`    - expectedEvidence: ${step.expectedEvidence || "-"}`);
     }
   }
   return lines.join("\n");

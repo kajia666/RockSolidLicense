@@ -2955,6 +2955,7 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.match(handoff, /Launch-duty watch artifact: launch_day_watch_summary \(pending_operator_entry\)/);
     assert.match(handoff, /Launch-duty stabilization window: stabilization_owner_handoff \(operator_handoff\)/);
     assert.match(handoff, /Launch-duty packet next action: Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff\./);
+    assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Next action: Archive production sign-off packet, record launch-day watch artifacts, and hand off stabilization owner records\./);
     assert.equal(output.operatorExecutionPlan.readinessSummary.canRunFullTestWindow, true);
     assert.equal(output.operatorExecutionPlan.readinessSummary.canSignoffProduction, true);
     assert.equal(output.productionSignoffReadiness.status, "ready");
@@ -3132,6 +3133,10 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     );
     assert.equal(output.stagingLaunchDutyArchiveIndex.sourceStatuses.launchDayWatch, "ready");
     assert.equal(output.stagingLaunchDutyArchiveIndex.sourceStatuses.stabilizationHandoff, "ready");
+    assert.equal(
+      output.stagingLaunchDutyArchiveIndex.nextAction,
+      "Archive production sign-off packet, record launch-day watch artifacts, and hand off stabilization owner records."
+    );
     assert.deepEqual(
       output.stagingLaunchDutyArchiveIndex.watchArtifacts.map((item) => [item.key, item.status]),
       [

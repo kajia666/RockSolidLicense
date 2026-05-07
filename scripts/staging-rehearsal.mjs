@@ -2016,6 +2016,9 @@ function buildStagingLaunchDutyArchiveIndex(result) {
     || runRecordIndex.archiveRoot
     || finalPacket.archiveRoot
     || "artifacts/staging/product/stable";
+  const nextAction = launchDayWatch.canStartCutoverWatch === true
+    ? "Archive production sign-off packet, record launch-day watch artifacts, and hand off stabilization owner records."
+    : "Archive the listed launch-duty packets, then use readiness review to decide whether the full test window can start.";
   const indexFile = result.launchDutyArchiveIndexFile?.path
     || bindingFiles.get("launch_duty_archive_index")?.path
     || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
@@ -2115,7 +2118,7 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       closeoutReload: readinessReviewPacket.commands?.closeoutReload || closeoutReloadPacket.commands?.closeoutReload || null,
       fullTestWindow: readinessReviewPacket.commands?.fullTestWindow || finalPacket.commands?.fullTestWindow || "npm.cmd test"
     },
-    nextAction: "Archive the listed launch-duty packets, then use readiness review to decide whether the full test window can start."
+    nextAction
   };
 }
 

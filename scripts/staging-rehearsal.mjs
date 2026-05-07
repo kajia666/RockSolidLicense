@@ -1626,20 +1626,55 @@ function buildStagingBackupRestoreDrillPacket(result) {
 }
 
 function buildPostSignoffActionChecklist(result, overrides = {}) {
+  const launchDayWatch = result.launchDayWatchPlan || {};
+  const watchRecordByKey = new Map((launchDayWatch.watchRecordDraft?.records || []).map((item) => [item.key, item]));
+  const checklistMetadata = (key) => {
+    const watchRecord = watchRecordByKey.get(key);
+    if (watchRecord) {
+      return {
+        receiptOperations: watchRecord.receiptOperations || [],
+        expectedEvidence: watchRecord.expectedEvidence || null
+      };
+    }
+    if (key === "production_signoff_packet") {
+      return {
+        receiptOperations: [],
+        expectedEvidence: "Archive the signed production sign-off packet with full-test status, GO/NO-GO decision, and receipt visibility lanes."
+      };
+    }
+    if (key === "launch_duty_archive_index") {
+      return {
+        receiptOperations: [],
+        expectedEvidence: "Keep the launch-duty archive index with packet paths, record groups, and current next action."
+      };
+    }
+    return {
+      receiptOperations: [],
+      expectedEvidence: null
+    };
+  };
+  const enrichChecklistItem = (item) => {
+    const metadata = checklistMetadata(item.key);
+    return {
+      ...item,
+      receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : metadata.receiptOperations,
+      expectedEvidence: item.expectedEvidence || metadata.expectedEvidence
+    };
+  };
   const existingTargets = result.stagingLaunchDutyArchiveIndex?.signoffTargets
     || result.stagingProductionSignoffPacket?.postSignoffTargets;
   if (Array.isArray(existingTargets) && existingTargets.length) {
-    return existingTargets.map((item) => ({
+    return existingTargets.map((item) => enrichChecklistItem({
       key: item.key || null,
       status: item.status || "not_available",
-      path: item.path || null
+      path: item.path || null,
+      receiptOperations: item.receiptOperations,
+      expectedEvidence: item.expectedEvidence
     }));
   }
 
   const bindingFiles = new Map((result.stagingEnvironmentBinding?.recommendedOutputFiles || []).map((item) => [item.key, item]));
   const productionSignoff = result.productionSignoffReadiness || {};
-  const launchDayWatch = result.launchDayWatchPlan || {};
-  const watchRecordByKey = new Map((launchDayWatch.watchRecordDraft?.records || []).map((item) => [item.key, item]));
   const archiveRoot = overrides.archiveRoot
     || result.stagingReadinessReviewPacket?.archiveRoot
     || result.stagingRehearsalRunRecordIndex?.archiveRoot
@@ -1682,7 +1717,7 @@ function buildPostSignoffActionChecklist(result, overrides = {}) {
       status: canStartCutoverWatch ? "prepare_after_cutover_watch" : "blocked_until_signoff_ready",
       path: watchRecordByKey.get("stabilization_owner_handoff")?.artifactPath || path.posix.join(archiveRoot, "stabilization-owner-handoff.md")
     }
-  ];
+  ].map(enrichChecklistItem);
 }
 
 function buildLaunchDutyOperatorFocus(result, { status = null, finalPacket = null } = {}) {
@@ -5781,6 +5816,8 @@ function appendPostSignoffActionChecklist(lines, checklist) {
   lines.push("- Post-signoff action checklist:");
   for (const item of checklist) {
     lines.push(`  - ${item.key || "-"}: ${item.status || "-"} -> ${item.path || "-"}`);
+    lines.push(`    - receiptOperations: ${(item.receiptOperations || []).join(", ") || "-"}`);
+    lines.push(`    - expectedEvidence: ${item.expectedEvidence || "-"}`);
   }
 }
 

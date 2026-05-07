@@ -2067,6 +2067,11 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.deepEqual(template.stagingRehearsalExecutionSummary, output.stagingRehearsalExecutionSummary);
     assert.equal(template.operatorExecutionPlan.realStagingRunFocus.currentAction.key, "set_required_secret_env");
     assert.equal(template.operatorExecutionPlan.realStagingRunFocus.canRunDryRun, true);
+    assert.deepEqual(template.operatorExecutionPlan.outputWriteSummary, output.operatorExecutionPlan.outputWriteSummary);
+    assert.deepEqual(
+      template.operatorExecutionPlan.realStagingRunFocus.executionEntry.preflight.outputBundle,
+      output.operatorExecutionPlan.realStagingRunFocus.executionEntry.preflight.outputBundle
+    );
     assert.deepEqual(template.stagingRehearsalRunRecordIndex, output.stagingRehearsalRunRecordIndex);
     assert.equal(output.runRecordFile.path, runRecordFile);
     assert.equal(output.runRecordFile.written, true);
@@ -2303,10 +2308,59 @@ test("staging rehearsal runner focuses closeout reload after real staging inputs
     );
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.paths.filledCloseoutInputFile, "artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.blockerSummary.missingCloseoutKeys.length, 7);
+    assert.deepEqual(output.operatorExecutionPlan.realStagingRunFocus.executionEntry, {
+      mode: "real-staging-execution-entry",
+      status: "ready_for_dry_run",
+      willModifyData: false,
+      currentActionKey: "run_staging_dry_run",
+      currentCommand: output.stagingEnvironmentBinding.dryRunCommand,
+      preflight: {
+        profile: {
+          status: "ready",
+          path: profileFile
+        },
+        secretEnv: {
+          status: "ready",
+          missingKeys: [],
+          unsafeCliSecretOverrides: []
+        },
+        outputBundle: {
+          status: "written",
+          writtenFileCount: 10,
+          outputFileCount: 10,
+          archiveEntrypoint: {
+            key: "launch_duty_archive_index",
+            status: "written",
+            path: launchDutyArchiveIndexFile
+          }
+        },
+        artifactArchive: {
+          status: "ready",
+          path: "artifacts/staging/READY_PRODUCT/stable"
+        }
+      },
+      evidenceBackfill: {
+        targetCount: 7,
+        currentTarget: {
+          key: "route_map_gate_result",
+          sourceStep: "run_route_map_gate",
+          artifactPath: "artifacts/staging/READY_PRODUCT/stable/route-map-gate-output.txt",
+          receiptOperations: []
+        },
+        closeoutInputPath: "artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json",
+        closeoutReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json",
+        closeoutReloadPacketFile
+      },
+      nextAction: "Run the profile-driven staging dry run, then backfill route_map_gate_result into filled-closeout-input.json and reload closeout readiness."
+    });
     const handoff = readFileSync(handoffFile, "utf8");
     assert.match(handoff, /Real staging run focus: ready_for_real_staging_rehearsal \(dryRun=yes, liveWriteSmoke=yes, evidence=yes\)/);
     assert.match(handoff, /Go-live execution entry: ready_for_real_staging_rehearsal \(phase=real_staging_inputs, source=realStagingRunFocus, action=run_staging_dry_run\)/);
     assert.match(handoff, /Go-live execution command: `npm\.cmd run staging:rehearsal -- --json --base-url https:\/\/ready-staging\.example\.com/);
+    assert.match(handoff, /Real staging execution entry: ready_for_dry_run \(action=run_staging_dry_run, outputs=written 10\/10\)/);
+    assert.match(handoff, /Real staging execution current command: `npm\.cmd run staging:rehearsal -- --json --base-url https:\/\/ready-staging\.example\.com/);
+    assert.match(handoff, /Real staging execution first backfill: route_map_gate_result -> artifacts\/staging\/READY_PRODUCT\/stable\/route-map-gate-output\.txt/);
+    assert.match(handoff, /Real staging execution closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/READY_PRODUCT\/stable\/filled-closeout-input\.json`/);
     assert.match(handoff, /Real staging current action: run_staging_dry_run \(env=-\)/);
     assert.match(handoff, /Real staging post-dry-run action: backfill_and_reload_closeout_input \(blocked_until_closeout_reload\)/);
     assert.match(handoff, /Real staging full-test entry: blocked_until_closeout_reload \(command=npm\.cmd test\)/);

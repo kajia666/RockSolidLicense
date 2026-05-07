@@ -1276,6 +1276,71 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
       missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
       nextAction: "Backfill filled-closeout-input.json from real staging artifacts, reload closeout input, then re-check full-test entry."
     };
+  const paths = {
+    profileFile: preflight.profileFile || null,
+    handoffFile: pathFor("handoff_file"),
+    closeoutFile: pathFor("closeout_file"),
+    artifactManifestFile: pathFor("artifact_manifest"),
+    closeoutReloadPacketFile: pathFor("closeout_reload_packet"),
+    launchDutyArchiveIndexFile: pathFor("launch_duty_archive_index"),
+    filledCloseoutInputFile,
+    artifactArchiveRoot: pathFor("artifact_archive_root")
+  };
+  const outputWriteSummary = buildStagingOutputWriteSummary(result, { outputFiles });
+  const backfillRows = Array.isArray(result.stagingProfileLaunchPlan?.backfillManifest?.rows)
+    ? result.stagingProfileLaunchPlan.backfillManifest.rows
+    : [];
+  const currentBackfillTarget = backfillRows[0]
+    ? {
+      key: backfillRows[0].closeoutKey,
+      sourceStep: backfillRows[0].sourceStep || CLOSEOUT_SOURCE_STEPS[backfillRows[0].closeoutKey] || "operator_backfill",
+      artifactPath: backfillRows[0].artifactPath || null,
+      receiptOperations: Array.isArray(backfillRows[0].receiptOperations) ? backfillRows[0].receiptOperations : []
+    }
+    : null;
+  const executionEntryStatus = currentAction.status === "ready" && outputWriteSummary.status === "written"
+    ? "ready_for_dry_run"
+    : currentAction.status === "ready"
+      ? "ready_for_output_review"
+      : currentAction.status || "blocked";
+  const executionEntry = {
+    mode: "real-staging-execution-entry",
+    status: executionEntryStatus,
+    willModifyData: false,
+    currentActionKey: currentAction.key,
+    currentCommand: currentAction.command || commands.stagingDryRun,
+    preflight: {
+      profile: {
+        status: paths.profileFile ? "ready" : "missing",
+        path: paths.profileFile
+      },
+      secretEnv: {
+        status: missingSecretEnv.length || unsafeCliSecretOverrides.length ? "blocked" : "ready",
+        missingKeys: missingSecretEnv,
+        unsafeCliSecretOverrides
+      },
+      outputBundle: {
+        status: outputWriteSummary.status,
+        writtenFileCount: outputWriteSummary.writtenFileCount,
+        outputFileCount: outputWriteSummary.outputFileCount,
+        archiveEntrypoint: outputWriteSummary.archiveEntrypoint
+      },
+      artifactArchive: {
+        status: paths.artifactArchiveRoot ? "ready" : "missing",
+        path: paths.artifactArchiveRoot
+      }
+    },
+    evidenceBackfill: {
+      targetCount: backfillRows.length,
+      currentTarget: currentBackfillTarget,
+      closeoutInputPath: filledCloseoutInputFile,
+      closeoutReloadCommand: commands.closeoutReload,
+      closeoutReloadPacketFile: paths.closeoutReloadPacketFile
+    },
+    nextAction: currentBackfillTarget
+      ? `Run the profile-driven staging dry run, then backfill ${currentBackfillTarget.key} into filled-closeout-input.json and reload closeout readiness.`
+      : currentAction.nextAction
+  };
   return {
     mode: "real-staging-run-focus",
     status: preflight.status || "not_available",
@@ -1288,6 +1353,7 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     missingOutputFiles,
     currentAction,
     postDryRunAction,
+    executionEntry,
     fullTestEntry: {
       status: fullTestEntryStatus,
       canRun: fullTestWindow.canRun === true,
@@ -1297,16 +1363,7 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     },
     commandSequence,
     commands,
-    paths: {
-      profileFile: preflight.profileFile || null,
-      handoffFile: pathFor("handoff_file"),
-      closeoutFile: pathFor("closeout_file"),
-      artifactManifestFile: pathFor("artifact_manifest"),
-      closeoutReloadPacketFile: pathFor("closeout_reload_packet"),
-      launchDutyArchiveIndexFile: pathFor("launch_duty_archive_index"),
-      filledCloseoutInputFile,
-      artifactArchiveRoot: pathFor("artifact_archive_root")
-    },
+    paths,
     nextAction: currentAction.nextAction
   };
 }
@@ -6798,7 +6855,15 @@ function renderOperatorExecutionPlan(plan) {
   if (plan.realStagingRunFocus) {
     const focus = plan.realStagingRunFocus;
     const current = focus.currentAction || {};
+    const executionEntry = focus.executionEntry || {};
+    const executionOutputBundle = executionEntry.preflight?.outputBundle || {};
+    const executionBackfill = executionEntry.evidenceBackfill || {};
+    const executionCurrentTarget = executionBackfill.currentTarget || {};
     lines.push(`- Real staging run focus: ${focus.status || "-"} (dryRun=${focus.canRunDryRun ? "yes" : "no"}, liveWriteSmoke=${focus.canRunLiveWriteSmoke ? "yes" : "no"}, evidence=${focus.canRecordEvidence ? "yes" : "no"})`);
+    lines.push(`- Real staging execution entry: ${executionEntry.status || "-"} (action=${executionEntry.currentActionKey || "-"}, outputs=${executionOutputBundle.status || "-"} ${executionOutputBundle.writtenFileCount ?? 0}/${executionOutputBundle.outputFileCount ?? 0})`);
+    lines.push(`- Real staging execution current command: \`${executionEntry.currentCommand || "-"}\``);
+    lines.push(`- Real staging execution first backfill: ${executionCurrentTarget.key || "-"} -> ${executionCurrentTarget.artifactPath || "-"}`);
+    lines.push(`- Real staging execution closeout reload: \`${executionBackfill.closeoutReloadCommand || "-"}\``);
     lines.push(`- Real staging current action: ${current.key || "-"} (env=${(current.envKeys || []).join(", ") || "-"})`);
     lines.push(`- Real staging current action unsafeCliSecretOverrides: ${(current.unsafeCliSecretOverrides || []).join(", ") || "-"}`);
     lines.push(`- Real staging archive root: ${focus.paths?.artifactArchiveRoot || "-"}`);
@@ -8494,6 +8559,8 @@ function writeOutputFiles(result) {
   nextResult = writeLaunchDutyArchiveIndexFile(nextResult);
   nextResult = refreshOperatorExecutionPlan(nextResult);
   nextResult = writeHandoffFile(nextResult);
+  nextResult = refreshOperatorExecutionPlan(nextResult);
+  nextResult = writeCloseoutFile(nextResult);
   return refreshOperatorExecutionPlan(nextResult);
 }
 

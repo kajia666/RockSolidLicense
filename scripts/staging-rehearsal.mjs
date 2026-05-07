@@ -5812,6 +5812,12 @@ function renderLaunchDutyReceiptOperationList(items = []) {
     .join("; ") || "-";
 }
 
+function renderLaunchDutyExpectedEvidenceList(items = []) {
+  return items
+    .map((item) => `${item.key || "-"}=${item.expectedEvidence || "-"}`)
+    .join("; ") || "-";
+}
+
 function appendGoLiveExecutionEntry(lines, entry = {}) {
   const blockers = entry.blockerSummary || {};
   const launchDayWatchEntry = entry.launchDayWatchEntry || null;
@@ -5826,6 +5832,7 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
     lines.push(`- Go-live launch-day evidence inputs: ${renderLaunchDutyActionInputList(launchDayWatchEntry.evidenceInputs)}`);
     lines.push(`- Go-live launch-day watch records: ${renderLaunchDutyRecordUpdates(launchDayWatchEntry.watchRecordQueue)}`);
     lines.push(`- Go-live launch-day receipt operations: ${renderLaunchDutyReceiptOperationList(launchDayWatchEntry.watchRecordQueue)}`);
+    lines.push(`- Go-live launch-day expected evidence: ${renderLaunchDutyExpectedEvidenceList(launchDayWatchEntry.watchRecordQueue)}`);
     lines.push(`- Go-live launch-day confirmation points: ${renderLaunchDutyActionConfirmationList(launchDayWatchEntry.confirmationPoints)}`);
     lines.push(`- Go-live launch-day archive trace: ${renderLaunchDutyArchiveTrace(launchDayWatchEntry.archiveTrace)}`);
   }

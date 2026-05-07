@@ -2949,6 +2949,7 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.match(handoff, /Go-live launch-day evidence inputs: production_signoff_packet=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /Go-live launch-day watch records: launch_day_watch_summary=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; receipt_visibility_snapshot=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-snapshot\.txt; first_wave_incident_log=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-incident-log\.md; rollback_signal_review=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md; stabilization_owner_handoff=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /Go-live launch-day receipt operations: launch_day_watch_summary=record_cutover_walkthrough, record_launch_day_readiness_review; receipt_visibility_snapshot=record_post_launch_ops_sweep; first_wave_incident_log=record_post_launch_ops_sweep; rollback_signal_review=record_rollback_walkthrough, record_launch_stabilization_review; stabilization_owner_handoff=record_launch_stabilization_review/);
+    assert.match(handoff, /Go-live launch-day expected evidence: launch_day_watch_summary=Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions.; receipt_visibility_snapshot=Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots.; first_wave_incident_log=Record first-wave incidents, customer impact, mitigation, owner, and status.; rollback_signal_review=Record whether rollback signals were observed, dismissed, or escalated.; stabilization_owner_handoff=Record stabilization owner, timestamp, unresolved items, and next-duty follow-up./);
     assert.match(handoff, /Go-live launch-day archive trace: group=launch_day_watch_and_stabilization, runRecord=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json, archiveIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Execution launch-duty archive trace: group=launch_day_watch_and_stabilization, runRecord=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json, archiveIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Final packet launch-duty record updates: production_signoff_packet=archive_before_cutover -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=operator_handoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
@@ -2996,6 +2997,16 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
         ["first_wave_incident_log", ["record_post_launch_ops_sweep"]],
         ["rollback_signal_review", ["record_rollback_walkthrough", "record_launch_stabilization_review"]],
         ["stabilization_owner_handoff", ["record_launch_stabilization_review"]]
+      ]
+    );
+    assert.deepEqual(
+      output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry?.watchRecordQueue?.map((item) => [item.key, item.expectedEvidence]),
+      [
+        ["launch_day_watch_summary", "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions."],
+        ["receipt_visibility_snapshot", "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."],
+        ["first_wave_incident_log", "Record first-wave incidents, customer impact, mitigation, owner, and status."],
+        ["rollback_signal_review", "Record whether rollback signals were observed, dismissed, or escalated."],
+        ["stabilization_owner_handoff", "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."]
       ]
     );
     assert.equal(output.launchDayWatchPlan.nextAction, "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility open.");

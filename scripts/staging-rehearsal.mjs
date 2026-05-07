@@ -1366,6 +1366,9 @@ function buildStagingCloseoutReloadPacket(result) {
   const runRecordIndex = result.stagingRehearsalRunRecordIndex || buildStagingRehearsalRunRecordIndex(result);
   const artifactManifest = result.stagingArtifactManifest || buildStagingArtifactManifest(result);
   const finalPacket = result.finalRehearsalPacket || buildFinalRehearsalPacket(result);
+  const fullTestWindowReadiness = result.fullTestWindowReadiness || buildFullTestWindowReadiness(result);
+  const productionSignoffReadiness = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
+  const launchDutyArchiveIndex = result.stagingLaunchDutyArchiveIndex || null;
   const closeoutReview = result.stagingExecutionRunbook?.closeoutInputReview
     || finalPacket.closeoutInputReview
     || summarizeCloseoutInputReview(result.closeoutInput?.backfillReview, closeout);
@@ -1386,12 +1389,25 @@ function buildStagingCloseoutReloadPacket(result) {
   const packetFile = result.closeoutReloadPacketFile?.path
     || bindingFiles.get("closeout_reload_packet")?.path
     || path.posix.join(archiveRoot, "staging-closeout-reload-packet.json");
-  const postReloadTarget = (key, outputPath, fallbackFileName, status) => ({
+  const postReloadTarget = ({
+    key,
+    outputPath,
+    fallbackFileName,
+    status,
+    command = null,
+    requiredDecision = null,
+    expectedEvidence = null,
+    nextAction = null
+  }) => ({
     key,
     path: outputPath
       || bindingFiles.get(key)?.path
       || path.posix.join(archiveRoot, fallbackFileName),
-    status
+    status,
+    command,
+    requiredDecision,
+    expectedEvidence,
+    nextAction
   });
   const requiredCloseoutKeys = (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
   const missingCloseoutKeys = Array.isArray(result.closeoutInput?.missingKeys)
@@ -1428,9 +1444,32 @@ function buildStagingCloseoutReloadPacket(result) {
       closeoutTemplateFile
     },
     postReloadTargets: [
-      postReloadTarget("readiness_review_packet", result.readinessReviewPacketFile?.path, "staging-readiness-review-packet.json", "review_after_reload"),
-      postReloadTarget("production_signoff_packet", result.productionSignoffPacketFile?.path, "staging-production-signoff-packet.json", "prepare_after_full_test"),
-      postReloadTarget("launch_duty_archive_index", result.launchDutyArchiveIndexFile?.path, "staging-launch-duty-archive-index.json", "archive_after_signoff")
+      postReloadTarget({
+        key: "readiness_review_packet",
+        outputPath: result.readinessReviewPacketFile?.path,
+        fallbackFileName: "staging-readiness-review-packet.json",
+        status: "review_after_reload",
+        expectedEvidence: "Review the reloaded closeout status, remaining missing closeout keys, and full-test readiness from the readiness review packet.",
+        nextAction: "Use the readiness review packet as the first checkpoint immediately after reload."
+      }),
+      postReloadTarget({
+        key: "production_signoff_packet",
+        outputPath: result.productionSignoffPacketFile?.path,
+        fallbackFileName: "staging-production-signoff-packet.json",
+        status: "prepare_after_full_test",
+        command: fullTestWindowReadiness.command || closeout.fullTestWindowEntry?.command || "npm.cmd test",
+        requiredDecision: closeout.productionSignoffConditions?.requiredDecision || "ready-for-production-signoff",
+        expectedEvidence: "After the full test window, backfill sign-off conditions plus receipt visibility lanes into the production sign-off packet.",
+        nextAction: productionSignoffReadiness.nextAction || "Prepare the production sign-off packet once the full test window passes."
+      }),
+      postReloadTarget({
+        key: "launch_duty_archive_index",
+        outputPath: result.launchDutyArchiveIndexFile?.path,
+        fallbackFileName: "staging-launch-duty-archive-index.json",
+        status: "archive_after_signoff",
+        expectedEvidence: "Archive the signed production sign-off packet and prepare launch-day watch plus stabilization artifacts.",
+        nextAction: launchDutyArchiveIndex?.nextAction || "Refresh the launch-duty archive index after production sign-off."
+      })
     ],
     sourceStatuses: {
       closeoutInput: result.closeoutInput?.status || "not_loaded",
@@ -1452,27 +1491,32 @@ function buildStagingCloseoutReloadPacket(result) {
         key: "promote_filled_closeout_draft",
         status: "operator_copy",
         from: filledCloseoutDraftFile,
-        to: filledCloseoutInputFile
+        to: filledCloseoutInputFile,
+        expectedEvidence: "Promote the draft into the real filled closeout input path before replacing any remaining placeholders."
       },
       {
         key: "backfill_required_evidence",
         status: missingCloseoutKeys.length ? "operator_backfill" : "ready",
-        missingCloseoutKeys
+        missingCloseoutKeys,
+        expectedEvidence: "Backfill every missing closeout key with redacted artifact paths, receipt IDs, and operator decisions before reload."
       },
       {
         key: "remove_example_only_guard",
         status: "operator_confirm",
-        expected: "exampleOnly must be absent or false before reload."
+        expected: "exampleOnly must be absent or false before reload.",
+        expectedEvidence: "Confirm the filled closeout input is no longer marked exampleOnly before reload."
       },
       {
         key: "reload_closeout_input",
         status: "operator_execute",
-        command: closeoutReload
+        command: closeoutReload,
+        expectedEvidence: "Capture the reloaded closeout review status, missing field count, and full-test readiness decision."
       },
       {
         key: "review_full_test_window_readiness",
         status: result.closeoutInput?.readyForFullTestWindow === true ? "ready" : "blocked",
-        command: finalPacket.commands?.fullTestWindow || closeout.fullTestWindowEntry?.command || "npm.cmd test"
+        command: finalPacket.commands?.fullTestWindow || closeout.fullTestWindowEntry?.command || "npm.cmd test",
+        expectedEvidence: "Review the readiness review packet after reload and only run npm.cmd test once missing closeout keys are empty."
       }
     ],
     nextAction: result.closeoutInput?.readyForFullTestWindow === true
@@ -6617,19 +6661,23 @@ function renderStagingCloseoutReloadPacket(packet) {
     `- Next action: ${packet.nextAction || "-"}`
   ];
   appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
-  if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
-    lines.push("- Operator steps:");
-    for (const step of packet.operatorSteps) {
-      lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
-      if (step.command) {
-        lines.push(`    - command: \`${step.command}\``);
-      }
-    }
-  }
+  appendOperatorStepList(lines, "- Operator steps:", packet.operatorSteps || []);
   if (Array.isArray(packet.postReloadTargets) && packet.postReloadTargets.length) {
     lines.push("- Post-reload targets:");
     for (const target of packet.postReloadTargets) {
       lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
+      if (target.command) {
+        lines.push(`    - command: \`${target.command}\``);
+      }
+      if (target.requiredDecision) {
+        lines.push(`    - requiredDecision: ${target.requiredDecision}`);
+      }
+      if (target.expectedEvidence) {
+        lines.push(`    - expectedEvidence: ${target.expectedEvidence}`);
+      }
+      if (target.nextAction) {
+        lines.push(`    - nextAction: ${target.nextAction}`);
+      }
     }
   }
   return lines.join("\n");

@@ -2957,6 +2957,7 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
   const currentWatchArtifact = findLaunchDutyFocusItem(archiveIndex.watchArtifacts);
   const currentStabilizationWindow = findLaunchDutyFocusItem(archiveIndex.stabilizationHandoff?.handoffWindows);
   const readyForCutoverWatch = result.launchDayWatchPlan?.canStartCutoverWatch === true;
+  const watchArtifactQueue = readyForCutoverWatch ? archiveIndex.watchArtifacts || [] : [];
   const launchWatchNextAction = readyForCutoverWatch && currentPostSignoffTarget
     ? `Archive ${currentPostSignoffTarget.key}, then record launch-day watch artifacts and prepare stabilization handoff.`
     : enrichedCurrentPacket.nextAction || null;
@@ -2970,6 +2971,7 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
     packetSequence,
     currentPostSignoffTarget: readyForCutoverWatch ? currentPostSignoffTarget : null,
     currentWatchArtifact: readyForCutoverWatch ? currentWatchArtifact : null,
+    watchArtifactQueue,
     currentStabilizationWindow: readyForCutoverWatch ? currentStabilizationWindow : null,
     controlPaths: {
       runRecordIndex: keyedPath(packetSequence, "run_record_index"),
@@ -3113,6 +3115,9 @@ function buildGoLiveExecutionEntry({
   const confirmationPoints = Array.isArray(launchDutyCurrentAction?.confirmationPoints)
     ? launchDutyCurrentAction.confirmationPoints.map(normalizeLaunchDutyEntryItem).filter(Boolean)
     : [];
+  const watchRecordQueue = Array.isArray(launchDutyPacketFocus?.watchArtifactQueue)
+    ? launchDutyPacketFocus.watchArtifactQueue.map(normalizeLaunchDutyEntryItem).filter(Boolean)
+    : [];
   const launchDayWatchEntry = canSignoffProduction || launchDutyCurrentAction?.stage === "launch_day_watch_entry"
     ? {
       status,
@@ -3127,6 +3132,7 @@ function buildGoLiveExecutionEntry({
         launchDutyPacketFocus?.currentStabilizationWindow || evidenceInputByKey.get("stabilization_owner_handoff")
       ),
       evidenceInputs,
+      watchRecordQueue,
       confirmationPoints,
       archiveTrace: launchDutyCurrentAction?.archiveTrace || null,
       nextAction: nextAction || launchDutyCurrentAction?.nextAction || null
@@ -5810,6 +5816,7 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
   if (launchDayWatchEntry) {
     lines.push(`- Go-live launch-day watch entry: ${launchDayWatchEntry.status || "-"} (target=${launchDayWatchEntry.currentPostSignoffTarget?.key || "-"}, watch=${launchDayWatchEntry.currentWatchArtifact?.key || "-"}, stabilization=${launchDayWatchEntry.currentStabilizationWindow?.key || "-"})`);
     lines.push(`- Go-live launch-day evidence inputs: ${renderLaunchDutyActionInputList(launchDayWatchEntry.evidenceInputs)}`);
+    lines.push(`- Go-live launch-day watch records: ${renderLaunchDutyRecordUpdates(launchDayWatchEntry.watchRecordQueue)}`);
     lines.push(`- Go-live launch-day confirmation points: ${renderLaunchDutyActionConfirmationList(launchDayWatchEntry.confirmationPoints)}`);
     lines.push(`- Go-live launch-day archive trace: ${renderLaunchDutyArchiveTrace(launchDayWatchEntry.archiveTrace)}`);
   }

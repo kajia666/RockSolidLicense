@@ -654,7 +654,11 @@ function buildStagingRehearsalExecutionSummary(result) {
     ? runbook.commandSequence.map((item) => item.key).filter(Boolean)
     : [];
   const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv) ? profilePreflight.missingSecretEnv : [];
+  const unsafeCliSecretOverrides = Array.isArray(profilePreflight.unsafeCliSecretOverrides)
+    ? profilePreflight.unsafeCliSecretOverrides
+    : [];
   const orderedNextActions = [
+    ...(unsafeCliSecretOverrides.length ? ["move_cli_secret_overrides_to_env"] : []),
     ...(missingSecretEnv.length ? ["set_missing_secret_env"] : []),
     ...commandSequence
   ];
@@ -672,7 +676,7 @@ function buildStagingRehearsalExecutionSummary(result) {
     status = "ready_for_full_test_window";
   } else if (sourceStatuses.profilePreflight === "profile_not_loaded" && sourceStatuses.closeoutReview === "not_loaded") {
     status = "profile_not_loaded";
-  } else if (missingSecretEnv.length) {
+  } else if (missingSecretEnv.length || unsafeCliSecretOverrides.length) {
     status = "blocked_until_secret_env";
   } else if (closeoutReview.safeToEnterFullTestWindow !== true) {
     status = "blocked_until_closeout_reload";
@@ -690,6 +694,14 @@ function buildStagingRehearsalExecutionSummary(result) {
         key: "profile_not_loaded",
         status: "blocked",
         nextAction: "Load a secret-free staging profile before the real rehearsal."
+      });
+    }
+    if (unsafeCliSecretOverrides.length) {
+      blockingReasons.push({
+        key: "unsafe_cli_secret_overrides",
+        status: "blocked",
+        unsafeCliSecretOverrides,
+        nextAction: "Remove CLI password flags and rely on the required secret environment variables before evidence recording."
       });
     }
     if (missingSecretEnv.length) {
@@ -745,6 +757,7 @@ function buildStagingRehearsalExecutionSummary(result) {
     sourceStatuses,
     operatorFocus: {
       missingSecretEnv,
+      unsafeCliSecretOverrides,
       closeoutPlaceholderKeys: closeoutReview.placeholderKeys || [],
       closeoutMissingFieldCount: closeoutReview.missingFieldCount ?? 0,
       canRunDryRun: profilePreflight.canRunDryRun === true,
@@ -811,7 +824,10 @@ function buildGoLiveOperatorActionPlan(progress = {}) {
       operatorAction,
       command: operatorAction.command || null,
       artifactPath: operatorAction.artifactPath || null,
-      envKeys: Array.isArray(operatorAction.envKeys) ? operatorAction.envKeys : []
+      envKeys: Array.isArray(operatorAction.envKeys) ? operatorAction.envKeys : [],
+      unsafeCliSecretOverrides: Array.isArray(operatorAction.unsafeCliSecretOverrides)
+        ? operatorAction.unsafeCliSecretOverrides
+        : []
     };
   });
   const actionQueue = actions.filter((item) => item.needsOperatorAction);
@@ -856,12 +872,14 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
     command = null,
     artifactPath = null,
     envKeys = [],
+    unsafeCliSecretOverrides = [],
     summary = ""
   }) => ({
     kind,
     command,
     artifactPath,
     envKeys,
+    unsafeCliSecretOverrides,
     summary
   });
   const operatorActionFor = (check) => {
@@ -874,10 +892,17 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
       });
     }
     if (check.key === "required_secret_env") {
+      const unsafeCliSecretOverrides = Array.isArray(check.unsafeCliSecretOverrides)
+        ? check.unsafeCliSecretOverrides
+        : (profilePreflight.unsafeCliSecretOverrides || []);
+      const envKeys = Array.isArray(check.missing) ? check.missing : profilePreflight.missingSecretEnv || [];
       return action({
-        kind: "set_env",
-        envKeys: Array.isArray(check.missing) ? check.missing : profilePreflight.missingSecretEnv || [],
-        summary: "Set required environment variables before continuing the real staging rehearsal."
+        kind: unsafeCliSecretOverrides.length ? "move_cli_secret_overrides_to_env" : "set_env",
+        envKeys,
+        unsafeCliSecretOverrides,
+        summary: unsafeCliSecretOverrides.length
+          ? "Remove CLI password flags and rely on required environment variables before continuing the real staging rehearsal."
+          : "Set required environment variables before continuing the real staging rehearsal."
       });
     }
     if (check.key === "artifact_output_paths") {
@@ -1020,6 +1045,9 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
 
 function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = {} } = {}) {
   const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv) ? profilePreflight.missingSecretEnv : [];
+  const unsafeCliSecretOverrides = Array.isArray(profilePreflight.unsafeCliSecretOverrides)
+    ? profilePreflight.unsafeCliSecretOverrides
+    : [];
   const missingOutputFiles = Array.isArray(profilePreflight.missingOutputFiles) ? profilePreflight.missingOutputFiles : [];
   const recommendedFiles = Array.isArray(profilePreflight.recommendedFiles) ? profilePreflight.recommendedFiles : [];
   const artifactArchiveRoot = recommendedFiles.find((item) => item.key === "artifact_archive_root")?.path || null;
@@ -1032,6 +1060,17 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
     : closeoutReview.status === "not_loaded"
       ? "not_loaded"
       : "missing";
+  const secretEnvReady = missingSecretEnv.length === 0 && unsafeCliSecretOverrides.length === 0;
+  const secretEnvStatus = unsafeCliSecretOverrides.length
+    ? "unsafe_cli_override"
+    : missingSecretEnv.length
+      ? "missing"
+      : "ready";
+  const secretEnvNextAction = secretEnvReady
+    ? "Required secret environment variables are present."
+    : unsafeCliSecretOverrides.length
+      ? "Remove CLI password flags and rely on the required secret environment variables before live-write smoke and evidence recording."
+      : "Set missing secret environment variables before live-write smoke and evidence recording.";
   const checks = [
     {
       key: "staging_profile",
@@ -1043,11 +1082,10 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
     },
     {
       key: "required_secret_env",
-      status: missingSecretEnv.length === 0 ? "ready" : "missing",
+      status: secretEnvStatus,
       missing: missingSecretEnv,
-      nextAction: missingSecretEnv.length === 0
-        ? "Required secret environment variables are present."
-        : "Set missing secret environment variables before live-write smoke and evidence recording."
+      unsafeCliSecretOverrides,
+      nextAction: secretEnvNextAction
     },
     {
       key: "artifact_output_paths",
@@ -1079,7 +1117,7 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
   let status = "ready_for_real_staging_inputs";
   if (!profileReady || missingOutputFiles.length) {
     status = "blocked_until_profile_and_paths";
-  } else if (missingSecretEnv.length) {
+  } else if (!secretEnvReady) {
     status = "blocked_until_secret_env";
   } else if (!closeoutReady) {
     status = "blocked_until_closeout_input";
@@ -1089,7 +1127,9 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
     : status === "blocked_until_profile_and_paths"
       ? "Load the staging profile and provide launch-duty artifact output paths."
       : status === "blocked_until_secret_env"
-        ? "Set missing secret env, then reload filled closeout input before full-test/sign-off."
+        ? unsafeCliSecretOverrides.length
+          ? "Remove CLI password flags and rely on required secret env before full-test/sign-off."
+          : "Set missing secret env, then reload filled closeout input before full-test/sign-off."
         : "Backfill and reload filled closeout input before full-test/sign-off.";
   const operatorSteps = [
     {
@@ -1101,9 +1141,10 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
     },
     {
       key: "set_required_secret_env",
-      status: missingSecretEnv.length === 0 ? "ready" : (profileReady ? "operator_execute" : "blocked_until_profile"),
+      status: secretEnvReady ? "ready" : (profileReady ? "operator_execute" : "blocked_until_profile"),
       envKeys: missingSecretEnv,
-      expectedEvidence: "Record which required secret environment variables are loaded in the shell used for route-map, evidence, and live-write duty."
+      unsafeCliSecretOverrides,
+      expectedEvidence: "Record which required secret environment variables are loaded in the shell used for route-map, evidence, and live-write duty, and confirm no CLI password flags remain."
     },
     {
       key: "confirm_artifact_output_paths",
@@ -1140,6 +1181,7 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
     status,
     readyCheckCount,
     blockedCheckCount,
+    unsafeCliSecretOverrides,
     checks,
     operatorSteps,
     nextAction
@@ -1152,6 +1194,9 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     ? preflight.recommendedFiles
     : (result.stagingEnvironmentBinding?.recommendedOutputFiles || []);
   const missingSecretEnv = Array.isArray(preflight.missingSecretEnv) ? preflight.missingSecretEnv : [];
+  const unsafeCliSecretOverrides = Array.isArray(preflight.unsafeCliSecretOverrides)
+    ? preflight.unsafeCliSecretOverrides
+    : [];
   const missingOutputFiles = Array.isArray(preflight.missingOutputFiles) ? preflight.missingOutputFiles : [];
   const commandSequence = Array.isArray(preflight.commandSequence) ? preflight.commandSequence : [];
   const pathFor = (key) => keyedPath(recommendedFiles, key) || keyedPath(outputFiles, key);
@@ -1192,7 +1237,15 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
       key: "set_required_secret_env",
       status: "blocked",
       envKeys: missingSecretEnv,
+      unsafeCliSecretOverrides,
       nextAction: "Set the missing secret environment variables before evidence recording or live-write duty continues."
+    };
+  } else if (unsafeCliSecretOverrides.length) {
+    currentAction = {
+      key: "move_cli_secret_overrides_to_env",
+      status: "blocked",
+      unsafeCliSecretOverrides,
+      nextAction: "Remove CLI password flags and rely on the required secret environment variables before evidence recording or live-write duty continues."
     };
   }
   const postDryRunAction = fullTestWindow.canRun === true
@@ -1218,6 +1271,7 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     canRunLiveWriteSmoke: preflight.canRunLiveWriteSmoke === true,
     canRecordEvidence: preflight.canRecordEvidence === true,
     missingSecretEnv,
+    unsafeCliSecretOverrides,
     missingOutputFiles,
     currentAction,
     postDryRunAction,
@@ -6249,6 +6303,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Writes data by itself: ${summary.willModifyData ? "yes" : "no"}`,
     `- Source statuses: profilePreflight=${statuses.profilePreflight || "-"}, executionRunbook=${statuses.executionRunbook || "-"}, closeoutReview=${statuses.closeoutReview || "-"}, readinessTransition=${statuses.readinessTransition || "-"}, finalPacket=${statuses.finalPacket || "-"}`,
     `- Missing secret env: ${(focus.missingSecretEnv || []).join(", ") || "-"}`,
+    `- Unsafe CLI secret overrides: ${(focus.unsafeCliSecretOverrides || []).join(", ") || "-"}`,
     `- Closeout review: ${statuses.closeoutReview || "-"} (missing=${focus.closeoutMissingFieldCount ?? 0})`,
     `- Can run dry run: ${focus.canRunDryRun ? "yes" : "no"}`,
     `- Can run live-write smoke: ${focus.canRunLiveWriteSmoke ? "yes" : "no"}`,
@@ -6258,6 +6313,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Go-live progress: ${goLiveProgress.status || "-"} (ready=${goLiveProgress.readyCheckCount ?? "-"}, blocked=${goLiveProgress.blockedCheckCount ?? "-"}, scriptReadiness=${goLiveProgress.scriptReadinessPercent ?? "-"}%)`,
     `- Go-live current blocker: ${goLiveProgress.currentBlocker?.key || "-"}`,
     `- Go-live current action: ${goLiveAction.kind || "-"} (command=${goLiveAction.command || "-"}, env=${(goLiveAction.envKeys || []).join(", ") || "-"}, artifact=${goLiveAction.artifactPath || "-"})`,
+    `- Go-live current action unsafeCliSecretOverrides: ${(goLiveAction.unsafeCliSecretOverrides || []).join(", ") || "-"}`,
     `- Go-live blocked queue: ${(goLiveProgress.blockedQueue || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
     `- Go-live operator action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
     `- Go-live operator current action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
@@ -6286,6 +6342,9 @@ function renderStagingRehearsalExecutionSummary(summary) {
       for (const item of goLiveProgress.operatorActionQueue) {
         const itemAction = item.operatorAction || {};
         lines.push(`  - ${item.key || "-"}: ${itemAction.kind || "-"} (command=${itemAction.command || "-"}, env=${(itemAction.envKeys || []).join(", ") || "-"}, artifact=${itemAction.artifactPath || "-"})`);
+        if (Array.isArray(itemAction.unsafeCliSecretOverrides) && itemAction.unsafeCliSecretOverrides.length) {
+          lines.push(`    - unsafeCliSecretOverrides: ${itemAction.unsafeCliSecretOverrides.join(", ")}`);
+        }
       }
     }
     if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
@@ -6299,6 +6358,9 @@ function renderStagingRehearsalExecutionSummary(summary) {
       lines.push(`  - ${reason.key || "-"}: ${reason.status || "-"}`);
       if (Array.isArray(reason.missing) && reason.missing.length) {
         lines.push(`    - missing: ${reason.missing.join(", ")}`);
+      }
+      if (Array.isArray(reason.unsafeCliSecretOverrides) && reason.unsafeCliSecretOverrides.length) {
+        lines.push(`    - unsafeCliSecretOverrides: ${reason.unsafeCliSecretOverrides.join(", ")}`);
       }
       if (Array.isArray(reason.placeholderKeys) && reason.placeholderKeys.length) {
         lines.push(`    - placeholders: ${reason.placeholderKeys.join(", ")}`);
@@ -6321,6 +6383,9 @@ function appendOperatorStepList(lines, heading, steps) {
     }
     if (Array.isArray(step.envKeys) && step.envKeys.length) {
       lines.push(`    - envKeys: ${step.envKeys.join(", ")}`);
+    }
+    if (Array.isArray(step.unsafeCliSecretOverrides) && step.unsafeCliSecretOverrides.length) {
+      lines.push(`    - unsafeCliSecretOverrides: ${step.unsafeCliSecretOverrides.join(", ")}`);
     }
     if (Array.isArray(step.missingKeys) && step.missingKeys.length) {
       lines.push(`    - missingKeys: ${step.missingKeys.join(", ")}`);
@@ -6557,6 +6622,7 @@ function renderOperatorExecutionPlan(plan) {
     const current = focus.currentAction || {};
     lines.push(`- Real staging run focus: ${focus.status || "-"} (dryRun=${focus.canRunDryRun ? "yes" : "no"}, liveWriteSmoke=${focus.canRunLiveWriteSmoke ? "yes" : "no"}, evidence=${focus.canRecordEvidence ? "yes" : "no"})`);
     lines.push(`- Real staging current action: ${current.key || "-"} (env=${(current.envKeys || []).join(", ") || "-"})`);
+    lines.push(`- Real staging current action unsafeCliSecretOverrides: ${(current.unsafeCliSecretOverrides || []).join(", ") || "-"}`);
     lines.push(`- Real staging archive root: ${focus.paths?.artifactArchiveRoot || "-"}`);
     lines.push(`- Real staging dry-run command: \`${focus.commands?.stagingDryRun || "-"}\``);
     lines.push(`- Real staging closeout reload: \`${focus.commands?.closeoutReload || "-"}\``);
@@ -6612,6 +6678,9 @@ function renderOperatorExecutionPlan(plan) {
       lines.push(`  - Operator real input ${check.key || "-"}: ${check.status || "-"}`);
       if (Array.isArray(check.missing) && check.missing.length) {
         lines.push(`    - missing: ${check.missing.join(", ")}`);
+      }
+      if (Array.isArray(check.unsafeCliSecretOverrides) && check.unsafeCliSecretOverrides.length) {
+        lines.push(`    - unsafeCliSecretOverrides: ${check.unsafeCliSecretOverrides.join(", ")}`);
       }
       if (check.path) {
         lines.push(`    - path: ${check.path}`);

@@ -2448,6 +2448,113 @@ test("staging rehearsal profile gate requires password secrets to come from envi
   }
 });
 
+test("staging rehearsal profile gate keeps cli secret overrides visible after env secrets are set", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-profile-cli-secret-override-"));
+  const profileFile = join(tempDir, "staging-profile.json");
+  const handoffFile = join(tempDir, "handoff.md");
+  const closeoutFile = join(tempDir, "closeout-template.json");
+  const runRecordFile = join(tempDir, "profile-run-record-index.json");
+  const artifactManifestFile = join(tempDir, "profile-artifact-manifest.json");
+  const backupRestorePacketFile = join(tempDir, "profile-backup-restore-packet.json");
+  const closeoutReloadPacketFile = join(tempDir, "profile-closeout-reload-packet.json");
+  const readinessReviewPacketFile = join(tempDir, "profile-readiness-review-packet.json");
+  const productionSignoffPacketFile = join(tempDir, "profile-production-signoff-packet.json");
+  const launchDutyArchiveIndexFile = join(tempDir, "profile-launch-duty-archive-index.json");
+  const filledCloseoutDraftFile = join(tempDir, "profile-filled-closeout-input.draft.json");
+  try {
+    writeFileSync(profileFile, JSON.stringify({
+      baseUrl: "https://profile-staging.example.com",
+      productCode: "PROFILE_PRODUCT",
+      channel: "stable",
+      adminUsername: "profile-admin@example.com",
+      developerUsername: "profile.developer",
+      targetOs: "linux",
+      storageProfile: "postgres-preview",
+      targetEnvFile: "/etc/rocksolidlicense/profile.env",
+      appBackupDir: "/var/lib/rocksolid/profile-backups",
+      postgresBackupDir: "/var/lib/rocksolid/profile-postgres-backups"
+    }, null, 2));
+
+    const result = runRehearsal([
+      "--profile-file",
+      profileFile,
+      "--admin-password",
+      "CliAdminShouldStayFlagOnly123!",
+      "--developer-password",
+      "CliDeveloperShouldStayFlagOnly123!",
+      "--handoff-file",
+      handoffFile,
+      "--closeout-file",
+      closeoutFile,
+      "--run-record-file",
+      runRecordFile,
+      "--artifact-manifest-file",
+      artifactManifestFile,
+      "--backup-restore-packet-file",
+      backupRestorePacketFile,
+      "--closeout-reload-packet-file",
+      closeoutReloadPacketFile,
+      "--readiness-review-packet-file",
+      readinessReviewPacketFile,
+      "--production-signoff-packet-file",
+      productionSignoffPacketFile,
+      "--launch-duty-archive-index-file",
+      launchDutyArchiveIndexFile,
+      "--filled-closeout-draft-file",
+      filledCloseoutDraftFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "EnvAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "EnvDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: "developer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.stagingProfileOperatorPreflight.missingSecretEnv, []);
+    assert.deepEqual(output.stagingProfileOperatorPreflight.unsafeCliSecretOverrides, [
+      "--admin-password",
+      "--developer-password"
+    ]);
+    assert.equal(output.stagingProfileOperatorPreflight.status, "blocked_until_secret_env");
+    assert.equal(output.stagingProfileOperatorPreflight.canRunLiveWriteSmoke, false);
+    assert.equal(output.operatorExecutionPlan.realStagingInputClosure.status, "blocked_until_secret_env");
+    assert.deepEqual(output.operatorExecutionPlan.realStagingInputClosure.unsafeCliSecretOverrides, [
+      "--admin-password",
+      "--developer-password"
+    ]);
+    assert.equal(output.operatorExecutionPlan.realStagingInputClosure.checks[1].status, "unsafe_cli_override");
+    assert.deepEqual(output.operatorExecutionPlan.realStagingRunFocus.currentAction, {
+      key: "move_cli_secret_overrides_to_env",
+      status: "blocked",
+      unsafeCliSecretOverrides: [
+        "--admin-password",
+        "--developer-password"
+      ],
+      nextAction: "Remove CLI password flags and rely on the required secret environment variables before evidence recording or live-write duty continues."
+    });
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.orderedNextActions.slice(0, 1),
+      ["move_cli_secret_overrides_to_env"]
+    );
+    assert.equal(output.stagingRehearsalExecutionSummary.blockingReasons[0].key, "unsafe_cli_secret_overrides");
+    assert.deepEqual(output.stagingRehearsalExecutionSummary.blockingReasons[0].unsafeCliSecretOverrides, [
+      "--admin-password",
+      "--developer-password"
+    ]);
+    assert.deepEqual(
+      output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.currentBlocker.operatorAction.unsafeCliSecretOverrides,
+      ["--admin-password", "--developer-password"]
+    );
+    const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, /Unsafe CLI secret overrides: --admin-password, --developer-password/);
+    assert.match(handoff, /Operator real input required_secret_env: unsafe_cli_override/);
+    assert.match(handoff, /unsafeCliSecretOverrides: --admin-password, --developer-password/);
+    assert.doesNotMatch(result.stdout, /CliAdminShouldStayFlagOnly123!|CliDeveloperShouldStayFlagOnly123!/);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("staging rehearsal runner refuses staging profile files containing secret values", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-profile-secret-"));
   const profileFile = join(tempDir, "staging-profile.json");

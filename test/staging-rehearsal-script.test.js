@@ -469,6 +469,11 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   );
   assert.equal(output.stagingProductionSignoffPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingProductionSignoffPacket.commands.fullTestWindow, "npm.cmd test");
+  assert.equal(output.stagingProductionSignoffPacket.goLiveExecutionEntry.mode, "go-live-execution-entry");
+  assert.equal(output.stagingProductionSignoffPacket.goLiveExecutionEntry.status, "awaiting_closeout_backfill");
+  assert.equal(output.stagingProductionSignoffPacket.goLiveExecutionEntry.currentActionKey, "route_map_gate_result");
+  assert.equal(output.stagingProductionSignoffPacket.goLiveExecutionEntry.commands.closeoutReload, output.stagingProductionSignoffPacket.commands.closeoutReload);
+  assert.equal(output.stagingProductionSignoffPacket.goLiveExecutionEntry.commands.fullTestWindow, "npm.cmd test");
   assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.status, "blocked_until_full_test_window");
   assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.closeoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.reloadCommand, output.stagingProductionSignoffPacket.commands.closeoutReload);
@@ -737,6 +742,11 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   );
   assert.equal(output.stagingReadinessReviewPacket.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingReadinessReviewPacket.commands.fullTestWindow, "npm.cmd test");
+  assert.equal(output.stagingReadinessReviewPacket.goLiveExecutionEntry.mode, "go-live-execution-entry");
+  assert.equal(output.stagingReadinessReviewPacket.goLiveExecutionEntry.status, "awaiting_closeout_backfill");
+  assert.equal(output.stagingReadinessReviewPacket.goLiveExecutionEntry.currentPhase, "full_test_window_entry");
+  assert.equal(output.stagingReadinessReviewPacket.goLiveExecutionEntry.currentActionKey, "route_map_gate_result");
+  assert.equal(output.stagingReadinessReviewPacket.goLiveExecutionEntry.blockerSummary.missingCloseoutKeys.length, 7);
   assert.equal(output.stagingReadinessReviewPacket.nextAction, "Reload filled closeout input, then use this packet to decide whether the full test window can start.");
   assert.equal(output.stagingLaunchDutyArchiveIndex.mode, "staging-launch-duty-archive-index");
   assert.equal(output.stagingLaunchDutyArchiveIndex.status, "awaiting_archive_review");
@@ -816,6 +826,10 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   });
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.fullTestWindow, "npm.cmd test");
+  assert.equal(output.stagingLaunchDutyArchiveIndex.goLiveExecutionEntry.mode, "go-live-execution-entry");
+  assert.equal(output.stagingLaunchDutyArchiveIndex.goLiveExecutionEntry.status, "awaiting_closeout_backfill");
+  assert.equal(output.stagingLaunchDutyArchiveIndex.goLiveExecutionEntry.currentActionKey, "route_map_gate_result");
+  assert.equal(output.stagingLaunchDutyArchiveIndex.goLiveExecutionEntry.paths.filledCloseoutInputFile, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingLaunchDutyArchiveIndex.nextAction, "Archive the listed launch-duty packets, then use readiness review to decide whether the full test window can start.");
   assert.equal(output.filledCloseoutInputExample.mode, "staging-closeout-input-example");
   assert.equal(output.filledCloseoutInputExample.status, "example_only");

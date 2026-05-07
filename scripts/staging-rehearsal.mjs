@@ -1422,6 +1422,15 @@ function buildStagingReadinessReviewPacket(result) {
   const packetFile = result.readinessReviewPacketFile?.path
     || bindingFiles.get("readiness_review_packet")?.path
     || path.posix.join(archiveRoot, "staging-readiness-review-packet.json");
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
+    || finalPacket.goLiveExecutionEntry
+    || buildGoLiveExecutionEntry({
+      realStagingRunFocus: buildRealStagingRunFocus(result),
+      closeoutBackfillFocus: buildCloseoutBackfillFocus(result),
+      fullTestSignoffFocus: buildFullTestSignoffFocus(result),
+      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null
+    });
   let status = "blocked_until_closeout_reload";
   if (stabilizationHandoff.canStartStabilizationHandoff === true) {
     status = "ready_for_stabilization_handoff";
@@ -1489,6 +1498,7 @@ function buildStagingReadinessReviewPacket(result) {
       closeoutReload: closeoutReloadPacket.commands?.closeoutReload || finalPacket.commands?.closeoutReload || null,
       fullTestWindow: fullTestWindow.command || finalPacket.commands?.fullTestWindow || "npm.cmd test"
     },
+    goLiveExecutionEntry,
     nextAction: status === "ready_for_stabilization_handoff"
       ? "Start stabilization handoff from the launch-day watch and receipt visibility records."
       : status === "ready_for_launch_day_watch"
@@ -1812,6 +1822,16 @@ function buildStagingProductionSignoffPacket(result) {
     || runRecordIndex.closeoutProgress?.reloadCommand
     || productionSignoff.reloadCommand
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
+    || readinessReviewPacket.goLiveExecutionEntry
+    || result.finalRehearsalPacket?.goLiveExecutionEntry
+    || buildGoLiveExecutionEntry({
+      realStagingRunFocus: buildRealStagingRunFocus(result),
+      closeoutBackfillFocus: buildCloseoutBackfillFocus(result),
+      fullTestSignoffFocus: buildFullTestSignoffFocus(result),
+      launchDutyCurrentAction: result.finalRehearsalPacket?.launchDutyCurrentAction || null
+    });
   const launchDutyArchiveIndexPath = result.launchDutyArchiveIndexFile?.path
     || bindingFiles.get("launch_duty_archive_index")?.path
     || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
@@ -1910,6 +1930,7 @@ function buildStagingProductionSignoffPacket(result) {
       closeoutReload,
       fullTestWindow: fullTestWindow.command || readinessReviewPacket.commands?.fullTestWindow || "npm.cmd test"
     },
+    goLiveExecutionEntry,
     operatorSteps: [
       {
         key: "run_full_test_window",
@@ -1973,6 +1994,17 @@ function buildStagingLaunchDutyArchiveIndex(result) {
     || bindingFiles.get("launch_duty_archive_index")?.path
     || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
   const packetPath = (key, fallback) => bindingFiles.get(key)?.path || fallback || null;
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
+    || productionSignoffPacket.goLiveExecutionEntry
+    || readinessReviewPacket.goLiveExecutionEntry
+    || finalPacket.goLiveExecutionEntry
+    || buildGoLiveExecutionEntry({
+      realStagingRunFocus: buildRealStagingRunFocus(result),
+      closeoutBackfillFocus: buildCloseoutBackfillFocus(result),
+      fullTestSignoffFocus: buildFullTestSignoffFocus(result),
+      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null
+    });
   return {
     mode: "staging-launch-duty-archive-index",
     status: "awaiting_archive_review",
@@ -1991,6 +2023,7 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       finalPacket: finalPacket.status || "not_available"
     },
     goLiveOperatorActionPlan: finalPacket.goLiveOperatorActionPlan || null,
+    goLiveExecutionEntry,
     packets: [
       {
         key: "run_record_index",

@@ -2945,6 +2945,8 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.match(handoff, /Launch-duty current packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(handoff, /Launch-duty evidence inputs: production_signoff_packet=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /Launch-duty confirmation points: production_signoff_packet=archive_before_cutover; launch_day_watch_summary=pending_operator_entry; stabilization_owner_handoff=operator_handoff/);
+    assert.match(handoff, /Go-live launch-day watch entry: ready_for_launch_day_watch \(target=production_signoff_packet, watch=launch_day_watch_summary, stabilization=stabilization_owner_handoff\)/);
+    assert.match(handoff, /Go-live launch-day evidence inputs: production_signoff_packet=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /Execution launch-duty archive trace: group=launch_day_watch_and_stabilization, runRecord=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json, archiveIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Final packet launch-duty record updates: production_signoff_packet=archive_before_cutover -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=operator_handoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /Launch-duty archive trace: group=launch_day_watch_and_stabilization, runRecord=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json, archiveIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
@@ -3066,6 +3068,19 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.key, "archive_production_signoff");
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.status, "ready_for_launch_day_watch");
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.signoffBackfillDraftStatus, "already_filled");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentPhase, "launch_watch_and_stabilization");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry?.status, "ready_for_launch_day_watch");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry?.currentPostSignoffTarget?.key, "production_signoff_packet");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry?.currentWatchArtifact?.key, "launch_day_watch_summary");
+    assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry?.currentStabilizationWindow?.key, "stabilization_owner_handoff");
+    assert.deepEqual(
+      output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry?.evidenceInputs?.map((item) => [item.key, item.status, item.path]),
+      [
+        ["production_signoff_packet", "archive_before_cutover", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"],
+        ["launch_day_watch_summary", "pending_operator_entry", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+        ["stabilization_owner_handoff", "operator_handoff", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+      ]
+    );
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.mode, "launch-duty-current-action");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.stage, "launch_day_watch_entry");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.sourceFocus, "launchDutyPacketFocus");

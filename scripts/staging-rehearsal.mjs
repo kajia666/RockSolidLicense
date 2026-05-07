@@ -3094,6 +3094,42 @@ function buildGoLiveExecutionEntry({
     nextAction = current.nextAction || realStagingRunFocus.nextAction || null;
   }
 
+  const normalizeLaunchDutyEntryItem = (item) => item && item.key
+    ? {
+      key: item.key,
+      kind: item.kind || null,
+      status: item.status || null,
+      path: item.path || item.artifactPath || null,
+      command: item.command || null
+    }
+    : null;
+  const evidenceInputs = Array.isArray(launchDutyCurrentAction?.evidenceInputs)
+    ? launchDutyCurrentAction.evidenceInputs.map(normalizeLaunchDutyEntryItem).filter(Boolean)
+    : [];
+  const evidenceInputByKey = new Map(evidenceInputs.map((item) => [item.key, item]));
+  const confirmationPoints = Array.isArray(launchDutyCurrentAction?.confirmationPoints)
+    ? launchDutyCurrentAction.confirmationPoints.map(normalizeLaunchDutyEntryItem).filter(Boolean)
+    : [];
+  const launchDayWatchEntry = canSignoffProduction || launchDutyCurrentAction?.stage === "launch_day_watch_entry"
+    ? {
+      status,
+      stage: launchDutyCurrentAction?.stage || "launch_day_watch_entry",
+      currentPostSignoffTarget: normalizeLaunchDutyEntryItem(
+        launchDutyPacketFocus?.currentPostSignoffTarget || evidenceInputByKey.get("production_signoff_packet")
+      ),
+      currentWatchArtifact: normalizeLaunchDutyEntryItem(
+        launchDutyPacketFocus?.currentWatchArtifact || evidenceInputByKey.get("launch_day_watch_summary")
+      ),
+      currentStabilizationWindow: normalizeLaunchDutyEntryItem(
+        launchDutyPacketFocus?.currentStabilizationWindow || evidenceInputByKey.get("stabilization_owner_handoff")
+      ),
+      evidenceInputs,
+      confirmationPoints,
+      archiveTrace: launchDutyCurrentAction?.archiveTrace || null,
+      nextAction: nextAction || launchDutyCurrentAction?.nextAction || null
+    }
+    : null;
+
   return {
     mode: "go-live-execution-entry",
     status,
@@ -3118,6 +3154,7 @@ function buildGoLiveExecutionEntry({
     },
     blockerSummary,
     launchDutyCurrentActionKey: launchDutyCurrentAction?.key || null,
+    ...(launchDayWatchEntry ? { launchDayWatchEntry } : {}),
     nextAction
   };
 }
@@ -5760,12 +5797,18 @@ function renderLaunchDutyRecordUpdates(items = []) {
 
 function appendGoLiveExecutionEntry(lines, entry = {}) {
   const blockers = entry.blockerSummary || {};
+  const launchDayWatchEntry = entry.launchDayWatchEntry || null;
   lines.push(`- Go-live execution entry: ${entry.status || "-"} (phase=${entry.currentPhase || "-"}, source=${entry.sourceFocus || "-"}, action=${entry.currentActionKey || "-"})`);
   lines.push(`- Go-live execution command: \`${entry.currentCommand || "-"}\``);
   lines.push(`- Go-live execution closeout reload: \`${entry.commands?.closeoutReload || "-"}\``);
   lines.push(`- Go-live execution full-test command: \`${entry.commands?.fullTestWindow || "-"}\``);
   lines.push(`- Go-live execution packets: current=${entry.packetFocus?.currentPacketKey || "-"} -> ${entry.packetFocus?.currentPacketPath || "-"}, closeout=${entry.paths?.closeoutReloadPacketFile || "-"}, readiness=${entry.paths?.readinessReviewPacketFile || "-"}, signoff=${entry.paths?.productionSignoffPacketFile || "-"}`);
   lines.push(`- Go-live execution blockers: closeout=${(blockers.missingCloseoutKeys || []).join(", ") || "-"}, signoff=${(blockers.missingSignoffKeys || []).join(", ") || "-"}, receipts=${(blockers.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
+  if (launchDayWatchEntry) {
+    lines.push(`- Go-live launch-day watch entry: ${launchDayWatchEntry.status || "-"} (target=${launchDayWatchEntry.currentPostSignoffTarget?.key || "-"}, watch=${launchDayWatchEntry.currentWatchArtifact?.key || "-"}, stabilization=${launchDayWatchEntry.currentStabilizationWindow?.key || "-"})`);
+    lines.push(`- Go-live launch-day evidence inputs: ${renderLaunchDutyActionInputList(launchDayWatchEntry.evidenceInputs)}`);
+    lines.push(`- Go-live launch-day confirmation points: ${renderLaunchDutyActionConfirmationList(launchDayWatchEntry.confirmationPoints)}`);
+  }
   lines.push(`- Go-live execution next action: ${entry.nextAction || "-"}`);
 }
 

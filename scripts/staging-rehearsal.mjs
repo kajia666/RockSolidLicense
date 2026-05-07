@@ -1488,6 +1488,7 @@ function buildStagingReadinessReviewPacket(result) {
         command: fullTestWindow.command || "npm.cmd test",
         closeoutInputStatus: fullTestWindow.closeoutInputStatus || "missing",
         missingCloseoutKeys: fullTestWindow.missingCloseoutKeys || [],
+        closeoutEvidenceTargets: fullTestWindow.closeoutEvidenceTargets || [],
         nextAction: fullTestWindow.nextAction || null
       },
       {
@@ -1498,6 +1499,8 @@ function buildStagingReadinessReviewPacket(result) {
         productionDecision: productionSignoff.productionDecision || null,
         missingSignoffKeys: productionSignoff.missingSignoffKeys || [],
         missingReceiptVisibilityKeys: productionSignoff.missingReceiptVisibilityKeys || [],
+        signoffEvidenceTargets: productionSignoff.signoffEvidenceTargets || [],
+        receiptVisibilityEvidenceTargets: productionSignoff.receiptVisibilityEvidenceTargets || [],
         nextAction: productionSignoff.nextAction || null
       },
       {
@@ -1932,8 +1935,11 @@ function buildStagingProductionSignoffPacket(result) {
   const signoffConditions = (closeout.productionSignoffConditions?.conditions || []).map((item) => ({
     key: item.key,
     status: canSignoff ? "filled" : missingSignoffKeys.includes(item.key) ? "missing" : "filled",
-    evidence: item.evidence || null
+    evidence: item.evidence || null,
+    expectedEvidence: item.evidence || null
   }));
+  const receiptVisibilityEvidenceTargets = productionSignoff.receiptVisibilityEvidenceTargets
+    || buildReceiptVisibilityEvidenceTargets(missingReceiptVisibilityKeys);
   const closeoutReceiptVisibility = closeoutInput?.receiptVisibility && typeof closeoutInput.receiptVisibility === "object"
     ? closeoutInput.receiptVisibility
     : {};
@@ -1992,6 +1998,7 @@ function buildStagingProductionSignoffPacket(result) {
     missingSignoffKeys,
     missingReceiptVisibilityKeys,
     signoffConditions,
+    receiptVisibilityEvidenceTargets,
     signoffBackfillDraft,
     routes: {
       launchMainline: launchDayWatch.routes?.launchMainline || result.nextCommands?.launchMainline || null,
@@ -2014,34 +2021,40 @@ function buildStagingProductionSignoffPacket(result) {
       {
         key: "run_full_test_window",
         status: canSignoff ? "complete" : canRunFullTestWindow ? "operator_execute" : "blocked_until_closeout_reload",
-        command: fullTestWindow.command || "npm.cmd test"
+        command: fullTestWindow.command || "npm.cmd test",
+        expectedEvidence: "Run npm.cmd test and capture the pass/fail summary before production sign-off."
       },
       {
         key: "backfill_production_signoff",
         status: canSignoff ? "complete" : canRunFullTestWindow ? "operator_backfill" : "blocked_until_full_test_window",
         requiredSignoffKeys,
-        missingSignoffKeys
+        missingSignoffKeys,
+        expectedEvidence: "Backfill every production sign-off condition with redacted full-test and release-readiness evidence."
       },
       {
         key: "verify_receipt_visibility",
         status: canSignoff && missingReceiptVisibilityKeys.length === 0 ? "complete" : "operator_backfill",
         requiredReceiptVisibilityKeys: RECEIPT_VISIBILITY_KEYS,
-        missingReceiptVisibilityKeys
+        missingReceiptVisibilityKeys,
+        expectedEvidence: "Confirm Launch Mainline, Launch Review, Launch Smoke, Developer Ops, and Launch Ops Overview Status receipt visibility before cutover."
       },
       {
         key: "reload_closeout_input",
         status: "operator_execute",
-        command: closeoutReload
+        command: closeoutReload,
+        expectedEvidence: "Reload the filled closeout input and confirm production sign-off readiness is recalculated from redacted evidence."
       },
       {
         key: "archive_production_signoff",
         status: canSignoff ? "ready" : "blocked_until_signoff_ready",
-        packetFile
+        packetFile,
+        expectedEvidence: "Archive the signed production sign-off packet with full-test status, GO/NO-GO decision, and receipt visibility lanes."
       },
       {
         key: "start_launch_day_watch",
         status: launchDayWatch.canStartCutoverWatch === true ? "ready" : "blocked_until_signoff_ready",
-        routes: launchDayWatch.routes || {}
+        routes: launchDayWatch.routes || {},
+        expectedEvidence: "Start launch-day watch only after production sign-off and receipt visibility are ready."
       }
     ],
     nextAction: canSignoff
@@ -2714,6 +2727,46 @@ function buildProductionSignoffInputTemplate(signoff = {}) {
   };
 }
 
+const RECEIPT_VISIBILITY_EVIDENCE_TARGETS = {
+  launchMainline: "Confirm Launch Mainline receipt visibility shows the latest staging evidence receipts before cutover.",
+  launchReview: "Confirm Launch Review summary download shows the latest staging evidence receipts before cutover.",
+  launchSmoke: "Confirm Launch Smoke summary download shows the latest staging evidence receipts before cutover.",
+  developerOps: "Confirm Developer Ops receipt visibility shows the latest staging evidence receipts before cutover.",
+  launchOpsOverviewStatus: "Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover."
+};
+
+function buildCloseoutEvidenceTargets(closeout = {}, missingKeys = []) {
+  const missingSet = new Set(Array.isArray(missingKeys) ? missingKeys : []);
+  return (closeout.acceptanceChecks || [])
+    .filter((check) => check?.key)
+    .map((check) => ({
+      key: check.key,
+      status: missingSet.has(check.key) ? "missing" : "filled",
+      sourceStep: CLOSEOUT_SOURCE_STEPS[check.key] || "operator_backfill",
+      expectedEvidence: check.expectedEvidence || null
+    }));
+}
+
+function buildSignoffEvidenceTargets(closeout = {}, missingKeys = []) {
+  const missingSet = new Set(Array.isArray(missingKeys) ? missingKeys : []);
+  return (closeout.productionSignoffConditions?.conditions || [])
+    .filter((condition) => condition?.key)
+    .map((condition) => ({
+      key: condition.key,
+      status: missingSet.has(condition.key) ? "missing" : "filled",
+      expectedEvidence: condition.evidence || null
+    }));
+}
+
+function buildReceiptVisibilityEvidenceTargets(missingKeys = []) {
+  const missingSet = new Set(Array.isArray(missingKeys) ? missingKeys : []);
+  return RECEIPT_VISIBILITY_KEYS.map((key) => ({
+    key,
+    status: missingSet.has(key) ? "missing" : "visible",
+    expectedEvidence: RECEIPT_VISIBILITY_EVIDENCE_TARGETS[key] || null
+  }));
+}
+
 function buildCloseoutBackfillGuide(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const orderedBackfillKeys = (closeout.acceptanceChecks || [])
@@ -2754,6 +2807,7 @@ function buildFullTestWindowReadiness(result) {
   const missingCloseoutKeys = closeoutInput?.missingKeys
     || (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
   const canRun = closeoutInput?.readyForFullTestWindow === true;
+  const closeoutEvidenceTargets = buildCloseoutEvidenceTargets(closeout, missingCloseoutKeys);
   return {
     status: canRun ? "ready" : "blocked",
     canRun,
@@ -2763,6 +2817,7 @@ function buildFullTestWindowReadiness(result) {
     requiredDecision: closeout.fullTestWindowEntry?.triggerDecision || "ready-for-full-test-window",
     closeoutInputStatus: closeoutInput?.status || "missing",
     missingCloseoutKeys,
+    closeoutEvidenceTargets,
     reloadCommand: result.closeoutBackfillGuide?.closeoutInputReload?.command || "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
     nextAction: canRun
       ? `Run ${command} in the reserved full test window, then backfill productionSignoff.`
@@ -2777,6 +2832,8 @@ function buildProductionSignoffReadiness(result) {
     .map((item) => item.key)
     .filter(Boolean);
   const canSignoff = closeoutInput?.readyForProductionSignoff === true;
+  const missingSignoffKeys = closeoutInput?.signoffMissingKeys || requiredSignoffKeys;
+  const missingReceiptVisibilityKeys = closeoutInput?.missingReceiptVisibilityKeys || RECEIPT_VISIBILITY_KEYS;
   return {
     status: canSignoff ? "ready" : "blocked",
     canSignoff,
@@ -2784,8 +2841,10 @@ function buildProductionSignoffReadiness(result) {
     productionDecision: closeoutInput?.productionDecision || null,
     closeoutInputStatus: closeoutInput?.status || "missing",
     readyForFullTestWindow: closeoutInput?.readyForFullTestWindow === true,
-    missingSignoffKeys: closeoutInput?.signoffMissingKeys || requiredSignoffKeys,
-    missingReceiptVisibilityKeys: closeoutInput?.missingReceiptVisibilityKeys || RECEIPT_VISIBILITY_KEYS,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys,
+    signoffEvidenceTargets: buildSignoffEvidenceTargets(closeout, missingSignoffKeys),
+    receiptVisibilityEvidenceTargets: buildReceiptVisibilityEvidenceTargets(missingReceiptVisibilityKeys),
     reloadCommand: result.closeoutBackfillGuide?.closeoutInputReload?.command || "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
     nextAction: canSignoff
       ? "Production sign-off is ready; keep the closeout artifact with release evidence before cutover."
@@ -6243,7 +6302,7 @@ function renderFullTestWindowReadiness(readiness) {
   if (!readiness) {
     return "- Not available";
   }
-  return [
+  const lines = [
     `- Status: ${readiness.status || "-"}`,
     `- Can run: ${readiness.canRun ? "yes" : "no"}`,
     `- Command: \`${readiness.command || "-"}\``,
@@ -6254,14 +6313,22 @@ function renderFullTestWindowReadiness(readiness) {
     `- Missing closeout keys: ${(readiness.missingCloseoutKeys || []).join(", ") || "-"}`,
     `- Reload command: \`${readiness.reloadCommand || "-"}\``,
     `- Next action: ${readiness.nextAction || "-"}`
-  ].join("\n");
+  ];
+  if (Array.isArray(readiness.closeoutEvidenceTargets) && readiness.closeoutEvidenceTargets.length) {
+    lines.push("- Closeout evidence targets:");
+    for (const target of readiness.closeoutEvidenceTargets) {
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"} (${target.sourceStep || "-"})`);
+      lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 function renderProductionSignoffReadiness(readiness) {
   if (!readiness) {
     return "- Not available";
   }
-  return [
+  const lines = [
     `- Status: ${readiness.status || "-"}`,
     `- Can sign off: ${readiness.canSignoff ? "yes" : "no"}`,
     `- Required decision: ${readiness.requiredDecision || "-"}`,
@@ -6272,7 +6339,22 @@ function renderProductionSignoffReadiness(readiness) {
     `- Missing receipt visibility keys: ${(readiness.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
     `- Reload command: \`${readiness.reloadCommand || "-"}\``,
     `- Next action: ${readiness.nextAction || "-"}`
-  ].join("\n");
+  ];
+  if (Array.isArray(readiness.signoffEvidenceTargets) && readiness.signoffEvidenceTargets.length) {
+    lines.push("- Sign-off evidence targets:");
+    for (const target of readiness.signoffEvidenceTargets) {
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"}`);
+      lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
+    }
+  }
+  if (Array.isArray(readiness.receiptVisibilityEvidenceTargets) && readiness.receiptVisibilityEvidenceTargets.length) {
+    lines.push("- Receipt visibility evidence targets:");
+    for (const target of readiness.receiptVisibilityEvidenceTargets) {
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"}`);
+      lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 function renderStagingBackupRestoreDrillPacket(packet) {
@@ -6419,16 +6501,36 @@ function renderStagingProductionSignoffPacket(packet) {
     `- Next action: ${packet.nextAction || "-"}`
   ];
   appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
+  if (Array.isArray(packet.signoffConditions) && packet.signoffConditions.length) {
+    lines.push("- Sign-off conditions:");
+    for (const condition of packet.signoffConditions) {
+      lines.push(`  - ${condition.key || "-"}: ${condition.status || "-"}`);
+      lines.push(`    - expectedEvidence: ${condition.expectedEvidence || condition.evidence || "-"}`);
+    }
+  }
+  if (Array.isArray(packet.receiptVisibilityEvidenceTargets) && packet.receiptVisibilityEvidenceTargets.length) {
+    lines.push("- Receipt visibility evidence targets:");
+    for (const target of packet.receiptVisibilityEvidenceTargets) {
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"}`);
+      lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
+    }
+  }
   if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
     lines.push("- Operator steps:");
     for (const step of packet.operatorSteps) {
       lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+      if (step.expectedEvidence) {
+        lines.push(`    - expectedEvidence: ${step.expectedEvidence}`);
+      }
     }
   }
   if (Array.isArray(packet.postSignoffTargets) && packet.postSignoffTargets.length) {
     lines.push("- Post-signoff targets:");
     for (const target of packet.postSignoffTargets) {
       lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
+      if (target.expectedEvidence) {
+        lines.push(`    - expectedEvidence: ${target.expectedEvidence}`);
+      }
     }
   }
   return lines.join("\n");

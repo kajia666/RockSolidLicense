@@ -17572,6 +17572,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(initialLaunchOpsTraceability.nextFollowUp.downloadFileName, "developer-ops-launch-receipt-next-follow-up.txt");
     assert.equal(initialLaunchOpsTraceability.nextFollowUp.downloadFormat, "launch-receipt-next-follow-up");
     assert.equal(initialLaunchOpsTraceability.nextFollowUp.downloadSource, "developer-ops");
+    assert.equal(initialLaunchOpsTraceability.nextFollowUp.operationalReadinessLaunchReadinessNextGateStatus, "awaiting_launch_readiness");
+    assert.equal(initialLaunchOpsTraceability.nextFollowUp.operationalReadinessLaunchReadinessNextGateCurrentGate, "ready_for_closeout_reload");
+    assert.equal(initialLaunchOpsTraceability.nextFollowUp.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand, "npm.cmd test");
     assert.match(initialLaunchOpsTraceability.nextFollowUp.downloadHref, /\/api\/developer\/ops\/export\/download\?/);
     assert.match(initialLaunchOpsTraceability.nextFollowUp.downloadHref, /format=launch-receipt-next-follow-up/);
     assert.equal(
@@ -17665,6 +17668,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /next=record_launch_rehearsal_run/);
     assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:/);
     assert.match(launchReceiptSnapshot.summaryText, /latestReceipt=record_post_launch_ops_sweep/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:[\s\S]*readinessGate=awaiting_launch_readiness/);
+    assert.match(launchReceiptSnapshot.summaryText, /Initial Launch Ops Traceability:[\s\S]*readinessGateCurrent=ready_for_closeout_reload/);
     assert.ok(launchReceiptSnapshot.summaryText.includes(`handoff=${latestLaunchReceipt.handoffFileName}`));
     assert.match(launchReceiptSnapshot.summaryText, /opsIndex=handoff-index\.txt/);
     assert.match(launchReceiptSnapshot.summaryText, /Staging Launch-Duty Archive:/);
@@ -17782,6 +17787,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewProductionSignoffPacket","launchOpsOverviewLaunchDayWatchEntry"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"launchOpsOverviewFirstWaveLifecycleStatus","launchOpsOverviewFirstWaveLifecycleNextOperation","launchOpsOverviewFirstWaveLifecyclePrimaryDownloadKey"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /"operationalReadinessWatchRecordDraftStatus","operationalReadinessWatchRecordDraftRecordCount"/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /"operationalReadinessLaunchReadinessNextGateStatus","operationalReadinessLaunchReadinessNextGateCurrentGate","operationalReadinessLaunchReadinessNextGateFullTestWindowCommand"/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_ops_overview_status/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /ops_launch_operations_overview_status/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /developer-ops-launch-operations-overview-status\.txt/);
@@ -17789,6 +17795,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptFollowUpsCsvDownload.body, /artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /enter_after_production_signoff/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /blocked_until_runway_evidence/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /awaiting_launch_readiness/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /ready_for_closeout_reload/);
+    assert.match(launchReceiptFollowUpsCsvDownload.body, /npm\.cmd test/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /record_launch_rehearsal_run/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /launch_mainline_operations_handoff/);
     assert.match(launchReceiptFollowUpsCsvDownload.body, /\/api\/developer\/launch-mainline\/download\?/);
@@ -18643,6 +18652,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadSource,
       "developer-ops"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.operationalReadinessLaunchReadinessNextGateStatus,
+      "awaiting_launch_readiness"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.operationalReadinessLaunchReadinessNextGateCurrentGate,
+      "ready_for_closeout_reload"
+    );
+    assert.equal(
+      launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand,
+      "npm.cmd test"
     );
     assert.match(
       launchMainlineTraceability.postLaunchHandoffTraceability.nextFollowUp.downloadHref,

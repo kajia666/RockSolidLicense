@@ -1166,7 +1166,9 @@ function buildStagingRehearsalRunRecordIndex(result) {
       key,
       sourcePlan: record.sourcePlan || null,
       artifactPath: record.artifactPath || null,
-      receiptOperations: record.receiptOperations || []
+      receiptOperations: record.receiptOperations || [],
+      expectedEvidence: record.expectedEvidence || null,
+      operatorNote: record.operatorNote || null
     };
   });
   const preFullTestStatus = missingRecordKeys.length === 0 && closeoutInput?.readyForFullTestWindow === true
@@ -3734,12 +3736,14 @@ function buildStagingRunRecordTemplate(result) {
     launchDayWatch: result.launchDayWatchPlan?.status || "not_available",
     stabilizationHandoff: result.stabilizationHandoffPlan?.status || "not_available"
   };
+  const acceptanceCheckByKey = new Map((closeout.acceptanceChecks || []).map((check) => [check.key, check]));
   const ledgerRecords = (ledger.rows || []).map((row) => ({
     key: row.checkKey,
     sourcePlan: "stagingAcceptanceCloseout",
     artifactKey: row.artifactKey || null,
     artifactPath: row.artifactPath || null,
     receiptOperations: row.receiptOperations || [],
+    expectedEvidence: acceptanceCheckByKey.get(row.checkKey)?.expectedEvidence || null,
     operatorNote: row.operatorNote || null
   }));
   const extraRecords = [
@@ -3749,6 +3753,7 @@ function buildStagingRunRecordTemplate(result) {
       artifactKey: "launch_day_watch_summary",
       artifactPath: path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
       receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+      expectedEvidence: "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions.",
       operatorNote: "Record cutover watch start/end time, owner, route checks, and any operator decisions."
     },
     {
@@ -3757,6 +3762,7 @@ function buildStagingRunRecordTemplate(result) {
       artifactKey: "first_wave_incident_log",
       artifactPath: path.posix.join(archiveRoot, "first-wave-incident-log.md"),
       receiptOperations: ["record_post_launch_ops_sweep"],
+      expectedEvidence: "Record first-wave incidents, customer impact, mitigation, owner, and status.",
       operatorNote: "Record first-wave incidents, customer impact, mitigation, owner, and status."
     },
     {
@@ -3765,6 +3771,7 @@ function buildStagingRunRecordTemplate(result) {
       artifactKey: "receipt_visibility_snapshot",
       artifactPath: path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt"),
       receiptOperations: ["record_post_launch_ops_sweep"],
+      expectedEvidence: "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots.",
       operatorNote: "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."
     },
     {
@@ -3773,6 +3780,7 @@ function buildStagingRunRecordTemplate(result) {
       artifactKey: "rollback_signal_review",
       artifactPath: path.posix.join(archiveRoot, "rollback-signal-review.md"),
       receiptOperations: ["record_rollback_walkthrough", "record_launch_stabilization_review"],
+      expectedEvidence: "Record whether rollback signals were observed, dismissed, or escalated.",
       operatorNote: "Record whether rollback signals were observed, dismissed, or escalated."
     },
     {
@@ -3781,6 +3789,7 @@ function buildStagingRunRecordTemplate(result) {
       artifactKey: "stabilization_owner_handoff",
       artifactPath: path.posix.join(archiveRoot, "stabilization-owner-handoff.md"),
       receiptOperations: ["record_launch_stabilization_review"],
+      expectedEvidence: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up.",
       operatorNote: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."
     }
   ];
@@ -6464,6 +6473,7 @@ function renderStagingRunRecordTemplate(template) {
       lines.push(`  - ${record.key || "-"}: ${record.artifactPath || "-"}`);
       lines.push(`    - sourcePlan: ${record.sourcePlan || "-"}`);
       lines.push(`    - receiptOperations: ${(record.receiptOperations || []).join(", ") || "-"}`);
+      lines.push(`    - expectedEvidence: ${record.expectedEvidence || "-"}`);
       lines.push(`    - operatorNote: ${record.operatorNote || "-"}`);
     }
   }
@@ -6542,6 +6552,15 @@ function renderStagingRehearsalRunRecordIndex(index) {
     }
     if (Array.isArray(group.missingReceiptVisibilityKeys) && group.missingReceiptVisibilityKeys.length) {
       lines.push(`    - missingReceiptVisibilityKeys: ${group.missingReceiptVisibilityKeys.join(", ")}`);
+    }
+    if (Array.isArray(group.records) && group.records.length) {
+      lines.push("    - records:");
+      for (const record of group.records) {
+        lines.push(`      - ${record.key || "-"}: ${record.sourcePlan || "-"} -> ${record.artifactPath || "-"}`);
+        lines.push(`        - receiptOperations: ${(record.receiptOperations || []).join(", ") || "-"}`);
+        lines.push(`        - expectedEvidence: ${record.expectedEvidence || "-"}`);
+        lines.push(`        - operatorNote: ${record.operatorNote || "-"}`);
+      }
     }
   }
   lines.push(`- Next action: ${index.nextAction || "-"}`);

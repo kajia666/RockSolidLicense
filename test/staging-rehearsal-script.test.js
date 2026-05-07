@@ -612,6 +612,20 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["stabilization_owner_handoff", "stabilizationHandoffPlan", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
     ]
   );
+  assert.equal(
+    output.stagingRunRecordTemplate.records.find((item) => item.key === "route_map_gate_result").expectedEvidence,
+    "Record the targeted gate exit status, pass count, and redacted output artifact path."
+  );
+  assert.deepEqual(
+    output.stagingRunRecordTemplate.records.slice(-5).map((item) => [item.key, item.expectedEvidence]),
+    [
+      ["launch_day_watch_summary", "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions."],
+      ["first_wave_incident_log", "Record first-wave incidents, customer impact, mitigation, owner, and status."],
+      ["receipt_visibility_snapshot", "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."],
+      ["rollback_signal_review", "Record whether rollback signals were observed, dismissed, or escalated."],
+      ["stabilization_owner_handoff", "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."]
+    ]
+  );
   assert.equal(output.stagingRehearsalRunRecordIndex.mode, "staging-rehearsal-run-record-index");
   assert.equal(output.stagingRehearsalRunRecordIndex.status, "awaiting_evidence_backfill");
   assert.equal(output.stagingRehearsalRunRecordIndex.willModifyData, false);
@@ -639,6 +653,24 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["pre_full_test_closeout", "awaiting_operator_evidence", 7],
       ["production_signoff", "blocked_until_full_test_window", expectedProductionSignoffConditionKeys.length],
       ["launch_day_watch_and_stabilization", "blocked_until_production_signoff", 5]
+    ]
+  );
+  assert.equal(
+    output.stagingRehearsalRunRecordIndex.recordGroups
+      .find((item) => item.key === "pre_full_test_closeout")
+      .records.find((item) => item.key === "route_map_gate_result").expectedEvidence,
+    "Record the targeted gate exit status, pass count, and redacted output artifact path."
+  );
+  assert.deepEqual(
+    output.stagingRehearsalRunRecordIndex.recordGroups
+      .find((item) => item.key === "launch_day_watch_and_stabilization")
+      .records.map((item) => [item.key, item.expectedEvidence]),
+    [
+      ["launch_day_watch_summary", "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions."],
+      ["first_wave_incident_log", "Record first-wave incidents, customer impact, mitigation, owner, and status."],
+      ["receipt_visibility_snapshot", "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."],
+      ["rollback_signal_review", "Record whether rollback signals were observed, dismissed, or escalated."],
+      ["stabilization_owner_handoff", "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."]
     ]
   );
   assert.deepEqual(
@@ -2168,6 +2200,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /artifacts\/staging\/PILOT_ALPHA\/stable/);
     assert.match(handoff, /launch_mainline_evidence_receipts/);
     assert.match(handoff, /record_recovery_drill, record_backup_verification/);
+    assert.match(handoff, /## Staging Run Record Template[\s\S]*Records:[\s\S]*route_map_gate_result: artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt[\s\S]*expectedEvidence: Record the targeted gate exit status, pass count, and redacted output artifact path\.[\s\S]*launch_day_watch_summary: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\.[\s\S]*stabilization_owner_handoff: artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md[\s\S]*expectedEvidence: Record stabilization owner, timestamp, unresolved items, and next-duty follow-up\.[\s\S]*## Staging Rehearsal Run Record Index/);
+    assert.match(handoff, /## Staging Rehearsal Run Record Index[\s\S]*Record groups:[\s\S]*pre_full_test_closeout: awaiting_operator_evidence \(records=7\)[\s\S]*route_map_gate_result: stagingAcceptanceCloseout -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt[\s\S]*expectedEvidence: Record the targeted gate exit status, pass count, and redacted output artifact path\.[\s\S]*launch_day_watch_and_stabilization: blocked_until_production_signoff \(records=5\)[\s\S]*launch_day_watch_summary: launchDayWatchPlan -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\.[\s\S]*stabilization_owner_handoff: stabilizationHandoffPlan -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md[\s\S]*expectedEvidence: Record stabilization owner, timestamp, unresolved items, and next-duty follow-up\.[\s\S]*## Staging Launch Duty Archive Index/);
     assert.match(handoff, /## Full Test Window Entry/);
     assert.match(handoff, /Command: `npm\.cmd test`/);
     assert.match(handoff, /blocked_until_staging_closeout/);

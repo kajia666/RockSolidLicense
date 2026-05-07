@@ -105,6 +105,19 @@ const PROFILE_OPTION_FLAGS = {
   closeoutInputFile: "--closeout-input-file"
 };
 
+const STAGING_PROFILE_OUTPUT_FILE_KEYS = [
+  "handoffFile",
+  "closeoutFile",
+  "runRecordFile",
+  "artifactManifestFile",
+  "backupRestorePacketFile",
+  "closeoutReloadPacketFile",
+  "readinessReviewPacketFile",
+  "productionSignoffPacketFile",
+  "launchDutyArchiveIndexFile",
+  "filledCloseoutDraftFile"
+];
+
 const CLOSEOUT_SOURCE_STEPS = {
   route_map_gate_result: "run_route_map_gate",
   backup_restore_drill_result: "run_backup_restore_drill",
@@ -423,7 +436,7 @@ function buildStagingProfileLaunchPlan(options) {
     "appBackupDir",
     ...(options.storageProfile === "postgres-preview" ? ["postgresBackupDir"] : [])
   ];
-  const outputFiles = ["handoffFile", "closeoutFile", "runRecordFile", "artifactManifestFile", "closeoutReloadPacketFile", "readinessReviewPacketFile", "launchDutyArchiveIndexFile", "filledCloseoutDraftFile"];
+  const outputFiles = STAGING_PROFILE_OUTPUT_FILE_KEYS;
   const missingRequiredInputs = requiredInputs.filter((key) => !options[key]);
   const missingOutputFiles = outputFiles.filter((key) => !options[key]);
   const requiredSecretEnv = [
@@ -448,6 +461,11 @@ function buildStagingProfileLaunchPlan(options) {
     : missingRequiredInputs.length || missingOutputFiles.length
       ? "needs_profile_completion"
       : "ready_for_profile_driven_rehearsal";
+  const nextAction = !profileLoaded
+    ? "Create a secret-free staging profile from docs/staging-rehearsal-profile.example.json before the real staging rehearsal."
+    : status === "needs_profile_completion"
+      ? "Complete missing staging profile inputs and launch-duty output paths before setting secret env vars or running live-write rehearsal steps."
+      : "Set required secret env vars, run the recommended profile-driven rehearsal command, then review the generated handoff and closeout template before live writes.";
   return {
     status,
     willModifyData: false,
@@ -461,9 +479,7 @@ function buildStagingProfileLaunchPlan(options) {
     requiredSecretEnv,
     recommendedCommand: buildProfileDrivenCommand(options),
     backfillManifest: buildProfileBackfillManifest(options),
-    nextAction: profileLoaded
-      ? "Set required secret env vars, run the recommended profile-driven rehearsal command, then review the generated handoff and closeout template before live writes."
-      : "Create a secret-free staging profile from docs/staging-rehearsal-profile.example.json before the real staging rehearsal."
+    nextAction
   };
 }
 
@@ -547,7 +563,7 @@ function buildStagingProfileOperatorPreflight(result) {
         missing: missingOutputFiles,
         nextAction: missingOutputFiles.length === 0
           ? "Handoff and closeout output paths are available."
-          : "Provide handoffFile, closeoutFile, runRecordFile, artifactManifestFile, closeoutReloadPacketFile, readinessReviewPacketFile, launchDutyArchiveIndexFile, and filledCloseoutDraftFile paths for launch duty artifacts."
+          : `Provide ${STAGING_PROFILE_OUTPUT_FILE_KEYS.join(", ")} paths for launch duty artifacts.`
       },
       {
         key: "secret_env",
@@ -6104,6 +6120,7 @@ function renderStagingProfileLaunchPlan(plan) {
     `- Profile file: ${plan.profileFile || "-"}`,
     `- CLI override keys: ${(plan.cliOverrideKeys || []).join(", ") || "-"}`,
     `- Missing required inputs: ${(plan.missingRequiredInputs || []).join(", ") || "-"}`,
+    `- Required output files: ${(plan.outputFiles || []).join(", ") || "-"}`,
     `- Missing output files: ${(plan.missingOutputFiles || []).join(", ") || "-"}`,
     `- Recommended command: \`${plan.recommendedCommand || "-"}\``,
     `- Next action: ${plan.nextAction || "-"}`

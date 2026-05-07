@@ -2023,6 +2023,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /## Staging Profile Launch Plan/);
     assert.match(handoff, /Profile launch plan status: ready_for_profile_driven_rehearsal/);
     assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile, runRecordFile, artifactManifestFile, backupRestorePacketFile, closeoutReloadPacketFile, readinessReviewPacketFile, productionSignoffPacketFile, launchDutyArchiveIndexFile, filledCloseoutDraftFile/);
+    assert.match(handoff, /Required output files: handoffFile, closeoutFile, runRecordFile, artifactManifestFile, backupRestorePacketFile, closeoutReloadPacketFile, readinessReviewPacketFile, productionSignoffPacketFile, launchDutyArchiveIndexFile, filledCloseoutDraftFile/);
     assert.match(handoff, /RSL_DEVELOPER_BEARER_TOKEN: missing before_evidence_recording/);
     assert.match(handoff, /## Staging Profile Operator Preflight/);
     assert.match(handoff, /Profile preflight status: blocked_until_secret_env/);
@@ -2262,6 +2263,88 @@ test("staging rehearsal runner focuses closeout reload after real staging inputs
     assert.doesNotMatch(result.stdout, /ReadyAdmin123!|ReadyDeveloper123!|ready-developer-token/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging rehearsal profile gate requires launch-critical packet output paths", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-profile-output-gate-"));
+  const profileFile = join(tempDir, "staging-profile.json");
+  try {
+    const handoffFile = join(tempDir, "profile-handoff.md");
+    const closeoutFile = join(tempDir, "profile-closeout.json");
+    const runRecordFile = join(tempDir, "profile-run-record-index.json");
+    const artifactManifestFile = join(tempDir, "profile-artifact-manifest.json");
+    const closeoutReloadPacketFile = join(tempDir, "profile-closeout-reload-packet.json");
+    const readinessReviewPacketFile = join(tempDir, "profile-readiness-review-packet.json");
+    const launchDutyArchiveIndexFile = join(tempDir, "profile-launch-duty-archive-index.json");
+    const filledCloseoutDraftFile = join(tempDir, "profile-filled-closeout-input.draft.json");
+    writeFileSync(profileFile, JSON.stringify({
+      baseUrl: "https://profile-staging.example.com",
+      productCode: "PROFILE_PRODUCT",
+      channel: "stable",
+      adminUsername: "profile-admin@example.com",
+      developerUsername: "profile.developer",
+      targetOs: "linux",
+      storageProfile: "postgres-preview",
+      targetEnvFile: "/etc/rocksolidlicense/profile.env",
+      appBackupDir: "/var/lib/rocksolid/profile-backups",
+      postgresBackupDir: "/var/lib/rocksolid/profile-postgres-backups"
+    }, null, 2));
+
+    const result = runRehearsal([
+      "--profile-file",
+      profileFile,
+      "--handoff-file",
+      handoffFile,
+      "--closeout-file",
+      closeoutFile,
+      "--run-record-file",
+      runRecordFile,
+      "--artifact-manifest-file",
+      artifactManifestFile,
+      "--closeout-reload-packet-file",
+      closeoutReloadPacketFile,
+      "--readiness-review-packet-file",
+      readinessReviewPacketFile,
+      "--launch-duty-archive-index-file",
+      launchDutyArchiveIndexFile,
+      "--filled-closeout-draft-file",
+      filledCloseoutDraftFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "ProfileAdmin123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "ProfileDeveloper123!",
+      RSL_DEVELOPER_BEARER_TOKEN: "developer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.stagingProfileLaunchPlan.status, "needs_profile_completion");
+    assert.deepEqual(output.stagingProfileLaunchPlan.missingRequiredInputs, []);
+    assert.deepEqual(output.stagingProfileLaunchPlan.missingOutputFiles, [
+      "backupRestorePacketFile",
+      "productionSignoffPacketFile"
+    ]);
+    assert.match(output.stagingProfileLaunchPlan.nextAction, /Complete missing staging profile inputs and launch-duty output paths/);
+    assert.equal(output.stagingProfileOperatorPreflight.status, "missing_profile_inputs");
+    assert.deepEqual(output.stagingProfileOperatorPreflight.missingOutputFiles, [
+      "backupRestorePacketFile",
+      "productionSignoffPacketFile"
+    ]);
+    assert.equal(output.stagingProfileOperatorPreflight.canRunDryRun, false);
+    assert.equal(
+      output.stagingProfileOperatorPreflight.checks.find((item) => item.key === "output_files").status,
+      "missing"
+    );
+    assert.deepEqual(
+      output.operatorExecutionPlan.realStagingInputClosure.checks.find((item) => item.key === "artifact_output_paths").missing,
+      ["backupRestorePacketFile", "productionSignoffPacketFile"]
+    );
+    assert.deepEqual(
+      output.operatorExecutionPlan.realStagingInputClosure.operatorSteps.find((item) => item.key === "confirm_artifact_output_paths").missingKeys,
+      ["backupRestorePacketFile", "productionSignoffPacketFile"]
+    );
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
   }
 });
 

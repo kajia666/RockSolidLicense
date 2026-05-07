@@ -4920,6 +4920,16 @@ function buildLaunchMainlineActionReceiptHandoffText({
       + ` | stabilization=${mainlineOperationalReadiness.stabilizationStatus || "-"}`
       + ` | steadyState=${mainlineOperationalReadiness.steadyStateStatus || "-"}`
     );
+    const launchReadinessNextGateForOperationalReadiness = normalizeLaunchReadinessNextGateForHandoff(mainlineOperationalReadiness);
+    if (launchReadinessNextGateForOperationalReadiness) {
+      lines.push(
+        `- launchReadinessNextGate: ${launchReadinessNextGateForOperationalReadiness.status || "-"}`
+        + ` | decision=${launchReadinessNextGateForOperationalReadiness.decision || "-"}`
+        + ` | canEnterInitialLaunch=${launchReadinessNextGateForOperationalReadiness.canEnterInitialLaunch === true}`
+        + ` | currentGate=${launchReadinessNextGateForOperationalReadiness.currentGate || "-"}`
+      );
+      lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGateForOperationalReadiness.fullTestWindowCommand || "-"}`);
+    }
     if (mainlineOperationalReadiness.nextActionKey || mainlineOperationalReadiness.nextActionOperation) {
       lines.push(`- nextAction: ${mainlineOperationalReadiness.nextActionKey || "-"} | operation=${mainlineOperationalReadiness.nextActionOperation || "-"}`);
     }
@@ -6691,6 +6701,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
         ].filter((item) => item?.key || item?.summary || item?.controls?.length)
       }
     : null;
+  const mainlineOperationalReadinessGate = normalizeLaunchReadinessNextGateForHandoff(mainlineOperationalReadiness);
   const mainlineRecapCards = [
     {
       key: "result_status",
@@ -6724,12 +6735,19 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
         { label: "ready", value: mainlineOperationalReadiness.readyToOperate === true ? "YES" : "NO", strong: mainlineOperationalReadiness.readyToOperate === true },
         { label: "evidence", value: Number(mainlineOperationalReadiness.blockingCount || 0), strong: Number(mainlineOperationalReadiness.blockingCount || 0) > 0 },
         mainlineOperationalReadiness.watchCheckInStatus ? { label: "watch", value: mainlineOperationalReadiness.watchCheckInStatus, strong: mainlineOperationalReadiness.watchCheckInStatus === "checked_in" } : null,
-        mainlineOperationalReadiness.steadyStateStatus ? { label: "steady", value: mainlineOperationalReadiness.steadyStateStatus, strong: mainlineOperationalReadiness.steadyStateStatus === "ready_for_steady_state" } : null
+        mainlineOperationalReadiness.steadyStateStatus ? { label: "steady", value: mainlineOperationalReadiness.steadyStateStatus, strong: mainlineOperationalReadiness.steadyStateStatus === "ready_for_steady_state" } : null,
+        mainlineOperationalReadinessGate?.currentGate ? { label: "gate", value: mainlineOperationalReadinessGate.currentGate, strong: mainlineOperationalReadinessGate.decision !== "go" } : null
       ].filter(Boolean),
       details: [
         mainlineOperationalReadiness.nextActionOperation
           ? `Next operational action: ${mainlineOperationalReadiness.nextActionOperation}`
           : "Next operational action: none",
+        mainlineOperationalReadinessGate
+          ? `Launch readiness gate: ${mainlineOperationalReadinessGate.status || "-"} | decision=${mainlineOperationalReadinessGate.decision || "-"} | currentGate=${mainlineOperationalReadinessGate.currentGate || "-"}`
+          : "",
+        mainlineOperationalReadinessGate?.fullTestWindowCommand
+          ? `Full test window: ${mainlineOperationalReadinessGate.fullTestWindowCommand}`
+          : "",
         `Watch check-in: ${mainlineOperationalReadiness.watchCheckInStatus || "-"}`,
         `Stabilization: ${mainlineOperationalReadiness.stabilizationStatus || "-"}`,
         `Steady-state: ${mainlineOperationalReadiness.steadyStateStatus || "-"}`,
@@ -7120,6 +7138,7 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
   const operationalReadiness = receipt.mainlineOperationalReadiness && typeof receipt.mainlineOperationalReadiness === "object"
     ? receipt.mainlineOperationalReadiness
     : null;
+  const operationalReadinessLaunchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(operationalReadiness);
   const launchOpsOverviewContext = receipt.launchOpsOverviewContext && typeof receipt.launchOpsOverviewContext === "object"
     ? receipt.launchOpsOverviewContext
     : null;
@@ -7245,6 +7264,19 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           steadyStateStatus: operationalReadiness.steadyStateStatus || null,
           nextActionKey: operationalReadiness.nextActionKey || null,
           nextOperation: operationalReadiness.nextActionOperation || null,
+          launchReadinessNextGate: operationalReadinessLaunchReadinessNextGate,
+          launchReadinessNextGateStatus: operationalReadinessLaunchReadinessNextGate?.status || null,
+          launchReadinessNextGateDecision: operationalReadinessLaunchReadinessNextGate?.decision || null,
+          launchReadinessNextGateCurrentGate: operationalReadinessLaunchReadinessNextGate?.currentGate || null,
+          launchReadinessNextGateCanEnterInitialLaunch: operationalReadinessLaunchReadinessNextGate?.canEnterInitialLaunch === true,
+          launchReadinessNextGateFullTestWindowCommand: operationalReadinessLaunchReadinessNextGate?.fullTestWindowCommand || null,
+          launchReadinessNextGateProductionSignoffPacket: operationalReadinessLaunchReadinessNextGate?.productionSignoffPacket || null,
+          launchReadinessNextGateLaunchDayWatchEntry: operationalReadinessLaunchReadinessNextGate?.launchDayWatchEntry || null,
+          launchReadinessNextGateCloseoutReloadCommand: operationalReadinessLaunchReadinessNextGate?.closeoutReloadCommand || null,
+          launchReadinessNextGatePrimaryDownloadKey: operationalReadinessLaunchReadinessNextGate?.primaryDownloadKey || null,
+          launchReadinessNextGatePrimaryDownloadFileName: operationalReadinessLaunchReadinessNextGate?.primaryDownloadFileName || null,
+          launchReadinessNextGatePrimaryDownloadFormat: operationalReadinessLaunchReadinessNextGate?.primaryDownloadFormat || null,
+          launchReadinessNextGatePrimaryDownloadHref: operationalReadinessLaunchReadinessNextGate?.primaryDownloadHref || null,
           primaryWorkspaceKey: operationalReadiness.primaryWorkspaceAction?.key || null,
           primaryWorkspaceAutofocus: operationalReadiness.primaryWorkspaceAction?.autofocus || null,
           primaryDownloadKey: operationalReadiness.primaryDownload?.key || null,
@@ -21114,6 +21146,18 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         operationalReadinessPrimaryDownloadFormat: receipt.operationalReadiness?.primaryDownloadFormat || null,
         operationalReadinessPrimaryDownloadFileName: receipt.operationalReadiness?.primaryDownloadFileName || null,
         operationalReadinessPrimaryDownloadHref: receipt.operationalReadiness?.primaryDownloadHref || null,
+        operationalReadinessLaunchReadinessNextGateStatus: receipt.operationalReadiness?.launchReadinessNextGateStatus || null,
+        operationalReadinessLaunchReadinessNextGateDecision: receipt.operationalReadiness?.launchReadinessNextGateDecision || null,
+        operationalReadinessLaunchReadinessNextGateCurrentGate: receipt.operationalReadiness?.launchReadinessNextGateCurrentGate || null,
+        operationalReadinessLaunchReadinessNextGateCanEnterInitialLaunch: receipt.operationalReadiness?.launchReadinessNextGateCanEnterInitialLaunch === true,
+        operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: receipt.operationalReadiness?.launchReadinessNextGateFullTestWindowCommand || null,
+        operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: receipt.operationalReadiness?.launchReadinessNextGateProductionSignoffPacket || null,
+        operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry: receipt.operationalReadiness?.launchReadinessNextGateLaunchDayWatchEntry || null,
+        operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand: receipt.operationalReadiness?.launchReadinessNextGateCloseoutReloadCommand || null,
+        operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey: receipt.operationalReadiness?.launchReadinessNextGatePrimaryDownloadKey || null,
+        operationalReadinessLaunchReadinessNextGatePrimaryDownloadFileName: receipt.operationalReadiness?.launchReadinessNextGatePrimaryDownloadFileName || null,
+        operationalReadinessLaunchReadinessNextGatePrimaryDownloadFormat: receipt.operationalReadiness?.launchReadinessNextGatePrimaryDownloadFormat || null,
+        operationalReadinessLaunchReadinessNextGatePrimaryDownloadHref: receipt.operationalReadiness?.launchReadinessNextGatePrimaryDownloadHref || null,
         launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(receipt.launchOpsOverviewContext),
         initialLaunchOperatorDecision: receipt.initialLaunchOperator?.decision || null,
         initialLaunchOperatorStatus: receipt.initialLaunchOperator?.status || null,
@@ -21932,6 +21976,16 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       operationalReadinessPrimaryDownloadKey: receipt.operationalReadinessPrimaryDownloadKey || null,
       operationalReadinessWatchRecordDraftStatus: receipt.operationalReadinessWatchRecordDraftStatus || null,
       operationalReadinessWatchRecordDraftRecordCount: receipt.operationalReadinessWatchRecordDraftRecordCount ?? null,
+      operationalReadinessLaunchReadinessNextGateStatus: receipt.operationalReadinessLaunchReadinessNextGateStatus || launchReadinessNextGate?.status || null,
+      operationalReadinessLaunchReadinessNextGateDecision: receipt.operationalReadinessLaunchReadinessNextGateDecision || launchReadinessNextGate?.decision || null,
+      operationalReadinessLaunchReadinessNextGateCurrentGate: receipt.operationalReadinessLaunchReadinessNextGateCurrentGate || launchReadinessNextGate?.currentGate || null,
+      operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: receipt.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || launchReadinessNextGate?.fullTestWindowCommand || null,
+      operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: receipt.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || launchReadinessNextGate?.productionSignoffPacket || null,
+      operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry: receipt.operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry || launchReadinessNextGate?.launchDayWatchEntry || null,
+      operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand: receipt.operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand || launchReadinessNextGate?.closeoutReloadCommand || null,
+      operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey: receipt.operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey || launchReadinessNextGate?.primaryDownloadKey || null,
+      operationalReadinessLaunchReadinessNextGatePrimaryDownloadFileName: receipt.operationalReadinessLaunchReadinessNextGatePrimaryDownloadFileName || launchReadinessNextGate?.primaryDownloadFileName || null,
+      operationalReadinessLaunchReadinessNextGatePrimaryDownloadFormat: receipt.operationalReadinessLaunchReadinessNextGatePrimaryDownloadFormat || launchReadinessNextGate?.primaryDownloadFormat || null,
       launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(payload.launchOpsOverviewContext || receipt.launchOpsOverviewContext),
       launchReadinessNextGateStatus: launchReadinessNextGate?.status || null,
       launchReadinessNextGateDecision: launchReadinessNextGate?.decision || null,
@@ -22135,6 +22189,16 @@ function buildLaunchReceiptNextFollowUp(items = []) {
     operationalReadinessPrimaryDownloadKey: selected.operationalReadinessPrimaryDownloadKey || null,
     operationalReadinessWatchRecordDraftStatus: selected.operationalReadinessWatchRecordDraftStatus || null,
     operationalReadinessWatchRecordDraftRecordCount: selected.operationalReadinessWatchRecordDraftRecordCount ?? null,
+    operationalReadinessLaunchReadinessNextGateStatus: selected.operationalReadinessLaunchReadinessNextGateStatus || null,
+    operationalReadinessLaunchReadinessNextGateDecision: selected.operationalReadinessLaunchReadinessNextGateDecision || null,
+    operationalReadinessLaunchReadinessNextGateCurrentGate: selected.operationalReadinessLaunchReadinessNextGateCurrentGate || null,
+    operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: selected.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || null,
+    operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: selected.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || null,
+    operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry: selected.operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry || null,
+    operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand: selected.operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand || null,
+    operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey: selected.operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey || null,
+    operationalReadinessLaunchReadinessNextGatePrimaryDownloadFileName: selected.operationalReadinessLaunchReadinessNextGatePrimaryDownloadFileName || null,
+    operationalReadinessLaunchReadinessNextGatePrimaryDownloadFormat: selected.operationalReadinessLaunchReadinessNextGatePrimaryDownloadFormat || null,
     launchOpsOverviewContext: normalizeLaunchOpsOverviewContext(selected.launchOpsOverviewContext),
     createdAt: selected.createdAt || null
   };
@@ -22163,6 +22227,8 @@ function formatLaunchReceiptNextFollowUp(item = null) {
     item.operationalReadinessWatchRecordDraftStatus ? `watchRecordDraft=${item.operationalReadinessWatchRecordDraftStatus}` : "",
     item.operationalReadinessNextActionKey ? `readinessAction=${item.operationalReadinessNextActionKey}` : "",
     item.operationalReadinessNextOperation ? `readinessNext=${item.operationalReadinessNextOperation}` : "",
+    item.operationalReadinessLaunchReadinessNextGateStatus ? `readinessGate=${item.operationalReadinessLaunchReadinessNextGateStatus}` : "",
+    item.operationalReadinessLaunchReadinessNextGateCurrentGate ? `readinessGateCurrent=${item.operationalReadinessLaunchReadinessNextGateCurrentGate}` : "",
     formatLaunchWorkflowActionContextText(item.launchOpsOverviewContext),
     `handoff=${item.handoffFileName || "-"}`
   ].filter(Boolean).join(" | ");
@@ -22180,6 +22246,9 @@ function buildDeveloperOpsLaunchReceiptDownloadParams(scope = {}, item = null) {
     readinessActionKey: item?.operationalReadinessNextActionKey || "",
     readinessOperation: item?.operationalReadinessNextOperation || "",
     readinessDownloadKey: item?.operationalReadinessPrimaryDownloadKey || "",
+    readinessGate: item?.operationalReadinessLaunchReadinessNextGateStatus || "",
+    readinessGateCurrent: item?.operationalReadinessLaunchReadinessNextGateCurrentGate || "",
+    readinessGateFullTestWindow: item?.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || "",
     watchRecordDraftStatus: item?.operationalReadinessWatchRecordDraftStatus || "",
     watchRecordDraftRecordCount: item?.operationalReadinessWatchRecordDraftRecordCount ?? "",
     routeTitle: item?.title || "",
@@ -26464,6 +26533,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         operationalReadinessPrimaryDownloadKey: item.operationalReadinessPrimaryDownloadKey || null,
         operationalReadinessWatchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || null,
         operationalReadinessWatchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? null,
+        operationalReadinessLaunchReadinessNextGateStatus: item.operationalReadinessLaunchReadinessNextGateStatus || null,
+        operationalReadinessLaunchReadinessNextGateDecision: item.operationalReadinessLaunchReadinessNextGateDecision || null,
+        operationalReadinessLaunchReadinessNextGateCurrentGate: item.operationalReadinessLaunchReadinessNextGateCurrentGate || null,
+        operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || null,
+        operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: item.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || null,
+        operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry: item.operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry || null,
+        operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand: item.operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand || null,
+        operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey: item.operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey || null,
+        operationalReadinessLaunchReadinessNextGatePrimaryDownloadFileName: item.operationalReadinessLaunchReadinessNextGatePrimaryDownloadFileName || null,
+        operationalReadinessLaunchReadinessNextGatePrimaryDownloadFormat: item.operationalReadinessLaunchReadinessNextGatePrimaryDownloadFormat || null,
         firstUserValidationStatus: item.firstUserValidationStatus || null,
         firstUserValidationActionCount: item.firstUserValidationActionCount ?? null,
         firstUserValidationRemainingCount: item.firstUserValidationRemainingCount ?? null,
@@ -28921,6 +29000,9 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) 
       readinessActionKey: item.operationalReadinessNextActionKey || "",
       readinessOperation: item.operationalReadinessNextOperation || "",
       readinessDownloadKey: item.operationalReadinessPrimaryDownloadKey || "",
+      readinessGate: item.operationalReadinessLaunchReadinessNextGateStatus || "",
+      readinessGateCurrent: item.operationalReadinessLaunchReadinessNextGateCurrentGate || "",
+      readinessGateFullTestWindow: item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || "",
       watchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || "",
       watchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? "",
       routeTitle: item.title || "Launch receipt follow-up",
@@ -28952,6 +29034,11 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpAction(item = null) {
     operationalReadinessPrimaryDownloadKey: item.operationalReadinessPrimaryDownloadKey || null,
     operationalReadinessWatchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || null,
     operationalReadinessWatchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? null,
+    operationalReadinessLaunchReadinessNextGateStatus: item.operationalReadinessLaunchReadinessNextGateStatus || null,
+    operationalReadinessLaunchReadinessNextGateDecision: item.operationalReadinessLaunchReadinessNextGateDecision || null,
+    operationalReadinessLaunchReadinessNextGateCurrentGate: item.operationalReadinessLaunchReadinessNextGateCurrentGate || null,
+    operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || null,
+    operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: item.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || null,
     workspaceAction: buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item),
     productCode: item.productCode || null,
     channel: item.channel || null,
@@ -32627,6 +32714,9 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Operational Readiness Action: ${item.operationalReadinessNextActionKey || "-"}`);
   lines.push(`Operational Readiness Next: ${item.operationalReadinessNextOperation || "-"}`);
   lines.push(`Operational Readiness Download: ${item.operationalReadinessPrimaryDownloadKey || "-"}`);
+  lines.push(`Operational Readiness Launch Gate: ${item.operationalReadinessLaunchReadinessNextGateStatus || "-"}`);
+  lines.push(`Operational Readiness Launch Gate Current: ${item.operationalReadinessLaunchReadinessNextGateCurrentGate || "-"}`);
+  lines.push(`Operational Readiness Full Test Window: ${item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || "-"}`);
   lines.push(`Created At: ${item.createdAt || "-"}`);
   lines.push(`Recommended Action: ${recommendedAction?.key || "-"}`);
   lines.push(`Action Operation: ${recommendedAction?.operation || "-"}`);

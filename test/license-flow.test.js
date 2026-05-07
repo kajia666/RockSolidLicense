@@ -9305,11 +9305,36 @@ test("developer launch mainline action can record a launch rehearsal run and ref
       actionResult.receipt?.mainlineOperationalReadiness?.nextActionOperation,
       "record_launch_day_readiness_review"
     );
+    assert.deepEqual(
+      actionResult.receipt?.mainlineOperationalReadiness?.launchReadinessNextGate
+        ? {
+            status: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.status,
+            decision: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.decision,
+            canEnterInitialLaunch: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.canEnterInitialLaunch,
+            currentGate: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.currentGate,
+            fullTestWindowCommand: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.fullTestWindowCommand,
+            productionSignoffPacket: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.productionSignoffPacket
+          }
+        : null,
+      {
+        status: "awaiting_launch_readiness",
+        decision: "no_go",
+        canEnterInitialLaunch: false,
+        currentGate: "ready_for_closeout_reload",
+        fullTestWindowCommand: "npm.cmd test",
+        productionSignoffPacket: "artifacts/staging/MAINLINE_REHEARSAL/stable/staging-production-signoff-packet.json"
+      }
+    );
+    assert.equal(actionResult.receipt?.mainlineOperationalReadiness?.launchReadinessNextGateStatus, "awaiting_launch_readiness");
+    assert.equal(actionResult.receipt?.mainlineOperationalReadiness?.launchReadinessNextGateDecision, "no_go");
+    assert.equal(actionResult.receipt?.mainlineOperationalReadiness?.launchReadinessNextGateCurrentGate, "ready_for_closeout_reload");
     assert.ok(actionResult.receipt.mainlineRecapCards.some((item) =>
       item?.key === "operational_readiness"
       && /Still Needs Evidence/i.test(String(item.title || ""))
       && Array.isArray(item.details)
       && item.details.some((detail) => /Next operational action: record_launch_day_readiness_review/i.test(String(detail || "")))
+      && item.details.some((detail) => /Launch readiness gate: awaiting_launch_readiness \| decision=no_go \| currentGate=ready_for_closeout_reload/i.test(String(detail || "")))
+      && item.details.some((detail) => /Full test window: npm\.cmd test/i.test(String(detail || "")))
       && Array.isArray(item.controls)
       && item.controls.some((control) =>
         control?.label === "Record Operational Readiness Action"
@@ -9324,6 +9349,8 @@ test("developer launch mainline action can record a launch rehearsal run and ref
     assert.match(actionResult.receipt?.handoffText || "", /Operational Readiness After Action:/);
     assert.match(actionResult.receipt?.handoffText || "", /- status: still_needs_evidence \| label=Still Needs Evidence \| ready=false/);
     assert.match(actionResult.receipt?.handoffText || "", /watchRecordDraft=blocked_until_runway_evidence/);
+    assert.match(actionResult.receipt?.handoffText || "", /Operational Readiness After Action:[\s\S]*- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
+    assert.match(actionResult.receipt?.handoffText || "", /Operational Readiness After Action:[\s\S]*- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
     assert.match(actionResult.receipt?.handoffText || "", /- nextAction: .*operation=record_launch_day_readiness_review/);
     const summaryLaunchOpsContext = actionResult.launchMainline?.mainlineSummary?.initialLaunchOpsMainlineGate?.actionPlan?.find((item) =>
       item?.key === "initial_launch_ops_overview_status"
@@ -17106,6 +17133,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestLaunchReceipt.operationalReadinessNextActionKey, "launch_mainline_record_launch_rehearsal_run");
     assert.equal(latestLaunchReceipt.operationalReadinessNextOperation, "record_launch_rehearsal_run");
     assert.equal(latestLaunchReceipt.operationalReadinessPrimaryDownloadKey, "launch_mainline_rehearsal_guide");
+    assert.equal(latestLaunchReceipt.operationalReadinessLaunchReadinessNextGateStatus, "awaiting_launch_readiness");
+    assert.equal(latestLaunchReceipt.operationalReadinessLaunchReadinessNextGateDecision, "no_go");
+    assert.equal(latestLaunchReceipt.operationalReadinessLaunchReadinessNextGateCurrentGate, "ready_for_closeout_reload");
+    assert.equal(latestLaunchReceipt.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand, "npm.cmd test");
+    assert.equal(
+      latestLaunchReceipt.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket,
+      "artifacts/staging/EXPORT_ALPHA/stable/staging-production-signoff-packet.json"
+    );
     assert.equal(latestLaunchReceipt.initialLaunchOperatorDecision, "no_go");
     assert.equal(latestLaunchReceipt.initialLaunchOperatorPrimaryActionKey, "launch_mainline_follow_up");
     assert.equal(latestLaunchReceipt.initialLaunchOperatorActionCount, 1);
@@ -17163,6 +17198,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptReadinessFollowUp.downloadKey, latestLaunchReceipt.operationalReadinessPrimaryDownloadKey);
     assert.equal(launchReceiptReadinessFollowUp.operationalReadinessStatus, "still_needs_evidence");
     assert.equal(launchReceiptReadinessFollowUp.operationalReadinessWatchRecordDraftStatus, "blocked_until_runway_evidence");
+    assert.equal(launchReceiptReadinessFollowUp.operationalReadinessLaunchReadinessNextGateStatus, "awaiting_launch_readiness");
+    assert.equal(launchReceiptReadinessFollowUp.operationalReadinessLaunchReadinessNextGateCurrentGate, "ready_for_closeout_reload");
+    assert.equal(launchReceiptReadinessFollowUp.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand, "npm.cmd test");
     assert.match(launchReceiptReadinessFollowUp.summary, /Operational readiness still needs evidence/i);
     const launchReceiptLifecycleFollowUp = launchReceiptSnapshot.overview?.launchReceiptFollowUps?.find((item) =>
       item.operation === "record_post_launch_ops_sweep" && item.stage === "post_launch_lifecycle"
@@ -17178,6 +17216,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summaryText, /readiness=still_needs_evidence/);
     assert.match(launchReceiptSnapshot.summaryText, /watchRecordDraft=blocked_until_runway_evidence/);
     assert.match(launchReceiptSnapshot.summaryText, /readinessNext=record_launch_rehearsal_run/);
+    assert.match(launchReceiptSnapshot.summaryText, /readinessGate=awaiting_launch_readiness/);
+    assert.match(launchReceiptSnapshot.summaryText, /readinessGateCurrent=ready_for_closeout_reload/);
     assert.ok(launchReceiptSnapshot.summary.launchReceiptAuditBackfill >= 1);
     assert.equal(
       launchReceiptSnapshot.summary.launchReceiptAuditBackfill,
@@ -17210,6 +17250,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationToRecord, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessWatchRecordDraftStatus, "blocked_until_runway_evidence");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessWatchRecordDraftRecordCount, 5);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateStatus, "awaiting_launch_readiness");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateCurrentGate, "ready_for_closeout_reload");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.launchOpsOverviewContext?.watchRecordDraftStatus, "blocked_until_runway_evidence");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
@@ -17219,6 +17261,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.downloadKey, launchReceiptSnapshot.summary.launchReceiptNextFollowUp.downloadKey);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessWatchRecordDraftStatus, "blocked_until_runway_evidence");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessWatchRecordDraftRecordCount, 5);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessLaunchReadinessNextGateStatus, "awaiting_launch_readiness");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessLaunchReadinessNextGateCurrentGate, "ready_for_closeout_reload");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.source, "developer-ops-launch-receipt");
     assert.ok(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.key, "launch-mainline");
@@ -17228,9 +17272,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.watchRecordDraftStatus, "blocked_until_runway_evidence");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.watchRecordDraftRecordCount, 5);
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.readinessGate, "awaiting_launch_readiness");
+    assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.params.readinessGateCurrent, "ready_for_closeout_reload");
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /\/developer\/launch-mainline\?/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /productCode=EXPORT_ALPHA/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /watchRecordDraftStatus=blocked_until_runway_evidence/);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /readinessGate=awaiting_launch_readiness/);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /readinessGateCurrent=ready_for_closeout_reload/);
     assert.match(
       launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href,
       new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
@@ -17242,6 +17290,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /format=launch-receipt-next-follow-up/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /productCode=EXPORT_ALPHA/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /watchRecordDraftStatus=blocked_until_runway_evidence/);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /readinessGate=awaiting_launch_readiness/);
+    assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /readinessGateCurrent=ready_for_closeout_reload/);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.status, "review");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpCount, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.stage, "production_evidence");

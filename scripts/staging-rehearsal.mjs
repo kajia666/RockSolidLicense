@@ -1201,6 +1201,10 @@ function buildStagingRehearsalRunRecordIndex(result) {
     : status === "ready_for_full_test_window"
       ? "Run the full test window, backfill production sign-off evidence, then reload closeout input."
       : "Collect the missing pre-full-test record artifacts, backfill filled-closeout-input.json, then reload closeout input.";
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || executionSummary.operatorFocus?.goLiveExecutionEntry
+    || finalPacket.goLiveExecutionEntry
+    || buildGoLiveExecutionEntryFromResult(result);
   return {
     mode: "staging-rehearsal-run-record-index",
     status,
@@ -1212,6 +1216,7 @@ function buildStagingRehearsalRunRecordIndex(result) {
       finalPacket: finalPacket.status || "not_available",
       closeoutInput: closeoutInput?.status || "not_loaded"
     },
+    goLiveExecutionEntry,
     recordCount: Array.isArray(runTemplate.records) ? runTemplate.records.length : 0,
     closeoutProgress: {
       requiredRecordKeys,
@@ -1275,6 +1280,11 @@ function buildStagingArtifactManifest(result) {
     || runRecordIndex.archiveRoot
     || finalPacket.archiveRoot
     || "artifacts/staging/product/stable";
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || executionSummary.operatorFocus?.goLiveExecutionEntry
+    || runRecordIndex.goLiveExecutionEntry
+    || finalPacket.goLiveExecutionEntry
+    || buildGoLiveExecutionEntryFromResult(result);
   return {
     mode: "staging-artifact-manifest",
     status: "awaiting_artifact_generation",
@@ -1287,6 +1297,7 @@ function buildStagingArtifactManifest(result) {
       runRecordIndex: runRecordIndex.status || "not_available",
       finalPacket: finalPacket.status || "not_available"
     },
+    goLiveExecutionEntry,
     commands: {
       stagingDryRun: binding.dryRunCommand || null,
       routeMapGate: executionSummary.commands?.routeMapGate || finalPacket.commands?.routeMapGate || null,
@@ -1545,6 +1556,10 @@ function buildStagingBackupRestoreDrillPacket(result) {
   const closeoutReloadCommand = runRecordIndex.closeoutProgress?.reloadCommand
     || result.closeoutBackfillGuide?.closeoutInputReload?.command
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
+    || runRecordIndex.goLiveExecutionEntry
+    || buildGoLiveExecutionEntryFromResult(result);
   return {
     mode: "staging-backup-restore-drill-operator-packet",
     status: "awaiting_backup_restore_drill",
@@ -1569,6 +1584,7 @@ function buildStagingBackupRestoreDrillPacket(result) {
       executionRunbook: runbook.status || "not_available",
       closeoutInput: result.closeoutInput?.status || "not_loaded"
     },
+    goLiveExecutionEntry,
     operatorSteps: [
       {
         key: "run_app_backup",
@@ -2986,7 +3002,14 @@ function buildGoLiveExecutionEntry({
     || launchDutyPacketFocus?.commands?.closeoutReload
     || fullTestSignoffFocus?.commands?.closeoutReload
     || null;
-  const currentPacket = launchDutyPacketFocus?.currentPacket || {};
+  const currentPacket = launchDutyPacketFocus?.currentPacket
+    || (closeoutBackfillFocus?.paths?.closeoutReloadPacketFile
+      ? {
+        key: "closeout_reload_packet",
+        status: closeoutBackfillFocus.status || null,
+        path: closeoutBackfillFocus.paths.closeoutReloadPacketFile
+      }
+      : {});
   const paths = {
     filledCloseoutInputFile: fullTestSignoffFocus?.paths?.filledCloseoutInputFile
       || closeoutBackfillFocus?.paths?.filledCloseoutInputFile
@@ -3097,6 +3120,32 @@ function buildGoLiveExecutionEntry({
     launchDutyCurrentActionKey: launchDutyCurrentAction?.key || null,
     nextAction
   };
+}
+
+function buildGoLiveExecutionEntryFromResult(result, { outputFiles = [], launchDutyPacketFocus = null } = {}) {
+  const realStagingRunFocus = result.operatorExecutionPlan?.realStagingRunFocus
+    || buildRealStagingRunFocus(result, { outputFiles });
+  const closeoutBackfillFocus = result.operatorExecutionPlan?.closeoutBackfillFocus
+    || buildCloseoutBackfillFocus(result, { outputFiles });
+  const fullTestSignoffFocus = result.operatorExecutionPlan?.fullTestSignoffFocus
+    || buildFullTestSignoffFocus(result, { outputFiles });
+  const packetFocus = launchDutyPacketFocus || result.operatorExecutionPlan?.launchDutyPacketFocus || null;
+  const launchDutyCurrentAction = result.operatorExecutionPlan?.launchDutyCurrentAction
+    || result.finalRehearsalPacket?.launchDutyCurrentAction
+    || buildLaunchDutyCurrentAction({
+      realStagingRunFocus,
+      closeoutBackfillFocus,
+      fullTestSignoffFocus,
+      launchDutyPacketFocus: packetFocus,
+      archiveContext: buildLaunchDutyArchiveTraceContext(result, { outputFiles, launchDutyPacketFocus: packetFocus })
+    });
+  return buildGoLiveExecutionEntry({
+    realStagingRunFocus,
+    closeoutBackfillFocus,
+    fullTestSignoffFocus,
+    launchDutyPacketFocus: packetFocus,
+    launchDutyCurrentAction
+  });
 }
 
 function buildLaunchDutyCurrentAction({
@@ -6094,10 +6143,37 @@ function renderStagingBackupRestoreDrillPacket(packet) {
     `- Closeout reload: \`${packet.closeoutReloadCommand || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`
   ];
+  appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
   if (Array.isArray(packet.operatorSteps) && packet.operatorSteps.length) {
     lines.push("- Operator steps:");
     for (const step of packet.operatorSteps) {
       lines.push(`  - ${step.key || "-"}: ${step.status || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function renderStagingArtifactManifest(manifest) {
+  if (!manifest) {
+    return "- Not available";
+  }
+  const statuses = manifest.sourceStatuses || {};
+  const lines = [
+    `- Artifact manifest status: ${manifest.status || "-"}`,
+    `- Writes data by itself: ${manifest.willModifyData ? "yes" : "no"}`,
+    `- Archive root: ${manifest.archiveRoot || "-"}`,
+    `- Source statuses: profilePreflight=${statuses.profilePreflight || "-"}, executionSummary=${statuses.executionSummary || "-"}, runRecordIndex=${statuses.runRecordIndex || "-"}, finalPacket=${statuses.finalPacket || "-"}`,
+    `- Staging dry run: \`${manifest.commands?.stagingDryRun || "-"}\``,
+    `- Route-map gate: \`${manifest.commands?.routeMapGate || "-"}\``,
+    `- Live-write smoke: \`${manifest.commands?.liveWriteSmoke || "-"}\``,
+    `- Closeout reload: \`${manifest.commands?.closeoutReload || "-"}\``,
+    `- Next action: ${manifest.nextAction || "-"}`
+  ];
+  appendGoLiveExecutionEntry(lines, manifest.goLiveExecutionEntry || {});
+  if (Array.isArray(manifest.files) && manifest.files.length) {
+    lines.push("- Manifest files:");
+    for (const file of manifest.files) {
+      lines.push(`  - ${file.key || "-"}: ${file.status || "-"} -> ${file.path || "-"}`);
     }
   }
   return lines.join("\n");
@@ -6337,6 +6413,7 @@ function renderStagingRehearsalRunRecordIndex(index) {
     `- Ordered milestones: ${(index.orderedOperatorMilestones || []).join(", ") || "-"}`,
     "- Record groups:"
   ];
+  appendGoLiveExecutionEntry(lines, index.goLiveExecutionEntry || {});
   for (const group of index.recordGroups || []) {
     lines.push(`  - ${group.key || "-"}: ${group.status || "-"} (records=${group.recordCount ?? 0})`);
     if (Array.isArray(group.missingRecordKeys) && group.missingRecordKeys.length) {
@@ -6759,6 +6836,10 @@ function renderHandoffFile(result) {
     "## Staging Rehearsal Run Record Index",
     "",
     renderStagingRehearsalRunRecordIndex(result.stagingRehearsalRunRecordIndex),
+    "",
+    "## Staging Artifact Manifest",
+    "",
+    renderStagingArtifactManifest(result.stagingArtifactManifest),
     "",
     "## Staging Launch Duty Archive Index",
     "",

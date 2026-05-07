@@ -1490,6 +1490,7 @@ function buildStagingCloseoutReloadPacket(result) {
   const finalPacket = result.finalRehearsalPacket || buildFinalRehearsalPacket(result);
   const fullTestWindowReadiness = result.fullTestWindowReadiness || buildFullTestWindowReadiness(result);
   const productionSignoffReadiness = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
+  const backupRestoreDrillPacket = result.stagingBackupRestoreDrillPacket || buildStagingBackupRestoreDrillPacket(result);
   const launchDutyArchiveIndex = result.stagingLaunchDutyArchiveIndex || null;
   const closeoutReview = result.stagingExecutionRunbook?.closeoutInputReview
     || finalPacket.closeoutInputReview
@@ -1596,9 +1597,20 @@ function buildStagingCloseoutReloadPacket(result) {
     sourceStatuses: {
       closeoutInput: result.closeoutInput?.status || "not_loaded",
       closeoutReview: closeoutReview.status || "not_loaded",
+      backupRestorePacket: backupRestoreDrillPacket.status || "not_available",
       readinessTransition: result.stagingReadinessTransition?.status || "not_available",
       finalPacket: finalPacket.status || "not_available",
       artifactManifest: artifactManifest.status || "not_available"
+    },
+    backupRestoreGate: {
+      status: backupRestoreDrillPacket.closeoutBackfill?.status === "filled" ? "ready" : "blocked",
+      packetStatus: backupRestoreDrillPacket.status || "not_available",
+      closeoutKey: backupRestoreDrillPacket.closeoutKey || "backup_restore_drill_result",
+      artifactPath: backupRestoreDrillPacket.closeoutBackfill?.artifactPath || backupRestoreDrillPacket.artifactPath || null,
+      closeoutInputPath: backupRestoreDrillPacket.closeoutBackfill?.closeoutInputPath || filledCloseoutInputFile,
+      nextAction: backupRestoreDrillPacket.closeoutBackfill?.status === "filled"
+        ? "Backup/restore evidence is backfilled; continue closeout reload and full-test readiness review."
+        : "Backfill backup_restore_drill_result before treating closeout reload as full-test ready."
     },
     requiredCloseoutKeys,
     missingCloseoutKeys,
@@ -1809,13 +1821,32 @@ function buildStagingBackupRestoreDrillPacket(result) {
   const closeoutReloadCommand = runRecordIndex.closeoutProgress?.reloadCommand
     || result.closeoutBackfillGuide?.closeoutInputReload?.command
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
+  const closeoutBackfillRow = (result.closeoutInput?.backfillReview?.fieldRows || [])
+    .find((row) => row.key === "backup_restore_drill_result") || null;
+  const backupRestoreBackfilled = closeoutBackfillRow?.status === "filled"
+    || (Array.isArray(result.closeoutInput?.filledKeys) && result.closeoutInput.filledKeys.includes("backup_restore_drill_result"));
+  const closeoutBackfill = {
+    status: backupRestoreBackfilled
+      ? "filled"
+      : result.closeoutInput?.status === "loaded"
+        ? "missing"
+        : "not_loaded",
+    closeoutInputStatus: result.closeoutInput?.status || "not_loaded",
+    closeoutInputPath: result.closeoutInput?.path || closeoutInputPath,
+    sourceStep: closeoutBackfillRow?.sourceStep || "run_backup_restore_drill",
+    artifactPath: closeoutBackfillRow?.artifactPath || artifactPath,
+    receiptOperations: closeoutBackfillRow?.receiptOperations || [],
+    nextAction: backupRestoreBackfilled
+      ? "Keep backup_restore_drill_result in the filled closeout input and reload closeout readiness."
+      : "Backfill backup_restore_drill_result in the filled closeout input before closeout reload."
+  };
   const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
     || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
     || runRecordIndex.goLiveExecutionEntry
     || buildGoLiveExecutionEntryFromResult(result);
   return {
     mode: "staging-backup-restore-drill-operator-packet",
-    status: "awaiting_backup_restore_drill",
+    status: backupRestoreBackfilled ? "backfilled_for_closeout_reload" : "awaiting_backup_restore_drill",
     willModifyData: false,
     archiveRoot,
     packetFile,
@@ -1823,6 +1854,7 @@ function buildStagingBackupRestoreDrillPacket(result) {
     artifactPath,
     receiptOperations: ledgerRow.receiptOperations || ["record_recovery_drill", "record_backup_verification"],
     expectedEvidence,
+    closeoutBackfill,
     commandKeys,
     commands,
     environment: {
@@ -1880,14 +1912,16 @@ function buildStagingBackupRestoreDrillPacket(result) {
       },
       {
         key: "backfill_closeout_key",
-        status: "operator_backfill",
+        status: backupRestoreBackfilled ? "ready" : "operator_backfill",
         closeoutKey: "backup_restore_drill_result",
         artifactPath,
         expectedEvidence: "Backfill backup_restore_drill_result with the backup artifact path, restore dry-run result, healthcheck result, and receipt IDs."
       }
     ],
     closeoutReloadCommand,
-    nextAction: "Run the backup/restore drill commands on the restore target, record recovery and backup verification receipts, then backfill backup_restore_drill_result."
+    nextAction: backupRestoreBackfilled
+      ? "Backup/restore evidence is backfilled; reload closeout input and review full-test readiness."
+      : "Run the backup/restore drill commands on the restore target, record recovery and backup verification receipts, then backfill backup_restore_drill_result."
   };
 }
 
@@ -7051,6 +7085,7 @@ function renderStagingCloseoutReloadPacket(packet) {
   }
   const paths = packet.paths || {};
   const review = packet.closeoutReview || {};
+  const backupRestoreGate = packet.backupRestoreGate || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -7060,6 +7095,10 @@ function renderStagingCloseoutReloadPacket(packet) {
     `- Filled closeout input: ${paths.filledCloseoutInputFile || "-"}`,
     `- Closeout template: ${paths.closeoutTemplateFile || "-"}`,
     `- Closeout review: ${review.status || "-"} (missing=${review.missingFieldCount ?? 0}, safeForFullTest=${review.safeToEnterFullTestWindow ? "yes" : "no"})`,
+    `- Backup/restore gate: ${backupRestoreGate.status || "-"} (packet=${backupRestoreGate.packetStatus || "-"}, closeoutKey=${backupRestoreGate.closeoutKey || "-"})`,
+    `- Backup/restore artifact: ${backupRestoreGate.artifactPath || "-"}`,
+    `- Backup/restore closeout input: ${backupRestoreGate.closeoutInputPath || "-"}`,
+    `- Backup/restore next action: ${backupRestoreGate.nextAction || "-"}`,
     `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`

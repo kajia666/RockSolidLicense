@@ -336,6 +336,50 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   );
   assert.equal(output.operatorExecutionPlan.goLiveOperatorActionPlan.currentAction.key, "staging_profile");
   assert.equal(output.operatorExecutionPlan.goLiveOperatorActionPlan.remainingActionCount, 8);
+  assert.deepEqual(output.operatorExecutionPlan.launchReadinessDistance, {
+    mode: "launch-readiness-distance",
+    status: "blocked_until_real_staging_inputs",
+    launchBlockedBy: "real_environment_evidence",
+    readinessPercent: 11,
+    readyActionCount: 1,
+    remainingOperatorActionCount: 8,
+    remainingPhaseCount: 4,
+    currentBlocker: {
+      key: "staging_profile",
+      phase: "real_staging_inputs",
+      status: "missing",
+      actionKind: "load_profile",
+      command: "npm.cmd run staging:rehearsal -- --profile-file <staging-profile.json> --base-url https://staging.example.com --product-code PILOT_ALPHA --channel stable --admin-username admin@example.com --developer-username launch.smoke.owner --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/staging.env --app-backup-dir /var/lib/rocksolid/backups --postgres-backup-dir /var/lib/rocksolid/postgres-backups",
+      artifactPath: null,
+      envKeys: []
+    },
+    remainingBlockerKeys: [
+      "staging_profile",
+      "required_secret_env",
+      "artifact_output_paths",
+      "filled_closeout_input",
+      "full_test_window",
+      "production_signoff",
+      "launch_day_watch",
+      "stabilization_handoff"
+    ],
+    remainingPhases: [
+      { phase: "real_staging_inputs", actionCount: 4, readyCount: 1, blockedCount: 3 },
+      { phase: "full_test_window_entry", actionCount: 2, readyCount: 0, blockedCount: 2 },
+      { phase: "production_signoff", actionCount: 1, readyCount: 0, blockedCount: 1 },
+      { phase: "launch_watch_and_stabilization", actionCount: 2, readyCount: 0, blockedCount: 2 }
+    ],
+    explanation: "The application code path is prepared; launch is still blocked by real staging inputs, evidence backfill, full-test sign-off, and launch-day watch records.",
+    nextAction: "Clear the real staging input closure, then rerun the no-write staging rehearsal."
+  });
+  assert.deepEqual(
+    output.finalRehearsalPacket.launchReadinessDistance,
+    output.operatorExecutionPlan.launchReadinessDistance
+  );
+  assert.deepEqual(
+    output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.launchReadinessDistance,
+    output.operatorExecutionPlan.launchReadinessDistance
+  );
   assert.deepEqual(
     output.operatorExecutionPlan.goLiveOperatorActionPlan.phaseSummary.map((item) => [item.phase, item.readyCount, item.blockedCount]),
     [

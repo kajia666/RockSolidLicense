@@ -889,6 +889,57 @@ function buildGoLiveOperatorActionPlan(progress = {}) {
   };
 }
 
+function buildLaunchReadinessDistance(progress = {}) {
+  const actionPlan = progress.operatorActionPlan || {};
+  const actions = Array.isArray(actionPlan.actions)
+    ? actionPlan.actions
+    : [];
+  const actionQueue = Array.isArray(actionPlan.actionQueue)
+    ? actionPlan.actionQueue
+    : actions.filter((item) => item.needsOperatorAction);
+  const currentAction = actionPlan.currentAction || actionQueue[0] || null;
+  const remainingPhases = (Array.isArray(actionPlan.phaseSummary) ? actionPlan.phaseSummary : [])
+    .filter((phase) => (phase.blockedCount ?? 0) > 0)
+    .map((phase) => ({
+      phase: phase.phase || null,
+      actionCount: phase.actionCount ?? 0,
+      readyCount: phase.readyCount ?? 0,
+      blockedCount: phase.blockedCount ?? 0
+    }));
+  const remainingOperatorActionCount = actionQueue.length;
+  const launchBlockedBy = remainingOperatorActionCount === 0 && progress.status === "ready_for_controlled_pilot_launch"
+    ? "none"
+    : "real_environment_evidence";
+  const currentOperatorAction = currentAction?.operatorAction || {};
+  const explanation = launchBlockedBy === "none"
+    ? "The controlled pilot launch path is ready; keep launch-day watch and stabilization records open during cutover."
+    : "The application code path is prepared; launch is still blocked by real staging inputs, evidence backfill, full-test sign-off, and launch-day watch records.";
+  return {
+    mode: "launch-readiness-distance",
+    status: progress.status || "unknown",
+    launchBlockedBy,
+    readinessPercent: progress.scriptReadinessPercent ?? 0,
+    readyActionCount: actionPlan.readyActionCount ?? 0,
+    remainingOperatorActionCount,
+    remainingPhaseCount: remainingPhases.length,
+    currentBlocker: currentAction
+      ? {
+        key: currentAction.key || null,
+        phase: currentAction.phase || null,
+        status: currentAction.status || null,
+        actionKind: currentOperatorAction.kind || null,
+        command: currentOperatorAction.command || null,
+        artifactPath: currentOperatorAction.artifactPath || null,
+        envKeys: Array.isArray(currentOperatorAction.envKeys) ? currentOperatorAction.envKeys : []
+      }
+      : null,
+    remainingBlockerKeys: actionQueue.map((item) => item.key).filter(Boolean),
+    remainingPhases,
+    explanation,
+    nextAction: progress.nextAction || null
+  };
+}
+
 function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
   const profilePreflight = result.stagingProfileOperatorPreflight || {};
   const fullTestWindow = result.fullTestWindowReadiness || {};
@@ -1068,9 +1119,14 @@ function buildGoLiveProgress(result, { realStagingInputClosure = {} } = {}) {
     currentBlocker: blockedQueue[0] || null,
     nextAction
   };
+  const operatorActionPlan = buildGoLiveOperatorActionPlan(progress);
   return {
     ...progress,
-    operatorActionPlan: buildGoLiveOperatorActionPlan(progress)
+    launchReadinessDistance: buildLaunchReadinessDistance({
+      ...progress,
+      operatorActionPlan
+    }),
+    operatorActionPlan
   };
 }
 
@@ -6716,6 +6772,7 @@ function buildFinalRehearsalPacket(result) {
     goLiveStatus: goLiveProgress.status,
     goLiveCurrentBlocker: goLiveProgress.currentBlocker,
     goLiveActionQueue: goLiveProgress.operatorActionQueue,
+    launchReadinessDistance: goLiveProgress.launchReadinessDistance,
     goLiveOperatorActionPlan: goLiveProgress.operatorActionPlan,
     launchDutyCurrentAction,
     goLiveExecutionEntry,
@@ -6937,6 +6994,9 @@ function buildStagingOperatorExecutionPlan(result) {
     : [];
   const realStagingInputClosure = result.stagingRehearsalExecutionSummary?.operatorFocus?.realStagingInputClosure || null;
   const goLiveOperatorActionPlan = result.finalRehearsalPacket?.goLiveOperatorActionPlan || null;
+  const launchReadinessDistance = result.finalRehearsalPacket?.launchReadinessDistance
+    || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveProgress?.launchReadinessDistance
+    || null;
   const outputFiles = [
     {
       key: "handoff_file",
@@ -7047,6 +7107,7 @@ function buildStagingOperatorExecutionPlan(result) {
     readinessGaps,
     realStagingInputClosure,
     realStagingRunFocus,
+    launchReadinessDistance,
     goLiveOperatorActionPlan,
     closeoutBackfillFocus,
     fullTestSignoffFocus,
@@ -7804,6 +7865,7 @@ function renderStagingRehearsalExecutionSummary(summary) {
   const goLiveProgress = focus.goLiveProgress || {};
   const goLiveActionPlan = goLiveProgress.operatorActionPlan || {};
   const goLiveAction = goLiveProgress.currentBlocker?.operatorAction || {};
+  const launchDistance = goLiveProgress.launchReadinessDistance || {};
   const closure = focus.launchReadinessClosure || {};
   const launchDutyFocus = focus.launchDutyFocus || {};
   const launchDutyCurrentAction = focus.launchDutyCurrentAction || {};
@@ -7827,6 +7889,8 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Go-live current action unsafeCliSecretOverrides: ${(goLiveAction.unsafeCliSecretOverrides || []).join(", ") || "-"}`,
     `- Go-live blocked queue: ${(goLiveProgress.blockedQueue || []).map((item) => item.key).filter(Boolean).join(" -> ") || "-"}`,
     `- Go-live operator action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
+    `- Launch readiness distance: ${launchDistance.status || "-"} (percent=${launchDistance.readinessPercent ?? "-"}%, remaining=${launchDistance.remainingOperatorActionCount ?? "-"}, blockedBy=${launchDistance.launchBlockedBy || "-"})`,
+    `- Launch readiness distance blockers: ${(launchDistance.remainingBlockerKeys || []).join(" -> ") || "-"}`,
     `- Go-live operator current action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Launch closure status: ${closure.status || "-"} (remainingBlockers=${closure.remainingBlockerCount ?? "-"})`,
     `- Launch closure remaining blockers: ${(closure.remainingBlockers || []).map((item) => item.key).filter(Boolean).join(", ") || "-"}`,
@@ -8171,6 +8235,7 @@ function renderOperatorExecutionPlan(plan) {
   }
   const realClosure = plan.realStagingInputClosure || {};
   const goLiveActionPlan = plan.goLiveOperatorActionPlan || {};
+  const launchDistance = plan.launchReadinessDistance || {};
   const currentLaunchDutyAction = plan.launchDutyCurrentAction || {};
   const goLiveExecutionEntry = plan.goLiveExecutionEntry || {};
   const outputWriteSummary = plan.outputWriteSummary || {};
@@ -8190,6 +8255,8 @@ function renderOperatorExecutionPlan(plan) {
     `- Readiness gap count: ${plan.readinessSummary?.gapCount ?? "-"}`,
     `- Operator real staging input closure: ${realClosure.status || "-"} (ready=${realClosure.readyCheckCount ?? "-"}, blocked=${realClosure.blockedCheckCount ?? "-"})`,
     `- Operator go-live action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
+    `- Launch readiness distance: ${launchDistance.status || "-"} (percent=${launchDistance.readinessPercent ?? "-"}%, remaining=${launchDistance.remainingOperatorActionCount ?? "-"}, blockedBy=${launchDistance.launchBlockedBy || "-"})`,
+    `- Launch readiness distance blockers: ${(launchDistance.remainingBlockerKeys || []).join(" -> ") || "-"}`,
     `- Operator current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Launch-duty current action: ${currentLaunchDutyAction.key || "-"} (stage=${currentLaunchDutyAction.stage || "-"}, source=${currentLaunchDutyAction.sourceFocus || "-"})`,
     `- Launch-duty current command: \`${currentLaunchDutyAction.command || "-"}\``,
@@ -9516,6 +9583,7 @@ function renderFinalRehearsalPacket(packet) {
   const review = packet.closeoutInputReview || {};
   const goLiveActionQueue = Array.isArray(packet.goLiveActionQueue) ? packet.goLiveActionQueue : [];
   const goLiveActionPlan = packet.goLiveOperatorActionPlan || {};
+  const launchDistance = packet.launchReadinessDistance || {};
   const launchDutyCurrentAction = packet.launchDutyCurrentAction || {};
   const goLiveExecutionEntry = packet.goLiveExecutionEntry || {};
   const lines = [
@@ -9540,6 +9608,8 @@ function renderFinalRehearsalPacket(packet) {
     `- Ordered packet steps: ${(packet.orderedSteps || []).map((item) => item.key).join(", ") || "-"}`,
     `- Final packet go-live current blocker: ${packet.goLiveCurrentBlocker?.key || "-"}`,
     `- Final packet go-live operator action plan: status=${goLiveActionPlan.status || "-"}, remaining=${goLiveActionPlan.remainingActionCount ?? "-"}`,
+    `- Final packet launch readiness distance: ${launchDistance.status || "-"} (percent=${launchDistance.readinessPercent ?? "-"}%, remaining=${launchDistance.remainingOperatorActionCount ?? "-"}, blockedBy=${launchDistance.launchBlockedBy || "-"})`,
+    `- Final packet launch readiness distance blockers: ${(launchDistance.remainingBlockerKeys || []).join(" -> ") || "-"}`,
     `- Current go-live action: ${goLiveActionPlan.currentAction?.key || "-"} (phase=${goLiveActionPlan.currentAction?.phase || "-"}, kind=${goLiveActionPlan.currentAction?.operatorAction?.kind || "-"})`,
     `- Final packet launch-duty current action: ${launchDutyCurrentAction.key || "-"} (stage=${launchDutyCurrentAction.stage || "-"}, source=${launchDutyCurrentAction.sourceFocus || "-"})`,
     `- Final packet launch-duty current packet: ${launchDutyCurrentAction.packetPath || "-"}`,

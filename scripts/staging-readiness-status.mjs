@@ -376,6 +376,14 @@ function commandForCloseoutBackfill(inputFile, key) {
   return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key} --value-json <redacted-json>`;
 }
 
+function commandValue(value) {
+  const text = String(value || "");
+  if (/[\s"`]/.test(text)) {
+    return `"${text.replace(/"/g, "`\"")}"`;
+  }
+  return text;
+}
+
 function quoteValueJson(value) {
   return `'${JSON.stringify(value).replaceAll("'", "''")}'`;
 }
@@ -421,8 +429,9 @@ function reloadCommand(inputFile) {
   return `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`;
 }
 
-function statusCommand(inputFile) {
-  return `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`;
+function statusCommand(inputFile, actionsFile = null) {
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
+  return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(inputFile)}${actionsArg}`;
 }
 
 function queueStatus(index) {
@@ -431,6 +440,7 @@ function queueStatus(index) {
 
 function buildActionQueue({
   inputFile,
+  actionsFile,
   artifactPathRoot,
   missingCloseoutKeys,
   closeoutDecision,
@@ -440,7 +450,7 @@ function buildActionQueue({
   canRunFullTestWindow,
   canSignoffProduction
 }) {
-  const localStatusCommand = statusCommand(inputFile);
+  const localStatusCommand = statusCommand(inputFile, actionsFile);
   if (missingCloseoutKeys.length > 0) {
     return missingCloseoutKeys.map((key, index) => {
       const evidence = evidenceForCloseoutKey(key, artifactPathRoot);
@@ -565,12 +575,13 @@ function buildActionQueue({
   ];
 }
 
-function buildActionsFileSummary(actionsFile, actionQueue) {
+function buildActionsFileSummary(actionsFile, actionQueue, inputFile) {
   return {
     path: actionsFile,
     status: "written",
     itemCount: actionQueue.length,
     currentCount: actionQueue.filter((item) => item.status === "current").length,
+    rerunCommand: statusCommand(inputFile, actionsFile),
     nextAction: "Open the action file, complete the current item, then rerun staging:readiness:status."
   };
 }
@@ -715,7 +726,7 @@ function buildNextStep({
   };
 }
 
-function buildStatus(payload, inputFile) {
+function buildStatus(payload, inputFile, actionsFile = null) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("closeout input must be a JSON object.");
   }
@@ -768,6 +779,7 @@ function buildStatus(payload, inputFile) {
   });
   const actionQueue = buildActionQueue({
     inputFile,
+    actionsFile,
     artifactPathRoot,
     missingCloseoutKeys,
     closeoutDecision,
@@ -816,7 +828,7 @@ function writeActionsFile(result, actionsFile) {
   const resolvedActionsFile = path.resolve(actionsFile);
   const nextResult = {
     ...result,
-    actionsFile: buildActionsFileSummary(resolvedActionsFile, result.actionQueue)
+    actionsFile: buildActionsFileSummary(resolvedActionsFile, result.actionQueue, result.inputFile)
   };
   mkdirSync(path.dirname(resolvedActionsFile), { recursive: true });
   writeFileSync(resolvedActionsFile, renderActionQueueMarkdown(nextResult), "utf8");
@@ -845,9 +857,10 @@ function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
     const inputFile = path.resolve(options.inputFile);
+    const actionsFile = options.actionsFile ? path.resolve(options.actionsFile) : null;
     const payload = JSON.parse(readFileSync(inputFile, "utf8"));
-    const result = buildStatus(payload, inputFile);
-    writeResult(options.actionsFile ? writeActionsFile(result, options.actionsFile) : result, options.json);
+    const result = buildStatus(payload, inputFile, actionsFile);
+    writeResult(actionsFile ? writeActionsFile(result, actionsFile) : result, options.json);
   } catch (error) {
     writeResult({
       status: "fail",

@@ -374,6 +374,7 @@ test("staging readiness status can write a redacted markdown action queue", () =
       status: "written",
       itemCount: 10,
       currentCount: 1,
+      rerunCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile} --actions-file ${actionsFile}`,
       nextAction: "Open the action file, complete the current item, then rerun staging:readiness:status."
     });
     const markdown = readFileSync(actionsFile, "utf8");
@@ -390,7 +391,7 @@ test("staging readiness status can write a redacted markdown action queue", () =
     assert.match(markdown, /10\. \[blocked_after_prior_actions\] `receipt_visibility` -> `launchOpsOverviewStatus`/);
     assert.match(markdown, /Receipt operations: record_post_launch_ops_sweep/);
     assert.match(markdown, /Example command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --receipt-lane launchOpsOverviewStatus --value-json '\{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/launch-ops-overview-status-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id>`/);
-    assert.match(markdown, /Status check: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json`/);
+    assert.match(markdown, /Status check: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md`/);
     assert.doesNotMatch(markdown, /StrongAdmin|StrongDeveloper|Bearer|password/i);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

@@ -69,6 +69,16 @@ npm.cmd run staging:profile:init -- --json `
 
 Review the generated JSON, set `$env:RSL_SMOKE_ADMIN_PASSWORD`, `$env:RSL_SMOKE_DEVELOPER_PASSWORD`, and `$env:RSL_DEVELOPER_BEARER_TOKEN` in the shell that will run rehearsal commands, then run `staging:rehearsal --profile-file <generated-profile.json>`.
 
+After the profile-driven rehearsal writes `filled-closeout-input.draft.json`, initialize the real closeout input file from that draft before backfilling evidence:
+
+```powershell
+npm.cmd run staging:closeout:init -- --json `
+  --draft-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.draft.json `
+  --output-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json
+```
+
+This command removes the `exampleOnly` guard so the file can be loaded by `staging:rehearsal --closeout-input-file`, but it keeps every evidence value empty. The reload must still report missing fields until real route-map, backup/restore, live-write smoke, receipt visibility, and operator go/no-go evidence are backfilled.
+
 For a staging API rehearsal, run the no-write rehearsal runner before the live-write smoke step:
 
 ```powershell

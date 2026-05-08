@@ -45,6 +45,14 @@ function runStatus(args) {
   });
 }
 
+function runStatusPlain(args) {
+  return spawnSync(process.execPath, ["scripts/staging-readiness-status.mjs", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 120_000
+  });
+}
+
 function writeCloseoutInput(file, {
   filledCloseoutKeys = [],
   decision = null,
@@ -487,6 +495,37 @@ test("staging readiness status reports launch-day watch readiness after all loca
     assert.match(markdown, /3\. \[blocked_after_prior_actions\] `first_wave_closeout` -> `first_wave_closeout`/);
     assert.match(markdown, /Action key: `close_first_wave`/);
     assert.match(markdown, /Source records: first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging readiness status prints launch-duty next run in plain output", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-plain-ready-"));
+  try {
+    const inputFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "readiness-action-queue.md");
+    mkdirSync(dirname(inputFile), { recursive: true });
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: closeoutKeys,
+      decision: "ready-for-full-test-window",
+      productionDecision: "ready-for-production-signoff",
+      filledSignoffKeys: signoffKeys,
+      visibleReceiptLanes: receiptVisibilityKeys
+    });
+
+    const result = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Current gate: launch_day_watch/);
+    assert.match(result.stdout, /Next step: reload_rehearsal_for_launch_day_watch/);
+    assert.match(result.stdout, /Launch duty current action: archive_production_signoff/);
+    assert.match(result.stdout, /Launch duty reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Launch duty follow-up actions: archive_production_signoff -> record_launch_day_watch_summary -> close_first_wave/);
+    assert.match(result.stdout, /Launch duty watch artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+    assert.match(result.stdout, /Launch duty first-wave closeout: artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
+    assert.match(result.stdout, /Action file: .*readiness-action-queue\.md/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

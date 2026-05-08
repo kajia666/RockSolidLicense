@@ -956,6 +956,14 @@ function writeResult(result, json) {
     console.log(`Current gate: ${result.readiness.currentGate}`);
     console.log(`Next step: ${result.nextStep.key}`);
     console.log(result.nextStep.command);
+    if (result.launchDutyNextRun) {
+      const nextRun = result.launchDutyNextRun;
+      console.log(`Launch duty current action: ${nextRun.currentActionKey}`);
+      console.log(`Launch duty reload: ${nextRun.reloadCommand}`);
+      console.log(`Launch duty follow-up actions: ${(nextRun.actionKeys || []).join(" -> ") || "-"}`);
+      console.log(`Launch duty watch artifact: ${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}`);
+      console.log(`Launch duty first-wave closeout: ${nextRun.artifactPathHints?.firstWaveCloseout || "-"}`);
+    }
     if (result.actionsFile) {
       console.log(`Action file: ${result.actionsFile.path}`);
     }

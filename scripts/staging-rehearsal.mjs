@@ -2451,13 +2451,22 @@ function buildStagingBackupRestoreDrillPacket(result) {
 
 function buildPostSignoffActionChecklist(result, overrides = {}) {
   const launchDayWatch = result.launchDayWatchPlan || {};
+  const stabilizationHandoff = result.stabilizationHandoffPlan || {};
   const watchRecordByKey = new Map((launchDayWatch.watchRecordDraft?.records || []).map((item) => [item.key, item]));
+  const handoffWindowByKey = new Map((stabilizationHandoff.handoffWindows || []).map((item) => [item.key, item]));
   const checklistMetadata = (key) => {
     const watchRecord = watchRecordByKey.get(key);
     if (watchRecord) {
       return {
         receiptOperations: watchRecord.receiptOperations || [],
         expectedEvidence: watchRecord.expectedEvidence || null
+      };
+    }
+    const handoffWindow = handoffWindowByKey.get(key);
+    if (handoffWindow) {
+      return {
+        receiptOperations: Array.isArray(handoffWindow.receiptOperations) ? handoffWindow.receiptOperations : [],
+        expectedEvidence: handoffWindow.expectedEvidence || null
       };
     }
     if (key === "production_signoff_packet") {
@@ -2515,6 +2524,12 @@ function buildPostSignoffActionChecklist(result, overrides = {}) {
     || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
   const canSignoff = productionSignoff.canSignoff === true;
   const canStartCutoverWatch = launchDayWatch.canStartCutoverWatch === true;
+  const watchRecordPath = (key, fileName) => (
+    watchRecordByKey.get(key)?.artifactPath || path.posix.join(archiveRoot, fileName)
+  );
+  const handoffWindowPath = (key, fileName) => (
+    handoffWindowByKey.get(key)?.path || path.posix.join(archiveRoot, fileName)
+  );
   return [
     {
       key: "production_signoff_packet",
@@ -2524,12 +2539,22 @@ function buildPostSignoffActionChecklist(result, overrides = {}) {
     {
       key: "launch_day_watch_summary",
       status: canStartCutoverWatch ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
-      path: watchRecordByKey.get("launch_day_watch_summary")?.artifactPath || path.posix.join(archiveRoot, "launch-day-watch-summary.md")
+      path: watchRecordPath("launch_day_watch_summary", "launch-day-watch-summary.md")
     },
     {
       key: "receipt_visibility_snapshot",
       status: canStartCutoverWatch ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
-      path: watchRecordByKey.get("receipt_visibility_snapshot")?.artifactPath || path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt")
+      path: watchRecordPath("receipt_visibility_snapshot", "receipt-visibility-snapshot.txt")
+    },
+    {
+      key: "first_wave_incident_log",
+      status: canStartCutoverWatch ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
+      path: watchRecordPath("first_wave_incident_log", "first-wave-incident-log.md")
+    },
+    {
+      key: "rollback_signal_review",
+      status: canStartCutoverWatch ? "record_during_cutover_watch" : "blocked_until_signoff_ready",
+      path: watchRecordPath("rollback_signal_review", "rollback-signal-review.md")
     },
     {
       key: "launch_duty_archive_index",
@@ -2539,7 +2564,12 @@ function buildPostSignoffActionChecklist(result, overrides = {}) {
     {
       key: "stabilization_owner_handoff",
       status: canStartCutoverWatch ? "prepare_after_cutover_watch" : "blocked_until_signoff_ready",
-      path: watchRecordByKey.get("stabilization_owner_handoff")?.artifactPath || path.posix.join(archiveRoot, "stabilization-owner-handoff.md")
+      path: watchRecordPath("stabilization_owner_handoff", "stabilization-owner-handoff.md")
+    },
+    {
+      key: "first_wave_closeout",
+      status: canStartCutoverWatch ? "close_after_stabilization_handoff" : "blocked_until_signoff_ready",
+      path: handoffWindowPath("first_wave_closeout", "first-wave-closeout.md")
     }
   ].map(enrichChecklistItem);
 }

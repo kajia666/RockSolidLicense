@@ -165,6 +165,13 @@ const LAUNCH_DAY_WATCH_SOURCE_STEPS = {
   stabilization_owner_handoff: "handoff_stabilization_owner"
 };
 
+const POST_SIGNOFF_ACTION_KEYS = {
+  production_signoff_packet: "archive_production_signoff",
+  ...LAUNCH_DAY_WATCH_SOURCE_STEPS,
+  launch_duty_archive_index: "review_launch_duty_archive_index",
+  first_wave_closeout: "close_first_wave"
+};
+
 const PROFILE_BACKFILL_ARTIFACTS = [
   {
     closeoutKey: "route_map_gate_result",
@@ -2490,6 +2497,7 @@ function buildPostSignoffActionChecklist(result, overrides = {}) {
     const metadata = checklistMetadata(item.key);
     return {
       ...item,
+      currentActionKey: item.currentActionKey || POST_SIGNOFF_ACTION_KEYS[item.key] || null,
       receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : metadata.receiptOperations,
       expectedEvidence: item.expectedEvidence || metadata.expectedEvidence
     };
@@ -2501,6 +2509,7 @@ function buildPostSignoffActionChecklist(result, overrides = {}) {
       key: item.key || null,
       status: item.status || "not_available",
       path: item.path || null,
+      currentActionKey: item.currentActionKey || POST_SIGNOFF_ACTION_KEYS[item.key] || null,
       receiptOperations: item.receiptOperations,
       expectedEvidence: item.expectedEvidence
     }));
@@ -3164,6 +3173,7 @@ function buildStagingLaunchDutyArchiveIndex(result) {
     key: item.key || null,
     status: item.status || "not_available",
     path: item.path || null,
+    currentActionKey: item.currentActionKey || POST_SIGNOFF_ACTION_KEYS[item.key] || null,
     receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
     expectedEvidence: item.expectedEvidence || null
   }));
@@ -8568,7 +8578,7 @@ function appendPostSignoffActionChecklist(lines, checklist) {
   }
   lines.push("- Post-signoff action checklist:");
   for (const item of checklist) {
-    lines.push(`  - ${item.key || "-"}: ${item.status || "-"} -> ${item.path || "-"}`);
+    lines.push(`  - ${item.key || "-"}: ${item.status || "-"} (action=${item.currentActionKey || "-"}) -> ${item.path || "-"}`);
     lines.push(`    - receiptOperations: ${(item.receiptOperations || []).join(", ") || "-"}`);
     lines.push(`    - expectedEvidence: ${item.expectedEvidence || "-"}`);
   }
@@ -9539,7 +9549,7 @@ function renderStagingProductionSignoffPacket(packet) {
   if (Array.isArray(packet.postSignoffTargets) && packet.postSignoffTargets.length) {
     lines.push("- Post-signoff targets:");
     for (const target of packet.postSignoffTargets) {
-      lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"} (action=${target.currentActionKey || "-"}) -> ${target.path || "-"}`);
       lines.push(`    - receiptOperations: ${(target.receiptOperations || []).join(", ") || "-"}`);
       lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
     }
@@ -9881,7 +9891,7 @@ function renderStagingLaunchDutyArchiveIndex(index) {
   if (Array.isArray(index.signoffTargets) && index.signoffTargets.length) {
     lines.push("- Launch-duty signoff targets:");
     for (const target of index.signoffTargets) {
-      lines.push(`  - ${target.key || "-"}: ${target.status || "-"} -> ${target.path || "-"}`);
+      lines.push(`  - ${target.key || "-"}: ${target.status || "-"} (action=${target.currentActionKey || "-"}) -> ${target.path || "-"}`);
       lines.push(`    - receiptOperations: ${(target.receiptOperations || []).join(", ") || "-"}`);
       lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
     }

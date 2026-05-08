@@ -3452,9 +3452,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
   assert.match(handoff, /Sign-off draft closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
   assert.match(handoff, /## Staging Production Sign-Off Packet[\s\S]*Sign-off conditions:[\s\S]*full_test_window_passed: missing[\s\S]*expectedEvidence: Attach the full `npm\.cmd test` output summary and failure count\.[\s\S]*Receipt visibility evidence targets:[\s\S]*developerOps: missing[\s\S]*expectedEvidence: Confirm Developer Ops receipt visibility shows the latest staging evidence receipts before cutover\.[\s\S]*Operator steps:[\s\S]*run_full_test_window: blocked_until_closeout_reload[\s\S]*expectedEvidence: Run npm\.cmd test and capture the pass\/fail summary before production sign-off\.[\s\S]*verify_receipt_visibility: operator_backfill[\s\S]*expectedEvidence: Confirm Launch Mainline, Launch Review, Launch Smoke, Developer Ops, and Launch Ops Overview Status receipt visibility before cutover\.[\s\S]*## Launch Day Watch Plan/);
   assert.match(handoff, /Post-signoff targets:/);
-  assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
-  assert.match(handoff, /launch_day_watch_summary: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
-  assert.match(handoff, /stabilization_owner_handoff: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+  assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready \(action=archive_production_signoff\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+  assert.match(handoff, /launch_day_watch_summary: blocked_until_signoff_ready \(action=record_launch_day_watch_summary\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+  assert.match(handoff, /stabilization_owner_handoff: blocked_until_signoff_ready \(action=handoff_stabilization_owner\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
   assert.match(handoff, /Launch-day watch bridge: blocked_until_signoff_ready \(source=blocked, watchDraft=blocked_until_production_signoff, target=production_signoff_packet\)/);
   assert.match(handoff, /Launch-day watch evidence inputs: production_signoff_packet=blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=blocked_until_cutover_watch -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
   assert.match(handoff, /Launch-day watch record queue:/);
@@ -3506,8 +3506,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Launch Ops overview status: https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=launch-operations-overview-status&limit=20/);
     assert.match(handoff, /launch_day_watch_summary: blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
     assert.match(handoff, /Launch-duty signoff targets:/);
-    assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
-    assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready \(action=archive_production_signoff\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready \(action=review_launch_duty_archive_index\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Archive first-wave closeout gate: blocked_until_stabilization_handoff \(owner=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md, closeout=artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md\)/);
     assert.match(handoff, /stabilization_owner_handoff: blocked_until_cutover_watch \(T\+2h stabilization owner handoff\)/);
     assert.match(handoff, /## Staging Environment Binding/);
@@ -3590,11 +3590,11 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Current go-live action: staging_profile \(phase=real_staging_inputs, kind=load_profile\)/);
     assert.match(handoff, /Phase real_staging_inputs: ready=1, blocked=3/);
     assert.match(handoff, /Post-signoff action checklist:/);
-    assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(handoff, /production_signoff_packet: blocked_until_signoff_ready \(action=archive_production_signoff\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(handoff, /expectedEvidence: Archive the signed production sign-off packet with full-test status, GO\/NO-GO decision, and receipt visibility lanes\./);
-    assert.match(handoff, /launch_day_watch_summary: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\./);
-    assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
-    assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Launch-duty signoff targets:[\s\S]*production_signoff_packet: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json[\s\S]*expectedEvidence: Archive the signed production sign-off packet with full-test status, GO\/NO-GO decision, and receipt visibility lanes\.[\s\S]*launch_day_watch_summary: blocked_until_signoff_ready -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\.[\s\S]*## Staging Environment Binding/);
+    assert.match(handoff, /launch_day_watch_summary: blocked_until_signoff_ready \(action=record_launch_day_watch_summary\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\./);
+    assert.match(handoff, /launch_duty_archive_index: blocked_until_signoff_ready \(action=review_launch_duty_archive_index\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Launch-duty signoff targets:[\s\S]*production_signoff_packet: blocked_until_signoff_ready \(action=archive_production_signoff\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json[\s\S]*expectedEvidence: Archive the signed production sign-off packet with full-test status, GO\/NO-GO decision, and receipt visibility lanes\.[\s\S]*launch_day_watch_summary: blocked_until_signoff_ready \(action=record_launch_day_watch_summary\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\.[\s\S]*## Staging Environment Binding/);
     assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Watch artifacts:[\s\S]*launch_day_watch_summary: blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review[\s\S]*expectedEvidence: Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions\.[\s\S]*rollback_signal_review: blocked_until_production_signoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md[\s\S]*expectedEvidence: Record whether rollback signals were observed, dismissed, or escalated\.[\s\S]*## Staging Environment Binding/);
     assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Stabilization handoff windows:[\s\S]*stabilization_owner_handoff: blocked_until_cutover_watch \(T\+2h stabilization owner handoff\)[\s\S]*summary: Hand off launch-day watch summary, incidents, receipt snapshots, and rollback signals to the stabilization owner\.[\s\S]*receiptOperations: record_launch_stabilization_review[\s\S]*expectedEvidence: Record stabilization owner, timestamp, unresolved items, and next-duty follow-up\.[\s\S]*first_wave_closeout: blocked_until_stabilization_owner_handoff \(T\+24h first-wave closeout\)[\s\S]*receiptOperations: record_launch_closeout_review[\s\S]*expectedEvidence: Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp\.[\s\S]*## Staging Environment Binding/);
     assert.match(handoff, /## Artifact \/ Receipt Ledger/);
@@ -5120,6 +5120,19 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
         ["first_wave_closeout", "close_after_stabilization_handoff"]
       ]
     );
+    assert.deepEqual(
+      output.stagingProductionSignoffPacket.postSignoffTargets.map((item) => [item.key, item.currentActionKey]),
+      [
+        ["production_signoff_packet", "archive_production_signoff"],
+        ["launch_day_watch_summary", "record_launch_day_watch_summary"],
+        ["receipt_visibility_snapshot", "record_receipt_visibility_snapshot"],
+        ["first_wave_incident_log", "record_first_wave_incident_log"],
+        ["rollback_signal_review", "record_rollback_signal_review"],
+        ["launch_duty_archive_index", "review_launch_duty_archive_index"],
+        ["stabilization_owner_handoff", "handoff_stabilization_owner"],
+        ["first_wave_closeout", "close_first_wave"]
+      ]
+    );
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.status, "ready_for_launch_day_watch");
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.sourceStatus, "ready");
     assert.equal(output.stagingProductionSignoffPacket.launchDayWatchBridge.watchRecordDraftStatus, "ready_for_operator_watch");
@@ -5761,6 +5774,21 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
         ["first_wave_closeout", ["record_launch_closeout_review"], "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp."]
       ]
     );
+    assert.deepEqual(
+      output.operatorExecutionPlan.postSignoffActionChecklist.map((item) => [item.key, item.currentActionKey]),
+      [
+        ["production_signoff_packet", "archive_production_signoff"],
+        ["launch_day_watch_summary", "record_launch_day_watch_summary"],
+        ["receipt_visibility_snapshot", "record_receipt_visibility_snapshot"],
+        ["first_wave_incident_log", "record_first_wave_incident_log"],
+        ["rollback_signal_review", "record_rollback_signal_review"],
+        ["launch_duty_archive_index", "review_launch_duty_archive_index"],
+        ["stabilization_owner_handoff", "handoff_stabilization_owner"],
+        ["first_wave_closeout", "close_first_wave"]
+      ]
+    );
+    assert.match(handoff, /Post-signoff action checklist:[\s\S]*first_wave_closeout: close_after_stabilization_handoff \(action=close_first_wave\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
+    assert.match(handoff, /Post-signoff targets:[\s\S]*rollback_signal_review: record_during_cutover_watch \(action=record_rollback_signal_review\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md/);
     assert.equal(output.stagingRehearsalRunRecordIndex.status, "ready_for_launch_day_watch");
     assert.deepEqual(output.stagingRehearsalRunRecordIndex.signoffProgress.missingSignoffKeys, []);
     assert.deepEqual(output.stagingRehearsalRunRecordIndex.signoffProgress.missingReceiptVisibilityKeys, []);

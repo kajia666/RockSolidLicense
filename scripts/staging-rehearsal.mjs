@@ -460,6 +460,39 @@ function buildReadinessStatusCommand({ filledCloseoutInputFile, readinessActionQ
   ].join(" ");
 }
 
+function buildCloseoutBackfillCommand({
+  filledCloseoutInputFile,
+  key,
+  artifactPath,
+  receiptOperations = [],
+  readinessActionQueueFile
+}) {
+  if (!filledCloseoutInputFile || !key) {
+    return null;
+  }
+  const parts = [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--key",
+    commandValue(key),
+    "--value-json",
+    "<redacted-json>"
+  ];
+  if (artifactPath) {
+    parts.push("--artifact-path", commandValue(artifactPath));
+  }
+  for (const operation of Array.isArray(receiptOperations) ? receiptOperations : []) {
+    if (operation) {
+      parts.push("--receipt-id", `<${operation}-receipt-id>`);
+    }
+  }
+  if (readinessActionQueueFile) {
+    parts.push("--actions-file", commandValue(readinessActionQueueFile));
+  }
+  return parts.join(" ");
+}
+
 function buildProfileDrivenCommand(options) {
   const parts = ["npm.cmd run staging:rehearsal --"];
   if (options.profileFile) {
@@ -4412,6 +4445,10 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
     || keyedPath(finalFiles, "closeout_reload_packet")
     || keyedPath(bindingFiles, "closeout_reload_packet")
     || null;
+  const readinessActionQueueFile = keyedPath(outputFiles, "readiness_action_queue")
+    || keyedPath(finalFiles, "readiness_action_queue")
+    || keyedPath(bindingFiles, "readiness_action_queue")
+    || null;
   const reloadStep = findKeyedItem(runbook.commandSequence, "reload_closeout_input");
   const reloadCommand = finalPacket.commands?.closeoutReload
     || reloadStep?.command
@@ -4429,6 +4466,17 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
     receiptOperations: currentTarget.receiptOperations || currentField?.receiptOperations || [],
     expectedEvidence: currentTarget.expectedEvidence || currentField?.expectedEvidence || null,
     operatorNote: currentTarget.operatorNote || null,
+    backfillCommand: buildCloseoutBackfillCommand({
+      filledCloseoutInputFile,
+      key: currentTarget.key,
+      artifactPath: currentTarget.artifactPath || currentField?.artifactPath || null,
+      receiptOperations: currentTarget.receiptOperations || currentField?.receiptOperations || [],
+      readinessActionQueueFile
+    }),
+    statusCommand: buildReadinessStatusCommand({
+      filledCloseoutInputFile,
+      readinessActionQueueFile
+    }),
     nextAction: `Backfill ${currentTarget.key} into ${filledCloseoutInputFile || "filled-closeout-input.json"}, then reload closeout input.`
   } : null;
   const reloadExecutionEntry = buildCloseoutReloadExecutionEntry({
@@ -4479,7 +4527,8 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
       closeoutTemplateFile,
       filledCloseoutDraftFile,
       filledCloseoutInputFile,
-      closeoutReloadPacketFile
+      closeoutReloadPacketFile,
+      readinessActionQueueFile
     },
     reloadCommand,
     fullTestWindow: {
@@ -4818,7 +4867,7 @@ function buildGoLiveExecutionEntry({
   let sourceFocus = "closeoutBackfillFocus";
   let currentActionKey = closeoutBackfillFocus?.currentBackfillTarget?.key || "reload_closeout_input";
   let status = closeoutBackfillFocus?.status || launchDutyCurrentAction?.status || "blocked_until_closeout_reload";
-  let currentCommand = closeoutReloadCommand;
+  let currentCommand = closeoutBackfillFocus?.currentBackfillTarget?.backfillCommand || closeoutReloadCommand;
   let nextAction = closeoutBackfillFocus?.currentBackfillTarget?.nextAction
     || closeoutBackfillFocus?.nextAction
     || launchDutyCurrentAction?.nextAction
@@ -5117,7 +5166,7 @@ function buildLaunchDutyCurrentAction({
       sourceFocus: "closeoutBackfillFocus",
       key: current.key || "reload_closeout_input",
       status: closeoutBackfillFocus.status || "awaiting_closeout_backfill",
-      command: closeoutBackfillFocus.reloadCommand || null,
+      command: current.backfillCommand || closeoutBackfillFocus.reloadCommand || null,
       packetPath: launchDutyPacketFocus?.controlPaths?.closeoutReloadPacket || closeoutBackfillFocus.paths?.closeoutReloadPacketFile || null,
       artifactPath: current.artifactPath || null,
       envKeys: current.envKeys || [],
@@ -8448,6 +8497,8 @@ function renderOperatorExecutionPlan(plan) {
     lines.push(`- Closeout reload command: \`${focus.reloadCommand || "-"}\``);
     lines.push(`- Current closeout source step: ${current.sourceStep || "-"}`);
     lines.push(`- Current closeout artifact: ${current.artifactPath || "-"}`);
+    lines.push(`- Current closeout backfill command: \`${current.backfillCommand || "-"}\``);
+    lines.push(`- Current closeout status command: \`${current.statusCommand || "-"}\``);
     lines.push(`- Filled closeout input: ${focus.paths?.filledCloseoutInputFile || "-"}`);
     lines.push(`- Full test focus: ${focus.fullTestWindow?.status || "-"} (canRun=${focus.fullTestWindow?.canRun ? "yes" : "no"}, command=${focus.fullTestWindow?.command || "-"})`);
     lines.push(`- Production sign-off focus: ${focus.productionSignoff?.status || "-"} (canSignoff=${focus.productionSignoff?.canSignoff ? "yes" : "no"})`);

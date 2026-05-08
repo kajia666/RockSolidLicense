@@ -437,8 +437,20 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt"
   );
   assert.equal(
+    output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget.backfillCommand,
+    "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt --actions-file artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md"
+  );
+  assert.equal(
+    output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget.statusCommand,
+    "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md"
+  );
+  assert.equal(
     output.operatorExecutionPlan.closeoutBackfillFocus.paths.filledCloseoutInputFile,
     "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+  );
+  assert.equal(
+    output.operatorExecutionPlan.closeoutBackfillFocus.paths.readinessActionQueueFile,
+    "artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md"
   );
   assert.equal(
     output.operatorExecutionPlan.closeoutBackfillFocus.reloadCommand,
@@ -526,6 +538,10 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentPhase, "full_test_window_entry");
   assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.sourceFocus, "closeoutBackfillFocus");
   assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentActionKey, "route_map_gate_result");
+  assert.equal(
+    output.operatorExecutionPlan.goLiveExecutionEntry.currentCommand,
+    output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget.backfillCommand
+  );
   assert.equal(
     output.operatorExecutionPlan.goLiveExecutionEntry.commands.closeoutReload,
     "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
@@ -3453,6 +3469,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Staging Rehearsal Run Record Index/);
     assert.match(handoff, /Run record index status: awaiting_evidence_backfill/);
     assert.match(handoff, /## Staging Rehearsal Run Record Index[\s\S]*Go-live execution entry: awaiting_closeout_backfill \(phase=full_test_window_entry, source=closeoutBackfillFocus, action=route_map_gate_result\)[\s\S]*## Staging Artifact Manifest/);
+    assert.match(handoff, /Go-live execution command: `npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md`/);
     assert.match(handoff, /Closeout progress: missing=7/);
     assert.match(handoff, /pre_full_test_closeout: awaiting_operator_evidence \(records=7\)/);
     assert.match(handoff, /production_signoff: blocked_until_full_test_window \(records=7\)/);
@@ -3500,6 +3517,8 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Reload execution entry: awaiting_backfill \(current=route_map_gate_result, queue=7\/7\)[\s\S]*Reload execution first queue item: route_map_gate_result -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt[\s\S]*Reload execution post-reload review: readiness_review_packet \(fullTest=no, command=npm\.cmd test\)/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Operator go\/no-go result capture entry: pending_operator_decision \(decision=-, action=backfill_filled_closeout_input\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md[\s\S]*Operator go\/no-go allowed decisions: ready-for-full-test-window, hold, rollback-follow-up[\s\S]*Operator go\/no-go reload command: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Post-live-write result capture entries: 3[\s\S]*launch_smoke_handoff: pending_operator_result \(action=archive_launch_smoke_handoff\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-smoke-handoff\.json[\s\S]*launch_mainline_evidence_receipts: pending_operator_result \(action=record_launch_mainline_evidence\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-mainline-evidence-receipts\.json[\s\S]*receipt_visibility_review: pending_operator_result \(action=verify_receipt_visibility\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-review\.txt/);
+    assert.match(handoff, /Current closeout backfill command: `npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md`/);
+    assert.match(handoff, /Current closeout status command: `npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md`/);
     assert.match(handoff, /## Staging Production Sign-Off Packet[\s\S]*Operator go\/no-go result capture entry: pending_operator_decision \(decision=-, action=backfill_filled_closeout_input\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md[\s\S]*Operator go\/no-go next action: Record operator_go_no_go as ready-for-full-test-window before full-test window entry\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*review_full_test_window_readiness: blocked[\s\S]*command: `npm\.cmd test`[\s\S]*expectedEvidence: Review the readiness review packet after reload and only run npm\.cmd test once missing closeout keys are empty\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Post-reload targets:[\s\S]*readiness_review_packet: review_after_reload -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-readiness-review-packet\.json[\s\S]*expectedEvidence: Review the reloaded closeout status, remaining missing closeout keys, and full-test readiness from the readiness review packet\./);

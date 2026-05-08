@@ -2890,6 +2890,83 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       canStartCutoverWatch: launchDayWatch.canStartCutoverWatch === true,
       records: launchDayWatch.watchRecordDraft?.records || []
     });
+  const packets = [
+    {
+      key: "run_record_index",
+      status: runRecordIndex.status || "not_available",
+      path: packetPath("run_record_index", result.runRecordFile?.path)
+    },
+    {
+      key: "artifact_manifest",
+      status: artifactManifest.status || "not_available",
+      path: packetPath("artifact_manifest", result.artifactManifestFile?.path)
+    },
+    {
+      key: "backup_restore_packet",
+      status: backupRestorePacket.status || "not_available",
+      path: packetPath("backup_restore_packet", backupRestorePacket.packetFile)
+    },
+    {
+      key: "closeout_reload_packet",
+      status: closeoutReloadPacket.status || "not_available",
+      path: packetPath("closeout_reload_packet", closeoutReloadPacket.paths?.packetFile)
+    },
+    {
+      key: "readiness_review_packet",
+      status: readinessReviewPacket.status || "not_available",
+      path: packetPath("readiness_review_packet", readinessReviewPacket.packetFile)
+    },
+    {
+      key: "production_signoff_packet",
+      status: productionSignoffPacket.status || "not_available",
+      path: packetPath("production_signoff_packet", productionSignoffPacket.packetFile)
+    }
+  ];
+  const signoffTargets = (productionSignoffPacket.postSignoffTargets || []).map((item) => ({
+    key: item.key || null,
+    status: item.status || "not_available",
+    path: item.path || null,
+    receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+    expectedEvidence: item.expectedEvidence || null
+  }));
+  const watchArtifacts = (launchDayWatch.watchRecordDraft?.records || []).map((item) => ({
+    key: item.key || null,
+    status: item.status || "not_available",
+    path: item.artifactPath || null,
+    receiptOperations: item.receiptOperations || [],
+    expectedEvidence: item.expectedEvidence || null
+  }));
+  const stabilizationHandoffSummary = {
+    status: stabilizationHandoff.status || "not_available",
+    requiredEvidenceKeys: stabilizationHandoff.requiredEvidenceKeys || [],
+    watchEvidenceCaptureEntries: stabilizationHandoff.watchEvidenceCaptureEntries || watchEvidenceCaptureEntries,
+    handoffWindows: (stabilizationHandoff.handoffWindows || []).map((item) => ({
+      key: item.key || null,
+      label: item.label || null,
+      status: item.status || "not_available",
+      summary: item.summary || null,
+      receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+      expectedEvidence: item.expectedEvidence || null
+    })),
+    firstWaveCloseoutGate: stabilizationHandoff.firstWaveCloseoutGate || null,
+    firstWaveCloseoutCaptureEntry: stabilizationHandoff.firstWaveCloseoutCaptureEntry || null,
+    firstWaveCloseoutExecutionEntry: stabilizationHandoff.firstWaveCloseoutExecutionEntry || null
+  };
+  const commands = {
+    stagingDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
+    closeoutReload: readinessReviewPacket.commands?.closeoutReload || closeoutReloadPacket.commands?.closeoutReload || null,
+    fullTestWindow: readinessReviewPacket.commands?.fullTestWindow || finalPacket.commands?.fullTestWindow || "npm.cmd test"
+  };
+  const archiveReviewExecutionEntry = buildLaunchDutyArchiveReviewExecutionEntry({
+    indexFile,
+    packets,
+    signoffTargets,
+    watchArtifacts,
+    stabilizationHandoff: stabilizationHandoffSummary,
+    commands,
+    canStartCutoverWatch: launchDayWatch.canStartCutoverWatch === true,
+    nextAction
+  });
   const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
     || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
     || productionSignoffPacket.goLiveExecutionEntry
@@ -2920,38 +2997,8 @@ function buildStagingLaunchDutyArchiveIndex(result) {
     },
     goLiveOperatorActionPlan: finalPacket.goLiveOperatorActionPlan || null,
     goLiveExecutionEntry,
-    packets: [
-      {
-        key: "run_record_index",
-        status: runRecordIndex.status || "not_available",
-        path: packetPath("run_record_index", result.runRecordFile?.path)
-      },
-      {
-        key: "artifact_manifest",
-        status: artifactManifest.status || "not_available",
-        path: packetPath("artifact_manifest", result.artifactManifestFile?.path)
-      },
-      {
-        key: "backup_restore_packet",
-        status: backupRestorePacket.status || "not_available",
-        path: packetPath("backup_restore_packet", backupRestorePacket.packetFile)
-      },
-      {
-        key: "closeout_reload_packet",
-        status: closeoutReloadPacket.status || "not_available",
-        path: packetPath("closeout_reload_packet", closeoutReloadPacket.paths?.packetFile)
-      },
-      {
-        key: "readiness_review_packet",
-        status: readinessReviewPacket.status || "not_available",
-        path: packetPath("readiness_review_packet", readinessReviewPacket.packetFile)
-      },
-      {
-        key: "production_signoff_packet",
-        status: productionSignoffPacket.status || "not_available",
-        path: packetPath("production_signoff_packet", productionSignoffPacket.packetFile)
-      }
-    ],
+    archiveReviewExecutionEntry,
+    packets,
     receiptVisibilityRoutes: {
       launchMainline: launchDayWatch.routes?.launchMainline || result.nextCommands?.launchMainline || null,
       developerOps: launchDayWatch.routes?.developerOps || result.resultBackfillSummary?.destinations?.developerOps || null,
@@ -2959,42 +3006,11 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       launchSmokeSummary: launchDayWatch.routes?.launchSmokeSummary || result.nextCommands?.receiptVisibilitySummaries?.launchSmokeSummary || null,
       launchOpsOverviewStatus: launchDayWatch.routes?.launchOpsOverviewStatus || result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
     },
-    signoffTargets: (productionSignoffPacket.postSignoffTargets || []).map((item) => ({
-      key: item.key || null,
-      status: item.status || "not_available",
-      path: item.path || null,
-      receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
-      expectedEvidence: item.expectedEvidence || null
-    })),
-    watchArtifacts: (launchDayWatch.watchRecordDraft?.records || []).map((item) => ({
-      key: item.key || null,
-      status: item.status || "not_available",
-      path: item.artifactPath || null,
-      receiptOperations: item.receiptOperations || [],
-      expectedEvidence: item.expectedEvidence || null
-    })),
+    signoffTargets,
+    watchArtifacts,
     watchEvidenceCaptureEntries,
-    stabilizationHandoff: {
-      status: stabilizationHandoff.status || "not_available",
-      requiredEvidenceKeys: stabilizationHandoff.requiredEvidenceKeys || [],
-      watchEvidenceCaptureEntries: stabilizationHandoff.watchEvidenceCaptureEntries || watchEvidenceCaptureEntries,
-      handoffWindows: (stabilizationHandoff.handoffWindows || []).map((item) => ({
-        key: item.key || null,
-        label: item.label || null,
-        status: item.status || "not_available",
-        summary: item.summary || null,
-        receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
-        expectedEvidence: item.expectedEvidence || null
-      })),
-      firstWaveCloseoutGate: stabilizationHandoff.firstWaveCloseoutGate || null,
-      firstWaveCloseoutCaptureEntry: stabilizationHandoff.firstWaveCloseoutCaptureEntry || null,
-      firstWaveCloseoutExecutionEntry: stabilizationHandoff.firstWaveCloseoutExecutionEntry || null
-    },
-    commands: {
-      stagingDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
-      closeoutReload: readinessReviewPacket.commands?.closeoutReload || closeoutReloadPacket.commands?.closeoutReload || null,
-      fullTestWindow: readinessReviewPacket.commands?.fullTestWindow || finalPacket.commands?.fullTestWindow || "npm.cmd test"
-    },
+    stabilizationHandoff: stabilizationHandoffSummary,
+    commands,
     nextAction
   };
 }
@@ -4527,6 +4543,89 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
       fullTestWindow: archiveIndex.commands?.fullTestWindow || focus.fullTestWindow?.command || "npm.cmd test"
     },
     nextAction: launchWatchNextAction
+  };
+}
+
+function buildLaunchDutyArchiveReviewExecutionEntry({
+  indexFile = null,
+  packets = [],
+  signoffTargets = [],
+  watchArtifacts = [],
+  stabilizationHandoff = {},
+  commands = {},
+  canStartCutoverWatch = false,
+  nextAction = null
+} = {}) {
+  const packetQueue = (Array.isArray(packets) ? packets : []).map((item) => [
+    item.key || null,
+    item.status || "not_available",
+    item.path || null
+  ]);
+  const closeoutReloadPacket = findKeyedItem(packets, "closeout_reload_packet") || findLaunchDutyFocusItem(packets) || {};
+  const archiveIndexPacket = {
+    key: "launch_duty_archive_index",
+    status: "awaiting_archive_review",
+    path: indexFile
+  };
+  const postSignoffQueue = canStartCutoverWatch
+    ? (Array.isArray(signoffTargets) ? signoffTargets : []).map((item) => ({
+      key: item.key || null,
+      status: item.status || "not_available",
+      path: item.path || null
+    }))
+    : [];
+  const watchArtifactQueue = canStartCutoverWatch
+    ? (Array.isArray(watchArtifacts) ? watchArtifacts : []).map((item) => ({
+      key: item.key || null,
+      status: item.status || "not_available",
+      path: item.path || null
+    }))
+    : [];
+  const stabilizationWindowQueue = canStartCutoverWatch
+    ? (stabilizationHandoff.handoffWindows || []).map((item) => ({
+      key: item.key || null,
+      status: item.status || "not_available"
+    }))
+    : [];
+  const currentPostSignoffTarget = canStartCutoverWatch ? findLaunchDutyFocusItem(postSignoffQueue) : null;
+  const currentWatchArtifact = canStartCutoverWatch ? findLaunchDutyFocusItem(watchArtifactQueue) : null;
+  const currentStabilizationWindow = canStartCutoverWatch ? findLaunchDutyFocusItem(stabilizationWindowQueue) : null;
+  const firstWaveCloseout = stabilizationHandoff.firstWaveCloseoutExecutionEntry || {};
+  const currentTarget = canStartCutoverWatch
+    ? currentPostSignoffTarget || currentWatchArtifact || currentStabilizationWindow || archiveIndexPacket
+    : {
+      key: closeoutReloadPacket.key || "closeout_reload_packet",
+      status: closeoutReloadPacket.status || "not_available",
+      path: closeoutReloadPacket.path || null
+    };
+  const currentActionKey = canStartCutoverWatch
+    ? currentTarget.key === "production_signoff_packet"
+      ? "archive_production_signoff"
+      : LAUNCH_DAY_WATCH_SOURCE_STEPS[currentTarget.key] || firstWaveCloseout.currentActionKey || "review_launch_duty_archive_index"
+    : "review_closeout_reload_packet";
+  return {
+    mode: "launch-duty-archive-review-execution-entry",
+    status: canStartCutoverWatch ? "ready_for_launch_watch_archive_review" : "awaiting_closeout_reload_packet_review",
+    willModifyData: false,
+    currentPhase: canStartCutoverWatch ? "launch_watch_and_stabilization" : "pre_launch_archive_review",
+    currentActionKey,
+    currentPacket: canStartCutoverWatch ? archiveIndexPacket : currentTarget,
+    currentTarget,
+    packetQueue,
+    postSignoffQueue,
+    watchArtifactQueue,
+    stabilizationWindowQueue,
+    firstWaveCloseout: {
+      status: firstWaveCloseout.status || null,
+      currentActionKey: firstWaveCloseout.currentActionKey || null
+    },
+    commands: {
+      closeoutReload: commands.closeoutReload || null,
+      fullTestWindow: commands.fullTestWindow || "npm.cmd test"
+    },
+    nextAction: canStartCutoverWatch
+      ? nextAction
+      : "Open closeout_reload_packet, backfill closeout evidence, then reload the filled closeout input."
   };
 }
 
@@ -9149,6 +9248,8 @@ function renderStagingLaunchDutyArchiveIndex(index) {
   const routes = index.receiptVisibilityRoutes || {};
   const stabilization = index.stabilizationHandoff || {};
   const goLiveActionPlan = index.goLiveOperatorActionPlan || {};
+  const archiveReviewExecutionEntry = index.archiveReviewExecutionEntry || {};
+  const archiveReviewTarget = archiveReviewExecutionEntry.currentTarget || {};
   const lines = [
     `- Index status: ${index.status || "-"}`,
     `- Writes data by itself: ${index.willModifyData ? "yes" : "no"}`,
@@ -9165,6 +9266,13 @@ function renderStagingLaunchDutyArchiveIndex(index) {
     `- Launch Ops overview status: ${routes.launchOpsOverviewStatus || "-"}`,
     `- Closeout reload: \`${index.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${index.commands?.fullTestWindow || "-"}\``,
+    `- Archive review execution entry: ${archiveReviewExecutionEntry.status || "-"} (action=${archiveReviewExecutionEntry.currentActionKey || "-"}, target=${archiveReviewTarget.key || "-"})`,
+    `- Archive review current packet: ${archiveReviewExecutionEntry.currentPacket?.key || "-"} -> ${archiveReviewExecutionEntry.currentPacket?.path || "-"}`,
+    `- Archive review packet queue: ${(archiveReviewExecutionEntry.packetQueue || []).map((item) => `${item[0] || "-"}:${item[1] || "-"}`).join(", ") || "-"}`,
+    `- Archive review post-signoff queue: ${(archiveReviewExecutionEntry.postSignoffQueue || []).map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Archive review watch queue: ${(archiveReviewExecutionEntry.watchArtifactQueue || []).map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Archive review stabilization queue: ${(archiveReviewExecutionEntry.stabilizationWindowQueue || []).map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Archive review next action: ${archiveReviewExecutionEntry.nextAction || "-"}`,
     "- Packets:"
   ];
   appendGoLiveExecutionEntry(lines, index.goLiveExecutionEntry || {});

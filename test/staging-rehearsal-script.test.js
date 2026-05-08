@@ -1519,6 +1519,43 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       ["production_signoff_packet", "blocked_until_closeout_reload", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"]
     ]
   );
+  assert.deepEqual(output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry, {
+    mode: "launch-duty-archive-review-execution-entry",
+    status: "awaiting_closeout_reload_packet_review",
+    willModifyData: false,
+    currentPhase: "pre_launch_archive_review",
+    currentActionKey: "review_closeout_reload_packet",
+    currentPacket: {
+      key: "closeout_reload_packet",
+      status: "awaiting_closeout_backfill",
+      path: "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json"
+    },
+    currentTarget: {
+      key: "closeout_reload_packet",
+      status: "awaiting_closeout_backfill",
+      path: "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json"
+    },
+    packetQueue: [
+      ["run_record_index", "awaiting_evidence_backfill", "artifacts/staging/PILOT_ALPHA/stable/staging-run-record-index.json"],
+      ["artifact_manifest", "awaiting_artifact_generation", "artifacts/staging/PILOT_ALPHA/stable/staging-artifact-manifest.json"],
+      ["backup_restore_packet", "awaiting_backup_restore_drill", "artifacts/staging/PILOT_ALPHA/stable/staging-backup-restore-drill-packet.json"],
+      ["closeout_reload_packet", "awaiting_closeout_backfill", "artifacts/staging/PILOT_ALPHA/stable/staging-closeout-reload-packet.json"],
+      ["readiness_review_packet", "blocked_until_closeout_reload", "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json"],
+      ["production_signoff_packet", "blocked_until_closeout_reload", "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"]
+    ],
+    postSignoffQueue: [],
+    watchArtifactQueue: [],
+    stabilizationWindowQueue: [],
+    firstWaveCloseout: {
+      status: "blocked_until_stabilization_owner_handoff",
+      currentActionKey: "verify_cutover_watch_records"
+    },
+    commands: {
+      closeoutReload: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+      fullTestWindow: "npm.cmd test"
+    },
+    nextAction: "Open closeout_reload_packet, backfill closeout evidence, then reload the filled closeout input."
+  });
   assert.equal(
     output.stagingLaunchDutyArchiveIndex.receiptVisibilityRoutes.launchOpsOverviewStatus,
     output.nextCommands.receiptVisibilitySummaries.launchOpsOverviewStatus
@@ -5065,6 +5102,52 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       output.stagingLaunchDutyArchiveIndex.nextAction,
       "Archive production sign-off packet, record launch-day watch artifacts, and hand off stabilization owner records."
     );
+    assert.equal(output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.mode, "launch-duty-archive-review-execution-entry");
+    assert.equal(output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.status, "ready_for_launch_watch_archive_review");
+    assert.equal(output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.currentPhase, "launch_watch_and_stabilization");
+    assert.equal(output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.currentActionKey, "archive_production_signoff");
+    assert.deepEqual(output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.currentPacket, {
+      key: "launch_duty_archive_index",
+      status: "awaiting_archive_review",
+      path: "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json"
+    });
+    assert.deepEqual(output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.currentTarget, {
+      key: "production_signoff_packet",
+      status: "archive_before_cutover",
+      path: "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"
+    });
+    assert.deepEqual(
+      output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.postSignoffQueue.map((item) => [item.key, item.status]),
+      [
+        ["production_signoff_packet", "archive_before_cutover"],
+        ["launch_day_watch_summary", "record_during_cutover_watch"],
+        ["receipt_visibility_snapshot", "record_during_cutover_watch"],
+        ["launch_duty_archive_index", "archive_with_signoff"],
+        ["stabilization_owner_handoff", "prepare_after_cutover_watch"]
+      ]
+    );
+    assert.deepEqual(
+      output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.watchArtifactQueue.map((item) => [item.key, item.status]),
+      [
+        ["launch_day_watch_summary", "pending_operator_entry"],
+        ["receipt_visibility_snapshot", "pending_operator_entry"],
+        ["first_wave_incident_log", "pending_operator_entry"],
+        ["rollback_signal_review", "pending_operator_entry"],
+        ["stabilization_owner_handoff", "pending_operator_entry"]
+      ]
+    );
+    assert.deepEqual(
+      output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.stabilizationWindowQueue.map((item) => [item.key, item.status]),
+      [
+        ["stabilization_owner_handoff", "operator_handoff"],
+        ["first_wave_closeout", "operator_closeout"]
+      ]
+    );
+    assert.deepEqual(output.stagingLaunchDutyArchiveIndex.archiveReviewExecutionEntry.firstWaveCloseout, {
+      status: "awaiting_first_wave_closeout",
+      currentActionKey: "close_first_wave"
+    });
+    assert.match(handoff, /## Staging Launch Duty Archive Index[\s\S]*Archive review execution entry: ready_for_launch_watch_archive_review \(action=archive_production_signoff, target=production_signoff_packet\)[\s\S]*Archive review post-signoff queue: production_signoff_packet:archive_before_cutover, launch_day_watch_summary:record_during_cutover_watch[\s\S]*Archive review watch queue: launch_day_watch_summary:pending_operator_entry, receipt_visibility_snapshot:pending_operator_entry[\s\S]*Archive review stabilization queue: stabilization_owner_handoff:operator_handoff, first_wave_closeout:operator_closeout/);
     assert.deepEqual(
       output.stagingLaunchDutyArchiveIndex.watchArtifacts.map((item) => [item.key, item.status]),
       [

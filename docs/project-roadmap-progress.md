@@ -150,10 +150,11 @@ The project is now close to an initial pilot launch. The most important backend/
 - Latest post-live-write closeout capture slice: `closeoutBackfillFocus` and the staging closeout reload packet now expose no-write result capture entries for `launch_smoke_handoff`, `launch_mainline_evidence_receipts`, and `receipt_visibility_review`. The entries carry source steps, artifact paths, receipt targets, Launch Mainline evidence endpoint, receipt-visibility summary downloads, actual closeout reload command when loaded, and Markdown handoff rendering, reducing the remaining manual judgment between live-write smoke, receipt visibility, and full-test window entry.
 - Latest operator go/no-go capture slice: `closeoutBackfillFocus`, the staging closeout reload packet, and the staging production sign-off packet now expose a dedicated no-write `operator-go-no-go-result-capture-entry`. It carries the required `ready-for-full-test-window` decision, allowed alternatives, artifact path, closeout input path, reload command, pending/filled status, actual loaded decision when present, and Markdown handoff rendering, reducing the final manual jump between pre-full-test closeout and the production sign-off packet.
 - Latest production signoff evidence capture slice: production sign-off readiness, full-test signoff focus, and the staging production sign-off packet now expose a 12-item no-write `production-signoff-evidence-capture-entry` queue for the seven production sign-off conditions plus the five receipt-visibility lanes. The queue carries source actions, full-test command where relevant, production sign-off packet path, actual loaded closeout input path, reload command, pending/filled/visible status, receipt visibility downloads, and Markdown handoff rendering, shortening the handoff from full-test result capture into launch-day watch archive readiness.
+- Latest launch-day watch evidence capture slice: `launchDayWatchPlan` now exposes a 5-item no-write `launch-day-watch-evidence-capture-entry` queue for the launch-day watch summary, receipt visibility snapshot, first-wave incident log, rollback signal review, and stabilization owner handoff. The same queue is mirrored into `stabilizationHandoffPlan` and `stagingLaunchDutyArchiveIndex`, with source action, artifact path, receipt targets, expected evidence, blocked/ready status, and Markdown handoff rendering, so launch duty can move from production sign-off into T+2h/T+24h stabilization without reconstructing evidence rows by hand.
 
-Estimated initial pilot-launch readiness: about 99.8%.
+Estimated code-side initial pilot-launch readiness: about 99.9%.
 
-This estimate means the core flow is mostly ready for a controlled first launch, but still needs staging rehearsal, backup/restore rehearsal, and real first-wave operating data before being treated as production-stable.
+This estimate means the script-side launch chain is almost fully connected for a controlled first launch. Overall operational readiness still depends on staging rehearsal, backup/restore rehearsal, the full repository test window, and real first-wave operating data before the system should be treated as production-stable.
 
 ## Immediate Next Plan
 
@@ -327,14 +328,14 @@ Current high-level progress:
 
 - Core backend/API authorization: 90%-95%.
 - Developer delivery and handoff chain: 92%-94%.
-- Launch Mainline and first-launch operations: 93%-95%.
+- Launch Mainline and first-launch operations: 94%-96%.
 - SDK/integration packaging: 80%-85%.
-- Production deployment readiness: 89%-93%.
+- Production deployment readiness: 90%-94%.
 - Commercial operations readiness: 65%-75%.
 
-Overall initial pilot-launch readiness: 96%-97%.
+Overall operational initial pilot-launch readiness: 97%-98%.
 
-This is high enough to keep moving toward a controlled launch. The remaining 3%-4% is not mostly new product code; it is the real-environment and sign-off work that cannot be honestly replaced by local scripting: staging setup, backup/restore drill, live-write smoke, full repository test window, production sign-off, and first-wave support readiness.
+This is high enough to keep moving toward a controlled launch. The remaining 2%-3% is not mostly new product code; it is the real-environment and sign-off work that cannot be honestly replaced by local scripting: staging setup, backup/restore drill, live-write smoke, full repository test window, production sign-off, and first-wave support readiness.
 
 ## Work Remaining Before Initial Launch
 
@@ -355,6 +356,7 @@ Minimum remaining work before a controlled pilot:
 Current rhythm:
 
 - Run focused tests on every small backend/API slice.
+- Latest launch-day watch evidence capture check passed on 2026-05-08: targeted staging rehearsal tests now verify that `launchDayWatchPlan`, `stabilizationHandoffPlan`, and `stagingLaunchDutyArchiveIndex` expose the five launch-day watch evidence capture entries in blocked and ready states, including current source action, artifact path, receipt targets, expected evidence, no-write status, archive mirroring, and Markdown handoff rendering.
 - Latest production signoff evidence capture check passed on 2026-05-08: targeted staging rehearsal tests now verify that production sign-off readiness, full-test signoff focus, and the staging production sign-off packet expose all sign-off condition and receipt-visibility capture entries in pending and ready states, including full-test command, source action, packet path, closeout input path, reload command, visibility downloads, archive action, and Markdown handoff rendering.
 - Latest operator go/no-go capture check passed on 2026-05-08: targeted staging rehearsal tests now verify that `closeoutBackfillFocus`, the staging closeout reload packet, and the staging production sign-off packet expose the `operator-go-no-go-result-capture-entry` in pending and filled states, including allowed decisions, current decision, artifact path, closeout input path, reload command, next action, and Markdown handoff rendering.
 - Latest post-live-write closeout capture check passed on 2026-05-08: targeted staging rehearsal tests now verify that `closeoutBackfillFocus` and the staging closeout reload packet expose post-live-write result capture entries for Launch Smoke handoff, Launch Mainline evidence receipts, and receipt visibility review in pending and filled states, including receipt targets, evidence endpoint, visibility downloads, closeout reload command, and Markdown handoff rendering.

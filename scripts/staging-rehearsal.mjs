@@ -155,6 +155,14 @@ const PRODUCTION_SIGNOFF_SOURCE_STEPS = {
   operator_signoff_recorded: "record_operator_signoff"
 };
 
+const LAUNCH_DAY_WATCH_SOURCE_STEPS = {
+  launch_day_watch_summary: "record_launch_day_watch_summary",
+  receipt_visibility_snapshot: "record_receipt_visibility_snapshot",
+  first_wave_incident_log: "record_first_wave_incident_log",
+  rollback_signal_review: "record_rollback_signal_review",
+  stabilization_owner_handoff: "handoff_stabilization_owner"
+};
+
 const PROFILE_BACKFILL_ARTIFACTS = [
   {
     closeoutKey: "route_map_gate_result",
@@ -2803,6 +2811,13 @@ function buildStagingLaunchDutyArchiveIndex(result) {
     || bindingFiles.get("launch_duty_archive_index")?.path
     || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
   const packetPath = (key, fallback) => bindingFiles.get(key)?.path || fallback || null;
+  const watchEvidenceCaptureEntries = Array.isArray(launchDayWatch.watchEvidenceCaptureEntries)
+    && launchDayWatch.watchEvidenceCaptureEntries.length
+    ? launchDayWatch.watchEvidenceCaptureEntries
+    : buildLaunchDayWatchEvidenceCaptureEntries({
+      canStartCutoverWatch: launchDayWatch.canStartCutoverWatch === true,
+      records: launchDayWatch.watchRecordDraft?.records || []
+    });
   const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
     || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
     || productionSignoffPacket.goLiveExecutionEntry
@@ -2886,9 +2901,11 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       receiptOperations: item.receiptOperations || [],
       expectedEvidence: item.expectedEvidence || null
     })),
+    watchEvidenceCaptureEntries,
     stabilizationHandoff: {
       status: stabilizationHandoff.status || "not_available",
       requiredEvidenceKeys: stabilizationHandoff.requiredEvidenceKeys || [],
+      watchEvidenceCaptureEntries: stabilizationHandoff.watchEvidenceCaptureEntries || watchEvidenceCaptureEntries,
       handoffWindows: (stabilizationHandoff.handoffWindows || []).map((item) => ({
         key: item.key || null,
         label: item.label || null,
@@ -4921,6 +4938,46 @@ function buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch = false, 
   };
 }
 
+function buildLaunchDayWatchEvidenceCaptureEntries({
+  canStartCutoverWatch = false,
+  records = []
+} = {}) {
+  return (Array.isArray(records) ? records : []).map((record) => {
+    const receiptOperations = Array.isArray(record.receiptOperations) ? record.receiptOperations : [];
+    const status = canStartCutoverWatch
+      ? record.status || "pending_operator_entry"
+      : "blocked_until_production_signoff";
+    const currentActionKey = canStartCutoverWatch
+      ? LAUNCH_DAY_WATCH_SOURCE_STEPS[record.key] || "record_launch_day_watch_artifact"
+      : "complete_production_signoff";
+    return {
+      mode: "launch-day-watch-evidence-capture-entry",
+      key: record.key || null,
+      category: "launch_day_watch_record",
+      status,
+      willModifyData: false,
+      currentActionKey,
+      currentCommand: null,
+      resultBackfillTarget: {
+        key: record.key || null,
+        status,
+        artifactPath: record.artifactPath || record.path || null,
+        receiptOperations,
+        expectedEvidence: record.expectedEvidence || null,
+        operatorNote: record.operatorNote || null
+      },
+      receiptTargets: receiptOperations.map((operation) => ({
+        operation,
+        status: canStartCutoverWatch ? "pending_operator_receipt" : "blocked_until_production_signoff",
+        artifactPath: record.artifactPath || record.path || null
+      })),
+      nextAction: canStartCutoverWatch
+        ? `Record ${record.key || "launch-day watch artifact"} and attach receipt IDs before stabilization handoff.`
+        : "Complete production sign-off before starting launch-day watch evidence capture."
+    };
+  });
+}
+
 function buildLaunchDayWatchExecutionEntry({
   canStartCutoverWatch = false,
   watchRecordDraft = {},
@@ -4974,6 +5031,10 @@ function buildLaunchDayWatchPlan(result) {
     watchRecordDraft,
     nextAction: "Complete production sign-off before starting launch-day watch records."
   });
+  const watchEvidenceCaptureEntries = buildLaunchDayWatchEvidenceCaptureEntries({
+    canStartCutoverWatch,
+    records: watchRecordDraft.records || []
+  });
   return {
     status: canStartCutoverWatch ? "ready" : "blocked",
     canStartCutoverWatch,
@@ -4989,6 +5050,7 @@ function buildLaunchDayWatchPlan(result) {
     routes,
     watchRecordDraft,
     watchExecutionEntry,
+    watchEvidenceCaptureEntries,
     watchWindows: [
       {
         key: "cutover_watch",
@@ -5112,6 +5174,13 @@ function buildStabilizationHandoffPlan(result) {
       operatorNote: record.operatorNote || "Backfill only redacted watch results, artifact paths, receipt IDs, incident summaries, and owner handoff notes."
     };
   });
+  const watchEvidenceCaptureEntries = Array.isArray(watchPlan?.watchEvidenceCaptureEntries)
+    && watchPlan.watchEvidenceCaptureEntries.length
+    ? watchPlan.watchEvidenceCaptureEntries
+    : buildLaunchDayWatchEvidenceCaptureEntries({
+      canStartCutoverWatch: canStartStabilizationHandoff,
+      records: sourceWatchRecords
+    });
   const sourceRecordByKey = new Map(sourceWatchRecords.map((item) => [item.key, item]));
   const handoffWindow = ({
     key,
@@ -5189,6 +5258,7 @@ function buildStabilizationHandoffPlan(result) {
     handoffExecutionEntry,
     firstWaveCloseoutGate,
     sourceWatchRecords,
+    watchEvidenceCaptureEntries,
     handoffEvidenceInputs: sourceWatchRecords.map((item) => ({
       key: item.key,
       status: item.status,
@@ -7599,6 +7669,22 @@ function appendProductionSignoffEvidenceCaptureEntries(lines, entries = []) {
   }
 }
 
+function appendLaunchDayWatchEvidenceCaptureEntries(lines, entries = [], {
+  label = "Launch-day watch evidence capture entries"
+} = {}) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return;
+  }
+  lines.push(`- ${label}: ${entries.length}`);
+  for (const entry of entries) {
+    const target = entry.resultBackfillTarget || {};
+    const receiptTargets = Array.isArray(entry.receiptTargets) ? entry.receiptTargets : [];
+    lines.push(`  - ${entry.key || "-"}: ${entry.status || "-"} (${entry.category || "-"}, action=${entry.currentActionKey || "-"}) -> ${target.artifactPath || "-"}`);
+    lines.push(`    - receiptTargets: ${receiptTargets.map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+    lines.push(`    - expectedEvidence: ${target.expectedEvidence || "-"}`);
+  }
+}
+
 function renderOperatorExecutionPlan(plan) {
   if (!plan) {
     return "- Not available";
@@ -8434,6 +8520,7 @@ function renderLaunchDayWatchPlan(plan) {
       lines.push(`    - operatorNote: ${record.operatorNote || "-"}`);
     }
   }
+  appendLaunchDayWatchEvidenceCaptureEntries(lines, plan.watchEvidenceCaptureEntries || []);
   return lines.join("\n");
 }
 
@@ -8482,6 +8569,7 @@ function renderStabilizationHandoffPlan(plan) {
       lines.push(`    - operatorNote: ${record.operatorNote || "-"}`);
     }
   }
+  appendLaunchDayWatchEvidenceCaptureEntries(lines, plan.watchEvidenceCaptureEntries || []);
   for (const item of handoffWindows) {
     lines.push(`  - ${item.key || "-"}: ${item.status || "-"} -> ${item.path || "-"}`);
     lines.push(`    - label: ${item.label || "-"}`);
@@ -8664,6 +8752,9 @@ function renderStagingLaunchDutyArchiveIndex(index) {
       lines.push(`    - expectedEvidence: ${artifact.expectedEvidence || "-"}`);
     }
   }
+  appendLaunchDayWatchEvidenceCaptureEntries(lines, index.watchEvidenceCaptureEntries || [], {
+    label: "Archive watch evidence capture entries"
+  });
   if (Array.isArray(stabilization.handoffWindows) && stabilization.handoffWindows.length) {
     lines.push("- Stabilization handoff windows:");
     for (const window of stabilization.handoffWindows) {

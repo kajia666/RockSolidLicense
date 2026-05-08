@@ -5260,6 +5260,34 @@ function buildLaunchDutyCurrentAction({
     const followUpFirstWaveReceiptQueue = Array.isArray(firstWaveCloseoutExecutionEntry?.receiptQueue)
       ? firstWaveCloseoutExecutionEntry.receiptQueue
       : [];
+    const followUpWatchEvidenceAction = followUpWatchRecord ? {
+      key: followUpWatchRecord.key || "launch_day_watch_summary",
+      status: followUpWatchRecord.status || "pending_operator_entry",
+      currentActionKey: followUpWatchRecord.currentActionKey || watchEvidenceExecutionEntry?.currentActionKey || "record_launch_day_watch_summary",
+      currentCommand: followUpWatchRecord.currentCommand || watchEvidenceExecutionEntry?.currentCommand || null,
+      artifactPath: followUpWatchRecord.artifactPath || followUpWatchRecord.path || launchDutyPacketFocus?.currentWatchArtifact?.path || null,
+      receiptOperations: Array.isArray(followUpWatchRecord.receiptOperations) ? followUpWatchRecord.receiptOperations : [],
+      receiptQueue: followUpWatchReceiptQueue,
+      expectedEvidence: followUpWatchRecord.expectedEvidence || null,
+      nextAction: watchEvidenceExecutionEntry?.nextAction || null
+    } : null;
+    const followUpFirstWaveCloseoutAction = followUpFirstWaveCloseoutTarget ? {
+      key: followUpFirstWaveCloseoutTarget.key || "first_wave_closeout",
+      status: firstWaveCloseoutExecutionEntry?.status || "awaiting_first_wave_closeout",
+      currentActionKey: firstWaveCloseoutExecutionEntry?.currentActionKey || "close_first_wave",
+      currentCommand: firstWaveCloseoutExecutionEntry?.currentCommand || null,
+      artifactPath: followUpFirstWaveCloseoutTarget.path || followUpFirstWaveCloseoutTarget.artifactPath || null,
+      ownerHandoffPath: followUpFirstWaveCloseoutTarget.ownerHandoffPath || null,
+      requiredSourceRecordKeys: Array.isArray(followUpFirstWaveCloseoutTarget.requiredSourceRecordKeys)
+        ? followUpFirstWaveCloseoutTarget.requiredSourceRecordKeys
+        : [],
+      sourceRecordQueue: Array.isArray(firstWaveCloseoutExecutionEntry?.sourceRecordQueue)
+        ? firstWaveCloseoutExecutionEntry.sourceRecordQueue
+        : [],
+      receiptQueue: followUpFirstWaveReceiptQueue,
+      expectedEvidence: followUpFirstWaveCloseoutTarget.expectedEvidence || null,
+      nextAction: firstWaveCloseoutExecutionEntry?.nextAction || null
+    } : null;
     const archiveRoot = launchDutyPacketFocus?.archiveRoot || archiveContext?.archiveRoot || null;
     const productionSignoffPacketPath = current.packetPath
       || target.path
@@ -5303,10 +5331,12 @@ function buildLaunchDutyCurrentAction({
       status: current.status || fullTestSignoffFocus.status || target.status || "ready_for_launch_day_watch",
       command: current.command || null,
       followUpWatchRecord,
+      followUpWatchEvidenceAction,
       followUpWatchReceiptQueue,
       followUpStabilizationTarget,
       followUpStabilizationSourceQueue,
       followUpFirstWaveCloseoutTarget,
+      followUpFirstWaveCloseoutAction,
       followUpFirstWaveReceiptQueue,
       stabilizationHandoffNextAction: stabilizationHandoffExecutionEntry?.nextAction || null,
       firstWaveCloseoutNextAction: firstWaveCloseoutExecutionEntry?.nextAction || null,
@@ -8776,10 +8806,12 @@ function renderOperatorExecutionPlan(plan) {
     `- Launch-duty archive trace: ${renderLaunchDutyArchiveTrace(currentLaunchDutyAction.archiveTrace)}`,
     `- Launch-duty record updates: ${renderLaunchDutyRecordUpdates(currentLaunchDutyAction.recordUpdates)}`,
     `- Launch-duty follow-up watch record: ${currentLaunchDutyAction.followUpWatchRecord?.key || "-"} -> ${currentLaunchDutyAction.followUpWatchRecord?.artifactPath || "-"}`,
+    `- Launch-duty follow-up watch action: ${currentLaunchDutyAction.followUpWatchEvidenceAction?.key || "-"} (action=${currentLaunchDutyAction.followUpWatchEvidenceAction?.currentActionKey || "-"}) -> ${currentLaunchDutyAction.followUpWatchEvidenceAction?.artifactPath || "-"}`,
     `- Launch-duty follow-up watch receipts: ${(currentLaunchDutyAction.followUpWatchReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
     `- Launch-duty follow-up stabilization target: ${currentLaunchDutyAction.followUpStabilizationTarget?.key || "-"} -> ${currentLaunchDutyAction.followUpStabilizationTarget?.path || "-"}`,
     `- Launch-duty follow-up stabilization sources: ${(currentLaunchDutyAction.followUpStabilizationSourceQueue || []).map((item) => `${item.key || "-"}=${item.status || "-"} -> ${item.path || "-"}`).join("; ") || "-"}`,
     `- Launch-duty follow-up first-wave closeout: ${currentLaunchDutyAction.followUpFirstWaveCloseoutTarget?.key || "-"} -> ${currentLaunchDutyAction.followUpFirstWaveCloseoutTarget?.path || "-"}`,
+    `- Launch-duty follow-up first-wave action: ${currentLaunchDutyAction.followUpFirstWaveCloseoutAction?.key || "-"} (action=${currentLaunchDutyAction.followUpFirstWaveCloseoutAction?.currentActionKey || "-"}) -> ${currentLaunchDutyAction.followUpFirstWaveCloseoutAction?.artifactPath || "-"}`,
     `- Launch-duty follow-up first-wave receipts: ${(currentLaunchDutyAction.followUpFirstWaveReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
     `- Launch-duty stabilization next action: ${currentLaunchDutyAction.stabilizationHandoffNextAction || "-"}`,
     `- Launch-duty first-wave closeout next action: ${currentLaunchDutyAction.firstWaveCloseoutNextAction || "-"}`,
@@ -10158,10 +10190,12 @@ function renderFinalRehearsalPacket(packet) {
     `- Final packet launch-duty archive trace: ${renderLaunchDutyArchiveTrace(launchDutyCurrentAction.archiveTrace)}`,
     `- Final packet launch-duty record updates: ${renderLaunchDutyRecordUpdates(launchDutyCurrentAction.recordUpdates)}`,
     `- Final packet launch-duty follow-up watch record: ${launchDutyCurrentAction.followUpWatchRecord?.key || "-"} -> ${launchDutyCurrentAction.followUpWatchRecord?.artifactPath || "-"}`,
+    `- Final packet launch-duty follow-up watch action: ${launchDutyCurrentAction.followUpWatchEvidenceAction?.key || "-"} (action=${launchDutyCurrentAction.followUpWatchEvidenceAction?.currentActionKey || "-"}) -> ${launchDutyCurrentAction.followUpWatchEvidenceAction?.artifactPath || "-"}`,
     `- Final packet launch-duty follow-up watch receipts: ${(launchDutyCurrentAction.followUpWatchReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
     `- Final packet launch-duty follow-up stabilization target: ${launchDutyCurrentAction.followUpStabilizationTarget?.key || "-"} -> ${launchDutyCurrentAction.followUpStabilizationTarget?.path || "-"}`,
     `- Final packet launch-duty follow-up stabilization sources: ${(launchDutyCurrentAction.followUpStabilizationSourceQueue || []).map((item) => `${item.key || "-"}=${item.status || "-"} -> ${item.path || "-"}`).join("; ") || "-"}`,
     `- Final packet launch-duty follow-up first-wave closeout: ${launchDutyCurrentAction.followUpFirstWaveCloseoutTarget?.key || "-"} -> ${launchDutyCurrentAction.followUpFirstWaveCloseoutTarget?.path || "-"}`,
+    `- Final packet launch-duty follow-up first-wave action: ${launchDutyCurrentAction.followUpFirstWaveCloseoutAction?.key || "-"} (action=${launchDutyCurrentAction.followUpFirstWaveCloseoutAction?.currentActionKey || "-"}) -> ${launchDutyCurrentAction.followUpFirstWaveCloseoutAction?.artifactPath || "-"}`,
     `- Final packet launch-duty follow-up first-wave receipts: ${(launchDutyCurrentAction.followUpFirstWaveReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
     `- Final packet launch-duty stabilization next action: ${launchDutyCurrentAction.stabilizationHandoffNextAction || "-"}`,
     `- Final packet launch-duty first-wave closeout next action: ${launchDutyCurrentAction.firstWaveCloseoutNextAction || "-"}`,

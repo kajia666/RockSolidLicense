@@ -145,6 +145,8 @@ function writeResult(result, json) {
   if (result.status === "written") {
     console.log(`Staging profile written: ${result.outputFile}`);
     console.log(result.nextCommand);
+    console.log(result.closeoutInitCommand);
+    console.log(result.postCloseoutInitStatusCommand);
     console.log(result.nextAction);
     return;
   }
@@ -156,6 +158,8 @@ function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
     const { archiveRoot, profile } = buildProfile(options);
+    const closeoutDraftFile = profile.filledCloseoutDraftFile;
+    const closeoutInputFile = path.posix.join(archiveRoot, "filled-closeout-input.json");
     const outputFile = options.outputFile
       ? path.resolve(options.outputFile)
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
@@ -171,7 +175,11 @@ function main() {
       profileKeyCount: Object.keys(profile).length,
       secretPolicy: "passwords_and_bearer_tokens_must_stay_in_environment_variables",
       nextCommand: `npm.cmd run staging:rehearsal -- --profile-file ${commandValue(outputFile)}`,
-      nextAction: "Review the secret-free profile values, set required secret env vars, then run nextCommand."
+      closeoutDraftFile,
+      closeoutInputFile,
+      closeoutInitCommand: `npm.cmd run staging:closeout:init -- --draft-file ${commandValue(closeoutDraftFile)} --output-file ${commandValue(closeoutInputFile)}`,
+      postCloseoutInitStatusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(closeoutInputFile)}`,
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written."
     }, options.json);
   } catch (error) {
     writeResult({

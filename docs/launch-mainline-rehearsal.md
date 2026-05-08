@@ -67,7 +67,7 @@ npm.cmd run staging:profile:init -- --json `
   --output-file .\artifacts\staging\SMOKE_ALPHA\stable\staging-rehearsal-profile.json
 ```
 
-Review the generated JSON, set `$env:RSL_SMOKE_ADMIN_PASSWORD`, `$env:RSL_SMOKE_DEVELOPER_PASSWORD`, and `$env:RSL_DEVELOPER_BEARER_TOKEN` in the shell that will run rehearsal commands, then run `staging:rehearsal --profile-file <generated-profile.json>`.
+Review the generated JSON, set `$env:RSL_SMOKE_ADMIN_PASSWORD`, `$env:RSL_SMOKE_DEVELOPER_PASSWORD`, and `$env:RSL_DEVELOPER_BEARER_TOKEN` in the shell that will run rehearsal commands, then run `staging:rehearsal --profile-file <generated-profile.json>`. The JSON output also includes `closeoutInitCommand` and `postCloseoutInitStatusCommand`; keep those commands for the moment after rehearsal writes `filled-closeout-input.draft.json`.
 
 After the profile-driven rehearsal writes `filled-closeout-input.draft.json`, initialize the real closeout input file from that draft before backfilling evidence:
 

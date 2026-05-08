@@ -64,7 +64,11 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       profileKeyCount: 20,
       secretPolicy: "passwords_and_bearer_tokens_must_stay_in_environment_variables",
       nextCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
-      nextAction: "Review the secret-free profile values, set required secret env vars, then run nextCommand."
+      closeoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
+      closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      postCloseoutInitStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written."
     });
     assert.deepEqual(profile, {
       baseUrl: "https://staging.example.com",

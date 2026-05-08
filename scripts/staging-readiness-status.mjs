@@ -635,6 +635,28 @@ function buildActionQueue({
   ];
 }
 
+function buildLaunchDutyNextRun({ inputFile, actionQueue }) {
+  const reloadAction = actionQueue.find((item) => item.key === "reload_rehearsal_for_launch_day_watch") || {};
+  const watchAction = actionQueue.find((item) => item.key === "record_launch_day_watch_summary") || {};
+  const firstWaveAction = actionQueue.find((item) => item.key === "close_first_wave") || {};
+  return {
+    status: "ready_for_launch_day_watch",
+    currentActionKey: reloadAction.actionKey || "archive_production_signoff",
+    reloadCommand: reloadAction.command || reloadCommand(inputFile),
+    actionKeys: actionQueue.map((item) => item.actionKey).filter(Boolean),
+    artifactPathHints: {
+      launchDayWatchSummary: watchAction.evidence?.artifactPathHint || null,
+      firstWaveCloseout: firstWaveAction.evidence?.artifactPathHint || null
+    },
+    receiptOperations: {
+      launchDayWatchSummary: watchAction.evidence?.receiptOperations || [],
+      firstWaveCloseout: firstWaveAction.evidence?.receiptOperations || []
+    },
+    sourceRecordKeys: firstWaveAction.sourceRecordKeys || [],
+    nextAction: "Run the rehearsal reload, archive production sign-off, then record launch-day watch summary before first-wave closeout."
+  };
+}
+
 function buildActionsFileSummary(actionsFile, actionQueue, inputFile) {
   return {
     path: actionsFile,
@@ -661,6 +683,19 @@ function renderActionQueueMarkdown(result) {
     "Complete only `[current]` items first. Items marked `[blocked_after_prior_actions]` become safe after the earlier items are backfilled and the status command is rerun.",
     ""
   ];
+
+  if (result.launchDutyNextRun) {
+    const nextRun = result.launchDutyNextRun;
+    lines.push("## Launch Duty Next Run");
+    lines.push("");
+    lines.push(`Launch-duty status: \`${nextRun.status || "-"}\``);
+    lines.push(`Current action key: \`${nextRun.currentActionKey || "-"}\``);
+    lines.push(`Reload command: \`${nextRun.reloadCommand || "-"}\``);
+    lines.push(`Follow-up action keys: ${(nextRun.actionKeys || []).join(", ") || "-"}`);
+    lines.push(`Watch artifact: \`${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}\``);
+    lines.push(`First-wave closeout artifact: \`${nextRun.artifactPathHints?.firstWaveCloseout || "-"}\``);
+    lines.push("");
+  }
 
   for (const [index, item] of result.actionQueue.entries()) {
     lines.push(`${index + 1}. [${item.status}] \`${item.phase}\` -> ${renderActionTarget(item.targetKey)}`);
@@ -862,6 +897,9 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     canRunFullTestWindow,
     canSignoffProduction
   });
+  const launchDutyNextRun = canSignoffProduction
+    ? buildLaunchDutyNextRun({ inputFile, actionQueue })
+    : null;
 
   return {
     status: "pass",
@@ -892,6 +930,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
         missingReceiptVisibilityKeys
       }
     },
+    ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
     nextStep,
     actionQueue
   };

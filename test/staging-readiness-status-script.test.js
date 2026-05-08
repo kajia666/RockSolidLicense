@@ -425,6 +425,26 @@ test("staging readiness status reports launch-day watch readiness after all loca
       output.nextStep.command,
       `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`
     );
+    assert.deepEqual(output.launchDutyNextRun, {
+      status: "ready_for_launch_day_watch",
+      currentActionKey: "archive_production_signoff",
+      reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`,
+      actionKeys: [
+        "archive_production_signoff",
+        "record_launch_day_watch_summary",
+        "close_first_wave"
+      ],
+      artifactPathHints: {
+        launchDayWatchSummary: "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md",
+        firstWaveCloseout: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md"
+      },
+      receiptOperations: {
+        launchDayWatchSummary: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+        firstWaveCloseout: ["record_launch_closeout_review"]
+      },
+      sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"],
+      nextAction: "Run the rehearsal reload, archive production sign-off, then record launch-day watch summary before first-wave closeout."
+    });
     assert.deepEqual(
       output.actionQueue.map((item) => [item.key, item.phase, item.status, item.targetKey, item.actionKey]),
       [
@@ -451,6 +471,13 @@ test("staging readiness status reports launch-day watch readiness after all loca
     );
     assert.equal(output.actionsFile.itemCount, 3);
     const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /## Launch Duty Next Run/);
+    assert.match(markdown, /Launch-duty status: `ready_for_launch_day_watch`/);
+    assert.match(markdown, /Current action key: `archive_production_signoff`/);
+    assert.match(markdown, /Reload command: `npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json`/);
+    assert.match(markdown, /Follow-up action keys: archive_production_signoff, record_launch_day_watch_summary, close_first_wave/);
+    assert.match(markdown, /Watch artifact: `artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md`/);
+    assert.match(markdown, /First-wave closeout artifact: `artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md`/);
     assert.match(markdown, /1\. \[current\] `launch_day_watch` -> `none`/);
     assert.match(markdown, /Action key: `archive_production_signoff`/);
     assert.match(markdown, /2\. \[blocked_after_prior_actions\] `launch_day_watch` -> `launch_day_watch_summary`/);

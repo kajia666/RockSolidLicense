@@ -147,7 +147,8 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       missingConditionCount: 6,
       missingReceiptLaneCount: 5,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
-      nextAction: "Backfill the remaining production sign-off conditions and receipt visibility lanes, then run nextCommand."
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile}`,
+      nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     });
 
     const receiptResult = runBackfill([
@@ -178,7 +179,8 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       missingConditionCount: 6,
       missingReceiptLaneCount: 4,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
-      nextAction: "Backfill the remaining production sign-off conditions and receipt visibility lanes, then run nextCommand."
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile}`,
+      nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     });
 
     const closeoutInput = JSON.parse(readFileSync(closeoutInputFile, "utf8"));

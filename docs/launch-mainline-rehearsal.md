@@ -90,7 +90,7 @@ npm.cmd run staging:closeout:backfill -- --json `
   --receipt-id receipt-route-map-001
 ```
 
-Repeat that command for the remaining closeout keys, then reload with `staging:rehearsal --closeout-input-file` to check whether the full-test window is actually ready.
+The JSON output includes both the compatible `nextCommand` rehearsal reload and a shorter `statusCommand`. Prefer running `statusCommand` after each backfill so the next closeout, full-test, sign-off, or receipt visibility action is selected from the current file state.
 
 At any point after `filled-closeout-input.json` exists, ask the local status command for the current gate and next command:
 
@@ -124,7 +124,7 @@ npm.cmd run staging:signoff:backfill -- --json `
   --receipt-id receipt-launch-mainline-001
 ```
 
-Repeat that command until all seven production sign-off conditions are filled and all five receipt visibility lanes are visible, then reload with `staging:rehearsal --closeout-input-file`. Production sign-off remains blocked unless the closeout input is full-test ready, `productionSignoff.decision` is `ready-for-production-signoff`, every sign-off condition has evidence, and `launchMainline`, `launchReview`, `launchSmoke`, `developerOps`, and `launchOpsOverviewStatus` are visible.
+Repeat that command until `statusCommand` reports `launch_day_watch`. Production sign-off remains blocked unless the closeout input is full-test ready, `productionSignoff.decision` is `ready-for-production-signoff`, every sign-off condition has evidence, and `launchMainline`, `launchReview`, `launchSmoke`, `developerOps`, and `launchOpsOverviewStatus` are visible.
 
 For a staging API rehearsal, run the no-write rehearsal runner before the live-write smoke step:
 

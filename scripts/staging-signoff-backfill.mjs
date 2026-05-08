@@ -207,6 +207,7 @@ function writeResult(result, json) {
   if (result.status === "written") {
     console.log(`Production sign-off evidence backfilled: ${result.key}`);
     console.log(result.nextCommand);
+    console.log(result.statusCommand);
     console.log(result.nextAction);
     return;
   }
@@ -244,7 +245,8 @@ function main() {
       missingConditionCount: conditions.length - filledConditionCount,
       missingReceiptLaneCount: RECEIPT_VISIBILITY_KEYS.length - visibleReceiptLaneCount,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`,
-      nextAction: "Backfill the remaining production sign-off conditions and receipt visibility lanes, then run nextCommand."
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}`,
+      nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     }, options.json);
   } catch (error) {
     writeResult({

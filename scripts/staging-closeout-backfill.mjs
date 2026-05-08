@@ -127,6 +127,7 @@ function writeResult(result, json) {
   if (result.status === "written") {
     console.log(`Closeout evidence backfilled: ${result.key}`);
     console.log(result.nextCommand);
+    console.log(result.statusCommand);
     console.log(result.nextAction);
     return;
   }
@@ -154,7 +155,8 @@ function main() {
       filledFieldCount,
       remainingPlaceholderCount: fields.length - filledFieldCount,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`,
-      nextAction: "Backfill the remaining placeholder fields, then run nextCommand to review closeout readiness."
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}`,
+      nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     }, options.json);
   } catch (error) {
     writeResult({

@@ -123,7 +123,8 @@ test("staging closeout backfill writes one evidence field without clearing remai
       filledFieldCount: 1,
       remainingPlaceholderCount: 6,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
-      nextAction: "Backfill the remaining placeholder fields, then run nextCommand to review closeout readiness."
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile}`,
+      nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     });
 
     const closeoutInput = JSON.parse(readFileSync(closeoutInputFile, "utf8"));

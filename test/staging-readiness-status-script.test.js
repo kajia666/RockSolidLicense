@@ -113,6 +113,19 @@ test("staging readiness status reports closeout gap and next backfill command", 
       output.nextStep.reloadCommand,
       `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`
     );
+    assert.deepEqual(
+      output.actionQueue.map((item) => [item.key, item.phase, item.status, item.targetKey]),
+      closeoutKeys.slice(1).map((key, index) => [
+        "backfill_closeout_evidence",
+        "pre_full_test_closeout",
+        index === 0 ? "current" : "blocked_after_prior_actions",
+        key
+      ])
+    );
+    assert.equal(
+      output.actionQueue[0].statusCommand,
+      `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`
+    );
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -141,6 +154,17 @@ test("staging readiness status points to full-test window after closeout is read
       output.nextStep.backfillCommand,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`
     );
+    assert.deepEqual(output.actionQueue, [
+      {
+        key: "run_full_test_window",
+        phase: "full_test_window",
+        status: "current",
+        targetKey: "full_test_window_passed",
+        command: "npm.cmd test",
+        followUpCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`,
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`
+      }
+    ]);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -173,6 +197,27 @@ test("staging readiness status reports signoff and receipt visibility gaps befor
       output.nextStep.command,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json>`
     );
+    assert.deepEqual(
+      output.actionQueue.map((item) => [item.key, item.phase, item.status, item.targetKey]),
+      [
+        ...signoffKeys.slice(1).map((key, index) => [
+          "backfill_production_signoff",
+          "production_signoff",
+          index === 0 ? "current" : "blocked_after_prior_actions",
+          key
+        ]),
+        ...receiptVisibilityKeys.slice(1).map((key) => [
+          "backfill_receipt_visibility",
+          "receipt_visibility",
+          "blocked_after_prior_actions",
+          key
+        ])
+      ]
+    );
+    assert.equal(
+      output.actionQueue.at(-1).command,
+      `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane launchOpsOverviewStatus --value-json <redacted-json>`
+    );
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -203,6 +248,15 @@ test("staging readiness status reports launch-day watch readiness after all loca
       output.nextStep.command,
       `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`
     );
+    assert.deepEqual(output.actionQueue, [
+      {
+        key: "reload_rehearsal_for_launch_day_watch",
+        phase: "launch_day_watch",
+        status: "current",
+        targetKey: null,
+        command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`
+      }
+    ]);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

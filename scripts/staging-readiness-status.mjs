@@ -131,6 +131,124 @@ function reloadCommand(inputFile) {
   return `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`;
 }
 
+function statusCommand(inputFile) {
+  return `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`;
+}
+
+function queueStatus(index) {
+  return index === 0 ? "current" : "blocked_after_prior_actions";
+}
+
+function buildActionQueue({
+  inputFile,
+  missingCloseoutKeys,
+  closeoutDecision,
+  missingSignoffKeys,
+  missingReceiptVisibilityKeys,
+  productionDecision,
+  canRunFullTestWindow,
+  canSignoffProduction
+}) {
+  const localStatusCommand = statusCommand(inputFile);
+  if (missingCloseoutKeys.length > 0) {
+    return missingCloseoutKeys.map((key, index) => ({
+      key: "backfill_closeout_evidence",
+      phase: "pre_full_test_closeout",
+      status: queueStatus(index),
+      targetKey: key,
+      command: commandForCloseoutBackfill(inputFile, key),
+      statusCommand: localStatusCommand
+    }));
+  }
+  if (closeoutDecision !== "ready-for-full-test-window") {
+    return [
+      {
+        key: "confirm_full_test_go_no_go",
+        phase: "pre_full_test_closeout",
+        status: "current",
+        targetKey: "operator_go_no_go",
+        command: commandForCloseoutBackfill(inputFile, "operator_go_no_go"),
+        statusCommand: localStatusCommand
+      }
+    ];
+  }
+  if (!canRunFullTestWindow) {
+    return [
+      {
+        key: "reload_closeout_input",
+        phase: "pre_full_test_closeout",
+        status: "current",
+        targetKey: null,
+        command: reloadCommand(inputFile)
+      }
+    ];
+  }
+  if (missingSignoffKeys.includes("full_test_window_passed")) {
+    return [
+      {
+        key: "run_full_test_window",
+        phase: "full_test_window",
+        status: "current",
+        targetKey: "full_test_window_passed",
+        command: "npm.cmd test",
+        followUpCommand: commandForSignoffCondition(inputFile, "full_test_window_passed", true),
+        statusCommand: localStatusCommand
+      }
+    ];
+  }
+  if (productionDecision !== "ready-for-production-signoff") {
+    return [
+      {
+        key: "set_production_signoff_decision",
+        phase: "production_signoff",
+        status: "current",
+        targetKey: "productionSignoff.decision",
+        command: commandForSignoffCondition(inputFile, missingSignoffKeys[0] || "operator_signoff_recorded", true),
+        statusCommand: localStatusCommand
+      }
+    ];
+  }
+  const signoffQueue = missingSignoffKeys.map((key, index) => ({
+    key: "backfill_production_signoff",
+    phase: "production_signoff",
+    status: queueStatus(index),
+    targetKey: key,
+    command: commandForSignoffCondition(inputFile, key),
+    statusCommand: localStatusCommand
+  }));
+  const receiptQueue = missingReceiptVisibilityKeys.map((key, index) => ({
+    key: "backfill_receipt_visibility",
+    phase: "receipt_visibility",
+    status: signoffQueue.length === 0 && index === 0 ? "current" : "blocked_after_prior_actions",
+    targetKey: key,
+    command: commandForReceiptLane(inputFile, key),
+    statusCommand: localStatusCommand
+  }));
+  if (signoffQueue.length > 0 || receiptQueue.length > 0) {
+    return [...signoffQueue, ...receiptQueue];
+  }
+  if (canSignoffProduction) {
+    return [
+      {
+        key: "reload_rehearsal_for_launch_day_watch",
+        phase: "launch_day_watch",
+        status: "current",
+        targetKey: null,
+        command: reloadCommand(inputFile)
+      }
+    ];
+  }
+  return [
+    {
+      key: "review_readiness_packet",
+      phase: "readiness_review",
+      status: "current",
+      targetKey: null,
+      command: reloadCommand(inputFile)
+    }
+  ];
+}
+
 function buildNextStep({
   inputFile,
   missingCloseoutKeys,
@@ -273,6 +391,16 @@ function buildStatus(payload, inputFile) {
     canRunFullTestWindow,
     canSignoffProduction
   });
+  const actionQueue = buildActionQueue({
+    inputFile,
+    missingCloseoutKeys,
+    closeoutDecision,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys,
+    productionDecision,
+    canRunFullTestWindow,
+    canSignoffProduction
+  });
 
   return {
     status: "pass",
@@ -302,7 +430,8 @@ function buildStatus(payload, inputFile) {
         missingReceiptVisibilityKeys
       }
     },
-    nextStep
+    nextStep,
+    actionQueue
   };
 }
 

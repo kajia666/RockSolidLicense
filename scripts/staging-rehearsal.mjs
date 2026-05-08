@@ -1201,7 +1201,85 @@ function buildRealStagingInputClosure({ profilePreflight = {}, closeoutReview = 
   };
 }
 
+function buildLiveWriteSmokeResultCaptureEntry({
+  canRunLiveWriteSmoke = false,
+  currentAction = {},
+  commands = {},
+  closeoutInput = null,
+  closeout = {},
+  filledCloseoutInputFile = null,
+  backfillRows = []
+} = {}) {
+  const resultKey = "live_write_smoke_result";
+  const backfillRow = backfillRows.find((item) => item.closeoutKey === resultKey) || {};
+  const closeoutFieldRow = (closeoutInput?.backfillReview?.fieldRows || [])
+    .find((row) => row.key === resultKey) || null;
+  const ledgerRowsByKey = new Map((closeout.artifactReceiptLedger?.rows || []).map((row) => [row.checkKey, row]));
+  const ledgerRow = ledgerRowsByKey.get(resultKey) || {};
+  const acceptanceCheck = (closeout.acceptanceChecks || []).find((item) => item.key === resultKey) || {};
+  const receiptOperations = Array.isArray(backfillRow.receiptOperations) && backfillRow.receiptOperations.length
+    ? backfillRow.receiptOperations
+    : Array.isArray(ledgerRow.receiptOperations) && ledgerRow.receiptOperations.length
+      ? ledgerRow.receiptOperations
+      : ["record_launch_rehearsal_run"];
+  const resultFilled = closeoutFieldRow?.status === "filled"
+    || (Array.isArray(closeoutInput?.filledKeys) && closeoutInput.filledKeys.includes(resultKey));
+  const closeoutInputPath = closeoutInput?.path || filledCloseoutInputFile || null;
+  const reloadCommand = closeoutInput?.path
+    ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInput.path}`
+    : commands.closeoutReload;
+  return {
+    mode: "live-write-smoke-result-capture-entry",
+    status: resultFilled
+      ? "ready_for_closeout_reload"
+      : canRunLiveWriteSmoke
+        ? "ready_for_live_write_smoke_result_capture"
+        : "blocked_until_live_write_smoke_ready",
+    willModifyData: false,
+    commandWillModifyData: true,
+    currentActionKey: resultFilled
+      ? "reload_closeout_input"
+      : canRunLiveWriteSmoke
+        ? "run_live_write_smoke"
+        : currentAction.key || "prepare_live_write_smoke",
+    currentCommand: resultFilled
+      ? reloadCommand
+      : canRunLiveWriteSmoke
+        ? commands.liveWriteSmoke
+        : currentAction.command || commands.stagingDryRun,
+    approval: {
+      required: true,
+      sourceStep: "approve_live_write_smoke",
+      status: resultFilled
+        ? "already_approved_or_attached"
+        : canRunLiveWriteSmoke
+          ? "operator_confirm_required"
+          : "blocked_until_live_write_smoke_ready"
+    },
+    resultBackfillTarget: {
+      key: resultKey,
+      status: resultFilled ? "filled" : canRunLiveWriteSmoke ? "pending_operator_result" : "blocked_until_live_write_smoke",
+      closeoutInputPath,
+      artifactPath: closeoutFieldRow?.artifactPath || backfillRow.artifactPath || ledgerRow.artifactPath || null,
+      sourceStep: closeoutFieldRow?.sourceStep || backfillRow.sourceStep || "run_live_write_smoke",
+      receiptOperations,
+      reloadCommand,
+      expectedEvidence: acceptanceCheck.expectedEvidence || "Record smoke exit status, created test project/account/card identifiers, and the redacted smoke output artifact path."
+    },
+    receiptTargets: receiptOperations.map((operation) => ({
+      operation,
+      status: resultFilled ? "recorded_or_attached" : "pending_operator_receipt"
+    })),
+    nextAction: resultFilled
+      ? "Reload closeout input and continue full-test readiness review."
+      : canRunLiveWriteSmoke
+        ? "Confirm live-write approval, run launch:smoke:staging, record the launch rehearsal receipt, backfill live_write_smoke_result, then reload closeout input."
+        : "Finish real staging profile, secret env, and artifact output readiness before live-write smoke result capture."
+  };
+}
+
 function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
+  const closeout = result.stagingAcceptanceCloseout || {};
   const preflight = result.stagingProfileOperatorPreflight || {};
   const recommendedFiles = Array.isArray(preflight.recommendedFiles)
     ? preflight.recommendedFiles
@@ -1341,6 +1419,15 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
       ? `Run the profile-driven staging dry run, then backfill ${currentBackfillTarget.key} into filled-closeout-input.json and reload closeout readiness.`
       : currentAction.nextAction
   };
+  const liveWriteSmokeResultCaptureEntry = buildLiveWriteSmokeResultCaptureEntry({
+    canRunLiveWriteSmoke: preflight.canRunLiveWriteSmoke === true,
+    currentAction,
+    commands,
+    closeoutInput: result.closeoutInput || null,
+    closeout,
+    filledCloseoutInputFile,
+    backfillRows
+  });
   return {
     mode: "real-staging-run-focus",
     status: preflight.status || "not_available",
@@ -1354,6 +1441,7 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     currentAction,
     postDryRunAction,
     executionEntry,
+    liveWriteSmokeResultCaptureEntry,
     fullTestEntry: {
       status: fullTestEntryStatus,
       canRun: fullTestWindow.canRun === true,
@@ -7250,11 +7338,21 @@ function renderOperatorExecutionPlan(plan) {
     const executionOutputBundle = executionEntry.preflight?.outputBundle || {};
     const executionBackfill = executionEntry.evidenceBackfill || {};
     const executionCurrentTarget = executionBackfill.currentTarget || {};
+    const liveWriteEntry = focus.liveWriteSmokeResultCaptureEntry || {};
+    const liveWriteBackfill = liveWriteEntry.resultBackfillTarget || {};
+    const liveWriteReceipts = Array.isArray(liveWriteEntry.receiptTargets)
+      ? liveWriteEntry.receiptTargets
+      : [];
     lines.push(`- Real staging run focus: ${focus.status || "-"} (dryRun=${focus.canRunDryRun ? "yes" : "no"}, liveWriteSmoke=${focus.canRunLiveWriteSmoke ? "yes" : "no"}, evidence=${focus.canRecordEvidence ? "yes" : "no"})`);
     lines.push(`- Real staging execution entry: ${executionEntry.status || "-"} (action=${executionEntry.currentActionKey || "-"}, outputs=${executionOutputBundle.status || "-"} ${executionOutputBundle.writtenFileCount ?? 0}/${executionOutputBundle.outputFileCount ?? 0})`);
     lines.push(`- Real staging execution current command: \`${executionEntry.currentCommand || "-"}\``);
     lines.push(`- Real staging execution first backfill: ${executionCurrentTarget.key || "-"} -> ${executionCurrentTarget.artifactPath || "-"}`);
     lines.push(`- Real staging execution closeout reload: \`${executionBackfill.closeoutReloadCommand || "-"}\``);
+    lines.push(`- Live-write smoke result capture entry: ${liveWriteEntry.status || "-"} (action=${liveWriteEntry.currentActionKey || "-"}, target=${liveWriteBackfill.key || "-"})`);
+    lines.push(`- Live-write smoke result current command: \`${liveWriteEntry.currentCommand || "-"}\``);
+    lines.push(`- Live-write smoke result backfill: ${liveWriteBackfill.status || "-"} -> ${liveWriteBackfill.artifactPath || "-"} (closeout=${liveWriteBackfill.closeoutInputPath || "-"})`);
+    lines.push(`- Live-write smoke result receipts: ${liveWriteReceipts.map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+    lines.push(`- Live-write smoke result reload: \`${liveWriteBackfill.reloadCommand || "-"}\``);
     lines.push(`- Real staging current action: ${current.key || "-"} (env=${(current.envKeys || []).join(", ") || "-"})`);
     lines.push(`- Real staging current action unsafeCliSecretOverrides: ${(current.unsafeCliSecretOverrides || []).join(", ") || "-"}`);
     lines.push(`- Real staging archive root: ${focus.paths?.artifactArchiveRoot || "-"}`);

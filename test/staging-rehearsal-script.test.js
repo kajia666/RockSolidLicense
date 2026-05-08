@@ -2468,6 +2468,33 @@ test("staging rehearsal runner focuses closeout reload after real staging inputs
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.status, "blocked_until_closeout_reload");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.command, "npm.cmd test");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.fullTestEntry.missingCloseoutKeys.length, 7);
+    assert.deepEqual(output.operatorExecutionPlan.realStagingRunFocus.liveWriteSmokeResultCaptureEntry, {
+      mode: "live-write-smoke-result-capture-entry",
+      status: "ready_for_live_write_smoke_result_capture",
+      willModifyData: false,
+      commandWillModifyData: true,
+      currentActionKey: "run_live_write_smoke",
+      currentCommand: output.nextCommands.launchSmoke,
+      approval: {
+        required: true,
+        sourceStep: "approve_live_write_smoke",
+        status: "operator_confirm_required"
+      },
+      resultBackfillTarget: {
+        key: "live_write_smoke_result",
+        status: "pending_operator_result",
+        closeoutInputPath: "artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json",
+        artifactPath: "artifacts/staging/READY_PRODUCT/stable/live-write-smoke-output.json",
+        sourceStep: "run_live_write_smoke",
+        receiptOperations: ["record_launch_rehearsal_run"],
+        reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/READY_PRODUCT/stable/filled-closeout-input.json",
+        expectedEvidence: "Record smoke exit status, created test project/account/card identifiers, and the redacted smoke output artifact path."
+      },
+      receiptTargets: [
+        { operation: "record_launch_rehearsal_run", status: "pending_operator_receipt" }
+      ],
+      nextAction: "Confirm live-write approval, run launch:smoke:staging, record the launch rehearsal receipt, backfill live_write_smoke_result, then reload closeout input."
+    });
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.status, "ready_for_real_staging_rehearsal");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentPhase, "real_staging_inputs");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.sourceFocus, "realStagingRunFocus");
@@ -2532,6 +2559,9 @@ test("staging rehearsal runner focuses closeout reload after real staging inputs
     assert.match(handoff, /Real staging execution current command: `npm\.cmd run staging:rehearsal -- --json --base-url https:\/\/ready-staging\.example\.com/);
     assert.match(handoff, /Real staging execution first backfill: route_map_gate_result -> artifacts\/staging\/READY_PRODUCT\/stable\/route-map-gate-output\.txt/);
     assert.match(handoff, /Real staging execution closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/READY_PRODUCT\/stable\/filled-closeout-input\.json`/);
+    assert.match(handoff, /Live-write smoke result capture entry: ready_for_live_write_smoke_result_capture \(action=run_live_write_smoke, target=live_write_smoke_result\)/);
+    assert.match(handoff, /Live-write smoke result backfill: pending_operator_result -> artifacts\/staging\/READY_PRODUCT\/stable\/live-write-smoke-output\.json \(closeout=artifacts\/staging\/READY_PRODUCT\/stable\/filled-closeout-input\.json\)/);
+    assert.match(handoff, /Live-write smoke result receipts: record_launch_rehearsal_run:pending_operator_receipt/);
     assert.match(handoff, /Real staging current action: run_staging_dry_run \(env=-\)/);
     assert.match(handoff, /Real staging post-dry-run action: backfill_and_reload_closeout_input \(blocked_until_closeout_reload\)/);
     assert.match(handoff, /Real staging full-test entry: blocked_until_closeout_reload \(command=npm\.cmd test\)/);
@@ -3619,6 +3649,33 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentCommand, "npm.cmd test");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.canRunFullTestWindow, true);
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.canSignoffProduction, false);
+    assert.deepEqual(output.operatorExecutionPlan.realStagingRunFocus.liveWriteSmokeResultCaptureEntry, {
+      mode: "live-write-smoke-result-capture-entry",
+      status: "ready_for_closeout_reload",
+      willModifyData: false,
+      commandWillModifyData: true,
+      currentActionKey: "reload_closeout_input",
+      currentCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      approval: {
+        required: true,
+        sourceStep: "approve_live_write_smoke",
+        status: "already_approved_or_attached"
+      },
+      resultBackfillTarget: {
+        key: "live_write_smoke_result",
+        status: "filled",
+        closeoutInputPath: closeoutInputFile,
+        artifactPath: "artifacts/staging/PILOT_ALPHA/stable/live-write-smoke-output.json",
+        sourceStep: "run_live_write_smoke",
+        receiptOperations: ["record_launch_rehearsal_run"],
+        reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+        expectedEvidence: "Record smoke exit status, created test project/account/card identifiers, and the redacted smoke output artifact path."
+      },
+      receiptTargets: [
+        { operation: "record_launch_rehearsal_run", status: "recorded_or_attached" }
+      ],
+      nextAction: "Reload closeout input and continue full-test readiness review."
+    });
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.blockerSummary.missingCloseoutKeys.length, 0);
     assert.deepEqual(
       output.operatorExecutionPlan.goLiveExecutionEntry.blockerSummary.missingSignoffKeys,

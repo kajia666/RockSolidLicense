@@ -4836,6 +4836,12 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
   const currentWatchReceiptQueue = readyForCutoverWatch && Array.isArray(watchEvidenceExecutionEntry?.receiptQueue)
     ? watchEvidenceExecutionEntry.receiptQueue.filter((item) => item.key === (currentWatchEvidence?.key || watchEvidenceExecutionEntry.currentEvidenceKey))
     : [];
+  const stabilizationHandoffExecutionEntry = readyForCutoverWatch
+    ? result.stabilizationHandoffPlan?.handoffExecutionEntry || archiveIndex.stabilizationHandoff?.handoffExecutionEntry || null
+    : null;
+  const firstWaveCloseoutExecutionEntry = readyForCutoverWatch
+    ? result.stabilizationHandoffPlan?.firstWaveCloseoutExecutionEntry || archiveIndex.stabilizationHandoff?.firstWaveCloseoutExecutionEntry || null
+    : null;
   const launchWatchNextAction = readyForCutoverWatch && currentPostSignoffTarget
     ? `Archive ${currentPostSignoffTarget.key}, then record launch-day watch artifacts and prepare stabilization handoff.`
     : enrichedCurrentPacket.nextAction || null;
@@ -4853,6 +4859,8 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
     watchEvidenceExecutionEntry,
     currentWatchEvidence,
     currentWatchReceiptQueue,
+    stabilizationHandoffExecutionEntry,
+    firstWaveCloseoutExecutionEntry,
     currentStabilizationWindow: readyForCutoverWatch ? currentStabilizationWindow : null,
     controlPaths: {
       runRecordIndex: keyedPath(packetSequence, "run_record_index"),
@@ -5099,6 +5107,8 @@ function buildGoLiveExecutionEntry({
         : launchDutyPacketFocus.watchEvidenceExecutionEntry.receiptQueue || []
     }
     : null;
+  const stabilizationHandoffExecutionEntry = launchDutyPacketFocus?.stabilizationHandoffExecutionEntry || null;
+  const firstWaveCloseoutExecutionEntry = launchDutyPacketFocus?.firstWaveCloseoutExecutionEntry || null;
   const launchDayWatchEntry = canSignoffProduction || launchDutyCurrentAction?.stage === "launch_day_watch_entry"
     ? {
       status,
@@ -5115,6 +5125,8 @@ function buildGoLiveExecutionEntry({
       evidenceInputs,
       watchRecordQueue,
       watchEvidenceExecutionEntry,
+      stabilizationHandoffExecutionEntry,
+      firstWaveCloseoutExecutionEntry,
       confirmationPoints,
       archiveTrace: launchDutyCurrentAction?.archiveTrace || null,
       nextAction: nextAction || launchDutyCurrentAction?.nextAction || null
@@ -5192,11 +5204,22 @@ function buildLaunchDutyCurrentAction({
     const watch = launchDutyPacketFocus?.currentWatchArtifact || {};
     const stabilization = launchDutyPacketFocus?.currentStabilizationWindow || {};
     const watchEvidenceExecutionEntry = launchDutyPacketFocus?.watchEvidenceExecutionEntry || null;
+    const stabilizationHandoffExecutionEntry = launchDutyPacketFocus?.stabilizationHandoffExecutionEntry || null;
+    const firstWaveCloseoutExecutionEntry = launchDutyPacketFocus?.firstWaveCloseoutExecutionEntry || null;
     const followUpWatchRecord = launchDutyPacketFocus?.currentWatchEvidence || null;
     const followUpWatchReceiptQueue = Array.isArray(launchDutyPacketFocus?.currentWatchReceiptQueue)
       ? launchDutyPacketFocus.currentWatchReceiptQueue
       : [];
     const followUpStabilizationTarget = watchEvidenceExecutionEntry?.stabilizationHandoff || null;
+    const followUpStabilizationSourceQueue = Array.isArray(stabilizationHandoffExecutionEntry?.sourceRecordQueue)
+      ? stabilizationHandoffExecutionEntry.sourceRecordQueue
+      : [];
+    const followUpFirstWaveCloseoutTarget = firstWaveCloseoutExecutionEntry?.closeoutTarget
+      || stabilizationHandoffExecutionEntry?.firstWaveCloseoutTarget
+      || null;
+    const followUpFirstWaveReceiptQueue = Array.isArray(firstWaveCloseoutExecutionEntry?.receiptQueue)
+      ? firstWaveCloseoutExecutionEntry.receiptQueue
+      : [];
     const archiveRoot = launchDutyPacketFocus?.archiveRoot || archiveContext?.archiveRoot || null;
     const productionSignoffPacketPath = current.packetPath
       || target.path
@@ -5242,6 +5265,11 @@ function buildLaunchDutyCurrentAction({
       followUpWatchRecord,
       followUpWatchReceiptQueue,
       followUpStabilizationTarget,
+      followUpStabilizationSourceQueue,
+      followUpFirstWaveCloseoutTarget,
+      followUpFirstWaveReceiptQueue,
+      stabilizationHandoffNextAction: stabilizationHandoffExecutionEntry?.nextAction || null,
+      firstWaveCloseoutNextAction: firstWaveCloseoutExecutionEntry?.nextAction || null,
       watchEvidenceNextAction: watchEvidenceExecutionEntry?.nextAction || null,
       packetPath: productionSignoffPacketPath,
       artifactPath: target.path || null,
@@ -7099,6 +7127,8 @@ function buildFinalRehearsalPacket(result) {
   const currentWatchReceiptQueue = Array.isArray(watchEvidenceExecutionEntry?.receiptQueue)
     ? watchEvidenceExecutionEntry.receiptQueue.filter((item) => item.key === (currentWatchEvidence?.key || watchEvidenceExecutionEntry.currentEvidenceKey))
     : [];
+  const stabilizationHandoffExecutionEntry = stabilizationHandoffPlan.handoffExecutionEntry || null;
+  const firstWaveCloseoutExecutionEntry = stabilizationHandoffPlan.firstWaveCloseoutExecutionEntry || null;
   const currentStabilizationWindow = (() => {
     const handoffWindow = findLaunchDutyFocusItem(stabilizationHandoffPlan.handoffWindows) || {};
     const watchRecord = watchArtifactQueue.find((item) => item.key === handoffWindow.key)
@@ -7129,6 +7159,8 @@ function buildFinalRehearsalPacket(result) {
     watchEvidenceExecutionEntry,
     currentWatchEvidence,
     currentWatchReceiptQueue,
+    stabilizationHandoffExecutionEntry,
+    firstWaveCloseoutExecutionEntry,
     currentStabilizationWindow,
     controlPaths: {
       productionSignoffPacket: productionSignoffPacketPath,
@@ -8559,6 +8591,8 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
   lines.push(`- Go-live execution blockers: closeout=${(blockers.missingCloseoutKeys || []).join(", ") || "-"}, signoff=${(blockers.missingSignoffKeys || []).join(", ") || "-"}, receipts=${(blockers.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
   if (launchDayWatchEntry) {
     const watchEvidenceExecutionEntry = launchDayWatchEntry.watchEvidenceExecutionEntry || {};
+    const stabilizationHandoffExecutionEntry = launchDayWatchEntry.stabilizationHandoffExecutionEntry || {};
+    const firstWaveCloseoutExecutionEntry = launchDayWatchEntry.firstWaveCloseoutExecutionEntry || {};
     const watchEvidenceQueue = Array.isArray(watchEvidenceExecutionEntry.evidenceQueue)
       ? watchEvidenceExecutionEntry.evidenceQueue
       : [];
@@ -8577,6 +8611,10 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
     lines.push(`- Go-live launch-day evidence receipts: ${watchEvidenceReceiptQueue.map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
     lines.push(`- Go-live launch-day evidence stabilization: ${watchEvidenceExecutionEntry.stabilizationHandoff?.key || "-"} -> ${watchEvidenceExecutionEntry.stabilizationHandoff?.path || "-"}`);
     lines.push(`- Go-live launch-day evidence next action: ${watchEvidenceExecutionEntry.nextAction || "-"}`);
+    lines.push(`- Go-live launch-day stabilization handoff: ${stabilizationHandoffExecutionEntry.currentHandoffTarget?.key || "-"} -> ${stabilizationHandoffExecutionEntry.currentHandoffTarget?.path || "-"}`);
+    lines.push(`- Go-live launch-day stabilization sources: ${renderLaunchDutyRecordUpdates(stabilizationHandoffExecutionEntry.sourceRecordQueue || [])}`);
+    lines.push(`- Go-live launch-day first-wave closeout: ${firstWaveCloseoutExecutionEntry.closeoutTarget?.key || "-"} -> ${firstWaveCloseoutExecutionEntry.closeoutTarget?.path || "-"}`);
+    lines.push(`- Go-live launch-day first-wave receipts: ${(firstWaveCloseoutExecutionEntry.receiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
     lines.push(`- Go-live launch-day confirmation points: ${renderLaunchDutyActionConfirmationList(launchDayWatchEntry.confirmationPoints)}`);
     lines.push(`- Go-live launch-day archive trace: ${renderLaunchDutyArchiveTrace(launchDayWatchEntry.archiveTrace)}`);
   }
@@ -8700,6 +8738,11 @@ function renderOperatorExecutionPlan(plan) {
     `- Launch-duty follow-up watch record: ${currentLaunchDutyAction.followUpWatchRecord?.key || "-"} -> ${currentLaunchDutyAction.followUpWatchRecord?.artifactPath || "-"}`,
     `- Launch-duty follow-up watch receipts: ${(currentLaunchDutyAction.followUpWatchReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
     `- Launch-duty follow-up stabilization target: ${currentLaunchDutyAction.followUpStabilizationTarget?.key || "-"} -> ${currentLaunchDutyAction.followUpStabilizationTarget?.path || "-"}`,
+    `- Launch-duty follow-up stabilization sources: ${(currentLaunchDutyAction.followUpStabilizationSourceQueue || []).map((item) => `${item.key || "-"}=${item.status || "-"} -> ${item.path || "-"}`).join("; ") || "-"}`,
+    `- Launch-duty follow-up first-wave closeout: ${currentLaunchDutyAction.followUpFirstWaveCloseoutTarget?.key || "-"} -> ${currentLaunchDutyAction.followUpFirstWaveCloseoutTarget?.path || "-"}`,
+    `- Launch-duty follow-up first-wave receipts: ${(currentLaunchDutyAction.followUpFirstWaveReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Launch-duty stabilization next action: ${currentLaunchDutyAction.stabilizationHandoffNextAction || "-"}`,
+    `- Launch-duty first-wave closeout next action: ${currentLaunchDutyAction.firstWaveCloseoutNextAction || "-"}`,
     `- Launch-duty watch evidence next action: ${currentLaunchDutyAction.watchEvidenceNextAction || "-"}`,
     `- Launch-duty current next action: ${currentLaunchDutyAction.nextAction || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
@@ -10077,6 +10120,11 @@ function renderFinalRehearsalPacket(packet) {
     `- Final packet launch-duty follow-up watch record: ${launchDutyCurrentAction.followUpWatchRecord?.key || "-"} -> ${launchDutyCurrentAction.followUpWatchRecord?.artifactPath || "-"}`,
     `- Final packet launch-duty follow-up watch receipts: ${(launchDutyCurrentAction.followUpWatchReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
     `- Final packet launch-duty follow-up stabilization target: ${launchDutyCurrentAction.followUpStabilizationTarget?.key || "-"} -> ${launchDutyCurrentAction.followUpStabilizationTarget?.path || "-"}`,
+    `- Final packet launch-duty follow-up stabilization sources: ${(launchDutyCurrentAction.followUpStabilizationSourceQueue || []).map((item) => `${item.key || "-"}=${item.status || "-"} -> ${item.path || "-"}`).join("; ") || "-"}`,
+    `- Final packet launch-duty follow-up first-wave closeout: ${launchDutyCurrentAction.followUpFirstWaveCloseoutTarget?.key || "-"} -> ${launchDutyCurrentAction.followUpFirstWaveCloseoutTarget?.path || "-"}`,
+    `- Final packet launch-duty follow-up first-wave receipts: ${(launchDutyCurrentAction.followUpFirstWaveReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Final packet launch-duty stabilization next action: ${launchDutyCurrentAction.stabilizationHandoffNextAction || "-"}`,
+    `- Final packet launch-duty first-wave closeout next action: ${launchDutyCurrentAction.firstWaveCloseoutNextAction || "-"}`,
     `- Final packet launch-duty watch evidence next action: ${launchDutyCurrentAction.watchEvidenceNextAction || "-"}`,
     `- Next action: ${packet.nextAction || "-"}`
   ];

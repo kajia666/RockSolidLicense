@@ -4773,6 +4773,8 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.match(handoff, /Launch-duty confirmation points: production_signoff_packet=archive_before_cutover; launch_day_watch_summary=pending_operator_entry; stabilization_owner_handoff=operator_handoff/);
     assert.match(handoff, /Launch-duty follow-up watch record: launch_day_watch_summary -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
     assert.match(handoff, /Launch-duty follow-up watch receipts: launch_day_watch_summary=record_cutover_walkthrough:pending_operator_receipt, launch_day_watch_summary=record_launch_day_readiness_review:pending_operator_receipt/);
+    assert.match(handoff, /Launch-duty follow-up first-wave closeout: first_wave_closeout -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
+    assert.match(handoff, /Launch-duty stabilization next action: Record stabilization owner handoff, then close first-wave stabilization\./);
     assert.match(handoff, /Go-live launch-day watch entry: ready_for_launch_day_watch \(target=production_signoff_packet, watch=launch_day_watch_summary, stabilization=stabilization_owner_handoff\)/);
     assert.match(handoff, /Go-live launch-day evidence inputs: production_signoff_packet=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /Go-live launch-day watch records: launch_day_watch_summary=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; receipt_visibility_snapshot=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-snapshot\.txt; first_wave_incident_log=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-incident-log\.md; rollback_signal_review=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md; stabilization_owner_handoff=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
@@ -4780,10 +4782,13 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.match(handoff, /Go-live launch-day expected evidence: launch_day_watch_summary=Record cutover watch start\/end time, owner, route checks, and launch-day operator decisions.; receipt_visibility_snapshot=Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots.; first_wave_incident_log=Record first-wave incidents, customer impact, mitigation, owner, and status.; rollback_signal_review=Record whether rollback signals were observed, dismissed, or escalated.; stabilization_owner_handoff=Record stabilization owner, timestamp, unresolved items, and next-duty follow-up./);
     assert.match(handoff, /Go-live launch-day evidence current: launch_day_watch_summary \(action=record_launch_day_watch_summary, path=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md\)/);
     assert.match(handoff, /Go-live launch-day evidence stabilization: stabilization_owner_handoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+    assert.match(handoff, /Go-live launch-day stabilization handoff: stabilization_owner_handoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+    assert.match(handoff, /Go-live launch-day first-wave closeout: first_wave_closeout -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
     assert.match(handoff, /Go-live launch-day archive trace: group=launch_day_watch_and_stabilization, runRecord=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json, archiveIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Execution launch-duty archive trace: group=launch_day_watch_and_stabilization, runRecord=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json, archiveIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Final packet launch-duty record updates: production_signoff_packet=archive_before_cutover -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=operator_handoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
     assert.match(handoff, /Final packet launch-duty follow-up watch record: launch_day_watch_summary -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+    assert.match(handoff, /Final packet launch-duty follow-up first-wave closeout: first_wave_closeout -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
     assert.match(handoff, /Launch-duty archive trace: group=launch_day_watch_and_stabilization, runRecord=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json, archiveIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(handoff, /Launch-duty packet focus: launch_duty_archive_index \(awaiting_archive_review\)/);
     assert.match(handoff, /Launch-duty post-signoff target: production_signoff_packet \(archive_before_cutover\)/);
@@ -5262,6 +5267,74 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       path: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
       receiptOperations: ["record_launch_stabilization_review"]
     });
+    assert.deepEqual(
+      output.operatorExecutionPlan.launchDutyCurrentAction.followUpStabilizationSourceQueue,
+      [
+        {
+          key: "launch_day_watch_summary",
+          status: "pending_operator_entry",
+          path: "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md",
+          receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+          expectedEvidence: "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions."
+        },
+        {
+          key: "first_wave_incident_log",
+          status: "pending_operator_entry",
+          path: "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md",
+          receiptOperations: ["record_post_launch_ops_sweep"],
+          expectedEvidence: "Record first-wave incidents, customer impact, mitigation, owner, and status."
+        },
+        {
+          key: "receipt_visibility_snapshot",
+          status: "pending_operator_entry",
+          path: "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt",
+          receiptOperations: ["record_post_launch_ops_sweep"],
+          expectedEvidence: "Save Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility snapshots."
+        },
+        {
+          key: "rollback_signal_review",
+          status: "pending_operator_entry",
+          path: "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md",
+          receiptOperations: ["record_rollback_walkthrough", "record_launch_stabilization_review"],
+          expectedEvidence: "Record whether rollback signals were observed, dismissed, or escalated."
+        },
+        {
+          key: "stabilization_owner_handoff",
+          status: "pending_operator_entry",
+          path: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
+          receiptOperations: ["record_launch_stabilization_review"],
+          expectedEvidence: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."
+        }
+      ]
+    );
+    assert.deepEqual(output.operatorExecutionPlan.launchDutyCurrentAction.followUpFirstWaveCloseoutTarget, {
+      key: "first_wave_closeout",
+      status: "operator_closeout",
+      path: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md",
+      ownerHandoffPath: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
+      requiredSourceRecordKeys: [
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff"
+      ],
+      expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp."
+    });
+    assert.deepEqual(output.operatorExecutionPlan.launchDutyCurrentAction.followUpFirstWaveReceiptQueue, [
+      {
+        key: "first_wave_closeout",
+        operation: "record_launch_closeout_review",
+        status: "pending_operator_receipt",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md"
+      }
+    ]);
+    assert.equal(
+      output.operatorExecutionPlan.launchDutyCurrentAction.stabilizationHandoffNextAction,
+      "Record stabilization owner handoff, then close first-wave stabilization."
+    );
+    assert.equal(
+      output.operatorExecutionPlan.launchDutyCurrentAction.firstWaveCloseoutNextAction,
+      "Record first-wave closeout decision, unresolved incidents, customer impact, next-duty owner, and receipt ID."
+    );
     assert.equal(
       output.operatorExecutionPlan.launchDutyCurrentAction.watchEvidenceNextAction,
       "Record launch_day_watch_summary, attach receipt IDs, then continue launch-day watch evidence before stabilization handoff."
@@ -5299,6 +5372,14 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.equal(
       output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry.watchEvidenceExecutionEntry.nextAction,
       "Record launch_day_watch_summary, attach receipt IDs, then continue launch-day watch evidence before stabilization handoff."
+    );
+    assert.equal(
+      output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry.stabilizationHandoffExecutionEntry.currentActionKey,
+      "handoff_stabilization_owner"
+    );
+    assert.equal(
+      output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry.firstWaveCloseoutExecutionEntry.currentActionKey,
+      "close_first_wave"
     );
     assert.deepEqual(
       output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry.watchEvidenceExecutionEntry.receiptQueue,
@@ -5582,11 +5663,13 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.key, "archive_production_signoff");
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.evidenceInputs.length, 3);
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.followUpWatchRecord.key, "launch_day_watch_summary");
+    assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.followUpFirstWaveCloseoutTarget.key, "first_wave_closeout");
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.archiveTrace.currentRecordGroupKey, "launch_day_watch_and_stabilization");
     assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.mode, "launch-duty-current-action");
     assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.stage, "launch_day_watch_entry");
     assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.key, "archive_production_signoff");
     assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.followUpWatchRecord.key, "launch_day_watch_summary");
+    assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.followUpFirstWaveCloseoutTarget.key, "first_wave_closeout");
     assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.confirmationPoints.length, 3);
     assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.recordUpdates.length, 3);
     assert.deepEqual(output.stagingRehearsalExecutionSummary.operatorFocus.launchReadinessClosure, {

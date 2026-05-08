@@ -583,6 +583,45 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ],
     nextAction: "Run backup/restore drill, record recovery and backup verification receipts, backfill backup_restore_drill_result, then reload closeout input."
   });
+  assert.equal(output.stagingBackupRestoreDrillPacket.executionEntry.mode, "backup-restore-drill-execution-entry");
+  assert.equal(output.stagingBackupRestoreDrillPacket.executionEntry.status, "awaiting_backup_restore_drill");
+  assert.equal(output.stagingBackupRestoreDrillPacket.executionEntry.willModifyData, false);
+  assert.equal(output.stagingBackupRestoreDrillPacket.executionEntry.currentActionKey, "run_app_backup");
+  assert.equal(output.stagingBackupRestoreDrillPacket.executionEntry.currentCommand, output.nextCommands.recovery.appBackup);
+  assert.deepEqual(
+    output.stagingBackupRestoreDrillPacket.executionEntry.commandSequence.map((item) => [item.key, item.commandKey, item.status, item.command]),
+    [
+      ["run_app_backup", "appBackup", "operator_execute", output.nextCommands.recovery.appBackup],
+      ["run_postgres_backup", "postgresBackup", "operator_execute", output.nextCommands.recovery.postgresBackup],
+      ["run_postgres_restore_dry_run", "postgresRestoreDryRun", "operator_execute", output.nextCommands.recovery.postgresRestoreDryRun],
+      ["run_restore_healthcheck", "healthcheck", "operator_execute", output.nextCommands.recovery.healthcheck]
+    ]
+  );
+  assert.deepEqual(
+    output.stagingBackupRestoreDrillPacket.executionEntry.receiptQueue.map((item) => [item.operation, item.status]),
+    [
+      ["record_recovery_drill", "pending_operator_receipt"],
+      ["record_backup_verification", "pending_operator_receipt"]
+    ]
+  );
+  assert.deepEqual(output.stagingBackupRestoreDrillPacket.executionEntry.closeoutBackfillTarget, {
+    key: "backup_restore_drill_result",
+    status: "pending_operator_result",
+    closeoutInputPath: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+    artifactPath: "artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt",
+    sourceStep: "run_backup_restore_drill",
+    receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+    expectedEvidence: "Record backup artifact path, restore dry-run result, and post-restore healthcheck result."
+  });
+  assert.deepEqual(output.stagingBackupRestoreDrillPacket.executionEntry.closeoutReload, {
+    status: "blocked_until_backup_restore_backfill",
+    command: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+    closeoutInputPath: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+  });
+  assert.equal(
+    output.stagingBackupRestoreDrillPacket.executionEntry.nextAction,
+    "Run backup/restore commands in order, record both receipts, backfill backup_restore_drill_result, then reload closeout input."
+  );
   assert.deepEqual(output.stagingBackupRestoreDrillPacket.commandKeys, [
     "appBackup",
     "postgresBackup",
@@ -3132,6 +3171,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Production Sign-Off Readiness[\s\S]*Sign-off evidence targets:[\s\S]*full_test_window_passed: missing[\s\S]*expectedEvidence: Attach the full `npm\.cmd test` output summary and failure count\.[\s\S]*operator_signoff_recorded: missing[\s\S]*expectedEvidence: Record operator, timestamp, decision, and reason in the go\/no-go artifact\.[\s\S]*Receipt visibility evidence targets:[\s\S]*launchOpsOverviewStatus: missing[\s\S]*expectedEvidence: Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover\.[\s\S]*## Staging Backup \/ Restore Drill Packet/);
     assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Expected evidence: Record backup artifact path, restore dry-run result, and post-restore healthcheck result\.[\s\S]*Operator steps:[\s\S]*run_app_backup: operator_execute[\s\S]*expectedEvidence: Capture app backup command exit status and backup artifact path\.[\s\S]*run_postgres_restore_dry_run: operator_execute[\s\S]*expectedEvidence: Capture restore dry-run exit status and separate restore-target healthcheck result\.[\s\S]*record_backup_verification_receipt: operator_execute[\s\S]*expectedEvidence: Record the backup verification receipt ID for the app\/Postgres backup artifacts\.[\s\S]*backfill_closeout_key: operator_backfill[\s\S]*expectedEvidence: Backfill backup_restore_drill_result with the backup artifact path, restore dry-run result, healthcheck result, and receipt IDs\.[\s\S]*## Staging Closeout Reload Packet/);
     assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Backup\/restore result capture entry: awaiting_backup_restore_result \(action=run_backup_restore_drill, target=backup_restore_drill_result\)[\s\S]*Backup\/restore result backfill: pending_operator_result -> artifacts\/staging\/PILOT_ALPHA\/stable\/backup-restore-drill\.txt \(closeout=artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json\)[\s\S]*Backup\/restore result receipts: record_recovery_drill:pending_operator_receipt, record_backup_verification:pending_operator_receipt[\s\S]*Backup\/restore result reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`[\s\S]*## Staging Closeout Reload Packet/);
+    assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Backup\/restore execution entry: awaiting_backup_restore_drill \(action=run_app_backup, target=backup_restore_drill_result\)[\s\S]*Backup\/restore execution command sequence: run_app_backup:operator_execute, run_postgres_backup:operator_execute, run_postgres_restore_dry_run:operator_execute, run_restore_healthcheck:operator_execute[\s\S]*Backup\/restore execution receipts: record_recovery_drill:pending_operator_receipt, record_backup_verification:pending_operator_receipt[\s\S]*Backup\/restore execution reload: blocked_until_backup_restore_backfill -> `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`[\s\S]*## Staging Closeout Reload Packet/);
     assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Go-live execution entry: awaiting_closeout_backfill \(phase=full_test_window_entry, source=closeoutBackfillFocus, action=route_map_gate_result\)[\s\S]*## Staging Closeout Reload Packet/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Backup\/restore gate: blocked \(packet=awaiting_backup_restore_drill, closeoutKey=backup_restore_drill_result\)[\s\S]*Backup\/restore next action: Backfill backup_restore_drill_result before treating closeout reload as full-test ready\.[\s\S]*## Staging Readiness Review Packet/);
     assert.match(handoff, /## Staging Production Sign-Off Packet/);
@@ -3782,6 +3822,24 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
       ],
       nextAction: "Reload closeout input and continue full-test readiness review."
     });
+    assert.equal(output.stagingBackupRestoreDrillPacket.executionEntry.status, "ready_for_closeout_reload");
+    assert.equal(output.stagingBackupRestoreDrillPacket.executionEntry.currentActionKey, "reload_closeout_input");
+    assert.equal(
+      output.stagingBackupRestoreDrillPacket.executionEntry.currentCommand,
+      `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`
+    );
+    assert.deepEqual(output.stagingBackupRestoreDrillPacket.executionEntry.closeoutReload, {
+      status: "ready",
+      command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      closeoutInputPath: closeoutInputFile
+    });
+    assert.deepEqual(
+      output.stagingBackupRestoreDrillPacket.executionEntry.receiptQueue.map((item) => [item.operation, item.status]),
+      [
+        ["record_recovery_drill", "recorded_or_attached"],
+        ["record_backup_verification", "recorded_or_attached"]
+      ]
+    );
     assert.deepEqual(output.stagingCloseoutReloadPacket.backupRestoreGate, {
       status: "ready",
       packetStatus: "backfilled_for_closeout_reload",

@@ -2034,6 +2034,59 @@ function buildBackupRestoreResultCaptureEntry({
   };
 }
 
+function buildBackupRestoreDrillExecutionEntry({
+  backupRestoreBackfilled = false,
+  commands = {},
+  resultCaptureEntry = {},
+  packetFile = null,
+  artifactPath = null,
+  closeoutReloadCommand = null
+} = {}) {
+  const commandDefinitions = [
+    ["run_app_backup", "appBackup"],
+    ["run_postgres_backup", "postgresBackup"],
+    ["run_postgres_restore_dry_run", "postgresRestoreDryRun"],
+    ["run_restore_healthcheck", "healthcheck"]
+  ];
+  const commandSequence = commandDefinitions.map(([key, commandKey]) => ({
+    key,
+    commandKey,
+    status: commands[commandKey] ? "operator_execute" : "not_available",
+    command: commands[commandKey] || null
+  }));
+  const firstExecutableCommand = commandSequence.find((item) => item.status === "operator_execute") || null;
+  const target = resultCaptureEntry.resultBackfillTarget || {};
+  const reloadCommand = target.reloadCommand || closeoutReloadCommand || null;
+  const {
+    reloadCommand: _omitReloadCommand,
+    ...closeoutBackfillTarget
+  } = target;
+  return {
+    mode: "backup-restore-drill-execution-entry",
+    status: backupRestoreBackfilled ? "ready_for_closeout_reload" : "awaiting_backup_restore_drill",
+    willModifyData: false,
+    currentActionKey: backupRestoreBackfilled
+      ? "reload_closeout_input"
+      : firstExecutableCommand?.key || resultCaptureEntry.currentActionKey || "run_backup_restore_drill",
+    currentCommand: backupRestoreBackfilled
+      ? reloadCommand
+      : firstExecutableCommand?.command || resultCaptureEntry.currentCommand || null,
+    packetFile,
+    artifactPath,
+    commandSequence,
+    receiptQueue: resultCaptureEntry.receiptTargets || [],
+    closeoutBackfillTarget,
+    closeoutReload: {
+      status: backupRestoreBackfilled ? "ready" : "blocked_until_backup_restore_backfill",
+      command: reloadCommand,
+      closeoutInputPath: target.closeoutInputPath || null
+    },
+    nextAction: backupRestoreBackfilled
+      ? "Reload closeout input and continue full-test readiness review."
+      : "Run backup/restore commands in order, record both receipts, backfill backup_restore_drill_result, then reload closeout input."
+  };
+}
+
 function buildStagingBackupRestoreDrillPacket(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const binding = result.stagingEnvironmentBinding || {};
@@ -2088,6 +2141,25 @@ function buildStagingBackupRestoreDrillPacket(result) {
     || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
     || runRecordIndex.goLiveExecutionEntry
     || buildGoLiveExecutionEntryFromResult(result);
+  const resultCaptureEntry = buildBackupRestoreResultCaptureEntry({
+    backupRestoreBackfilled,
+    commands,
+    commandKeys,
+    closeoutBackfill,
+    closeoutInputPath,
+    closeoutReloadCommand: resultCaptureReloadCommand,
+    artifactPath,
+    expectedEvidence,
+    receiptOperations
+  });
+  const executionEntry = buildBackupRestoreDrillExecutionEntry({
+    backupRestoreBackfilled,
+    commands,
+    resultCaptureEntry,
+    packetFile,
+    artifactPath,
+    closeoutReloadCommand: resultCaptureReloadCommand
+  });
   return {
     mode: "staging-backup-restore-drill-operator-packet",
     status: backupRestoreBackfilled ? "backfilled_for_closeout_reload" : "awaiting_backup_restore_drill",
@@ -2099,17 +2171,8 @@ function buildStagingBackupRestoreDrillPacket(result) {
     receiptOperations,
     expectedEvidence,
     closeoutBackfill,
-    resultCaptureEntry: buildBackupRestoreResultCaptureEntry({
-      backupRestoreBackfilled,
-      commands,
-      commandKeys,
-      closeoutBackfill,
-      closeoutInputPath,
-      closeoutReloadCommand: resultCaptureReloadCommand,
-      artifactPath,
-      expectedEvidence,
-      receiptOperations
-    }),
+    resultCaptureEntry,
+    executionEntry,
     commandKeys,
     commands,
     environment: {
@@ -8198,6 +8261,15 @@ function renderStagingBackupRestoreDrillPacket(packet) {
   const receiptTargets = Array.isArray(resultCaptureEntry.receiptTargets)
     ? resultCaptureEntry.receiptTargets
     : [];
+  const executionEntry = packet.executionEntry || {};
+  const executionBackfillTarget = executionEntry.closeoutBackfillTarget || {};
+  const executionCommandSequence = Array.isArray(executionEntry.commandSequence)
+    ? executionEntry.commandSequence
+    : [];
+  const executionReceiptQueue = Array.isArray(executionEntry.receiptQueue)
+    ? executionEntry.receiptQueue
+    : [];
+  const executionReload = executionEntry.closeoutReload || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -8219,6 +8291,11 @@ function renderStagingBackupRestoreDrillPacket(packet) {
     `- Backup/restore result backfill: ${resultBackfillTarget.status || "-"} -> ${resultBackfillTarget.artifactPath || "-"} (closeout=${resultBackfillTarget.closeoutInputPath || "-"})`,
     `- Backup/restore result receipts: ${receiptTargets.map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
     `- Backup/restore result reload: \`${resultBackfillTarget.reloadCommand || "-"}\``,
+    `- Backup/restore execution entry: ${executionEntry.status || "-"} (action=${executionEntry.currentActionKey || "-"}, target=${executionBackfillTarget.key || "-"})`,
+    `- Backup/restore execution current command: \`${executionEntry.currentCommand || "-"}\``,
+    `- Backup/restore execution command sequence: ${executionCommandSequence.map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Backup/restore execution receipts: ${executionReceiptQueue.map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Backup/restore execution reload: ${executionReload.status || "-"} -> \`${executionReload.command || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`
   ];
   appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});

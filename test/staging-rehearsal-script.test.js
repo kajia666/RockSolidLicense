@@ -403,6 +403,28 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.fullTestWindow.canRun, false);
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.fullTestWindow.command, "npm.cmd test");
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.productionSignoff.canSignoff, false);
+  assert.deepEqual(output.operatorExecutionPlan.closeoutBackfillFocus.operatorGoNoGoResultCaptureEntry, {
+    mode: "operator-go-no-go-result-capture-entry",
+    key: "operator_go_no_go",
+    status: "pending_operator_decision",
+    willModifyData: false,
+    currentActionKey: "backfill_filled_closeout_input",
+    currentCommand: null,
+    decision: null,
+    requiredDecision: "ready-for-full-test-window",
+    allowedDecisions: ["ready-for-full-test-window", "hold", "rollback-follow-up"],
+    resultBackfillTarget: {
+      key: "operator_go_no_go",
+      status: "pending_operator_decision",
+      closeoutInputPath: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md",
+      sourceStep: "backfill_filled_closeout_input",
+      receiptOperations: [],
+      reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+      expectedEvidence: "Record ready-for-full-test-window, hold, or rollback-follow-up with the operator name and timestamp."
+    },
+    nextAction: "Record operator_go_no_go as ready-for-full-test-window before full-test window entry."
+  });
   assert.deepEqual(
     output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries.map((item) => [
       item.key,
@@ -709,6 +731,10 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.willModifyData, false);
   assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.currentActionKey, "run_full_test_window");
   assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.currentCommand, "npm.cmd test");
+  assert.deepEqual(
+    output.stagingProductionSignoffPacket.operatorGoNoGoResultCaptureEntry,
+    output.operatorExecutionPlan.closeoutBackfillFocus.operatorGoNoGoResultCaptureEntry
+  );
   assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.fullTestWindow, {
     status: "blocked",
     canRun: false,
@@ -3137,7 +3163,9 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Operator steps:[\s\S]*promote_filled_closeout_draft: operator_copy[\s\S]*paths: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.draft\.json -> artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*backfill_required_evidence: operator_backfill[\s\S]*missingCloseoutKeys: route_map_gate_result, backup_restore_drill_result, live_write_smoke_result, launch_smoke_handoff, launch_mainline_evidence_receipts, receipt_visibility_review, operator_go_no_go[\s\S]*expectedEvidence: Backfill every missing closeout key with redacted artifact paths, receipt IDs, and operator decisions before reload\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Reload execution entry: awaiting_backfill \(current=route_map_gate_result, queue=7\/7\)[\s\S]*Reload execution first queue item: route_map_gate_result -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt[\s\S]*Reload execution post-reload review: readiness_review_packet \(fullTest=no, command=npm\.cmd test\)/);
+    assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Operator go\/no-go result capture entry: pending_operator_decision \(decision=-, action=backfill_filled_closeout_input\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md[\s\S]*Operator go\/no-go allowed decisions: ready-for-full-test-window, hold, rollback-follow-up[\s\S]*Operator go\/no-go reload command: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Post-live-write result capture entries: 3[\s\S]*launch_smoke_handoff: pending_operator_result \(action=archive_launch_smoke_handoff\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-smoke-handoff\.json[\s\S]*launch_mainline_evidence_receipts: pending_operator_result \(action=record_launch_mainline_evidence\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-mainline-evidence-receipts\.json[\s\S]*receipt_visibility_review: pending_operator_result \(action=verify_receipt_visibility\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-review\.txt/);
+    assert.match(handoff, /## Staging Production Sign-Off Packet[\s\S]*Operator go\/no-go result capture entry: pending_operator_decision \(decision=-, action=backfill_filled_closeout_input\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/operator-go-no-go\.md[\s\S]*Operator go\/no-go next action: Record operator_go_no_go as ready-for-full-test-window before full-test window entry\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*review_full_test_window_readiness: blocked[\s\S]*command: `npm\.cmd test`[\s\S]*expectedEvidence: Review the readiness review packet after reload and only run npm\.cmd test once missing closeout keys are empty\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Post-reload targets:[\s\S]*readiness_review_packet: review_after_reload -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-readiness-review-packet\.json[\s\S]*expectedEvidence: Review the reloaded closeout status, remaining missing closeout keys, and full-test readiness from the readiness review packet\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*production_signoff_packet: prepare_after_full_test -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json[\s\S]*command: `npm\.cmd test`[\s\S]*requiredDecision: ready-for-production-signoff/);
@@ -3614,6 +3642,28 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.missingFieldCount, 0);
     assert.deepEqual(output.operatorExecutionPlan.closeoutBackfillFocus.missingBackfillKeys, []);
     assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget, null);
+    assert.deepEqual(output.operatorExecutionPlan.closeoutBackfillFocus.operatorGoNoGoResultCaptureEntry, {
+      mode: "operator-go-no-go-result-capture-entry",
+      key: "operator_go_no_go",
+      status: "filled",
+      willModifyData: false,
+      currentActionKey: "reload_closeout_input",
+      currentCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      decision: "ready-for-full-test-window",
+      requiredDecision: "ready-for-full-test-window",
+      allowedDecisions: ["ready-for-full-test-window", "hold", "rollback-follow-up"],
+      resultBackfillTarget: {
+        key: "operator_go_no_go",
+        status: "filled",
+        closeoutInputPath: closeoutInputFile,
+        artifactPath: "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md",
+        sourceStep: "backfill_filled_closeout_input",
+        receiptOperations: [],
+        reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+        expectedEvidence: "Record ready-for-full-test-window, hold, or rollback-follow-up with the operator name and timestamp."
+      },
+      nextAction: "Reload closeout input and continue full-test readiness review."
+    });
     assert.deepEqual(
       output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries.map((item) => [
         item.key,

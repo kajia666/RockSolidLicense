@@ -1773,6 +1773,7 @@ function buildStagingCloseoutReloadPacket(result) {
         : "Backfill backup_restore_drill_result before treating closeout reload as full-test ready."
     },
     reloadExecutionEntry: closeoutBackfillFocus.reloadExecutionEntry,
+    operatorGoNoGoResultCaptureEntry: closeoutBackfillFocus.operatorGoNoGoResultCaptureEntry,
     postLiveWriteResultCaptureEntries: closeoutBackfillFocus.postLiveWriteResultCaptureEntries || [],
     requiredCloseoutKeys,
     missingCloseoutKeys,
@@ -2431,6 +2432,9 @@ function buildStagingProductionSignoffPacket(result) {
     || runRecordIndex.closeoutProgress?.reloadCommand
     || productionSignoff.reloadCommand
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
+  const runbookTargets = Array.isArray(result.stagingExecutionRunbook?.closeoutBackfillTargets)
+    ? result.stagingExecutionRunbook.closeoutBackfillTargets
+    : [];
   const fullTestWindowCommand = fullTestWindow.command || readinessReviewPacket.commands?.fullTestWindow || "npm.cmd test";
   const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
     || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
@@ -2656,6 +2660,14 @@ function buildStagingProductionSignoffPacket(result) {
     launchDayWatchBridge,
     packetNextAction
   });
+  const operatorGoNoGoResultCaptureEntry = result.stagingCloseoutReloadPacket?.operatorGoNoGoResultCaptureEntry
+    || buildOperatorGoNoGoResultCaptureEntry({
+      closeout,
+      closeoutInput,
+      runbookTargets,
+      filledCloseoutInputFile: closeoutInputPath,
+      reloadCommand: closeoutReload
+    });
   return {
     mode: "staging-production-signoff-operator-packet",
     status,
@@ -2694,6 +2706,7 @@ function buildStagingProductionSignoffPacket(result) {
     },
     goLiveExecutionEntry,
     signoffExecutionEntry,
+    operatorGoNoGoResultCaptureEntry,
     operatorSteps: [
       {
         key: "run_full_test_window",
@@ -3783,6 +3796,63 @@ function buildProductionSignoffExecutionEntry({
   };
 }
 
+function buildOperatorGoNoGoResultCaptureEntry({
+  closeout = {},
+  closeoutInput = null,
+  runbookTargets = [],
+  filledCloseoutInputFile = null,
+  reloadCommand = null
+} = {}) {
+  const key = "operator_go_no_go";
+  const targetByKey = new Map(runbookTargets.filter((item) => item?.key).map((item) => [item.key, item]));
+  const fieldRowsByKey = new Map((closeoutInput?.backfillReview?.fieldRows || []).map((row) => [row.key, row]));
+  const ledgerRowsByKey = new Map((closeout.artifactReceiptLedger?.rows || []).map((row) => [row.checkKey, row]));
+  const checksByKey = new Map((closeout.acceptanceChecks || []).map((check) => [check.key, check]));
+  const target = targetByKey.get(key) || {};
+  const fieldRow = fieldRowsByKey.get(key) || null;
+  const ledgerRow = ledgerRowsByKey.get(key) || {};
+  const check = checksByKey.get(key) || {};
+  const sourceStep = fieldRow?.sourceStep || target.sourceStep || CLOSEOUT_SOURCE_STEPS[key] || "operator_backfill";
+  const receiptOperations = Array.isArray(target.receiptOperations) && target.receiptOperations.length
+    ? target.receiptOperations
+    : Array.isArray(ledgerRow.receiptOperations) && ledgerRow.receiptOperations.length
+      ? ledgerRow.receiptOperations
+      : [];
+  const filled = fieldRow?.status === "filled"
+    || (Array.isArray(closeoutInput?.filledKeys) && closeoutInput.filledKeys.includes(key));
+  const loadedCloseoutReloadCommand = closeoutInput?.path
+    ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInput.path}`
+    : reloadCommand;
+  const allowedDecisions = Array.isArray(ledgerRow.allowedDecisions) && ledgerRow.allowedDecisions.length
+    ? ledgerRow.allowedDecisions
+    : ["ready-for-full-test-window", "hold", "rollback-follow-up"];
+  const status = filled ? "filled" : "pending_operator_decision";
+  return {
+    mode: "operator-go-no-go-result-capture-entry",
+    key,
+    status,
+    willModifyData: false,
+    currentActionKey: filled ? "reload_closeout_input" : sourceStep,
+    currentCommand: filled ? loadedCloseoutReloadCommand : null,
+    decision: closeoutInput?.decision || null,
+    requiredDecision: "ready-for-full-test-window",
+    allowedDecisions,
+    resultBackfillTarget: {
+      key,
+      status,
+      closeoutInputPath: closeoutInput?.path || filledCloseoutInputFile,
+      artifactPath: fieldRow?.artifactPath || target.artifactPath || ledgerRow.artifactPath || null,
+      sourceStep,
+      receiptOperations,
+      reloadCommand: loadedCloseoutReloadCommand,
+      expectedEvidence: fieldRow?.expectedEvidence || target.expectedEvidence || check.expectedEvidence || null
+    },
+    nextAction: filled
+      ? "Reload closeout input and continue full-test readiness review."
+      : "Record operator_go_no_go as ready-for-full-test-window before full-test window entry."
+  };
+}
+
 function buildPostLiveWriteResultCaptureEntries({
   closeout = {},
   closeoutInput = null,
@@ -3932,6 +4002,13 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
     evidenceActionPlan: result.evidenceActionPlan || {},
     receiptVisibilitySummaries: result.nextCommands?.receiptVisibilitySummaries || null
   });
+  const operatorGoNoGoResultCaptureEntry = buildOperatorGoNoGoResultCaptureEntry({
+    closeout,
+    closeoutInput: result.closeoutInput || null,
+    runbookTargets,
+    filledCloseoutInputFile,
+    reloadCommand
+  });
   return {
     mode: "closeout-backfill-focus",
     status,
@@ -3941,6 +4018,7 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
     missingBackfillKeys,
     currentBackfillTarget,
     reloadExecutionEntry,
+    operatorGoNoGoResultCaptureEntry,
     postLiveWriteResultCaptureEntries,
     paths: {
       closeoutTemplateFile,
@@ -7367,6 +7445,17 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
   lines.push(`- Go-live execution next action: ${entry.nextAction || "-"}`);
 }
 
+function appendOperatorGoNoGoResultCaptureEntry(lines, entry = {}) {
+  if (!entry?.status) {
+    return;
+  }
+  const target = entry.resultBackfillTarget || {};
+  lines.push(`- Operator go/no-go result capture entry: ${entry.status || "-"} (decision=${entry.decision || "-"}, action=${entry.currentActionKey || "-"}) -> ${target.artifactPath || "-"}`);
+  lines.push(`- Operator go/no-go allowed decisions: ${(entry.allowedDecisions || []).join(", ") || "-"}`);
+  lines.push(`- Operator go/no-go reload command: \`${target.reloadCommand || entry.currentCommand || "-"}\``);
+  lines.push(`- Operator go/no-go next action: ${entry.nextAction || "-"}`);
+}
+
 function renderOperatorExecutionPlan(plan) {
   if (!plan) {
     return "- Not available";
@@ -7461,6 +7550,7 @@ function renderOperatorExecutionPlan(plan) {
       const target = entry.resultBackfillTarget || {};
       lines.push(`  - ${entry.key || "-"}: ${entry.status || "-"} -> ${target.artifactPath || "-"}`);
     }
+    appendOperatorGoNoGoResultCaptureEntry(lines, focus.operatorGoNoGoResultCaptureEntry || {});
     lines.push(`- Closeout reload command: \`${focus.reloadCommand || "-"}\``);
     lines.push(`- Current closeout source step: ${current.sourceStep || "-"}`);
     lines.push(`- Current closeout artifact: ${current.artifactPath || "-"}`);
@@ -7913,6 +8003,7 @@ function renderStagingCloseoutReloadPacket(packet) {
     `- Next action: ${packet.nextAction || "-"}`
   ];
   appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
+  appendOperatorGoNoGoResultCaptureEntry(lines, packet.operatorGoNoGoResultCaptureEntry || {});
   if (postLiveWriteEntries.length) {
     lines.push("- Post-live-write result capture queue:");
     for (const entry of postLiveWriteEntries) {
@@ -8077,6 +8168,7 @@ function renderStagingProductionSignoffPacket(packet) {
     lines.push(`- Production signoff closeout gate missing receipt visibility keys: ${(productionSignoffCloseoutGate.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
     lines.push(`- Production signoff closeout gate next action: ${productionSignoffCloseoutGate.nextAction || "-"}`);
   }
+  appendOperatorGoNoGoResultCaptureEntry(lines, packet.operatorGoNoGoResultCaptureEntry || {});
   appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
   if (Array.isArray(packet.signoffConditions) && packet.signoffConditions.length) {
     lines.push("- Sign-off conditions:");

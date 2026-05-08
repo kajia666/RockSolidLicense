@@ -92,6 +92,31 @@ npm.cmd run staging:closeout:backfill -- --json `
 
 Repeat that command for the remaining closeout keys, then reload with `staging:rehearsal --closeout-input-file` to check whether the full-test window is actually ready.
 
+After the full-test window completes, use `staging:signoff:backfill` to attach production sign-off evidence without hand-editing `productionSignoff.conditions`, `productionSignoff.decision`, or receipt visibility lanes:
+
+```powershell
+npm.cmd run staging:signoff:backfill -- --json `
+  --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --condition-key full_test_window_passed `
+  --value-json '{"result":"pass","command":"npm.cmd test","failureCount":0}' `
+  --artifact-path artifacts/staging/SMOKE_ALPHA/stable/full-test-output.txt `
+  --receipt-id receipt-full-test-001 `
+  --decision ready-for-production-signoff
+```
+
+Then backfill each receipt visibility lane as its latest receipt surface is verified:
+
+```powershell
+npm.cmd run staging:signoff:backfill -- --json `
+  --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --receipt-lane launchMainline `
+  --value-json '{"status":"visible","summaryPath":"/developer/launch-mainline?productCode=SMOKE_ALPHA"}' `
+  --artifact-path artifacts/staging/SMOKE_ALPHA/stable/launch-mainline-receipt-visibility.json `
+  --receipt-id receipt-launch-mainline-001
+```
+
+Repeat that command until all seven production sign-off conditions are filled and all five receipt visibility lanes are visible, then reload with `staging:rehearsal --closeout-input-file`. Production sign-off remains blocked unless the closeout input is full-test ready, `productionSignoff.decision` is `ready-for-production-signoff`, every sign-off condition has evidence, and `launchMainline`, `launchReview`, `launchSmoke`, `developerOps`, and `launchOpsOverviewStatus` are visible.
+
 For a staging API rehearsal, run the no-write rehearsal runner before the live-write smoke step:
 
 ```powershell

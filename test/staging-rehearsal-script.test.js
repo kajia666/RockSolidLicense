@@ -403,6 +403,32 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.fullTestWindow.canRun, false);
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.fullTestWindow.command, "npm.cmd test");
   assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.productionSignoff.canSignoff, false);
+  assert.deepEqual(
+    output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries.map((item) => [
+      item.key,
+      item.status,
+      item.currentActionKey,
+      item.resultBackfillTarget.artifactPath,
+      item.receiptTargets[0]?.operation || null
+    ]),
+    [
+      ["launch_smoke_handoff", "pending_operator_result", "archive_launch_smoke_handoff", "artifacts/staging/PILOT_ALPHA/stable/launch-smoke-handoff.json", "record_post_launch_ops_sweep"],
+      ["launch_mainline_evidence_receipts", "pending_operator_result", "record_launch_mainline_evidence", "artifacts/staging/PILOT_ALPHA/stable/launch-mainline-evidence-receipts.json", "record_launch_rehearsal_run"],
+      ["receipt_visibility_review", "pending_operator_result", "verify_receipt_visibility", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-review.txt", "record_post_launch_ops_sweep"]
+    ]
+  );
+  assert.equal(
+    output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries.find((item) => item.key === "launch_mainline_evidence_receipts").evidenceEndpoint,
+    output.evidenceActionPlan.endpoint
+  );
+  assert.equal(
+    output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries.find((item) => item.key === "launch_mainline_evidence_receipts").bearerTokenEnv,
+    "RSL_DEVELOPER_BEARER_TOKEN"
+  );
+  assert.deepEqual(
+    output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries.find((item) => item.key === "receipt_visibility_review").visibilityDownloads,
+    output.nextCommands.receiptVisibilitySummaries
+  );
   assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.mode, "launch-duty-packet-focus");
   assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.key, "closeout_reload_packet");
   assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.status, "awaiting_closeout_backfill");
@@ -1102,6 +1128,10 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.stagingCloseoutReloadPacket.reloadExecutionEntry.currentBackfillKey, "route_map_gate_result");
   assert.equal(output.stagingCloseoutReloadPacket.reloadExecutionEntry.backfillQueueCount, 7);
   assert.equal(output.stagingCloseoutReloadPacket.reloadExecutionEntry.missingBackfillCount, 7);
+  assert.deepEqual(
+    output.stagingCloseoutReloadPacket.postLiveWriteResultCaptureEntries,
+    output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries
+  );
   assert.deepEqual(
     output.stagingCloseoutReloadPacket.reloadExecutionEntry.backfillQueue.map((item) => [item.key, item.status, item.sourceStep, item.artifactPath]),
     [
@@ -3107,6 +3137,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Operator steps:[\s\S]*promote_filled_closeout_draft: operator_copy[\s\S]*paths: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.draft\.json -> artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*backfill_required_evidence: operator_backfill[\s\S]*missingCloseoutKeys: route_map_gate_result, backup_restore_drill_result, live_write_smoke_result, launch_smoke_handoff, launch_mainline_evidence_receipts, receipt_visibility_review, operator_go_no_go[\s\S]*expectedEvidence: Backfill every missing closeout key with redacted artifact paths, receipt IDs, and operator decisions before reload\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Reload execution entry: awaiting_backfill \(current=route_map_gate_result, queue=7\/7\)[\s\S]*Reload execution first queue item: route_map_gate_result -> artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt[\s\S]*Reload execution post-reload review: readiness_review_packet \(fullTest=no, command=npm\.cmd test\)/);
+    assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Post-live-write result capture entries: 3[\s\S]*launch_smoke_handoff: pending_operator_result \(action=archive_launch_smoke_handoff\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-smoke-handoff\.json[\s\S]*launch_mainline_evidence_receipts: pending_operator_result \(action=record_launch_mainline_evidence\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-mainline-evidence-receipts\.json[\s\S]*receipt_visibility_review: pending_operator_result \(action=verify_receipt_visibility\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-review\.txt/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*review_full_test_window_readiness: blocked[\s\S]*command: `npm\.cmd test`[\s\S]*expectedEvidence: Review the readiness review packet after reload and only run npm\.cmd test once missing closeout keys are empty\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Post-reload targets:[\s\S]*readiness_review_packet: review_after_reload -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-readiness-review-packet\.json[\s\S]*expectedEvidence: Review the reloaded closeout status, remaining missing closeout keys, and full-test readiness from the readiness review packet\./);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*production_signoff_packet: prepare_after_full_test -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json[\s\S]*command: `npm\.cmd test`[\s\S]*requiredDecision: ready-for-production-signoff/);
@@ -3583,6 +3614,21 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.missingFieldCount, 0);
     assert.deepEqual(output.operatorExecutionPlan.closeoutBackfillFocus.missingBackfillKeys, []);
     assert.equal(output.operatorExecutionPlan.closeoutBackfillFocus.currentBackfillTarget, null);
+    assert.deepEqual(
+      output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries.map((item) => [
+        item.key,
+        item.status,
+        item.currentActionKey,
+        item.currentCommand,
+        item.resultBackfillTarget.closeoutInputPath,
+        item.resultBackfillTarget.reloadCommand
+      ]),
+      [
+        ["launch_smoke_handoff", "filled", "reload_closeout_input", `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`, closeoutInputFile, `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`],
+        ["launch_mainline_evidence_receipts", "filled", "reload_closeout_input", `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`, closeoutInputFile, `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`],
+        ["receipt_visibility_review", "filled", "reload_closeout_input", `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`, closeoutInputFile, `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`]
+      ]
+    );
     assert.equal(output.stagingBackupRestoreDrillPacket.status, "backfilled_for_closeout_reload");
     assert.deepEqual(output.stagingBackupRestoreDrillPacket.closeoutBackfill, {
       status: "filled",

@@ -1773,6 +1773,7 @@ function buildStagingCloseoutReloadPacket(result) {
         : "Backfill backup_restore_drill_result before treating closeout reload as full-test ready."
     },
     reloadExecutionEntry: closeoutBackfillFocus.reloadExecutionEntry,
+    postLiveWriteResultCaptureEntries: closeoutBackfillFocus.postLiveWriteResultCaptureEntries || [],
     requiredCloseoutKeys,
     missingCloseoutKeys,
     closeoutReview,
@@ -3782,6 +3783,75 @@ function buildProductionSignoffExecutionEntry({
   };
 }
 
+function buildPostLiveWriteResultCaptureEntries({
+  closeout = {},
+  closeoutInput = null,
+  runbookTargets = [],
+  filledCloseoutInputFile = null,
+  reloadCommand = null,
+  evidenceActionPlan = {},
+  receiptVisibilitySummaries = null
+} = {}) {
+  const keys = [
+    "launch_smoke_handoff",
+    "launch_mainline_evidence_receipts",
+    "receipt_visibility_review"
+  ];
+  const targetByKey = new Map(runbookTargets.filter((item) => item?.key).map((item) => [item.key, item]));
+  const fieldRowsByKey = new Map((closeoutInput?.backfillReview?.fieldRows || []).map((row) => [row.key, row]));
+  const ledgerRowsByKey = new Map((closeout.artifactReceiptLedger?.rows || []).map((row) => [row.checkKey, row]));
+  const checksByKey = new Map((closeout.acceptanceChecks || []).map((check) => [check.key, check]));
+  const loadedCloseoutReloadCommand = closeoutInput?.path
+    ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInput.path}`
+    : reloadCommand;
+  return keys.map((key) => {
+    const target = targetByKey.get(key) || {};
+    const fieldRow = fieldRowsByKey.get(key) || null;
+    const ledgerRow = ledgerRowsByKey.get(key) || {};
+    const check = checksByKey.get(key) || {};
+    const receiptOperations = Array.isArray(target.receiptOperations) && target.receiptOperations.length
+      ? target.receiptOperations
+      : Array.isArray(ledgerRow.receiptOperations) && ledgerRow.receiptOperations.length
+        ? ledgerRow.receiptOperations
+        : [];
+    const filled = fieldRow?.status === "filled"
+      || (Array.isArray(closeoutInput?.filledKeys) && closeoutInput.filledKeys.includes(key));
+    const sourceStep = fieldRow?.sourceStep || target.sourceStep || CLOSEOUT_SOURCE_STEPS[key] || "operator_backfill";
+    return {
+      mode: "post-live-write-result-capture-entry",
+      key,
+      status: filled ? "filled" : "pending_operator_result",
+      willModifyData: false,
+      currentActionKey: filled ? "reload_closeout_input" : sourceStep,
+      currentCommand: filled ? loadedCloseoutReloadCommand : null,
+      resultBackfillTarget: {
+        key,
+        status: filled ? "filled" : "pending_operator_result",
+        closeoutInputPath: closeoutInput?.path || filledCloseoutInputFile,
+        artifactPath: fieldRow?.artifactPath || target.artifactPath || ledgerRow.artifactPath || null,
+        sourceStep,
+        receiptOperations,
+        reloadCommand: loadedCloseoutReloadCommand,
+        expectedEvidence: fieldRow?.expectedEvidence || target.expectedEvidence || check.expectedEvidence || null
+      },
+      receiptTargets: receiptOperations.map((operation) => ({
+        operation,
+        status: filled ? "recorded_or_attached" : "pending_operator_receipt"
+      })),
+      ...(key === "launch_mainline_evidence_receipts" ? {
+        evidenceEndpoint: evidenceActionPlan.endpoint || null,
+        bearerTokenEnv: evidenceActionPlan.bearerTokenEnv || DEVELOPER_BEARER_TOKEN_ENV
+      } : {}),
+      ...(key === "receipt_visibility_review" ? {
+        visibilityDownloads: receiptVisibilitySummaries || null
+      } : {}),
+      nextAction: filled
+        ? "Reload closeout input and continue full-test readiness review."
+        : `Capture ${key}, backfill the closeout input, then reload closeout readiness.`
+    };
+  });
+}
+
 function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const runbook = result.stagingExecutionRunbook || {};
@@ -3853,6 +3923,15 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
       nextAction: fullTestWindow.nextAction || null
     }
   });
+  const postLiveWriteResultCaptureEntries = buildPostLiveWriteResultCaptureEntries({
+    closeout,
+    closeoutInput: result.closeoutInput || null,
+    runbookTargets,
+    filledCloseoutInputFile,
+    reloadCommand,
+    evidenceActionPlan: result.evidenceActionPlan || {},
+    receiptVisibilitySummaries: result.nextCommands?.receiptVisibilitySummaries || null
+  });
   return {
     mode: "closeout-backfill-focus",
     status,
@@ -3862,6 +3941,7 @@ function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
     missingBackfillKeys,
     currentBackfillTarget,
     reloadExecutionEntry,
+    postLiveWriteResultCaptureEntries,
     paths: {
       closeoutTemplateFile,
       filledCloseoutDraftFile,
@@ -7369,10 +7449,18 @@ function renderOperatorExecutionPlan(plan) {
       ? reloadExecutionEntry.backfillQueue.find((item) => item.status === "missing") || reloadExecutionEntry.backfillQueue[0]
       : null;
     const postReloadReview = reloadExecutionEntry.postReloadReview || {};
+    const postLiveWriteEntries = Array.isArray(focus.postLiveWriteResultCaptureEntries)
+      ? focus.postLiveWriteResultCaptureEntries
+      : [];
     lines.push(`- Closeout backfill focus: ${focus.status || "-"} (missing=${focus.missingFieldCount ?? "-"}, current=${current.key || "-"})`);
     lines.push(`- Closeout reload execution entry: ${reloadExecutionEntry.status || "-"} (current=${reloadExecutionEntry.currentBackfillKey || "-"}, queue=${reloadExecutionEntry.missingBackfillCount ?? 0}/${reloadExecutionEntry.backfillQueueCount ?? 0})`);
     lines.push(`- Closeout reload first queue item: ${reloadQueueItem?.key || "-"} -> ${reloadQueueItem?.artifactPath || "-"}`);
     lines.push(`- Closeout reload post-reload review: ${postReloadReview.key || "-"} (fullTest=${postReloadReview.canRunFullTestWindow ? "yes" : "no"}, command=${postReloadReview.command || "-"})`);
+    lines.push(`- Post-live-write closeout result capture entries: ${postLiveWriteEntries.length}`);
+    for (const entry of postLiveWriteEntries) {
+      const target = entry.resultBackfillTarget || {};
+      lines.push(`  - ${entry.key || "-"}: ${entry.status || "-"} -> ${target.artifactPath || "-"}`);
+    }
     lines.push(`- Closeout reload command: \`${focus.reloadCommand || "-"}\``);
     lines.push(`- Current closeout source step: ${current.sourceStep || "-"}`);
     lines.push(`- Current closeout artifact: ${current.artifactPath || "-"}`);
@@ -7800,6 +7888,9 @@ function renderStagingCloseoutReloadPacket(packet) {
     ? reloadExecutionEntry.backfillQueue.find((item) => item.status === "missing") || reloadExecutionEntry.backfillQueue[0]
     : null;
   const postReloadReview = reloadExecutionEntry.postReloadReview || {};
+  const postLiveWriteEntries = Array.isArray(packet.postLiveWriteResultCaptureEntries)
+    ? packet.postLiveWriteResultCaptureEntries
+    : [];
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -7816,11 +7907,21 @@ function renderStagingCloseoutReloadPacket(packet) {
     `- Reload execution entry: ${reloadExecutionEntry.status || "-"} (current=${reloadExecutionEntry.currentBackfillKey || "-"}, queue=${reloadExecutionEntry.missingBackfillCount ?? 0}/${reloadExecutionEntry.backfillQueueCount ?? 0})`,
     `- Reload execution first queue item: ${reloadQueueItem?.key || "-"} -> ${reloadQueueItem?.artifactPath || "-"}`,
     `- Reload execution post-reload review: ${postReloadReview.key || "-"} (fullTest=${postReloadReview.canRunFullTestWindow ? "yes" : "no"}, command=${postReloadReview.command || "-"})`,
+    `- Post-live-write result capture entries: ${postLiveWriteEntries.length}`,
     `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`
   ];
   appendGoLiveExecutionEntry(lines, packet.goLiveExecutionEntry || {});
+  if (postLiveWriteEntries.length) {
+    lines.push("- Post-live-write result capture queue:");
+    for (const entry of postLiveWriteEntries) {
+      const target = entry.resultBackfillTarget || {};
+      lines.push(`  - ${entry.key || "-"}: ${entry.status || "-"} (action=${entry.currentActionKey || "-"}) -> ${target.artifactPath || "-"}`);
+      lines.push(`    - receiptTargets: ${(entry.receiptTargets || []).map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+      lines.push(`    - reloadCommand: \`${target.reloadCommand || "-"}\``);
+    }
+  }
   appendOperatorStepList(lines, "- Operator steps:", packet.operatorSteps || []);
   if (Array.isArray(packet.postReloadTargets) && packet.postReloadTargets.length) {
     lines.push("- Post-reload targets:");

@@ -4134,12 +4134,36 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.canSignoffProduction, false);
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.key, "backfill_production_signoff");
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.status, "ready_for_full_test_window");
+    assert.equal(
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.followUpBackfillCommand,
+      `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff --actions-file artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md`
+    );
+    assert.equal(
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.statusCommand,
+      `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md`
+    );
     assert.equal(output.operatorExecutionPlan.fullTestSignoffFocus.commands.fullTestWindow, "npm.cmd test");
+    assert.equal(
+      output.operatorExecutionPlan.fullTestSignoffFocus.commands.signoffBackfill,
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.followUpBackfillCommand
+    );
+    assert.equal(
+      output.operatorExecutionPlan.fullTestSignoffFocus.commands.readinessStatus,
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.statusCommand
+    );
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.status, "ready_for_full_test_window");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentPhase, "full_test_window_entry");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.sourceFocus, "fullTestSignoffFocus");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentActionKey, "run_full_test_window");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentCommand, "npm.cmd test");
+    assert.equal(
+      output.operatorExecutionPlan.goLiveExecutionEntry.commands.signoffBackfill,
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.followUpBackfillCommand
+    );
+    assert.equal(
+      output.operatorExecutionPlan.goLiveExecutionEntry.commands.readinessStatus,
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.statusCommand
+    );
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.canRunFullTestWindow, true);
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.canSignoffProduction, false);
     assert.deepEqual(output.operatorExecutionPlan.realStagingRunFocus.liveWriteSmokeResultCaptureEntry, {
@@ -4188,6 +4212,14 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.key, "backfill_production_signoff");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.status, "ready_for_full_test_window");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.command, "npm.cmd test");
+    assert.equal(
+      output.operatorExecutionPlan.launchDutyCurrentAction.followUpBackfillCommand,
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.followUpBackfillCommand
+    );
+    assert.equal(
+      output.operatorExecutionPlan.launchDutyCurrentAction.statusCommand,
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.statusCommand
+    );
     assert.equal(
       output.operatorExecutionPlan.launchDutyCurrentAction.packetPath,
       "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json"
@@ -4353,6 +4385,14 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
       command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
       closeoutInputPath: closeoutInputFile
     });
+    assert.equal(
+      output.stagingProductionSignoffPacket.productionSignoffEvidenceExecutionEntry.currentBackfillCommand,
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.followUpBackfillCommand
+    );
+    assert.equal(
+      output.stagingProductionSignoffPacket.productionSignoffEvidenceExecutionEntry.statusCommand,
+      output.operatorExecutionPlan.fullTestSignoffFocus.currentAction.statusCommand
+    );
     assert.equal(
       output.stagingProductionSignoffPacket.productionSignoffEvidenceExecutionEntry.nextAction,
       "Backfill full_test_window_passed, reload closeout input, then re-check production sign-off readiness."

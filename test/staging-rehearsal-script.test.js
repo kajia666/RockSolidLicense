@@ -1253,6 +1253,43 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     output.stagingCloseoutReloadPacket.postLiveWriteResultCaptureEntries,
     output.operatorExecutionPlan.closeoutBackfillFocus.postLiveWriteResultCaptureEntries
   );
+  assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.mode, "post-live-write-execution-entry");
+  assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.status, "awaiting_post_live_write_capture");
+  assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.willModifyData, false);
+  assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.currentCaptureKey, "launch_smoke_handoff");
+  assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.currentActionKey, "archive_launch_smoke_handoff");
+  assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.currentCommand, null);
+  assert.deepEqual(
+    output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.captureQueue.map((item) => [
+      item.key,
+      item.status,
+      item.currentActionKey,
+      item.artifactPath,
+      item.receiptOperations[0] || null
+    ]),
+    [
+      ["launch_smoke_handoff", "pending_operator_result", "archive_launch_smoke_handoff", "artifacts/staging/PILOT_ALPHA/stable/launch-smoke-handoff.json", "record_post_launch_ops_sweep"],
+      ["launch_mainline_evidence_receipts", "pending_operator_result", "record_launch_mainline_evidence", "artifacts/staging/PILOT_ALPHA/stable/launch-mainline-evidence-receipts.json", "record_launch_rehearsal_run"],
+      ["receipt_visibility_review", "pending_operator_result", "verify_receipt_visibility", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-review.txt", "record_post_launch_ops_sweep"]
+    ]
+  );
+  assert.deepEqual(
+    output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.receiptQueue.slice(0, 3).map((item) => [item.key, item.operation, item.status]),
+    [
+      ["launch_smoke_handoff", "record_post_launch_ops_sweep", "pending_operator_receipt"],
+      ["launch_mainline_evidence_receipts", "record_launch_rehearsal_run", "pending_operator_receipt"],
+      ["launch_mainline_evidence_receipts", "record_recovery_drill", "pending_operator_receipt"]
+    ]
+  );
+  assert.deepEqual(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.closeoutReload, {
+    status: "blocked_until_post_live_write_backfill",
+    command: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+    closeoutInputPath: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json"
+  });
+  assert.equal(
+    output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.nextAction,
+    "Capture launch_smoke_handoff, backfill the closeout input, then reload closeout readiness."
+  );
   assert.deepEqual(
     output.stagingCloseoutReloadPacket.reloadExecutionEntry.backfillQueue.map((item) => [item.key, item.status, item.sourceStep, item.artifactPath]),
     [
@@ -3174,6 +3211,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Backup\/restore execution entry: awaiting_backup_restore_drill \(action=run_app_backup, target=backup_restore_drill_result\)[\s\S]*Backup\/restore execution command sequence: run_app_backup:operator_execute, run_postgres_backup:operator_execute, run_postgres_restore_dry_run:operator_execute, run_restore_healthcheck:operator_execute[\s\S]*Backup\/restore execution receipts: record_recovery_drill:pending_operator_receipt, record_backup_verification:pending_operator_receipt[\s\S]*Backup\/restore execution reload: blocked_until_backup_restore_backfill -> `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`[\s\S]*## Staging Closeout Reload Packet/);
     assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Go-live execution entry: awaiting_closeout_backfill \(phase=full_test_window_entry, source=closeoutBackfillFocus, action=route_map_gate_result\)[\s\S]*## Staging Closeout Reload Packet/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Backup\/restore gate: blocked \(packet=awaiting_backup_restore_drill, closeoutKey=backup_restore_drill_result\)[\s\S]*Backup\/restore next action: Backfill backup_restore_drill_result before treating closeout reload as full-test ready\.[\s\S]*## Staging Readiness Review Packet/);
+    assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Post-live-write execution entry: awaiting_post_live_write_capture \(action=archive_launch_smoke_handoff, current=launch_smoke_handoff\)[\s\S]*Post-live-write execution capture queue: launch_smoke_handoff:pending_operator_result, launch_mainline_evidence_receipts:pending_operator_result, receipt_visibility_review:pending_operator_result[\s\S]*Post-live-write execution receipts: launch_smoke_handoff=record_post_launch_ops_sweep:pending_operator_receipt; launch_mainline_evidence_receipts=record_launch_rehearsal_run:pending_operator_receipt[\s\S]*Post-live-write execution reload: blocked_until_post_live_write_backfill -> `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`[\s\S]*## Staging Readiness Review Packet/);
     assert.match(handoff, /## Staging Production Sign-Off Packet/);
     assert.match(handoff, /Sign-off backfill draft: blocked_until_full_test_window/);
     assert.match(handoff, /## Staging Production Sign-Off Packet[\s\S]*Go-live execution entry: awaiting_closeout_backfill \(phase=full_test_window_entry, source=closeoutBackfillFocus, action=route_map_gate_result\)[\s\S]*## Launch Day Watch Plan/);
@@ -3776,6 +3814,26 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
         ["launch_smoke_handoff", "filled", "reload_closeout_input", `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`, closeoutInputFile, `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`],
         ["launch_mainline_evidence_receipts", "filled", "reload_closeout_input", `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`, closeoutInputFile, `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`],
         ["receipt_visibility_review", "filled", "reload_closeout_input", `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`, closeoutInputFile, `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`]
+      ]
+    );
+    assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.status, "ready_for_closeout_reload");
+    assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.currentCaptureKey, null);
+    assert.equal(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.currentActionKey, "reload_closeout_input");
+    assert.equal(
+      output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.currentCommand,
+      `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`
+    );
+    assert.deepEqual(output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.closeoutReload, {
+      status: "ready",
+      command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      closeoutInputPath: closeoutInputFile
+    });
+    assert.deepEqual(
+      output.stagingCloseoutReloadPacket.postLiveWriteExecutionEntry.captureQueue.map((item) => [item.key, item.status]),
+      [
+        ["launch_smoke_handoff", "filled"],
+        ["launch_mainline_evidence_receipts", "filled"],
+        ["receipt_visibility_review", "filled"]
       ]
     );
     assert.equal(output.stagingBackupRestoreDrillPacket.status, "backfilled_for_closeout_reload");

@@ -1734,6 +1734,8 @@ function buildStagingCloseoutReloadPacket(result) {
   } else if (result.closeoutInput) {
     status = "reload_needs_backfill";
   }
+  const postLiveWriteResultCaptureEntries = closeoutBackfillFocus.postLiveWriteResultCaptureEntries || [];
+  const postLiveWriteExecutionEntry = buildPostLiveWriteExecutionEntry(postLiveWriteResultCaptureEntries);
   return {
     mode: "staging-closeout-reload-packet",
     status,
@@ -1793,7 +1795,8 @@ function buildStagingCloseoutReloadPacket(result) {
     },
     reloadExecutionEntry: closeoutBackfillFocus.reloadExecutionEntry,
     operatorGoNoGoResultCaptureEntry: closeoutBackfillFocus.operatorGoNoGoResultCaptureEntry,
-    postLiveWriteResultCaptureEntries: closeoutBackfillFocus.postLiveWriteResultCaptureEntries || [],
+    postLiveWriteResultCaptureEntries,
+    postLiveWriteExecutionEntry,
     requiredCloseoutKeys,
     missingCloseoutKeys,
     closeoutReview,
@@ -4128,6 +4131,58 @@ function buildPostLiveWriteResultCaptureEntries({
         : `Capture ${key}, backfill the closeout input, then reload closeout readiness.`
     };
   });
+}
+
+function buildPostLiveWriteExecutionEntry(entries = []) {
+  const captureEntries = Array.isArray(entries) ? entries : [];
+  const pendingEntry = captureEntries.find((entry) => entry?.status !== "filled") || null;
+  const firstEntry = pendingEntry || captureEntries[0] || {};
+  const firstTarget = firstEntry.resultBackfillTarget || {};
+  const reloadCommand = firstTarget.reloadCommand
+    || captureEntries.map((entry) => entry?.resultBackfillTarget?.reloadCommand).find(Boolean)
+    || null;
+  const closeoutInputPath = firstTarget.closeoutInputPath
+    || captureEntries.map((entry) => entry?.resultBackfillTarget?.closeoutInputPath).find(Boolean)
+    || null;
+  const captureQueue = captureEntries.map((entry) => {
+    const target = entry.resultBackfillTarget || {};
+    return {
+      key: entry.key || target.key || null,
+      status: entry.status || target.status || "not_available",
+      currentActionKey: entry.currentActionKey || null,
+      artifactPath: target.artifactPath || null,
+      sourceStep: target.sourceStep || null,
+      receiptOperations: Array.isArray(target.receiptOperations) ? target.receiptOperations : [],
+      expectedEvidence: target.expectedEvidence || null,
+      receiptTargets: Array.isArray(entry.receiptTargets) ? entry.receiptTargets : [],
+      ...(entry.evidenceEndpoint ? { evidenceEndpoint: entry.evidenceEndpoint } : {}),
+      ...(entry.bearerTokenEnv ? { bearerTokenEnv: entry.bearerTokenEnv } : {}),
+      ...(entry.visibilityDownloads ? { visibilityDownloads: entry.visibilityDownloads } : {})
+    };
+  });
+  const receiptQueue = captureQueue.flatMap((entry) => entry.receiptTargets.map((receipt) => ({
+    key: entry.key,
+    operation: receipt.operation || null,
+    status: receipt.status || null
+  })));
+  return {
+    mode: "post-live-write-execution-entry",
+    status: pendingEntry ? "awaiting_post_live_write_capture" : "ready_for_closeout_reload",
+    willModifyData: false,
+    currentCaptureKey: pendingEntry?.key || null,
+    currentActionKey: pendingEntry ? pendingEntry.currentActionKey || null : "reload_closeout_input",
+    currentCommand: pendingEntry ? pendingEntry.currentCommand || null : reloadCommand,
+    captureQueue,
+    receiptQueue,
+    closeoutReload: {
+      status: pendingEntry ? "blocked_until_post_live_write_backfill" : "ready",
+      command: reloadCommand,
+      closeoutInputPath
+    },
+    nextAction: pendingEntry
+      ? `Capture ${pendingEntry.key}, backfill the closeout input, then reload closeout readiness.`
+      : "Reload closeout input and continue full-test readiness review."
+  };
 }
 
 function buildCloseoutBackfillFocus(result, { outputFiles = [] } = {}) {
@@ -8365,6 +8420,14 @@ function renderStagingCloseoutReloadPacket(packet) {
   const postLiveWriteEntries = Array.isArray(packet.postLiveWriteResultCaptureEntries)
     ? packet.postLiveWriteResultCaptureEntries
     : [];
+  const postLiveWriteExecutionEntry = packet.postLiveWriteExecutionEntry || {};
+  const postLiveWriteCaptureQueue = Array.isArray(postLiveWriteExecutionEntry.captureQueue)
+    ? postLiveWriteExecutionEntry.captureQueue
+    : [];
+  const postLiveWriteReceiptQueue = Array.isArray(postLiveWriteExecutionEntry.receiptQueue)
+    ? postLiveWriteExecutionEntry.receiptQueue
+    : [];
+  const postLiveWriteReload = postLiveWriteExecutionEntry.closeoutReload || {};
   const lines = [
     `- Packet status: ${packet.status || "-"}`,
     `- Writes data by itself: ${packet.willModifyData ? "yes" : "no"}`,
@@ -8382,6 +8445,10 @@ function renderStagingCloseoutReloadPacket(packet) {
     `- Reload execution first queue item: ${reloadQueueItem?.key || "-"} -> ${reloadQueueItem?.artifactPath || "-"}`,
     `- Reload execution post-reload review: ${postReloadReview.key || "-"} (fullTest=${postReloadReview.canRunFullTestWindow ? "yes" : "no"}, command=${postReloadReview.command || "-"})`,
     `- Post-live-write result capture entries: ${postLiveWriteEntries.length}`,
+    `- Post-live-write execution entry: ${postLiveWriteExecutionEntry.status || "-"} (action=${postLiveWriteExecutionEntry.currentActionKey || "-"}, current=${postLiveWriteExecutionEntry.currentCaptureKey || "-"})`,
+    `- Post-live-write execution capture queue: ${postLiveWriteCaptureQueue.map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Post-live-write execution receipts: ${postLiveWriteReceiptQueue.map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join("; ") || "-"}`,
+    `- Post-live-write execution reload: ${postLiveWriteReload.status || "-"} -> \`${postLiveWriteReload.command || "-"}\``,
     `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`

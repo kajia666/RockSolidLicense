@@ -432,6 +432,34 @@ function commandValue(value) {
   return text;
 }
 
+function buildCloseoutInitCommand({ filledCloseoutDraftFile, filledCloseoutInputFile, readinessActionQueueFile }) {
+  if (!filledCloseoutDraftFile || !filledCloseoutInputFile || !readinessActionQueueFile) {
+    return null;
+  }
+  return [
+    "npm.cmd run staging:closeout:init --",
+    "--draft-file",
+    commandValue(filledCloseoutDraftFile),
+    "--output-file",
+    commandValue(filledCloseoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
+function buildReadinessStatusCommand({ filledCloseoutInputFile, readinessActionQueueFile }) {
+  if (!filledCloseoutInputFile || !readinessActionQueueFile) {
+    return null;
+  }
+  return [
+    "npm.cmd run staging:readiness:status --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
 function buildProfileDrivenCommand(options) {
   const parts = ["npm.cmd run staging:rehearsal --"];
   if (options.profileFile) {
@@ -582,11 +610,24 @@ function buildStagingProfileOperatorPreflight(result) {
   const reloadStep = Array.isArray(runbook.commandSequence)
     ? runbook.commandSequence.find((item) => item.key === "reload_closeout_input")
     : null;
+  const recommendedFiles = binding.recommendedOutputFiles || [];
+  const filledCloseoutDraftFile = keyedPath(recommendedFiles, "filled_closeout_draft");
+  const filledCloseoutInputFile = keyedPath(recommendedFiles, "filled_closeout_input");
+  const readinessActionQueueFile = keyedPath(recommendedFiles, "readiness_action_queue");
   const commands = {
     profileDrivenRehearsal: plan.recommendedCommand || null,
     stagingDryRun: binding.dryRunCommand || null,
     routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
     liveWriteSmoke: result.nextCommands?.launchSmoke || null,
+    closeoutInit: buildCloseoutInitCommand({
+      filledCloseoutDraftFile,
+      filledCloseoutInputFile,
+      readinessActionQueueFile
+    }),
+    readinessStatus: buildReadinessStatusCommand({
+      filledCloseoutInputFile,
+      readinessActionQueueFile
+    }),
     closeoutReload: reloadStep?.command || result.closeoutBackfillGuide?.closeoutInputReload?.command || null
   };
   const profileLoaded = Boolean(plan.status) && plan.status !== "profile_not_loaded";
@@ -622,7 +663,7 @@ function buildStagingProfileOperatorPreflight(result) {
     canRunDryRun,
     canRunLiveWriteSmoke,
     canRecordEvidence,
-    recommendedFiles: binding.recommendedOutputFiles || [],
+    recommendedFiles,
     commandSequence,
     commands,
     checks: [
@@ -819,6 +860,8 @@ function buildStagingRehearsalExecutionSummary(result) {
       stagingDryRun: profilePreflight.commands?.stagingDryRun || null,
       routeMapGate: profilePreflight.commands?.routeMapGate || null,
       liveWriteSmoke: profilePreflight.commands?.liveWriteSmoke || null,
+      closeoutInit: profilePreflight.commands?.closeoutInit || null,
+      readinessStatus: profilePreflight.commands?.readinessStatus || null,
       closeoutReload: profilePreflight.commands?.closeoutReload || null,
       fullTestWindow: result.fullTestWindowReadiness?.command || closeout.fullTestWindowEntry?.command || "npm.cmd test"
     },
@@ -1376,6 +1419,8 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     stagingDryRun: preflight.commands?.stagingDryRun || result.stagingEnvironmentBinding?.dryRunCommand || null,
     routeMapGate: preflight.commands?.routeMapGate || result.nextCommands?.launchRouteMapGate?.command || null,
     liveWriteSmoke: preflight.commands?.liveWriteSmoke || result.nextCommands?.launchSmoke || null,
+    closeoutInit: preflight.commands?.closeoutInit || null,
+    readinessStatus: preflight.commands?.readinessStatus || null,
     closeoutReload: preflight.commands?.closeoutReload || result.finalRehearsalPacket?.commands?.closeoutReload || null
   };
   const fullTestWindow = result.fullTestWindowReadiness || {};
@@ -1442,6 +1487,7 @@ function buildRealStagingRunFocus(result, { outputFiles = [] } = {}) {
     closeoutReloadPacketFile: pathFor("closeout_reload_packet"),
     launchDutyArchiveIndexFile: pathFor("launch_duty_archive_index"),
     filledCloseoutInputFile,
+    readinessActionQueueFile: pathFor("readiness_action_queue"),
     artifactArchiveRoot: pathFor("artifact_archive_root")
   };
   const outputWriteSummary = buildStagingOutputWriteSummary(result, { outputFiles });
@@ -1696,6 +1742,9 @@ function buildStagingArtifactManifest(result) {
     || runRecordIndex.goLiveExecutionEntry
     || finalPacket.goLiveExecutionEntry
     || buildGoLiveExecutionEntryFromResult(result);
+  const filledCloseoutDraftFile = keyedPath(files, "filled_closeout_draft");
+  const filledCloseoutInputFile = keyedPath(files, "filled_closeout_input");
+  const readinessActionQueueFile = keyedPath(files, "readiness_action_queue");
   return {
     mode: "staging-artifact-manifest",
     status: "awaiting_artifact_generation",
@@ -1713,6 +1762,15 @@ function buildStagingArtifactManifest(result) {
       stagingDryRun: binding.dryRunCommand || null,
       routeMapGate: executionSummary.commands?.routeMapGate || finalPacket.commands?.routeMapGate || null,
       liveWriteSmoke: executionSummary.commands?.liveWriteSmoke || finalPacket.commands?.liveWriteSmoke || null,
+      closeoutInit: buildCloseoutInitCommand({
+        filledCloseoutDraftFile,
+        filledCloseoutInputFile,
+        readinessActionQueueFile
+      }),
+      readinessStatus: buildReadinessStatusCommand({
+        filledCloseoutInputFile,
+        readinessActionQueueFile
+      }),
       closeoutReload: finalPacket.commands?.closeoutReload
         || runRecordIndex.closeoutProgress?.reloadCommand
         || null
@@ -6585,6 +6643,9 @@ function buildLaunchRehearsalBundle(result) {
   ];
   const bundleReady = environmentBinding.status === "ready_for_real_staging_binding"
     && runbook.status === "ready_for_real_staging_dry_run";
+  const filledCloseoutDraftFile = fileByKey.get("filled_closeout_draft")?.path || null;
+  const filledCloseoutInputFile = fileByKey.get("filled_closeout_input")?.path || null;
+  const readinessActionQueueFile = fileByKey.get("readiness_action_queue")?.path || null;
   return {
     status: bundleReady ? "ready_for_staging_rehearsal_bundle" : "blocked_until_rehearsal_inputs_ready",
     willModifyData: false,
@@ -6601,6 +6662,15 @@ function buildLaunchRehearsalBundle(result) {
       stagingRehearsalDryRun: environmentBinding.dryRunCommand || null,
       routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
       liveWriteSmoke: result.nextCommands?.launchSmoke || null,
+      closeoutInit: buildCloseoutInitCommand({
+        filledCloseoutDraftFile,
+        filledCloseoutInputFile,
+        readinessActionQueueFile
+      }),
+      readinessStatus: buildReadinessStatusCommand({
+        filledCloseoutInputFile,
+        readinessActionQueueFile
+      }),
       closeoutReload: transition.reloadStep?.command || result.closeoutBackfillGuide?.closeoutInputReload?.command || null,
       fullTestWindow: result.fullTestWindowReadiness?.command || closeout.fullTestWindowEntry?.command || "npm.cmd test"
     },
@@ -6757,6 +6827,16 @@ function buildFinalRehearsalPacket(result) {
     finalLocalFile("filled_closeout_input_example", null, filledExample.saveAs || null, "example_only"),
     finalLocalFile("artifact_archive_root", null, archiveRoot, "operator_archive")
   ];
+  const localFileByKey = new Map(localFiles.map((item) => [item.key, item]));
+  const closeoutInitCommand = buildCloseoutInitCommand({
+    filledCloseoutDraftFile: localFileByKey.get("filled_closeout_draft")?.path || null,
+    filledCloseoutInputFile: localFileByKey.get("filled_closeout_input")?.path || null,
+    readinessActionQueueFile: localFileByKey.get("readiness_action_queue")?.path || null
+  });
+  const readinessStatusCommand = buildReadinessStatusCommand({
+    filledCloseoutInputFile: localFileByKey.get("filled_closeout_input")?.path || null,
+    readinessActionQueueFile: localFileByKey.get("readiness_action_queue")?.path || null
+  });
   const realStagingRunFocus = buildRealStagingRunFocus(result, { outputFiles: localFiles });
   const closeoutBackfillFocus = buildCloseoutBackfillFocus(result, { outputFiles: localFiles });
   const fullTestSignoffFocus = buildFullTestSignoffFocus(result, { outputFiles: localFiles });
@@ -6795,6 +6875,8 @@ function buildFinalRehearsalPacket(result) {
       stagingRehearsalDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
       routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
       liveWriteSmoke: result.nextCommands?.launchSmoke || null,
+      closeoutInit: closeoutInitCommand,
+      readinessStatus: readinessStatusCommand,
       closeoutReload: filledExample.reloadCommand || null,
       fullTestWindow: closeout.fullTestWindowEntry?.command || "npm.cmd test"
     },
@@ -7874,6 +7956,8 @@ function renderStagingProfileOperatorPreflight(preflight) {
     `- Profile command: \`${preflight.commands?.profileDrivenRehearsal || "-"}\``,
     `- Staging dry run: \`${preflight.commands?.stagingDryRun || "-"}\``,
     `- Route-map gate: \`${preflight.commands?.routeMapGate || "-"}\``,
+    `- Closeout init: \`${preflight.commands?.closeoutInit || "-"}\``,
+    `- Readiness status: \`${preflight.commands?.readinessStatus || "-"}\``,
     `- Closeout reload: \`${preflight.commands?.closeoutReload || "-"}\``,
     `- Next action: ${preflight.nextAction || "-"}`
   ];
@@ -7938,6 +8022,8 @@ function renderStagingRehearsalExecutionSummary(summary) {
     `- Launch duty next action: ${launchDutyFocus.nextAction || "-"}`,
     `- Ordered next actions: ${(summary.orderedNextActions || []).join(", ") || "-"}`,
     `- Staging dry run: \`${summary.commands?.stagingDryRun || "-"}\``,
+    `- Closeout init: \`${summary.commands?.closeoutInit || "-"}\``,
+    `- Readiness status: \`${summary.commands?.readinessStatus || "-"}\``,
     `- Closeout reload: \`${summary.commands?.closeoutReload || "-"}\``,
     `- Next action: ${summary.nextAction || "-"}`
   ];
@@ -8332,6 +8418,8 @@ function renderOperatorExecutionPlan(plan) {
     lines.push(`- Real staging current action unsafeCliSecretOverrides: ${(current.unsafeCliSecretOverrides || []).join(", ") || "-"}`);
     lines.push(`- Real staging archive root: ${focus.paths?.artifactArchiveRoot || "-"}`);
     lines.push(`- Real staging dry-run command: \`${focus.commands?.stagingDryRun || "-"}\``);
+    lines.push(`- Real staging closeout init: \`${focus.commands?.closeoutInit || "-"}\``);
+    lines.push(`- Real staging readiness status: \`${focus.commands?.readinessStatus || "-"}\``);
     lines.push(`- Real staging closeout reload: \`${focus.commands?.closeoutReload || "-"}\``);
     lines.push(`- Real staging post-dry-run action: ${focus.postDryRunAction?.key || "-"} (${focus.postDryRunAction?.status || "-"})`);
     lines.push(`- Real staging full-test entry: ${focus.fullTestEntry?.status || "-"} (command=${focus.fullTestEntry?.command || "-"})`);
@@ -8775,6 +8863,8 @@ function renderStagingArtifactManifest(manifest) {
     `- Staging dry run: \`${manifest.commands?.stagingDryRun || "-"}\``,
     `- Route-map gate: \`${manifest.commands?.routeMapGate || "-"}\``,
     `- Live-write smoke: \`${manifest.commands?.liveWriteSmoke || "-"}\``,
+    `- Closeout init: \`${manifest.commands?.closeoutInit || "-"}\``,
+    `- Readiness status: \`${manifest.commands?.readinessStatus || "-"}\``,
     `- Closeout reload: \`${manifest.commands?.closeoutReload || "-"}\``,
     `- Next action: ${manifest.nextAction || "-"}`
   ];
@@ -9577,6 +9667,8 @@ function renderLaunchRehearsalBundle(bundle) {
     `- Dry run: \`${bundle.commands?.stagingRehearsalDryRun || "-"}\``,
     `- Route-map gate: \`${bundle.commands?.routeMapGate || "-"}\``,
     `- Live-write smoke: \`${bundle.commands?.liveWriteSmoke || "-"}\``,
+    `- Closeout init: \`${bundle.commands?.closeoutInit || "-"}\``,
+    `- Readiness status: \`${bundle.commands?.readinessStatus || "-"}\``,
     `- Closeout reload: \`${bundle.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${bundle.commands?.fullTestWindow || "-"}\``,
     `- Execution order: ${(bundle.executionOrder || []).join(", ") || "-"}`,
@@ -9627,6 +9719,8 @@ function renderFinalRehearsalPacket(packet) {
     `- Staging rehearsal dry run: \`${packet.commands?.stagingRehearsalDryRun || "-"}\``,
     `- Route-map gate: \`${packet.commands?.routeMapGate || "-"}\``,
     `- Live-write smoke: \`${packet.commands?.liveWriteSmoke || "-"}\``,
+    `- Closeout init: \`${packet.commands?.closeoutInit || "-"}\``,
+    `- Readiness status: \`${packet.commands?.readinessStatus || "-"}\``,
     `- Closeout reload: \`${packet.commands?.closeoutReload || "-"}\``,
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Handoff file: ${fileByKey.get("handoff_file")?.path || "-"}`,

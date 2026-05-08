@@ -2914,7 +2914,8 @@ function buildStagingLaunchDutyArchiveIndex(result) {
         receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
         expectedEvidence: item.expectedEvidence || null
       })),
-      firstWaveCloseoutGate: stabilizationHandoff.firstWaveCloseoutGate || null
+      firstWaveCloseoutGate: stabilizationHandoff.firstWaveCloseoutGate || null,
+      firstWaveCloseoutCaptureEntry: stabilizationHandoff.firstWaveCloseoutCaptureEntry || null
     },
     commands: {
       stagingDryRun: result.stagingEnvironmentBinding?.dryRunCommand || null,
@@ -5116,6 +5117,49 @@ function buildStabilizationHandoffExecutionEntry({
   };
 }
 
+function buildFirstWaveCloseoutCaptureEntry({
+  canStartStabilizationHandoff = false,
+  firstWaveCloseoutGate = {},
+  firstWaveCloseoutWindow = {}
+} = {}) {
+  const receiptOperations = Array.isArray(firstWaveCloseoutGate.receiptOperations)
+    ? firstWaveCloseoutGate.receiptOperations
+    : Array.isArray(firstWaveCloseoutWindow.receiptOperations) ? firstWaveCloseoutWindow.receiptOperations : [];
+  const artifactPath = firstWaveCloseoutGate.firstWaveCloseoutPath
+    || firstWaveCloseoutWindow.path
+    || null;
+  const status = canStartStabilizationHandoff
+    ? firstWaveCloseoutWindow.status || "operator_closeout"
+    : firstWaveCloseoutWindow.status || "blocked_until_stabilization_owner_handoff";
+  return {
+    mode: "first-wave-closeout-capture-entry",
+    key: "first_wave_closeout",
+    category: "stabilization_closeout",
+    status,
+    willModifyData: false,
+    currentActionKey: canStartStabilizationHandoff ? "close_first_wave" : "verify_cutover_watch_records",
+    currentCommand: null,
+    resultBackfillTarget: {
+      key: "first_wave_closeout",
+      status,
+      artifactPath,
+      ownerHandoffPath: firstWaveCloseoutGate.ownerHandoffPath || null,
+      requiredSourceRecordKeys: firstWaveCloseoutGate.requiredSourceRecordKeys || firstWaveCloseoutWindow.sourceRecordKeys || [],
+      sourceRecords: firstWaveCloseoutGate.sourceRecords || [],
+      receiptOperations,
+      expectedEvidence: firstWaveCloseoutGate.expectedEvidence || firstWaveCloseoutWindow.expectedEvidence || null
+    },
+    receiptTargets: receiptOperations.map((operation) => ({
+      operation,
+      status: canStartStabilizationHandoff ? "pending_operator_receipt" : "blocked_until_stabilization_handoff",
+      artifactPath
+    })),
+    nextAction: canStartStabilizationHandoff
+      ? "Record first-wave closeout decision, unresolved incidents, customer impact, next-duty owner, and receipt ID."
+      : firstWaveCloseoutGate.nextAction || "Start launch-day watch and stabilization handoff before first-wave closeout."
+  };
+}
+
 function buildStabilizationHandoffPlan(result) {
   const watchPlan = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
   const canStartStabilizationHandoff = watchPlan?.canStartCutoverWatch === true;
@@ -5247,6 +5291,11 @@ function buildStabilizationHandoffPlan(result) {
       ? "Record stabilization owner handoff, then close first-wave stabilization with incident, rollback, and next-duty evidence."
       : "Start launch-day watch and stabilization handoff before first-wave closeout."
   };
+  const firstWaveCloseoutCaptureEntry = buildFirstWaveCloseoutCaptureEntry({
+    canStartStabilizationHandoff,
+    firstWaveCloseoutGate,
+    firstWaveCloseoutWindow
+  });
   return {
     status: canStartStabilizationHandoff ? "ready" : "blocked",
     canStartStabilizationHandoff,
@@ -5257,6 +5306,7 @@ function buildStabilizationHandoffPlan(result) {
     currentHandoffTarget,
     handoffExecutionEntry,
     firstWaveCloseoutGate,
+    firstWaveCloseoutCaptureEntry,
     sourceWatchRecords,
     watchEvidenceCaptureEntries,
     handoffEvidenceInputs: sourceWatchRecords.map((item) => ({
@@ -7685,6 +7735,22 @@ function appendLaunchDayWatchEvidenceCaptureEntries(lines, entries = [], {
   }
 }
 
+function appendFirstWaveCloseoutCaptureEntry(lines, entry, {
+  entryLabel = "First-wave closeout capture entry",
+  receiptLabel = "First-wave closeout capture receipts",
+  sourceLabel = "First-wave closeout capture sources"
+} = {}) {
+  if (!entry) {
+    return;
+  }
+  const target = entry.resultBackfillTarget || {};
+  const receiptTargets = Array.isArray(entry.receiptTargets) ? entry.receiptTargets : [];
+  lines.push(`- ${entryLabel}: ${entry.status || "-"} (action=${entry.currentActionKey || "-"}) -> ${target.artifactPath || "-"}`);
+  lines.push(`- ${receiptLabel}: ${receiptTargets.map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  lines.push(`- ${sourceLabel}: ${(target.sourceRecords || []).map((item) => `${item[0]}=${item[1]} -> ${item[2]}`).join("; ") || "-"}`);
+  lines.push(`- ${entryLabel} expected evidence: ${target.expectedEvidence || "-"}`);
+}
+
 function renderOperatorExecutionPlan(plan) {
   if (!plan) {
     return "- Not available";
@@ -8533,6 +8599,7 @@ function renderStabilizationHandoffPlan(plan) {
   const currentTarget = plan.currentHandoffTarget || {};
   const handoffExecutionEntry = plan.handoffExecutionEntry || {};
   const firstWaveCloseoutGate = plan.firstWaveCloseoutGate || {};
+  const firstWaveCloseoutCaptureEntry = plan.firstWaveCloseoutCaptureEntry || null;
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Can start stabilization handoff: ${plan.canStartStabilizationHandoff ? "yes" : "no"}`,
@@ -8559,6 +8626,7 @@ function renderStabilizationHandoffPlan(plan) {
     `- Escalation triggers: ${(plan.escalationTriggers || []).join(", ") || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
   ];
+  appendFirstWaveCloseoutCaptureEntry(lines, firstWaveCloseoutCaptureEntry);
   appendOperatorStepList(lines, "- Operator steps:", plan.operatorSteps || []);
   if (Array.isArray(plan.sourceWatchRecords) && plan.sourceWatchRecords.length) {
     lines.push("- Source watch records:");
@@ -8771,6 +8839,11 @@ function renderStagingLaunchDutyArchiveIndex(index) {
     lines.push(`- Archive first-wave closeout receipt operations: ${(gate.receiptOperations || []).join(", ") || "-"}`);
     lines.push(`- Archive first-wave closeout expected evidence: ${gate.expectedEvidence || "-"}`);
   }
+  appendFirstWaveCloseoutCaptureEntry(lines, stabilization.firstWaveCloseoutCaptureEntry || null, {
+    entryLabel: "Archive first-wave closeout capture entry",
+    receiptLabel: "Archive first-wave closeout capture receipts",
+    sourceLabel: "Archive first-wave closeout capture sources"
+  });
   lines.push(`- Required stabilization evidence: ${(stabilization.requiredEvidenceKeys || []).join(", ") || "-"}`);
   lines.push(`- Next action: ${index.nextAction || "-"}`);
   return lines.join("\n");

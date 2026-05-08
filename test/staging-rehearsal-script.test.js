@@ -1010,6 +1010,39 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     ],
     nextAction: "Start launch-day watch and stabilization handoff before first-wave closeout."
   });
+  assert.deepEqual(output.stabilizationHandoffPlan.firstWaveCloseoutExecutionEntry, {
+    mode: "first-wave-closeout-execution-entry",
+    status: "blocked_until_stabilization_owner_handoff",
+    willModifyData: false,
+    currentActionKey: "verify_cutover_watch_records",
+    currentCommand: null,
+    closeoutTarget: {
+      key: "first_wave_closeout",
+      status: "blocked_until_stabilization_owner_handoff",
+      path: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md",
+      ownerHandoffPath: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
+      requiredSourceRecordKeys: [
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff"
+      ],
+      expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp."
+    },
+    sourceRecordQueue: [
+      { key: "first_wave_incident_log", status: "blocked_until_production_signoff", path: "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md" },
+      { key: "rollback_signal_review", status: "blocked_until_production_signoff", path: "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md" },
+      { key: "stabilization_owner_handoff", status: "blocked_until_production_signoff", path: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md" }
+    ],
+    receiptQueue: [
+      {
+        key: "first_wave_closeout",
+        operation: "record_launch_closeout_review",
+        status: "blocked_until_stabilization_handoff",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md"
+      }
+    ],
+    nextAction: "Start launch-day watch and stabilization handoff before first-wave closeout."
+  });
   assert.equal(output.stabilizationHandoffPlan.handoffExecutionEntry.nextAction, "Complete launch-day watch records before handing off stabilization owner.");
   assert.deepEqual(output.stabilizationHandoffPlan.requiredWatchWindows, [
     "cutover_watch",
@@ -1577,7 +1610,8 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
       expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp.",
       nextAction: "Start launch-day watch and stabilization handoff before first-wave closeout."
     },
-    firstWaveCloseoutCaptureEntry: output.stabilizationHandoffPlan.firstWaveCloseoutCaptureEntry
+    firstWaveCloseoutCaptureEntry: output.stabilizationHandoffPlan.firstWaveCloseoutCaptureEntry,
+    firstWaveCloseoutExecutionEntry: output.stabilizationHandoffPlan.firstWaveCloseoutExecutionEntry
   });
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingLaunchDutyArchiveIndex.commands.fullTestWindow, "npm.cmd test");
@@ -5113,6 +5147,39 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       ],
       nextAction: "Record first-wave closeout decision, unresolved incidents, customer impact, next-duty owner, and receipt ID."
     });
+    assert.deepEqual(output.stabilizationHandoffPlan.firstWaveCloseoutExecutionEntry, {
+      mode: "first-wave-closeout-execution-entry",
+      status: "awaiting_first_wave_closeout",
+      willModifyData: false,
+      currentActionKey: "close_first_wave",
+      currentCommand: null,
+      closeoutTarget: {
+        key: "first_wave_closeout",
+        status: "operator_closeout",
+        path: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md",
+        ownerHandoffPath: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
+        requiredSourceRecordKeys: [
+          "first_wave_incident_log",
+          "rollback_signal_review",
+          "stabilization_owner_handoff"
+        ],
+        expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp."
+      },
+      sourceRecordQueue: [
+        { key: "first_wave_incident_log", status: "pending_operator_entry", path: "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md" },
+        { key: "rollback_signal_review", status: "pending_operator_entry", path: "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md" },
+        { key: "stabilization_owner_handoff", status: "pending_operator_entry", path: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md" }
+      ],
+      receiptQueue: [
+        {
+          key: "first_wave_closeout",
+          operation: "record_launch_closeout_review",
+          status: "pending_operator_receipt",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md"
+        }
+      ],
+      nextAction: "Record first-wave closeout decision, unresolved incidents, customer impact, next-duty owner, and receipt ID."
+    });
     assert.deepEqual(
       output.stagingLaunchDutyArchiveIndex.stabilizationHandoff.firstWaveCloseoutGate,
       output.stabilizationHandoffPlan.firstWaveCloseoutGate
@@ -5120,6 +5187,10 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     assert.deepEqual(
       output.stagingLaunchDutyArchiveIndex.stabilizationHandoff.firstWaveCloseoutCaptureEntry,
       output.stabilizationHandoffPlan.firstWaveCloseoutCaptureEntry
+    );
+    assert.deepEqual(
+      output.stagingLaunchDutyArchiveIndex.stabilizationHandoff.firstWaveCloseoutExecutionEntry,
+      output.stabilizationHandoffPlan.firstWaveCloseoutExecutionEntry
     );
     assert.equal(output.stabilizationHandoffPlan.currentHandoffTarget.key, "stabilization_owner_handoff");
     assert.equal(output.stabilizationHandoffPlan.currentHandoffTarget.status, "operator_handoff");
@@ -5158,7 +5229,15 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
     );
     assert.match(
       handoff,
+      /First-wave closeout execution entry: awaiting_first_wave_closeout \(action=close_first_wave, target=first_wave_closeout\)[\s\S]*First-wave closeout execution sources: first_wave_incident_log=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-incident-log\.md; rollback_signal_review=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md; stabilization_owner_handoff=pending_operator_entry -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md[\s\S]*First-wave closeout execution receipts: first_wave_closeout=record_launch_closeout_review:pending_operator_receipt/
+    );
+    assert.match(
+      handoff,
       /Archive first-wave closeout capture entry: operator_closeout \(action=close_first_wave\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md[\s\S]*Archive first-wave closeout capture receipts: record_launch_closeout_review:pending_operator_receipt/
+    );
+    assert.match(
+      handoff,
+      /Archive first-wave closeout execution entry: awaiting_first_wave_closeout \(action=close_first_wave, target=first_wave_closeout\)[\s\S]*Archive first-wave closeout execution receipts: first_wave_closeout=record_launch_closeout_review:pending_operator_receipt/
     );
     assert.match(
       handoff,

@@ -107,6 +107,7 @@ const PROFILE_OPTION_FLAGS = {
   productionSignoffPacketFile: "--production-signoff-packet-file",
   launchDutyArchiveIndexFile: "--launch-duty-archive-index-file",
   filledCloseoutDraftFile: "--filled-closeout-draft-file",
+  readinessActionQueueFile: "--readiness-action-queue-file",
   closeoutInputFile: "--closeout-input-file"
 };
 
@@ -234,6 +235,7 @@ function parseArgs(argv) {
     productionSignoffPacketFile: null,
     launchDutyArchiveIndexFile: null,
     filledCloseoutDraftFile: null,
+    readinessActionQueueFile: null,
     closeoutInputFile: null,
     profileFile: null
   };
@@ -291,6 +293,8 @@ function parseArgs(argv) {
       options.launchDutyArchiveIndexFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--filled-closeout-draft-file") {
       options.filledCloseoutDraftFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--readiness-action-queue-file") {
+      options.readinessActionQueueFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--closeout-input-file") {
       options.closeoutInputFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--profile-file") {
@@ -346,6 +350,7 @@ function parseArgs(argv) {
     productionSignoffPacketFile: resolveProfileOption(options.productionSignoffPacketFile, "RSL_REHEARSAL_PRODUCTION_SIGNOFF_PACKET_FILE", stagingProfile, "productionSignoffPacketFile"),
     launchDutyArchiveIndexFile: resolveProfileOption(options.launchDutyArchiveIndexFile, "RSL_REHEARSAL_LAUNCH_DUTY_ARCHIVE_INDEX_FILE", stagingProfile, "launchDutyArchiveIndexFile"),
     filledCloseoutDraftFile: resolveProfileOption(options.filledCloseoutDraftFile, "RSL_REHEARSAL_FILLED_CLOSEOUT_DRAFT_FILE", stagingProfile, "filledCloseoutDraftFile"),
+    readinessActionQueueFile: resolveProfileOption(options.readinessActionQueueFile, "RSL_REHEARSAL_READINESS_ACTION_QUEUE_FILE", stagingProfile, "readinessActionQueueFile"),
     closeoutInputFile: resolveProfileOption(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE", stagingProfile, "closeoutInputFile")
   };
 }
@@ -6098,6 +6103,7 @@ function buildStagingEnvironmentBinding(result, options = {}) {
   const filledCloseoutDraftPath = result.filledCloseoutDraftFile?.path
     || result.filledCloseoutInputDraft?.saveAs
     || path.posix.join(archiveRoot, "filled-closeout-input.draft.json");
+  const readinessActionQueuePath = options.readinessActionQueueFile || path.posix.join(archiveRoot, "readiness-action-queue.md");
   const filledExamplePath = result.filledCloseoutInputExample?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.example.json");
   const environment = {
     baseUrl: result.summary?.baseUrl || options.baseUrl || null,
@@ -6159,7 +6165,9 @@ function buildStagingEnvironmentBinding(result, options = {}) {
     "--launch-duty-archive-index-file",
     launchDutyArchiveIndexPath,
     "--filled-closeout-draft-file",
-    filledCloseoutDraftPath
+    filledCloseoutDraftPath,
+    "--readiness-action-queue-file",
+    readinessActionQueuePath
   ].filter((part) => part !== null && part !== undefined && String(part) !== "");
   return {
     status: "ready_for_real_staging_binding",
@@ -6225,6 +6233,11 @@ function buildStagingEnvironmentBinding(result, options = {}) {
         key: "filled_closeout_draft",
         path: filledCloseoutDraftPath,
         status: result.filledCloseoutDraftFile ? fileOutputStatus(result.filledCloseoutDraftFile) : "example_only"
+      },
+      {
+        key: "readiness_action_queue",
+        path: readinessActionQueuePath,
+        status: "operator_generate"
       },
       {
         key: "filled_closeout_input_example",
@@ -6740,6 +6753,7 @@ function buildFinalRehearsalPacket(result) {
       result.filledCloseoutInputDraft?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.draft.json"),
       "example_only"
     ),
+    finalLocalFile("readiness_action_queue", null, path.posix.join(archiveRoot, "readiness-action-queue.md"), "operator_generate"),
     finalLocalFile("filled_closeout_input_example", null, filledExample.saveAs || null, "example_only"),
     finalLocalFile("artifact_archive_root", null, archiveRoot, "operator_archive")
   ];

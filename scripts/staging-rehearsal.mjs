@@ -4449,6 +4449,40 @@ function buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch = false, 
   };
 }
 
+function buildLaunchDayWatchExecutionEntry({
+  canStartCutoverWatch = false,
+  watchRecordDraft = {},
+  nextAction = null
+} = {}) {
+  const records = Array.isArray(watchRecordDraft.records) ? watchRecordDraft.records : [];
+  const currentRecord = records.find((record) => record?.key === "launch_day_watch_summary")
+    || findLaunchDutyFocusItem(records)
+    || null;
+  const stabilizationRecord = records.find((record) => record?.key === "stabilization_owner_handoff") || null;
+  return {
+    mode: "launch-day-watch-execution-entry",
+    status: canStartCutoverWatch ? "ready_for_operator_watch" : "blocked_until_production_signoff",
+    willModifyData: false,
+    currentActionKey: canStartCutoverWatch ? "record_launch_day_watch_summary" : "complete_production_signoff",
+    currentRecord: currentRecord ? {
+      key: currentRecord.key || null,
+      status: currentRecord.status || null,
+      path: currentRecord.artifactPath || currentRecord.path || null,
+      receiptOperations: Array.isArray(currentRecord.receiptOperations) ? currentRecord.receiptOperations : [],
+      expectedEvidence: currentRecord.expectedEvidence || null
+    } : null,
+    stabilizationTarget: stabilizationRecord ? {
+      key: stabilizationRecord.key || null,
+      status: stabilizationRecord.status || null,
+      path: stabilizationRecord.artifactPath || stabilizationRecord.path || null,
+      receiptOperations: Array.isArray(stabilizationRecord.receiptOperations) ? stabilizationRecord.receiptOperations : []
+    } : null,
+    nextAction: canStartCutoverWatch
+      ? "Record launch-day watch summary, receipt visibility snapshot, incidents, rollback review, and stabilization owner handoff."
+      : (nextAction || "Complete production sign-off before starting launch-day watch records.")
+  };
+}
+
 function buildLaunchDayWatchPlan(result) {
   const readiness = result.productionSignoffReadiness || buildProductionSignoffReadiness(result);
   const canStartCutoverWatch = readiness?.canSignoff === true;
@@ -4460,6 +4494,14 @@ function buildLaunchDayWatchPlan(result) {
     launchOpsOverviewStatus: result.nextCommands?.receiptVisibilitySummaries?.launchOpsOverviewStatus || null
   };
   const watchRecordDraft = buildLaunchDayWatchRecordDraft(result, { canStartCutoverWatch, routes });
+  const planNextAction = canStartCutoverWatch
+    ? "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility open."
+    : "Do not start launch-day watch until production sign-off readiness is ready.";
+  const watchExecutionEntry = buildLaunchDayWatchExecutionEntry({
+    canStartCutoverWatch,
+    watchRecordDraft,
+    nextAction: "Complete production sign-off before starting launch-day watch records."
+  });
   return {
     status: canStartCutoverWatch ? "ready" : "blocked",
     canStartCutoverWatch,
@@ -4474,6 +4516,7 @@ function buildLaunchDayWatchPlan(result) {
     missingReceiptVisibilityKeys: readiness?.missingReceiptVisibilityKeys || [],
     routes,
     watchRecordDraft,
+    watchExecutionEntry,
     watchWindows: [
       {
         key: "cutover_watch",
@@ -4495,9 +4538,7 @@ function buildLaunchDayWatchPlan(result) {
       "developer_ops_receipt_mismatch",
       "backup_restore_or_rollback_unclear"
     ],
-    nextAction: canStartCutoverWatch
-      ? "Start launch-day watch with Launch Mainline, Developer Ops, Launch Review, Launch Smoke, and Launch Ops Overview Status receipt visibility open."
-      : "Do not start launch-day watch until production sign-off readiness is ready."
+    nextAction: planNextAction
   };
 }
 
@@ -7749,6 +7790,7 @@ function renderLaunchDayWatchPlan(plan) {
   const routes = plan.routes || {};
   const watchWindows = Array.isArray(plan.watchWindows) ? plan.watchWindows : [];
   const watchRecordDraft = plan.watchRecordDraft || {};
+  const watchExecutionEntry = plan.watchExecutionEntry || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Can start cutover watch: ${plan.canStartCutoverWatch ? "yes" : "no"}`,
@@ -7766,6 +7808,10 @@ function renderLaunchDayWatchPlan(plan) {
     `- Watch draft loaded closeout input: ${watchRecordDraft.loadedCloseoutInputPath || "-"}`,
     `- Watch draft archive closeout input: ${watchRecordDraft.archiveCloseoutInputPath || "-"}`,
     `- Watch draft next action: ${watchRecordDraft.nextAction || "-"}`,
+    `- Launch-day watch execution entry: ${watchExecutionEntry.status || "-"} (action=${watchExecutionEntry.currentActionKey || "-"}, record=${watchExecutionEntry.currentRecord?.key || "-"})`,
+    `- Launch-day watch execution current record: ${watchExecutionEntry.currentRecord?.key || "-"} -> ${watchExecutionEntry.currentRecord?.path || "-"}`,
+    `- Launch-day watch execution stabilization target: ${watchExecutionEntry.stabilizationTarget?.key || "-"} -> ${watchExecutionEntry.stabilizationTarget?.path || "-"}`,
+    `- Launch-day watch execution next action: ${watchExecutionEntry.nextAction || "-"}`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,

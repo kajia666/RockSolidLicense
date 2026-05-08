@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const REQUIRED_CLOSEOUT_KEYS = [
@@ -31,7 +31,8 @@ const RECEIPT_VISIBILITY_KEYS = [
 ];
 
 const OPTION_FLAGS = {
-  "--input-file": "inputFile"
+  "--input-file": "inputFile",
+  "--actions-file": "actionsFile"
 };
 
 function requireArgValue(name, value, inlineValue) {
@@ -249,6 +250,49 @@ function buildActionQueue({
   ];
 }
 
+function buildActionsFileSummary(actionsFile, actionQueue) {
+  return {
+    path: actionsFile,
+    status: "written",
+    itemCount: actionQueue.length,
+    currentCount: actionQueue.filter((item) => item.status === "current").length,
+    nextAction: "Open the action file, complete the current item, then rerun staging:readiness:status."
+  };
+}
+
+function renderActionTarget(targetKey) {
+  return targetKey ? `\`${targetKey}\`` : "`none`";
+}
+
+function renderActionQueueMarkdown(result) {
+  const lines = [
+    "# Staging Readiness Action Queue",
+    "",
+    `Input file: \`${result.inputFile}\``,
+    `Current gate: \`${result.readiness.currentGate}\``,
+    `Launch status: \`${result.readiness.launchStatus}\``,
+    "",
+    "Complete only `[current]` items first. Items marked `[blocked_after_prior_actions]` become safe after the earlier items are backfilled and the status command is rerun.",
+    ""
+  ];
+
+  for (const [index, item] of result.actionQueue.entries()) {
+    lines.push(`${index + 1}. [${item.status}] \`${item.phase}\` -> ${renderActionTarget(item.targetKey)}`);
+    lines.push(`   Key: \`${item.key}\``);
+    lines.push(`   Command: \`${item.command}\``);
+    if (item.followUpCommand) {
+      lines.push(`   Follow-up: \`${item.followUpCommand}\``);
+    }
+    if (item.statusCommand) {
+      lines.push(`   Status check: \`${item.statusCommand}\``);
+    }
+    lines.push("");
+  }
+
+  lines.push("Next action: complete the current item, rerun the status command, then regenerate this action file if the gate changes.");
+  return `${lines.join("\n")}\n`;
+}
+
 function buildNextStep({
   inputFile,
   missingCloseoutKeys,
@@ -435,6 +479,17 @@ function buildStatus(payload, inputFile) {
   };
 }
 
+function writeActionsFile(result, actionsFile) {
+  const resolvedActionsFile = path.resolve(actionsFile);
+  const nextResult = {
+    ...result,
+    actionsFile: buildActionsFileSummary(resolvedActionsFile, result.actionQueue)
+  };
+  mkdirSync(path.dirname(resolvedActionsFile), { recursive: true });
+  writeFileSync(resolvedActionsFile, renderActionQueueMarkdown(nextResult), "utf8");
+  return nextResult;
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -444,6 +499,9 @@ function writeResult(result, json) {
     console.log(`Current gate: ${result.readiness.currentGate}`);
     console.log(`Next step: ${result.nextStep.key}`);
     console.log(result.nextStep.command);
+    if (result.actionsFile) {
+      console.log(`Action file: ${result.actionsFile.path}`);
+    }
     return;
   }
   console.log(`Staging readiness status failed: ${result.error.message}`);
@@ -455,7 +513,8 @@ function main() {
     const options = parseArgs(process.argv.slice(2));
     const inputFile = path.resolve(options.inputFile);
     const payload = JSON.parse(readFileSync(inputFile, "utf8"));
-    writeResult(buildStatus(payload, inputFile), options.json);
+    const result = buildStatus(payload, inputFile);
+    writeResult(options.actionsFile ? writeActionsFile(result, options.actionsFile) : result, options.json);
   } catch (error) {
     writeResult({
       status: "fail",

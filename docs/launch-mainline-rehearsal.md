@@ -99,7 +99,15 @@ npm.cmd run staging:readiness:status -- --json `
   --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json
 ```
 
-Use this after each closeout or sign-off backfill. It is read-only: it reports whether the current gate is `pre_full_test_closeout`, `full_test_window`, `production_signoff`, or `launch_day_watch`, lists the remaining closeout/sign-off/receipt visibility keys, prints the next `staging:closeout:backfill`, `npm.cmd test`, `staging:signoff:backfill`, or `staging:rehearsal --closeout-input-file` command, and includes an `actionQueue` with the remaining local commands for the current launch gate.
+When launch duty needs a handoff checklist instead of raw JSON, add `--actions-file`:
+
+```powershell
+npm.cmd run staging:readiness:status -- --json `
+  --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --actions-file .\artifacts\staging\SMOKE_ALPHA\stable\readiness-action-queue.md
+```
+
+Use this after each closeout or sign-off backfill. It is read-only: it reports whether the current gate is `pre_full_test_closeout`, `full_test_window`, `production_signoff`, or `launch_day_watch`, lists the remaining closeout/sign-off/receipt visibility keys, prints the next `staging:closeout:backfill`, `npm.cmd test`, `staging:signoff:backfill`, or `staging:rehearsal --closeout-input-file` command, includes an `actionQueue` with the remaining local commands for the current launch gate, and can write a redacted Markdown action queue that marks the current executable item separately from blocked follow-up items.
 
 After the full-test window completes, use `staging:signoff:backfill` to attach production sign-off evidence without hand-editing `productionSignoff.conditions`, `productionSignoff.decision`, or receipt visibility lanes:
 

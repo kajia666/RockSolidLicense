@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -218,6 +218,47 @@ test("staging readiness status reports signoff and receipt visibility gaps befor
       output.actionQueue.at(-1).command,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane launchOpsOverviewStatus --value-json <redacted-json>`
     );
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging readiness status can write a redacted markdown action queue", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-actions-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "handoff", "readiness-action-queue.md");
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: closeoutKeys,
+      decision: "ready-for-full-test-window",
+      productionDecision: "ready-for-production-signoff",
+      filledSignoffKeys: ["full_test_window_passed"],
+      visibleReceiptLanes: ["launchMainline"]
+    });
+
+    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.equal(existsSync(actionsFile), true);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.actionsFile, {
+      path: actionsFile,
+      status: "written",
+      itemCount: 10,
+      currentCount: 1,
+      nextAction: "Open the action file, complete the current item, then rerun staging:readiness:status."
+    });
+    const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /^# Staging Readiness Action Queue/m);
+    assert.match(markdown, /Input file: `.*filled-closeout-input\.json`/);
+    assert.match(markdown, /Current gate: `production_signoff`/);
+    assert.match(markdown, /Launch status: `blocked`/);
+    assert.match(markdown, /1\. \[current\] `production_signoff` -> `staging_artifacts_archived`/);
+    assert.match(markdown, /Command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --condition-key staging_artifacts_archived --value-json <redacted-json>`/);
+    assert.match(markdown, /10\. \[blocked_after_prior_actions\] `receipt_visibility` -> `launchOpsOverviewStatus`/);
+    assert.match(markdown, /Status check: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json`/);
+    assert.doesNotMatch(markdown, /StrongAdmin|StrongDeveloper|Bearer|password/i);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

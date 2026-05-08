@@ -506,6 +506,35 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     output.stagingBackupRestoreDrillPacket.expectedEvidence,
     "Record backup artifact path, restore dry-run result, and post-restore healthcheck result."
   );
+  assert.deepEqual(output.stagingBackupRestoreDrillPacket.resultCaptureEntry, {
+    mode: "backup-restore-result-capture-entry",
+    status: "awaiting_backup_restore_result",
+    willModifyData: false,
+    currentActionKey: "run_backup_restore_drill",
+    currentCommand: output.nextCommands.recovery.restoreDrillReminder,
+    commandKeys: [
+      "appBackup",
+      "postgresBackup",
+      "postgresRestoreDryRun",
+      "restoreDrillReminder",
+      "healthcheck"
+    ],
+    resultBackfillTarget: {
+      key: "backup_restore_drill_result",
+      status: "pending_operator_result",
+      closeoutInputPath: "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt",
+      sourceStep: "run_backup_restore_drill",
+      receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+      reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json",
+      expectedEvidence: "Record backup artifact path, restore dry-run result, and post-restore healthcheck result."
+    },
+    receiptTargets: [
+      { operation: "record_recovery_drill", status: "pending_operator_receipt" },
+      { operation: "record_backup_verification", status: "pending_operator_receipt" }
+    ],
+    nextAction: "Run backup/restore drill, record recovery and backup verification receipts, backfill backup_restore_drill_result, then reload closeout input."
+  });
   assert.deepEqual(output.stagingBackupRestoreDrillPacket.commandKeys, [
     "appBackup",
     "postgresBackup",
@@ -2958,6 +2987,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Missing receipt visibility keys: launchMainline, launchReview, launchSmoke, developerOps, launchOpsOverviewStatus/);
     assert.match(handoff, /## Production Sign-Off Readiness[\s\S]*Sign-off evidence targets:[\s\S]*full_test_window_passed: missing[\s\S]*expectedEvidence: Attach the full `npm\.cmd test` output summary and failure count\.[\s\S]*operator_signoff_recorded: missing[\s\S]*expectedEvidence: Record operator, timestamp, decision, and reason in the go\/no-go artifact\.[\s\S]*Receipt visibility evidence targets:[\s\S]*launchOpsOverviewStatus: missing[\s\S]*expectedEvidence: Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover\.[\s\S]*## Staging Backup \/ Restore Drill Packet/);
     assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Expected evidence: Record backup artifact path, restore dry-run result, and post-restore healthcheck result\.[\s\S]*Operator steps:[\s\S]*run_app_backup: operator_execute[\s\S]*expectedEvidence: Capture app backup command exit status and backup artifact path\.[\s\S]*run_postgres_restore_dry_run: operator_execute[\s\S]*expectedEvidence: Capture restore dry-run exit status and separate restore-target healthcheck result\.[\s\S]*record_backup_verification_receipt: operator_execute[\s\S]*expectedEvidence: Record the backup verification receipt ID for the app\/Postgres backup artifacts\.[\s\S]*backfill_closeout_key: operator_backfill[\s\S]*expectedEvidence: Backfill backup_restore_drill_result with the backup artifact path, restore dry-run result, healthcheck result, and receipt IDs\.[\s\S]*## Staging Closeout Reload Packet/);
+    assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Backup\/restore result capture entry: awaiting_backup_restore_result \(action=run_backup_restore_drill, target=backup_restore_drill_result\)[\s\S]*Backup\/restore result backfill: pending_operator_result -> artifacts\/staging\/PILOT_ALPHA\/stable\/backup-restore-drill\.txt \(closeout=artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json\)[\s\S]*Backup\/restore result receipts: record_recovery_drill:pending_operator_receipt, record_backup_verification:pending_operator_receipt[\s\S]*Backup\/restore result reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`[\s\S]*## Staging Closeout Reload Packet/);
     assert.match(handoff, /## Staging Backup \/ Restore Drill Packet[\s\S]*Go-live execution entry: awaiting_closeout_backfill \(phase=full_test_window_entry, source=closeoutBackfillFocus, action=route_map_gate_result\)[\s\S]*## Staging Closeout Reload Packet/);
     assert.match(handoff, /## Staging Closeout Reload Packet[\s\S]*Backup\/restore gate: blocked \(packet=awaiting_backup_restore_drill, closeoutKey=backup_restore_drill_result\)[\s\S]*Backup\/restore next action: Backfill backup_restore_drill_result before treating closeout reload as full-test ready\.[\s\S]*## Staging Readiness Review Packet/);
     assert.match(handoff, /## Staging Production Sign-Off Packet/);
@@ -3538,6 +3568,35 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
       "ready"
     );
     assert.equal(output.stagingBackupRestoreDrillPacket.nextAction, "Backup/restore evidence is backfilled; reload closeout input and review full-test readiness.");
+    assert.deepEqual(output.stagingBackupRestoreDrillPacket.resultCaptureEntry, {
+      mode: "backup-restore-result-capture-entry",
+      status: "ready_for_closeout_reload",
+      willModifyData: false,
+      currentActionKey: "reload_closeout_input",
+      currentCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      commandKeys: [
+        "appBackup",
+        "postgresBackup",
+        "postgresRestoreDryRun",
+        "restoreDrillReminder",
+        "healthcheck"
+      ],
+      resultBackfillTarget: {
+        key: "backup_restore_drill_result",
+        status: "filled",
+        closeoutInputPath: closeoutInputFile,
+        artifactPath: "artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt",
+        sourceStep: "run_backup_restore_drill",
+        receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+        reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+        expectedEvidence: "Record backup artifact path, restore dry-run result, and post-restore healthcheck result."
+      },
+      receiptTargets: [
+        { operation: "record_recovery_drill", status: "recorded_or_attached" },
+        { operation: "record_backup_verification", status: "recorded_or_attached" }
+      ],
+      nextAction: "Reload closeout input and continue full-test readiness review."
+    });
     assert.deepEqual(output.stagingCloseoutReloadPacket.backupRestoreGate, {
       status: "ready",
       packetStatus: "backfilled_for_closeout_reload",

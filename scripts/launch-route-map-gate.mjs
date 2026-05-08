@@ -102,6 +102,18 @@ const commands = [
     ]
   },
   {
+    key: "staging_closeout_backfill_script",
+    label: "Staging closeout backfill handoff continuity",
+    command: "node",
+    executable: process.execPath,
+    args: [
+      "--test",
+      "--test-concurrency=1",
+      "--test-isolation=none",
+      "test/staging-closeout-backfill-script.test.js"
+    ]
+  },
+  {
     key: "staging_rehearsal_syntax_check",
     label: "Staging rehearsal script syntax check",
     command: "node",

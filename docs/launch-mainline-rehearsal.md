@@ -79,6 +79,19 @@ npm.cmd run staging:closeout:init -- --json `
 
 This command removes the `exampleOnly` guard so the file can be loaded by `staging:rehearsal --closeout-input-file`, but it keeps every evidence value empty. The reload must still report missing fields until real route-map, backup/restore, live-write smoke, receipt visibility, and operator go/no-go evidence are backfilled.
 
+Backfill each real evidence item with `staging:closeout:backfill` as the artifacts and receipt IDs become available:
+
+```powershell
+npm.cmd run staging:closeout:backfill -- --json `
+  --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --key route_map_gate_result `
+  --value-json '{"result":"pass","exitCode":0}' `
+  --artifact-path artifacts/staging/SMOKE_ALPHA/stable/route-map-gate-output.txt `
+  --receipt-id receipt-route-map-001
+```
+
+Repeat that command for the remaining closeout keys, then reload with `staging:rehearsal --closeout-input-file` to check whether the full-test window is actually ready.
+
 For a staging API rehearsal, run the no-write rehearsal runner before the live-write smoke step:
 
 ```powershell

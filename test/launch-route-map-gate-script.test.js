@@ -35,6 +35,7 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
       "launch_smoke_script",
       "staging_profile_init_script",
       "staging_closeout_init_script",
+      "staging_closeout_backfill_script",
       "staging_rehearsal_syntax_check",
       "staging_rehearsal_script",
       "services_syntax_check",
@@ -58,6 +59,15 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
   assert.equal(
     stagingCloseoutInitCommand.commandLine,
     "node --test --test-concurrency=1 --test-isolation=none test/staging-closeout-init-script.test.js"
+  );
+
+  const stagingCloseoutBackfillCommand = output.commands.find(
+    (command) => command.key === "staging_closeout_backfill_script"
+  );
+  assert.ok(stagingCloseoutBackfillCommand);
+  assert.equal(
+    stagingCloseoutBackfillCommand.commandLine,
+    "node --test --test-concurrency=1 --test-isolation=none test/staging-closeout-backfill-script.test.js"
   );
 
   const stagingSyntaxCommand = output.commands.find(

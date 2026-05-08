@@ -78,6 +78,20 @@ function buildEvidenceValue(options) {
   return value;
 }
 
+function extractDecisionValue(value) {
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    for (const key of ["decision", "value"]) {
+      if (typeof value[key] === "string" && value[key].trim()) {
+        return value[key].trim();
+      }
+    }
+  }
+  return null;
+}
+
 function backfill(payload, options) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error("closeout input must be a JSON object.");
@@ -97,8 +111,10 @@ function backfill(payload, options) {
       receiptIds: options.receiptIds
     }
     : field);
+  const decision = options.key === "operator_go_no_go" ? extractDecisionValue(value) : null;
   return {
     ...payload,
+    decision: decision || payload.decision || null,
     acceptanceFields: nextFields
   };
 }

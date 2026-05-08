@@ -6792,6 +6792,20 @@ function buildFinalRehearsalPacket(result) {
   };
 }
 
+function extractDecisionValue(value) {
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    for (const key of ["decision", "value"]) {
+      if (typeof value[key] === "string" && value[key].trim()) {
+        return value[key].trim();
+      }
+    }
+  }
+  return null;
+}
+
 function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   if (!closeoutInputFile) {
     return null;
@@ -6811,9 +6825,10 @@ function buildCloseoutInput(closeoutInputFile, closeout = {}) {
   const filledKeys = requiredKeys.filter((key) => isFilledCloseoutField(fieldsByKey.get(key)));
   const missingKeys = requiredKeys.filter((key) => !filledKeys.includes(key));
   const goNoGoField = fieldsByKey.get("operator_go_no_go");
-  const decision = typeof goNoGoField?.value === "string"
-    ? goNoGoField.value
-    : payload.decision || closeout.decision || null;
+  const decision = extractDecisionValue(goNoGoField?.value)
+    || extractDecisionValue(payload.decision)
+    || closeout.decision
+    || null;
   const signoffConditions = Array.isArray(payload.productionSignoff?.conditions)
     ? payload.productionSignoff.conditions
     : [];

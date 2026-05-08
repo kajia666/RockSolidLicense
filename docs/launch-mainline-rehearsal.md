@@ -92,6 +92,16 @@ npm.cmd run staging:closeout:backfill -- --json `
 
 The JSON output includes both the compatible `nextCommand` rehearsal reload and a shorter `statusCommand`. Prefer running `statusCommand` after each backfill so the next closeout, full-test, sign-off, or receipt visibility action is selected from the current file state.
 
+For the final closeout decision, write `operator_go_no_go` as object evidence so the same record carries the decision, operator, timestamp, and redacted summary. `staging:closeout:backfill`, `staging:readiness:status`, and `staging:rehearsal --closeout-input-file` all treat the object `decision` as the full-test-window gate:
+
+```powershell
+npm.cmd run staging:closeout:backfill -- --json `
+  --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --key operator_go_no_go `
+  --value-json '{"decision":"ready-for-full-test-window","operator":"launch-duty","timestamp":"2026-05-08T10:00:00+08:00","summary":"redacted go/no-go approval"}' `
+  --artifact-path artifacts/staging/SMOKE_ALPHA/stable/operator-go-no-go.md
+```
+
 At any point after `filled-closeout-input.json` exists, ask the local status command for the current gate and next command:
 
 ```powershell
@@ -107,7 +117,7 @@ npm.cmd run staging:readiness:status -- --json `
   --actions-file .\artifacts\staging\SMOKE_ALPHA\stable\readiness-action-queue.md
 ```
 
-Use this after each closeout or sign-off backfill. It is read-only: it reports whether the current gate is `pre_full_test_closeout`, `full_test_window`, `production_signoff`, or `launch_day_watch`, lists the remaining closeout/sign-off/receipt visibility keys, prints the next `staging:closeout:backfill`, `npm.cmd test`, `staging:signoff:backfill`, or `staging:rehearsal --closeout-input-file` command, includes an `actionQueue` with the remaining local commands for the current launch gate, and can write a redacted Markdown action queue that marks the current executable item separately from blocked follow-up items.
+Use this after each closeout or sign-off backfill. It is read-only: it reports whether the current gate is `pre_full_test_closeout`, `full_test_window`, `production_signoff`, or `launch_day_watch`, lists the remaining closeout/sign-off/receipt visibility keys, prints the next `staging:closeout:backfill`, `npm.cmd test`, `staging:signoff:backfill`, or `staging:rehearsal --closeout-input-file` command, includes an `actionQueue` with the remaining local commands for the current launch gate, and can write a redacted Markdown action queue that marks the current executable item separately from blocked follow-up items. Each backfill row also includes expected evidence, a redacted `valueJsonExample`, artifact path hints, receipt operations, and receipt ID guidance so launch duty does not have to cross-read the full rehearsal packet before filling the next key.
 
 After the full-test window completes, use `staging:signoff:backfill` to attach production sign-off evidence without hand-editing `productionSignoff.conditions`, `productionSignoff.decision`, or receipt visibility lanes:
 

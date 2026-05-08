@@ -30,6 +30,174 @@ const RECEIPT_VISIBILITY_KEYS = [
   "launchOpsOverviewStatus"
 ];
 
+const CLOSEOUT_EVIDENCE = {
+  route_map_gate_result: {
+    expectedEvidence: "Record the targeted gate exit status, pass count, and redacted output artifact path.",
+    valueJsonExample: {
+      result: "pass",
+      exitCode: 0,
+      summary: "<redacted route-map gate summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/route-map-gate-output.txt",
+    receiptOperations: []
+  },
+  backup_restore_drill_result: {
+    expectedEvidence: "Record backup artifact path, restore dry-run result, and post-restore healthcheck result.",
+    valueJsonExample: {
+      result: "pass",
+      restoreDryRun: "pass",
+      healthcheck: "pass",
+      summary: "<redacted operator summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt",
+    receiptOperations: ["record_recovery_drill", "record_backup_verification"]
+  },
+  live_write_smoke_result: {
+    expectedEvidence: "Record smoke exit status, created test project/account/card identifiers, and the redacted smoke output artifact path.",
+    valueJsonExample: {
+      result: "pass",
+      createdProject: "<redacted project id>",
+      createdCardBatch: "<redacted card batch id>",
+      summary: "<redacted smoke summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/live-write-smoke-output.json",
+    receiptOperations: ["record_launch_rehearsal_run"]
+  },
+  launch_smoke_handoff: {
+    expectedEvidence: "Save the launch smoke handoff JSON or Markdown path with passwords and bearer tokens redacted.",
+    valueJsonExample: {
+      result: "archived",
+      handoffPath: "<redacted handoff path>",
+      summary: "<redacted operator summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/launch-smoke-handoff.json",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  launch_mainline_evidence_receipts: {
+    expectedEvidence: "Record the Launch Mainline receipt IDs or handoff file names produced by each evidence action.",
+    valueJsonExample: {
+      result: "recorded",
+      receiptIds: ["<receipt-id>"],
+      summary: "<redacted receipt summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/launch-mainline-evidence-receipts.json",
+    receiptOperations: [
+      "record_launch_rehearsal_run",
+      "record_recovery_drill",
+      "record_backup_verification",
+      "record_operations_walkthrough",
+      "record_deploy_verification",
+      "record_health_verification",
+      "record_rollback_walkthrough",
+      "record_cutover_walkthrough",
+      "record_launch_day_readiness_review",
+      "record_post_launch_ops_sweep",
+      "record_launch_closeout_review",
+      "record_launch_stabilization_review"
+    ]
+  },
+  receipt_visibility_review: {
+    expectedEvidence: "Verify Launch Review, Launch Smoke, and Launch Ops Overview Status receipt-visibility summaries show the recorded first-wave receipt.",
+    valueJsonExample: {
+      result: "visible",
+      summaryPath: "<redacted receipt visibility summary path>",
+      summary: "<redacted operator summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/receipt-visibility-review.txt",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  operator_go_no_go: {
+    expectedEvidence: "Record ready-for-full-test-window, hold, or rollback-follow-up with the operator name and timestamp.",
+    valueJsonExample: {
+      decision: "ready-for-full-test-window",
+      operator: "<operator name>",
+      timestamp: "<ISO-8601 timestamp>",
+      summary: "<redacted go/no-go summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/operator-go-no-go.md",
+    receiptOperations: []
+  }
+};
+
+const SIGNOFF_EVIDENCE = {
+  full_test_window_passed: {
+    expectedEvidence: "Attach the full `npm.cmd test` output summary and failure count.",
+    valueJsonExample: {
+      result: "pass",
+      command: "npm.cmd test",
+      failureCount: 0,
+      summary: "<redacted test summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
+    receiptOperations: []
+  },
+  staging_artifacts_archived: {
+    expectedEvidence: "Confirm the artifact/receipt ledger archive paths exist and contain redacted artifacts.",
+    valueJsonExample: {
+      result: "confirmed",
+      summary: "<redacted operator summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt",
+    receiptOperations: [],
+    receiptIdHint: "Attach receipt IDs if your operating process records this sign-off in Launch Mainline."
+  },
+  launch_mainline_receipts_visible: {
+    expectedEvidence: "Confirm Launch Mainline, Launch Review, Launch Smoke, and Developer Ops show the latest receipts.",
+    valueJsonExample: {
+      result: "confirmed",
+      summary: "<redacted operator summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/launch-mainline-receipts-visible.json",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  launch_ops_overview_status_visible: {
+    expectedEvidence: "Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover.",
+    valueJsonExample: {
+      result: "confirmed",
+      summary: "<redacted operator summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/launch-ops-overview-status-visible.json",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  backup_restore_drill_passed: {
+    expectedEvidence: "Confirm the backup and restore drill passed on the intended staging storage profile.",
+    valueJsonExample: {
+      result: "pass",
+      summary: "<redacted backup/restore summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt",
+    receiptOperations: ["record_recovery_drill", "record_backup_verification"]
+  },
+  rollback_path_confirmed: {
+    expectedEvidence: "Confirm rollback walkthrough and recovery handoff are current before production cutover.",
+    valueJsonExample: {
+      result: "confirmed",
+      summary: "<redacted rollback summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/rollback-path-confirmed.md",
+    receiptOperations: ["record_rollback_walkthrough"]
+  },
+  operator_signoff_recorded: {
+    expectedEvidence: "Record operator, timestamp, decision, and reason in the go/no-go artifact.",
+    valueJsonExample: {
+      decision: "ready-for-production-signoff",
+      operator: "<operator name>",
+      timestamp: "<ISO-8601 timestamp>",
+      summary: "<redacted sign-off summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/operator-production-signoff.md",
+    receiptOperations: []
+  }
+};
+
+const RECEIPT_VISIBILITY_EVIDENCE = {
+  launchMainline: "Confirm Launch Mainline receipt visibility shows the latest staging evidence receipts before cutover.",
+  launchReview: "Confirm Launch Review summary download shows the latest staging evidence receipts before cutover.",
+  launchSmoke: "Confirm Launch Smoke summary download shows the latest staging evidence receipts before cutover.",
+  developerOps: "Confirm Developer Ops receipt visibility shows the latest staging evidence receipts before cutover.",
+  launchOpsOverviewStatus: "Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover."
+};
+
 const OPTION_FLAGS = {
   "--input-file": "inputFile",
   "--actions-file": "actionsFile"
@@ -115,6 +283,65 @@ function fieldsByKey(fields = []) {
   );
 }
 
+function receiptIdHint(receiptOperations) {
+  if (!receiptOperations.length) {
+    return "No Launch Mainline receipt is required for this condition unless your operating process records one.";
+  }
+  if (receiptOperations.length === 1) {
+    return `Attach the latest receipt ID for ${receiptOperations[0]} when available.`;
+  }
+  return `Attach receipt IDs produced by: ${receiptOperations.join(", ")}.`;
+}
+
+function evidenceWithReceiptHint(evidence) {
+  if (!evidence) {
+    return null;
+  }
+  return {
+    ...evidence,
+    receiptIdHint: evidence.receiptIdHint || receiptIdHint(evidence.receiptOperations || [])
+  };
+}
+
+function receiptLaneArtifactPathHint(key) {
+  return `artifacts/staging/<productCode>/<channel>/${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}-receipt-visibility.json`;
+}
+
+function evidenceForCloseoutKey(key) {
+  return evidenceWithReceiptHint(CLOSEOUT_EVIDENCE[key]);
+}
+
+function evidenceForSignoffKey(key) {
+  return evidenceWithReceiptHint(SIGNOFF_EVIDENCE[key]);
+}
+
+function evidenceForReceiptLane(key) {
+  return evidenceWithReceiptHint({
+    expectedEvidence: RECEIPT_VISIBILITY_EVIDENCE[key] || "Confirm the receipt visibility lane shows the latest staging evidence receipts before cutover.",
+    valueJsonExample: {
+      status: "visible",
+      summaryPath: "<redacted receipt visibility summary path>",
+      summary: "<redacted operator summary>"
+    },
+    artifactPathHint: receiptLaneArtifactPathHint(key),
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  });
+}
+
+function extractDecisionValue(value) {
+  if (typeof value === "string") {
+    return value.trim() || null;
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    for (const key of ["decision", "value"]) {
+      if (typeof value[key] === "string" && value[key].trim()) {
+        return value[key].trim();
+      }
+    }
+  }
+  return null;
+}
+
 function commandForCloseoutBackfill(inputFile, key) {
   return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key} --value-json <redacted-json>`;
 }
@@ -158,6 +385,7 @@ function buildActionQueue({
       status: queueStatus(index),
       targetKey: key,
       command: commandForCloseoutBackfill(inputFile, key),
+      evidence: evidenceForCloseoutKey(key),
       statusCommand: localStatusCommand
     }));
   }
@@ -169,6 +397,7 @@ function buildActionQueue({
         status: "current",
         targetKey: "operator_go_no_go",
         command: commandForCloseoutBackfill(inputFile, "operator_go_no_go"),
+        evidence: evidenceForCloseoutKey("operator_go_no_go"),
         statusCommand: localStatusCommand
       }
     ];
@@ -193,6 +422,7 @@ function buildActionQueue({
         targetKey: "full_test_window_passed",
         command: "npm.cmd test",
         followUpCommand: commandForSignoffCondition(inputFile, "full_test_window_passed", true),
+        evidence: evidenceForSignoffKey("full_test_window_passed"),
         statusCommand: localStatusCommand
       }
     ];
@@ -205,6 +435,7 @@ function buildActionQueue({
         status: "current",
         targetKey: "productionSignoff.decision",
         command: commandForSignoffCondition(inputFile, missingSignoffKeys[0] || "operator_signoff_recorded", true),
+        evidence: evidenceForSignoffKey(missingSignoffKeys[0] || "operator_signoff_recorded"),
         statusCommand: localStatusCommand
       }
     ];
@@ -215,6 +446,7 @@ function buildActionQueue({
     status: queueStatus(index),
     targetKey: key,
     command: commandForSignoffCondition(inputFile, key),
+    evidence: evidenceForSignoffKey(key),
     statusCommand: localStatusCommand
   }));
   const receiptQueue = missingReceiptVisibilityKeys.map((key, index) => ({
@@ -223,6 +455,7 @@ function buildActionQueue({
     status: signoffQueue.length === 0 && index === 0 ? "current" : "blocked_after_prior_actions",
     targetKey: key,
     command: commandForReceiptLane(inputFile, key),
+    evidence: evidenceForReceiptLane(key),
     statusCommand: localStatusCommand
   }));
   if (signoffQueue.length > 0 || receiptQueue.length > 0) {
@@ -279,6 +512,15 @@ function renderActionQueueMarkdown(result) {
   for (const [index, item] of result.actionQueue.entries()) {
     lines.push(`${index + 1}. [${item.status}] \`${item.phase}\` -> ${renderActionTarget(item.targetKey)}`);
     lines.push(`   Key: \`${item.key}\``);
+    if (item.evidence) {
+      lines.push(`   Expected evidence: ${item.evidence.expectedEvidence}`);
+      lines.push(`   Value JSON example: \`${JSON.stringify(item.evidence.valueJsonExample)}\``);
+      lines.push(`   Artifact path hint: \`${item.evidence.artifactPathHint}\``);
+      if (item.evidence.receiptOperations?.length) {
+        lines.push(`   Receipt operations: ${item.evidence.receiptOperations.join(", ")}`);
+      }
+      lines.push(`   Receipt ID hint: ${item.evidence.receiptIdHint}`);
+    }
     lines.push(`   Command: \`${item.command}\``);
     if (item.followUpCommand) {
       lines.push(`   Follow-up: \`${item.followUpCommand}\``);
@@ -397,9 +639,9 @@ function buildStatus(payload, inputFile) {
   const filledCloseoutKeys = REQUIRED_CLOSEOUT_KEYS.filter((key) => isFilledField(closeoutFieldsByKey.get(key)));
   const missingCloseoutKeys = REQUIRED_CLOSEOUT_KEYS.filter((key) => !filledCloseoutKeys.includes(key));
   const operatorGoNoGo = closeoutFieldsByKey.get("operator_go_no_go");
-  const closeoutDecision = typeof operatorGoNoGo?.value === "string"
-    ? operatorGoNoGo.value
-    : payload.decision || null;
+  const closeoutDecision = extractDecisionValue(operatorGoNoGo?.value)
+    || extractDecisionValue(payload.decision)
+    || null;
 
   const productionSignoff = payload.productionSignoff && typeof payload.productionSignoff === "object"
     ? payload.productionSignoff

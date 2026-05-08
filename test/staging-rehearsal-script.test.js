@@ -3832,7 +3832,7 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     const closeoutInputFile = join(tempDir, "filled-closeout.json");
     const closeoutInput = {
       mode: "staging-closeout-template",
-      decision: "ready-for-full-test-window",
+      decision: null,
       acceptanceFields: [
         {
           key: "route_map_gate_result",
@@ -3882,7 +3882,11 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
         {
           key: "operator_go_no_go",
           status: "filled",
-          value: "ready-for-full-test-window"
+          value: {
+            decision: "ready-for-full-test-window",
+            operator: "launch-duty",
+            summary: "redacted go/no-go approval"
+          }
         }
       ]
     };

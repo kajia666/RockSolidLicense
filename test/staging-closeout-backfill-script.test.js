@@ -153,6 +153,39 @@ test("staging closeout backfill writes one evidence field without clearing remai
   }
 });
 
+test("staging closeout backfill promotes object operator go/no-go evidence to the closeout decision", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-backfill-go-no-go-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-closeout-input.json");
+    writeCloseoutInput(closeoutInputFile);
+
+    const result = runBackfill([
+      "--input-file",
+      closeoutInputFile,
+      "--key",
+      "operator_go_no_go",
+      "--value-json",
+      "{\"decision\":\"ready-for-full-test-window\",\"operator\":\"launch-duty\",\"summary\":\"redacted go/no-go approval\"}",
+      "--artifact-path",
+      "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md"
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const closeoutInput = JSON.parse(readFileSync(closeoutInputFile, "utf8"));
+    assert.equal(closeoutInput.decision, "ready-for-full-test-window");
+    const field = closeoutInput.acceptanceFields.find((item) => item.key === "operator_go_no_go");
+    assert.equal(field.status, "filled");
+    assert.deepEqual(field.value, {
+      decision: "ready-for-full-test-window",
+      operator: "launch-duty",
+      summary: "redacted go/no-go approval",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md"
+    });
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging closeout backfill refuses unknown closeout keys", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-backfill-refuse-"));
   try {

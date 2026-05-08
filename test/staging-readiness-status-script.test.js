@@ -126,6 +126,18 @@ test("staging readiness status reports closeout gap and next backfill command", 
       output.actionQueue[0].statusCommand,
       `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`
     );
+    assert.deepEqual(output.actionQueue[0].evidence, {
+      expectedEvidence: "Record backup artifact path, restore dry-run result, and post-restore healthcheck result.",
+      valueJsonExample: {
+        result: "pass",
+        restoreDryRun: "pass",
+        healthcheck: "pass",
+        summary: "<redacted operator summary>"
+      },
+      artifactPathHint: "artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt",
+      receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+      receiptIdHint: "Attach receipt IDs produced by: record_recovery_drill, record_backup_verification."
+    });
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -162,7 +174,19 @@ test("staging readiness status points to full-test window after closeout is read
         targetKey: "full_test_window_passed",
         command: "npm.cmd test",
         followUpCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`,
-        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+        evidence: {
+          expectedEvidence: "Attach the full `npm.cmd test` output summary and failure count.",
+          valueJsonExample: {
+            result: "pass",
+            command: "npm.cmd test",
+            failureCount: 0,
+            summary: "<redacted test summary>"
+          },
+          artifactPathHint: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
+          receiptOperations: [],
+          receiptIdHint: "No Launch Mainline receipt is required for this condition unless your operating process records one."
+        }
       }
     ]);
   } finally {
@@ -218,6 +242,61 @@ test("staging readiness status reports signoff and receipt visibility gaps befor
       output.actionQueue.at(-1).command,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane launchOpsOverviewStatus --value-json <redacted-json>`
     );
+    assert.deepEqual(output.actionQueue[0].evidence, {
+      expectedEvidence: "Confirm the artifact/receipt ledger archive paths exist and contain redacted artifacts.",
+      valueJsonExample: {
+        result: "confirmed",
+        summary: "<redacted operator summary>"
+      },
+      artifactPathHint: "artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt",
+      receiptOperations: [],
+      receiptIdHint: "Attach receipt IDs if your operating process records this sign-off in Launch Mainline."
+    });
+    assert.deepEqual(output.actionQueue.at(-1).evidence, {
+      expectedEvidence: "Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover.",
+      valueJsonExample: {
+        status: "visible",
+        summaryPath: "<redacted receipt visibility summary path>",
+        summary: "<redacted operator summary>"
+      },
+      artifactPathHint: "artifacts/staging/<productCode>/<channel>/launch-ops-overview-status-receipt-visibility.json",
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      receiptIdHint: "Attach the latest receipt ID for record_post_launch_ops_sweep when available."
+    });
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging readiness status treats object operator go/no-go evidence as the full-test decision", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-go-no-go-object-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: closeoutKeys
+    });
+    const payload = JSON.parse(readFileSync(inputFile, "utf8"));
+    payload.decision = null;
+    payload.acceptanceFields = payload.acceptanceFields.map((field) => field.key === "operator_go_no_go"
+      ? {
+        ...field,
+        value: {
+          decision: "ready-for-full-test-window",
+          operator: "launch-duty",
+          summary: "redacted go/no-go approval"
+        }
+      }
+      : field);
+    writeFileSync(inputFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+
+    const result = runStatus(["--input-file", inputFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.readiness.closeout.decision, "ready-for-full-test-window");
+    assert.equal(output.readiness.currentGate, "full_test_window");
+    assert.equal(output.readiness.canRunFullTestWindow, true);
+    assert.equal(output.actionQueue[0].key, "run_full_test_window");
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -255,8 +334,12 @@ test("staging readiness status can write a redacted markdown action queue", () =
     assert.match(markdown, /Current gate: `production_signoff`/);
     assert.match(markdown, /Launch status: `blocked`/);
     assert.match(markdown, /1\. \[current\] `production_signoff` -> `staging_artifacts_archived`/);
+    assert.match(markdown, /Expected evidence: Confirm the artifact\/receipt ledger archive paths exist and contain redacted artifacts\./);
+    assert.match(markdown, /Value JSON example: `{"result":"confirmed","summary":"<redacted operator summary>"}`/);
+    assert.match(markdown, /Artifact path hint: `artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt`/);
     assert.match(markdown, /Command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --condition-key staging_artifacts_archived --value-json <redacted-json>`/);
     assert.match(markdown, /10\. \[blocked_after_prior_actions\] `receipt_visibility` -> `launchOpsOverviewStatus`/);
+    assert.match(markdown, /Receipt operations: record_post_launch_ops_sweep/);
     assert.match(markdown, /Status check: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json`/);
     assert.doesNotMatch(markdown, /StrongAdmin|StrongDeveloper|Bearer|password/i);
   } finally {

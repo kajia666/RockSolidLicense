@@ -33,11 +33,18 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
       "developer_ops_export_and_mainline_action",
       "launch_download_surface_audit",
       "launch_smoke_script",
+      "staging_rehearsal_syntax_check",
       "staging_rehearsal_script",
       "services_syntax_check",
       "diff_whitespace_check"
     ]
   );
+
+  const stagingSyntaxCommand = output.commands.find(
+    (command) => command.key === "staging_rehearsal_syntax_check"
+  );
+  assert.ok(stagingSyntaxCommand);
+  assert.equal(stagingSyntaxCommand.commandLine, "node --check scripts/staging-rehearsal.mjs");
 
   const licenseFlowCommand = output.commands.find(
     (command) => command.key === "developer_ops_export_and_mainline_action"

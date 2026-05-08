@@ -78,6 +78,13 @@ const commands = [
     ]
   },
   {
+    key: "staging_rehearsal_syntax_check",
+    label: "Staging rehearsal script syntax check",
+    command: "node",
+    executable: process.execPath,
+    args: ["--check", "scripts/staging-rehearsal.mjs"]
+  },
+  {
     key: "staging_rehearsal_script",
     label: "Staging rehearsal handoff continuity",
     command: "node",

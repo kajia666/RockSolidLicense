@@ -346,13 +346,45 @@ function commandForCloseoutBackfill(inputFile, key) {
   return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key} --value-json <redacted-json>`;
 }
 
+function quoteValueJson(value) {
+  return `'${JSON.stringify(value).replaceAll("'", "''")}'`;
+}
+
+function receiptIdArgs(receiptOperations = []) {
+  return receiptOperations.map((operation) => ` --receipt-id <${operation}-receipt-id>`).join("");
+}
+
+function evidenceArgs(evidence) {
+  if (!evidence) {
+    return "";
+  }
+  return [
+    ` --value-json ${quoteValueJson(evidence.valueJsonExample)}`,
+    ` --artifact-path ${evidence.artifactPathHint}`,
+    receiptIdArgs(evidence.receiptOperations)
+  ].join("");
+}
+
+function commandForCloseoutBackfillExample(inputFile, key, evidence) {
+  return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key}${evidenceArgs(evidence)}`;
+}
+
 function commandForSignoffCondition(inputFile, key, includeDecision = false) {
   const decision = includeDecision ? " --decision ready-for-production-signoff" : "";
   return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key ${key} --value-json <redacted-json>${decision}`;
 }
 
+function commandForSignoffConditionExample(inputFile, key, evidence, includeDecision = false) {
+  const decision = includeDecision ? " --decision ready-for-production-signoff" : "";
+  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key ${key}${evidenceArgs(evidence)}${decision}`;
+}
+
 function commandForReceiptLane(inputFile, key) {
   return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key} --value-json <redacted-json>`;
+}
+
+function commandForReceiptLaneExample(inputFile, key, evidence) {
+  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key}${evidenceArgs(evidence)}`;
 }
 
 function reloadCommand(inputFile) {
@@ -379,17 +411,22 @@ function buildActionQueue({
 }) {
   const localStatusCommand = statusCommand(inputFile);
   if (missingCloseoutKeys.length > 0) {
-    return missingCloseoutKeys.map((key, index) => ({
-      key: "backfill_closeout_evidence",
-      phase: "pre_full_test_closeout",
-      status: queueStatus(index),
-      targetKey: key,
-      command: commandForCloseoutBackfill(inputFile, key),
-      evidence: evidenceForCloseoutKey(key),
-      statusCommand: localStatusCommand
-    }));
+    return missingCloseoutKeys.map((key, index) => {
+      const evidence = evidenceForCloseoutKey(key);
+      return {
+        key: "backfill_closeout_evidence",
+        phase: "pre_full_test_closeout",
+        status: queueStatus(index),
+        targetKey: key,
+        command: commandForCloseoutBackfill(inputFile, key),
+        exampleCommand: commandForCloseoutBackfillExample(inputFile, key, evidence),
+        evidence,
+        statusCommand: localStatusCommand
+      };
+    });
   }
   if (closeoutDecision !== "ready-for-full-test-window") {
+    const evidence = evidenceForCloseoutKey("operator_go_no_go");
     return [
       {
         key: "confirm_full_test_go_no_go",
@@ -397,7 +434,8 @@ function buildActionQueue({
         status: "current",
         targetKey: "operator_go_no_go",
         command: commandForCloseoutBackfill(inputFile, "operator_go_no_go"),
-        evidence: evidenceForCloseoutKey("operator_go_no_go"),
+        exampleCommand: commandForCloseoutBackfillExample(inputFile, "operator_go_no_go", evidence),
+        evidence,
         statusCommand: localStatusCommand
       }
     ];
@@ -414,6 +452,7 @@ function buildActionQueue({
     ];
   }
   if (missingSignoffKeys.includes("full_test_window_passed")) {
+    const evidence = evidenceForSignoffKey("full_test_window_passed");
     return [
       {
         key: "run_full_test_window",
@@ -422,42 +461,54 @@ function buildActionQueue({
         targetKey: "full_test_window_passed",
         command: "npm.cmd test",
         followUpCommand: commandForSignoffCondition(inputFile, "full_test_window_passed", true),
-        evidence: evidenceForSignoffKey("full_test_window_passed"),
+        followUpExampleCommand: commandForSignoffConditionExample(inputFile, "full_test_window_passed", evidence, true),
+        evidence,
         statusCommand: localStatusCommand
       }
     ];
   }
   if (productionDecision !== "ready-for-production-signoff") {
+    const key = missingSignoffKeys[0] || "operator_signoff_recorded";
+    const evidence = evidenceForSignoffKey(key);
     return [
       {
         key: "set_production_signoff_decision",
         phase: "production_signoff",
         status: "current",
         targetKey: "productionSignoff.decision",
-        command: commandForSignoffCondition(inputFile, missingSignoffKeys[0] || "operator_signoff_recorded", true),
-        evidence: evidenceForSignoffKey(missingSignoffKeys[0] || "operator_signoff_recorded"),
+        command: commandForSignoffCondition(inputFile, key, true),
+        exampleCommand: commandForSignoffConditionExample(inputFile, key, evidence, true),
+        evidence,
         statusCommand: localStatusCommand
       }
     ];
   }
-  const signoffQueue = missingSignoffKeys.map((key, index) => ({
-    key: "backfill_production_signoff",
-    phase: "production_signoff",
-    status: queueStatus(index),
-    targetKey: key,
-    command: commandForSignoffCondition(inputFile, key),
-    evidence: evidenceForSignoffKey(key),
-    statusCommand: localStatusCommand
-  }));
-  const receiptQueue = missingReceiptVisibilityKeys.map((key, index) => ({
-    key: "backfill_receipt_visibility",
-    phase: "receipt_visibility",
-    status: signoffQueue.length === 0 && index === 0 ? "current" : "blocked_after_prior_actions",
-    targetKey: key,
-    command: commandForReceiptLane(inputFile, key),
-    evidence: evidenceForReceiptLane(key),
-    statusCommand: localStatusCommand
-  }));
+  const signoffQueue = missingSignoffKeys.map((key, index) => {
+    const evidence = evidenceForSignoffKey(key);
+    return {
+      key: "backfill_production_signoff",
+      phase: "production_signoff",
+      status: queueStatus(index),
+      targetKey: key,
+      command: commandForSignoffCondition(inputFile, key),
+      exampleCommand: commandForSignoffConditionExample(inputFile, key, evidence),
+      evidence,
+      statusCommand: localStatusCommand
+    };
+  });
+  const receiptQueue = missingReceiptVisibilityKeys.map((key, index) => {
+    const evidence = evidenceForReceiptLane(key);
+    return {
+      key: "backfill_receipt_visibility",
+      phase: "receipt_visibility",
+      status: signoffQueue.length === 0 && index === 0 ? "current" : "blocked_after_prior_actions",
+      targetKey: key,
+      command: commandForReceiptLane(inputFile, key),
+      exampleCommand: commandForReceiptLaneExample(inputFile, key, evidence),
+      evidence,
+      statusCommand: localStatusCommand
+    };
+  });
   if (signoffQueue.length > 0 || receiptQueue.length > 0) {
     return [...signoffQueue, ...receiptQueue];
   }
@@ -522,8 +573,14 @@ function renderActionQueueMarkdown(result) {
       lines.push(`   Receipt ID hint: ${item.evidence.receiptIdHint}`);
     }
     lines.push(`   Command: \`${item.command}\``);
+    if (item.exampleCommand) {
+      lines.push(`   Example command: \`${item.exampleCommand}\``);
+    }
     if (item.followUpCommand) {
       lines.push(`   Follow-up: \`${item.followUpCommand}\``);
+    }
+    if (item.followUpExampleCommand) {
+      lines.push(`   Follow-up example: \`${item.followUpExampleCommand}\``);
     }
     if (item.statusCommand) {
       lines.push(`   Status check: \`${item.statusCommand}\``);

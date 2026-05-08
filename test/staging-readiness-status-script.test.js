@@ -138,6 +138,10 @@ test("staging readiness status reports closeout gap and next backfill command", 
       receiptOperations: ["record_recovery_drill", "record_backup_verification"],
       receiptIdHint: "Attach receipt IDs produced by: record_recovery_drill, record_backup_verification."
     });
+    assert.equal(
+      output.actionQueue[0].exampleCommand,
+      `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key backup_restore_drill_result --value-json '{"result":"pass","restoreDryRun":"pass","healthcheck":"pass","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id>`
+    );
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -174,6 +178,7 @@ test("staging readiness status points to full-test window after closeout is read
         targetKey: "full_test_window_passed",
         command: "npm.cmd test",
         followUpCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`,
+        followUpExampleCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json '{"result":"pass","command":"npm.cmd test","failureCount":0,"summary":"<redacted test summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/full-test-output.txt --decision ready-for-production-signoff`,
         statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
         evidence: {
           expectedEvidence: "Attach the full `npm.cmd test` output summary and failure count.",
@@ -252,6 +257,10 @@ test("staging readiness status reports signoff and receipt visibility gaps befor
       receiptOperations: [],
       receiptIdHint: "Attach receipt IDs if your operating process records this sign-off in Launch Mainline."
     });
+    assert.equal(
+      output.actionQueue[0].exampleCommand,
+      `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json '{"result":"confirmed","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt`
+    );
     assert.deepEqual(output.actionQueue.at(-1).evidence, {
       expectedEvidence: "Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover.",
       valueJsonExample: {
@@ -263,6 +272,10 @@ test("staging readiness status reports signoff and receipt visibility gaps befor
       receiptOperations: ["record_post_launch_ops_sweep"],
       receiptIdHint: "Attach the latest receipt ID for record_post_launch_ops_sweep when available."
     });
+    assert.equal(
+      output.actionQueue.at(-1).exampleCommand,
+      `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane launchOpsOverviewStatus --value-json '{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/launch-ops-overview-status-receipt-visibility.json --receipt-id <record_post_launch_ops_sweep-receipt-id>`
+    );
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -338,8 +351,10 @@ test("staging readiness status can write a redacted markdown action queue", () =
     assert.match(markdown, /Value JSON example: `{"result":"confirmed","summary":"<redacted operator summary>"}`/);
     assert.match(markdown, /Artifact path hint: `artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt`/);
     assert.match(markdown, /Command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --condition-key staging_artifacts_archived --value-json <redacted-json>`/);
+    assert.match(markdown, /Example command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --condition-key staging_artifacts_archived --value-json '\{"result":"confirmed","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt`/);
     assert.match(markdown, /10\. \[blocked_after_prior_actions\] `receipt_visibility` -> `launchOpsOverviewStatus`/);
     assert.match(markdown, /Receipt operations: record_post_launch_ops_sweep/);
+    assert.match(markdown, /Example command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --receipt-lane launchOpsOverviewStatus --value-json '\{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/launch-ops-overview-status-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id>`/);
     assert.match(markdown, /Status check: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json`/);
     assert.doesNotMatch(markdown, /StrongAdmin|StrongDeveloper|Bearer|password/i);
   } finally {

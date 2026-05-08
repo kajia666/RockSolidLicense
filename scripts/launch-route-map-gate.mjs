@@ -78,6 +78,18 @@ const commands = [
     ]
   },
   {
+    key: "staging_profile_init_script",
+    label: "Staging profile init handoff continuity",
+    command: "node",
+    executable: process.execPath,
+    args: [
+      "--test",
+      "--test-concurrency=1",
+      "--test-isolation=none",
+      "test/staging-profile-init-script.test.js"
+    ]
+  },
+  {
     key: "staging_rehearsal_syntax_check",
     label: "Staging rehearsal script syntax check",
     command: "node",

@@ -50,6 +50,25 @@ Before starting, fix one lane:
 - one intended public entrypoint
 - one intended storage/runtime topology
 
+For the fastest staging setup, generate a secret-free profile draft first. This writes the ten launch-duty output paths under `artifacts/staging/<productCode>/<channel>/` and leaves passwords and bearer tokens out of the file:
+
+```powershell
+npm.cmd run staging:profile:init -- --json `
+  --base-url https://staging.example.com `
+  --product-code SMOKE_ALPHA `
+  --channel stable `
+  --admin-username admin@example.com `
+  --developer-username launch.smoke.owner `
+  --target-os linux `
+  --storage-profile postgres-preview `
+  --target-env-file /etc/rocksolidlicense/staging.env `
+  --app-backup-dir /var/lib/rocksolid/backups `
+  --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
+  --output-file .\artifacts\staging\SMOKE_ALPHA\stable\staging-rehearsal-profile.json
+```
+
+Review the generated JSON, set `$env:RSL_SMOKE_ADMIN_PASSWORD`, `$env:RSL_SMOKE_DEVELOPER_PASSWORD`, and `$env:RSL_DEVELOPER_BEARER_TOKEN` in the shell that will run rehearsal commands, then run `staging:rehearsal --profile-file <generated-profile.json>`.
+
 For a staging API rehearsal, run the no-write rehearsal runner before the live-write smoke step:
 
 ```powershell

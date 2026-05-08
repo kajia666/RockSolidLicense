@@ -81,6 +81,7 @@ function writeResult(result, json) {
   if (result.status === "written") {
     console.log(`Filled closeout input initialized: ${result.outputFile}`);
     console.log(result.nextCommand);
+    console.log(result.statusCommand);
     console.log(result.nextAction);
     return;
   }
@@ -107,7 +108,8 @@ function main() {
       acceptanceFieldCount: acceptanceFields.length,
       placeholderCount,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`,
-      nextAction: "Replace null values with real redacted staging evidence, keep exampleOnly absent, then run nextCommand."
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}`,
+      nextAction: "Run statusCommand to pick the first closeout evidence backfill target."
     }, options.json);
   } catch (error) {
     writeResult({

@@ -77,7 +77,7 @@ npm.cmd run staging:closeout:init -- --json `
   --output-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json
 ```
 
-This command removes the `exampleOnly` guard so the file can be loaded by `staging:rehearsal --closeout-input-file`, but it keeps every evidence value empty. The reload must still report missing fields until real route-map, backup/restore, live-write smoke, receipt visibility, and operator go/no-go evidence are backfilled.
+This command removes the `exampleOnly` guard so the file can be loaded by `staging:rehearsal --closeout-input-file`, but it keeps every evidence value empty. The JSON output includes a `statusCommand`; run it immediately after initialization to pick the first closeout backfill target. The reload must still report missing fields until real route-map, backup/restore, live-write smoke, receipt visibility, and operator go/no-go evidence are backfilled.
 
 Backfill each real evidence item with `staging:closeout:backfill` as the artifacts and receipt IDs become available:
 

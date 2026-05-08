@@ -120,7 +120,8 @@ test("staging closeout init promotes a draft without clearing closeout readiness
       acceptanceFieldCount: 7,
       placeholderCount: 7,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`,
-      nextAction: "Replace null values with real redacted staging evidence, keep exampleOnly absent, then run nextCommand."
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile}`,
+      nextAction: "Run statusCommand to pick the first closeout evidence backfill target."
     });
 
     const closeoutInput = JSON.parse(readFileSync(outputFile, "utf8"));

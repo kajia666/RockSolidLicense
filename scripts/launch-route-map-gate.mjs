@@ -126,6 +126,18 @@ const commands = [
     ]
   },
   {
+    key: "staging_readiness_status_script",
+    label: "Staging readiness status next-step continuity",
+    command: "node",
+    executable: process.execPath,
+    args: [
+      "--test",
+      "--test-concurrency=1",
+      "--test-isolation=none",
+      "test/staging-readiness-status-script.test.js"
+    ]
+  },
+  {
     key: "staging_rehearsal_syntax_check",
     label: "Staging rehearsal script syntax check",
     command: "node",

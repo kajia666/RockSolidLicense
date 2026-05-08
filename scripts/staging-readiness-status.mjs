@@ -1,0 +1,342 @@
+#!/usr/bin/env node
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+const REQUIRED_CLOSEOUT_KEYS = [
+  "route_map_gate_result",
+  "backup_restore_drill_result",
+  "live_write_smoke_result",
+  "launch_smoke_handoff",
+  "launch_mainline_evidence_receipts",
+  "receipt_visibility_review",
+  "operator_go_no_go"
+];
+
+const REQUIRED_SIGNOFF_KEYS = [
+  "full_test_window_passed",
+  "staging_artifacts_archived",
+  "launch_mainline_receipts_visible",
+  "launch_ops_overview_status_visible",
+  "backup_restore_drill_passed",
+  "rollback_path_confirmed",
+  "operator_signoff_recorded"
+];
+
+const RECEIPT_VISIBILITY_KEYS = [
+  "launchMainline",
+  "launchReview",
+  "launchSmoke",
+  "developerOps",
+  "launchOpsOverviewStatus"
+];
+
+const OPTION_FLAGS = {
+  "--input-file": "inputFile"
+};
+
+function requireArgValue(name, value, inlineValue) {
+  const missingValue = value === undefined
+    || value === null
+    || String(value).trim() === ""
+    || (inlineValue === undefined && String(value).startsWith("--"));
+  if (missingValue) {
+    throw new Error(`${name} requires a value.`);
+  }
+  return String(value).trim();
+}
+
+function parseArgs(argv) {
+  const options = {
+    json: false
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--json") {
+      options.json = true;
+      continue;
+    }
+    const [name, inlineValue] = arg.split("=", 2);
+    const key = OPTION_FLAGS[name];
+    if (!key) {
+      throw new Error(`Unknown option: ${name}`);
+    }
+    options[key] = requireArgValue(name, inlineValue ?? argv[index + 1], inlineValue);
+    if (inlineValue === undefined) {
+      index += 1;
+    }
+  }
+  if (!options.inputFile) {
+    throw new Error("--input-file requires a value.");
+  }
+  return options;
+}
+
+function isFilledValue(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === "string") {
+    return value.trim() !== "";
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (typeof value === "object") {
+    return Object.keys(value).length > 0;
+  }
+  return true;
+}
+
+function isFilledField(field) {
+  return Boolean(field) && isFilledValue(field.value);
+}
+
+function isReceiptVisibilityVisible(value) {
+  if (value === true) {
+    return true;
+  }
+  if (typeof value === "string") {
+    return ["visible", "pass", "confirmed"].includes(value.trim().toLowerCase());
+  }
+  if (value && typeof value === "object") {
+    return [value.status, value.result, value.visibility, value.value]
+      .map((item) => String(item || "").trim().toLowerCase())
+      .some((item) => ["visible", "pass", "confirmed"].includes(item));
+  }
+  return false;
+}
+
+function fieldsByKey(fields = []) {
+  return new Map(
+    (Array.isArray(fields) ? fields : [])
+      .filter((field) => field?.key)
+      .map((field) => [field.key, field])
+  );
+}
+
+function commandForCloseoutBackfill(inputFile, key) {
+  return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key} --value-json <redacted-json>`;
+}
+
+function commandForSignoffCondition(inputFile, key, includeDecision = false) {
+  const decision = includeDecision ? " --decision ready-for-production-signoff" : "";
+  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key ${key} --value-json <redacted-json>${decision}`;
+}
+
+function commandForReceiptLane(inputFile, key) {
+  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key} --value-json <redacted-json>`;
+}
+
+function reloadCommand(inputFile) {
+  return `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`;
+}
+
+function buildNextStep({
+  inputFile,
+  missingCloseoutKeys,
+  closeoutDecision,
+  missingSignoffKeys,
+  missingReceiptVisibilityKeys,
+  productionDecision,
+  canRunFullTestWindow,
+  canSignoffProduction
+}) {
+  if (missingCloseoutKeys.length > 0) {
+    const targetKey = missingCloseoutKeys[0];
+    return {
+      key: "backfill_closeout_evidence",
+      targetKey,
+      command: commandForCloseoutBackfill(inputFile, targetKey),
+      reloadCommand: reloadCommand(inputFile),
+      nextAction: `Backfill ${targetKey}, then run reloadCommand.`
+    };
+  }
+  if (closeoutDecision !== "ready-for-full-test-window") {
+    return {
+      key: "confirm_full_test_go_no_go",
+      targetKey: "operator_go_no_go",
+      command: commandForCloseoutBackfill(inputFile, "operator_go_no_go"),
+      reloadCommand: reloadCommand(inputFile),
+      nextAction: "Set operator_go_no_go to ready-for-full-test-window, then run reloadCommand."
+    };
+  }
+  if (!canRunFullTestWindow) {
+    return {
+      key: "reload_closeout_input",
+      targetKey: null,
+      command: reloadCommand(inputFile),
+      nextAction: "Reload the closeout input to refresh full-test readiness."
+    };
+  }
+  if (missingSignoffKeys.includes("full_test_window_passed")) {
+    return {
+      key: "run_full_test_window",
+      targetKey: "full_test_window_passed",
+      command: "npm.cmd test",
+      backfillCommand: commandForSignoffCondition(inputFile, "full_test_window_passed", true),
+      reloadCommand: reloadCommand(inputFile),
+      nextAction: "Run the full test window, backfill full_test_window_passed, then run reloadCommand."
+    };
+  }
+  if (productionDecision !== "ready-for-production-signoff") {
+    return {
+      key: "set_production_signoff_decision",
+      targetKey: "productionSignoff.decision",
+      command: commandForSignoffCondition(inputFile, missingSignoffKeys[0] || "operator_signoff_recorded", true),
+      reloadCommand: reloadCommand(inputFile),
+      nextAction: "Set productionSignoff.decision to ready-for-production-signoff while backfilling the next sign-off evidence."
+    };
+  }
+  if (missingSignoffKeys.length > 0) {
+    const targetKey = missingSignoffKeys[0];
+    return {
+      key: "backfill_production_signoff",
+      targetKey,
+      command: commandForSignoffCondition(inputFile, targetKey),
+      reloadCommand: reloadCommand(inputFile),
+      nextAction: `Backfill ${targetKey}, then run reloadCommand.`
+    };
+  }
+  if (missingReceiptVisibilityKeys.length > 0) {
+    const targetKey = missingReceiptVisibilityKeys[0];
+    return {
+      key: "backfill_receipt_visibility",
+      targetKey,
+      command: commandForReceiptLane(inputFile, targetKey),
+      reloadCommand: reloadCommand(inputFile),
+      nextAction: `Backfill ${targetKey} receipt visibility, then run reloadCommand.`
+    };
+  }
+  if (canSignoffProduction) {
+    return {
+      key: "reload_rehearsal_for_launch_day_watch",
+      targetKey: null,
+      command: reloadCommand(inputFile),
+      nextAction: "Reload rehearsal and start launch-day watch from the generated packet."
+    };
+  }
+  return {
+    key: "review_readiness_packet",
+    targetKey: null,
+    command: reloadCommand(inputFile),
+    nextAction: "Reload rehearsal and inspect the readiness packet for remaining blockers."
+  };
+}
+
+function buildStatus(payload, inputFile) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("closeout input must be a JSON object.");
+  }
+  if (payload.exampleOnly === true || payload.mode === "staging-closeout-input-example") {
+    throw new Error("Refusing to inspect example closeout input; use a real filled closeout input file.");
+  }
+
+  const closeoutFieldsByKey = fieldsByKey(payload.acceptanceFields);
+  const filledCloseoutKeys = REQUIRED_CLOSEOUT_KEYS.filter((key) => isFilledField(closeoutFieldsByKey.get(key)));
+  const missingCloseoutKeys = REQUIRED_CLOSEOUT_KEYS.filter((key) => !filledCloseoutKeys.includes(key));
+  const operatorGoNoGo = closeoutFieldsByKey.get("operator_go_no_go");
+  const closeoutDecision = typeof operatorGoNoGo?.value === "string"
+    ? operatorGoNoGo.value
+    : payload.decision || null;
+
+  const productionSignoff = payload.productionSignoff && typeof payload.productionSignoff === "object"
+    ? payload.productionSignoff
+    : {};
+  const signoffFieldsByKey = fieldsByKey(productionSignoff.conditions);
+  const filledSignoffKeys = REQUIRED_SIGNOFF_KEYS.filter((key) => isFilledField(signoffFieldsByKey.get(key)));
+  const missingSignoffKeys = REQUIRED_SIGNOFF_KEYS.filter((key) => !filledSignoffKeys.includes(key));
+  const receiptVisibility = payload.receiptVisibility || productionSignoff.receiptVisibility || {};
+  const visibleReceiptVisibilityKeys = RECEIPT_VISIBILITY_KEYS.filter((key) => isReceiptVisibilityVisible(receiptVisibility[key]));
+  const missingReceiptVisibilityKeys = RECEIPT_VISIBILITY_KEYS.filter((key) => !visibleReceiptVisibilityKeys.includes(key));
+  const productionDecision = productionSignoff.decision || null;
+
+  const canRunFullTestWindow = missingCloseoutKeys.length === 0 && closeoutDecision === "ready-for-full-test-window";
+  const canSignoffProduction = canRunFullTestWindow
+    && missingSignoffKeys.length === 0
+    && missingReceiptVisibilityKeys.length === 0
+    && productionDecision === "ready-for-production-signoff";
+  const currentGate = !canRunFullTestWindow
+    ? "pre_full_test_closeout"
+    : canSignoffProduction
+      ? "launch_day_watch"
+      : missingSignoffKeys.includes("full_test_window_passed")
+        ? "full_test_window"
+        : "production_signoff";
+  const launchStatus = canSignoffProduction ? "ready_for_launch_day_watch" : "blocked";
+  const nextStep = buildNextStep({
+    inputFile,
+    missingCloseoutKeys,
+    closeoutDecision,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys,
+    productionDecision,
+    canRunFullTestWindow,
+    canSignoffProduction
+  });
+
+  return {
+    status: "pass",
+    mode: "staging-readiness-status",
+    inputFile,
+    readiness: {
+      currentGate,
+      launchStatus,
+      canRunFullTestWindow,
+      canSignoffProduction,
+      canStartLaunchDayWatch: canSignoffProduction,
+      closeout: {
+        requiredCount: REQUIRED_CLOSEOUT_KEYS.length,
+        filledCount: filledCloseoutKeys.length,
+        requiredDecision: "ready-for-full-test-window",
+        decision: closeoutDecision,
+        missingKeys: missingCloseoutKeys
+      },
+      productionSignoff: {
+        requiredDecision: "ready-for-production-signoff",
+        decision: productionDecision,
+        requiredConditionCount: REQUIRED_SIGNOFF_KEYS.length,
+        filledConditionCount: filledSignoffKeys.length,
+        missingConditionKeys: missingSignoffKeys,
+        requiredReceiptVisibilityKeys: RECEIPT_VISIBILITY_KEYS,
+        visibleReceiptLaneCount: visibleReceiptVisibilityKeys.length,
+        missingReceiptVisibilityKeys
+      }
+    },
+    nextStep
+  };
+}
+
+function writeResult(result, json) {
+  if (json) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (result.status === "pass") {
+    console.log(`Current gate: ${result.readiness.currentGate}`);
+    console.log(`Next step: ${result.nextStep.key}`);
+    console.log(result.nextStep.command);
+    return;
+  }
+  console.log(`Staging readiness status failed: ${result.error.message}`);
+}
+
+function main() {
+  const json = process.argv.includes("--json");
+  try {
+    const options = parseArgs(process.argv.slice(2));
+    const inputFile = path.resolve(options.inputFile);
+    const payload = JSON.parse(readFileSync(inputFile, "utf8"));
+    writeResult(buildStatus(payload, inputFile), options.json);
+  } catch (error) {
+    writeResult({
+      status: "fail",
+      mode: "staging-readiness-status",
+      error: {
+        message: error.message
+      }
+    }, json);
+    process.exitCode = 1;
+  }
+}
+
+main();

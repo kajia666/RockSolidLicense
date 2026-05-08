@@ -92,6 +92,15 @@ npm.cmd run staging:closeout:backfill -- --json `
 
 Repeat that command for the remaining closeout keys, then reload with `staging:rehearsal --closeout-input-file` to check whether the full-test window is actually ready.
 
+At any point after `filled-closeout-input.json` exists, ask the local status command for the current gate and next command:
+
+```powershell
+npm.cmd run staging:readiness:status -- --json `
+  --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json
+```
+
+Use this after each closeout or sign-off backfill. It is read-only: it reports whether the current gate is `pre_full_test_closeout`, `full_test_window`, `production_signoff`, or `launch_day_watch`, lists the remaining closeout/sign-off/receipt visibility keys, and prints the next `staging:closeout:backfill`, `npm.cmd test`, `staging:signoff:backfill`, or `staging:rehearsal --closeout-input-file` command.
+
 After the full-test window completes, use `staging:signoff:backfill` to attach production sign-off evidence without hand-editing `productionSignoff.conditions`, `productionSignoff.decision`, or receipt visibility lanes:
 
 ```powershell

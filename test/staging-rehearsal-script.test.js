@@ -850,6 +850,51 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     receiptOperations: ["record_launch_stabilization_review"]
   });
   assert.equal(output.launchDayWatchPlan.watchExecutionEntry.nextAction, "Complete production sign-off before starting launch-day watch records.");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.mode, "launch-day-watch-evidence-execution-entry");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.status, "blocked_until_production_signoff");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.willModifyData, false);
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.currentEvidenceKey, "launch_day_watch_summary");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.currentActionKey, "complete_production_signoff");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.currentCommand, null);
+  assert.deepEqual(
+    output.launchDayWatchPlan.watchEvidenceExecutionEntry.evidenceQueue.map((item) => [
+      item.key,
+      item.category,
+      item.status,
+      item.currentActionKey,
+      item.artifactPath,
+      item.receiptOperations
+    ]),
+    [
+      ["launch_day_watch_summary", "launch_day_watch_record", "blocked_until_production_signoff", "complete_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md", ["record_cutover_walkthrough", "record_launch_day_readiness_review"]],
+      ["receipt_visibility_snapshot", "launch_day_watch_record", "blocked_until_production_signoff", "complete_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt", ["record_post_launch_ops_sweep"]],
+      ["first_wave_incident_log", "launch_day_watch_record", "blocked_until_production_signoff", "complete_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md", ["record_post_launch_ops_sweep"]],
+      ["rollback_signal_review", "launch_day_watch_record", "blocked_until_production_signoff", "complete_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md", ["record_rollback_walkthrough", "record_launch_stabilization_review"]],
+      ["stabilization_owner_handoff", "launch_day_watch_record", "blocked_until_production_signoff", "complete_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md", ["record_launch_stabilization_review"]]
+    ]
+  );
+  assert.deepEqual(
+    output.launchDayWatchPlan.watchEvidenceExecutionEntry.receiptQueue.map((item) => [item.key, item.operation, item.status, item.artifactPath]),
+    [
+      ["launch_day_watch_summary", "record_cutover_walkthrough", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+      ["launch_day_watch_summary", "record_launch_day_readiness_review", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+      ["receipt_visibility_snapshot", "record_post_launch_ops_sweep", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt"],
+      ["first_wave_incident_log", "record_post_launch_ops_sweep", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md"],
+      ["rollback_signal_review", "record_rollback_walkthrough", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+      ["rollback_signal_review", "record_launch_stabilization_review", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+      ["stabilization_owner_handoff", "record_launch_stabilization_review", "blocked_until_production_signoff", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+    ]
+  );
+  assert.deepEqual(output.launchDayWatchPlan.watchEvidenceExecutionEntry.stabilizationHandoff, {
+    key: "stabilization_owner_handoff",
+    status: "blocked_until_production_signoff",
+    path: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
+    receiptOperations: ["record_launch_stabilization_review"]
+  });
+  assert.equal(
+    output.launchDayWatchPlan.watchEvidenceExecutionEntry.nextAction,
+    "Complete production sign-off before starting launch-day watch evidence capture."
+  );
   assert.deepEqual(
     output.launchDayWatchPlan.watchRecordDraft.records.map((item) => [item.key, item.status]),
     [
@@ -4649,12 +4694,57 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       ]
     );
     assert.equal(
-      output.launchDayWatchPlan.watchEvidenceCaptureEntries.every((item) => item.willModifyData === false),
-      true
-    );
-    assert.deepEqual(
-      output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry?.watchRecordQueue?.map((item) => [item.key, item.receiptOperations]),
-      [
+    output.launchDayWatchPlan.watchEvidenceCaptureEntries.every((item) => item.willModifyData === false),
+    true
+  );
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.mode, "launch-day-watch-evidence-execution-entry");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.status, "awaiting_launch_day_watch_evidence");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.willModifyData, false);
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.currentEvidenceKey, "launch_day_watch_summary");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.currentActionKey, "record_launch_day_watch_summary");
+  assert.equal(output.launchDayWatchPlan.watchEvidenceExecutionEntry.currentCommand, null);
+  assert.deepEqual(
+    output.launchDayWatchPlan.watchEvidenceExecutionEntry.evidenceQueue.map((item) => [
+      item.key,
+      item.status,
+      item.currentActionKey,
+      item.artifactPath,
+      item.receiptOperations
+    ]),
+    [
+      ["launch_day_watch_summary", "pending_operator_entry", "record_launch_day_watch_summary", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md", ["record_cutover_walkthrough", "record_launch_day_readiness_review"]],
+      ["receipt_visibility_snapshot", "pending_operator_entry", "record_receipt_visibility_snapshot", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt", ["record_post_launch_ops_sweep"]],
+      ["first_wave_incident_log", "pending_operator_entry", "record_first_wave_incident_log", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md", ["record_post_launch_ops_sweep"]],
+      ["rollback_signal_review", "pending_operator_entry", "record_rollback_signal_review", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md", ["record_rollback_walkthrough", "record_launch_stabilization_review"]],
+      ["stabilization_owner_handoff", "pending_operator_entry", "handoff_stabilization_owner", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md", ["record_launch_stabilization_review"]]
+    ]
+  );
+  assert.deepEqual(
+    output.launchDayWatchPlan.watchEvidenceExecutionEntry.receiptQueue.map((item) => [item.key, item.operation, item.status, item.artifactPath]),
+    [
+      ["launch_day_watch_summary", "record_cutover_walkthrough", "pending_operator_receipt", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+      ["launch_day_watch_summary", "record_launch_day_readiness_review", "pending_operator_receipt", "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"],
+      ["receipt_visibility_snapshot", "record_post_launch_ops_sweep", "pending_operator_receipt", "artifacts/staging/PILOT_ALPHA/stable/receipt-visibility-snapshot.txt"],
+      ["first_wave_incident_log", "record_post_launch_ops_sweep", "pending_operator_receipt", "artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md"],
+      ["rollback_signal_review", "record_rollback_walkthrough", "pending_operator_receipt", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+      ["rollback_signal_review", "record_launch_stabilization_review", "pending_operator_receipt", "artifacts/staging/PILOT_ALPHA/stable/rollback-signal-review.md"],
+      ["stabilization_owner_handoff", "record_launch_stabilization_review", "pending_operator_receipt", "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md"]
+    ]
+  );
+  assert.deepEqual(output.launchDayWatchPlan.watchEvidenceExecutionEntry.stabilizationHandoff, {
+    key: "stabilization_owner_handoff",
+    status: "pending_operator_entry",
+    path: "artifacts/staging/PILOT_ALPHA/stable/stabilization-owner-handoff.md",
+    receiptOperations: ["record_launch_stabilization_review"]
+  });
+  assert.equal(
+    output.launchDayWatchPlan.watchEvidenceExecutionEntry.nextAction,
+    "Record launch_day_watch_summary, attach receipt IDs, then continue launch-day watch evidence before stabilization handoff."
+  );
+  assert.match(handoff, /## Launch Day Watch Plan[\s\S]*Launch-day watch evidence execution entry: awaiting_launch_day_watch_evidence \(action=record_launch_day_watch_summary, current=launch_day_watch_summary\)[\s\S]*Launch-day watch evidence queue: launch_day_watch_summary:pending_operator_entry, receipt_visibility_snapshot:pending_operator_entry[\s\S]*Launch-day watch evidence receipt queue: launch_day_watch_summary=record_cutover_walkthrough:pending_operator_receipt, launch_day_watch_summary=record_launch_day_readiness_review:pending_operator_receipt[\s\S]*Launch-day watch evidence stabilization handoff: stabilization_owner_handoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+  assert.deepEqual(
+    output.operatorExecutionPlan.goLiveExecutionEntry.launchDayWatchEntry?.watchRecordQueue?.map((item) => [item.key, item.receiptOperations]),
+    [
         ["launch_day_watch_summary", ["record_cutover_walkthrough", "record_launch_day_readiness_review"]],
         ["receipt_visibility_snapshot", ["record_post_launch_ops_sweep"]],
         ["first_wave_incident_log", ["record_post_launch_ops_sweep"]],

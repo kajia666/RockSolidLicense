@@ -5159,6 +5159,62 @@ function buildLaunchDayWatchEvidenceCaptureEntries({
   });
 }
 
+function buildLaunchDayWatchEvidenceExecutionEntry(entries = [], {
+  canStartCutoverWatch = false,
+  stabilizationTarget = null
+} = {}) {
+  const evidenceEntries = Array.isArray(entries) ? entries : [];
+  const completeStatuses = new Set(["filled", "visible", "recorded", "complete"]);
+  const currentEntry = evidenceEntries.find((entry) => !completeStatuses.has(entry?.status)) || evidenceEntries[0] || null;
+  const evidenceQueue = evidenceEntries.map((entry) => {
+    const target = entry.resultBackfillTarget || {};
+    const receiptTargets = Array.isArray(entry.receiptTargets) ? entry.receiptTargets : [];
+    return {
+      key: entry.key || target.key || null,
+      category: entry.category || null,
+      status: entry.status || target.status || "not_available",
+      currentActionKey: entry.currentActionKey || null,
+      currentCommand: entry.currentCommand || null,
+      artifactPath: target.artifactPath || null,
+      receiptOperations: Array.isArray(target.receiptOperations) ? target.receiptOperations : receiptTargets.map((item) => item.operation).filter(Boolean),
+      receiptTargets,
+      expectedEvidence: target.expectedEvidence || null,
+      operatorNote: target.operatorNote || null
+    };
+  });
+  const receiptQueue = evidenceQueue.flatMap((entry) => (Array.isArray(entry.receiptTargets) ? entry.receiptTargets : []).map((target) => ({
+    key: entry.key,
+    operation: target.operation || null,
+    status: target.status || "not_available",
+    artifactPath: target.artifactPath || entry.artifactPath || null
+  })));
+  const allRecorded = evidenceEntries.length > 0 && evidenceEntries.every((entry) => completeStatuses.has(entry?.status));
+  const status = !canStartCutoverWatch
+    ? "blocked_until_production_signoff"
+    : allRecorded ? "ready_for_stabilization_handoff" : "awaiting_launch_day_watch_evidence";
+  return {
+    mode: "launch-day-watch-evidence-execution-entry",
+    status,
+    willModifyData: false,
+    currentEvidenceKey: currentEntry?.key || null,
+    currentActionKey: currentEntry?.currentActionKey || (canStartCutoverWatch ? "record_launch_day_watch_artifact" : "complete_production_signoff"),
+    currentCommand: currentEntry?.currentCommand || null,
+    evidenceQueue,
+    receiptQueue,
+    stabilizationHandoff: stabilizationTarget ? {
+      key: stabilizationTarget.key || "stabilization_owner_handoff",
+      status: stabilizationTarget.status || (canStartCutoverWatch ? "pending_operator_entry" : "blocked_until_production_signoff"),
+      path: stabilizationTarget.artifactPath || stabilizationTarget.path || null,
+      receiptOperations: Array.isArray(stabilizationTarget.receiptOperations) ? stabilizationTarget.receiptOperations : []
+    } : null,
+    nextAction: !canStartCutoverWatch
+      ? "Complete production sign-off before starting launch-day watch evidence capture."
+      : allRecorded
+        ? "Hand off stabilization owner records after launch-day watch evidence is recorded."
+        : `Record ${currentEntry?.key || "launch_day_watch_summary"}, attach receipt IDs, then continue launch-day watch evidence before stabilization handoff.`
+  };
+}
+
 function buildLaunchDayWatchExecutionEntry({
   canStartCutoverWatch = false,
   watchRecordDraft = {},
@@ -5216,6 +5272,13 @@ function buildLaunchDayWatchPlan(result) {
     canStartCutoverWatch,
     records: watchRecordDraft.records || []
   });
+  const watchEvidenceExecutionEntry = buildLaunchDayWatchEvidenceExecutionEntry(
+    watchEvidenceCaptureEntries,
+    {
+      canStartCutoverWatch,
+      stabilizationTarget: (watchRecordDraft.records || []).find((record) => record?.key === "stabilization_owner_handoff") || null
+    }
+  );
   return {
     status: canStartCutoverWatch ? "ready" : "blocked",
     canStartCutoverWatch,
@@ -5232,6 +5295,7 @@ function buildLaunchDayWatchPlan(result) {
     watchRecordDraft,
     watchExecutionEntry,
     watchEvidenceCaptureEntries,
+    watchEvidenceExecutionEntry,
     watchWindows: [
       {
         key: "cutover_watch",
@@ -8777,6 +8841,13 @@ function renderLaunchDayWatchPlan(plan) {
   const watchWindows = Array.isArray(plan.watchWindows) ? plan.watchWindows : [];
   const watchRecordDraft = plan.watchRecordDraft || {};
   const watchExecutionEntry = plan.watchExecutionEntry || {};
+  const watchEvidenceExecutionEntry = plan.watchEvidenceExecutionEntry || {};
+  const watchEvidenceQueue = Array.isArray(watchEvidenceExecutionEntry.evidenceQueue)
+    ? watchEvidenceExecutionEntry.evidenceQueue
+    : [];
+  const watchEvidenceReceiptQueue = Array.isArray(watchEvidenceExecutionEntry.receiptQueue)
+    ? watchEvidenceExecutionEntry.receiptQueue
+    : [];
   const lines = [
     `- Status: ${plan.status || "-"}`,
     `- Can start cutover watch: ${plan.canStartCutoverWatch ? "yes" : "no"}`,
@@ -8798,6 +8869,11 @@ function renderLaunchDayWatchPlan(plan) {
     `- Launch-day watch execution current record: ${watchExecutionEntry.currentRecord?.key || "-"} -> ${watchExecutionEntry.currentRecord?.path || "-"}`,
     `- Launch-day watch execution stabilization target: ${watchExecutionEntry.stabilizationTarget?.key || "-"} -> ${watchExecutionEntry.stabilizationTarget?.path || "-"}`,
     `- Launch-day watch execution next action: ${watchExecutionEntry.nextAction || "-"}`,
+    `- Launch-day watch evidence execution entry: ${watchEvidenceExecutionEntry.status || "-"} (action=${watchEvidenceExecutionEntry.currentActionKey || "-"}, current=${watchEvidenceExecutionEntry.currentEvidenceKey || "-"})`,
+    `- Launch-day watch evidence queue: ${watchEvidenceQueue.map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Launch-day watch evidence receipt queue: ${watchEvidenceReceiptQueue.map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Launch-day watch evidence stabilization handoff: ${watchEvidenceExecutionEntry.stabilizationHandoff?.key || "-"} -> ${watchEvidenceExecutionEntry.stabilizationHandoff?.path || "-"}`,
+    `- Launch-day watch evidence next action: ${watchEvidenceExecutionEntry.nextAction || "-"}`,
     `- Launch Mainline: ${routes.launchMainline || "-"}`,
     `- Developer Ops: ${routes.developerOps || "-"}`,
     `- Launch Review summary: ${routes.launchReviewSummary || "-"}`,

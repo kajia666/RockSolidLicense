@@ -340,7 +340,7 @@ test("staging readiness status infers artifact root from a staging closeout inpu
     );
     assert.equal(
       output.actionQueue[0].exampleCommand,
-      `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key backup_restore_drill_result --value-json '{"result":"pass","restoreDryRun":"pass","healthcheck":"pass","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id>`
+      `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key backup_restore_drill_result --value-json '{"result":"pass","restoreDryRun":"pass","healthcheck":"pass","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id> --actions-file ${actionsFile}`
     );
     const markdown = readFileSync(actionsFile, "utf8");
     assert.match(markdown, /Artifact path hint: `artifacts\/staging\/PILOT_ALPHA\/stable\/backup-restore-drill\.txt`/);
@@ -386,11 +386,11 @@ test("staging readiness status can write a redacted markdown action queue", () =
     assert.match(markdown, /Expected evidence: Confirm the artifact\/receipt ledger archive paths exist and contain redacted artifacts\./);
     assert.match(markdown, /Value JSON example: `{"result":"confirmed","summary":"<redacted operator summary>"}`/);
     assert.match(markdown, /Artifact path hint: `artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt`/);
-    assert.match(markdown, /Command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --condition-key staging_artifacts_archived --value-json <redacted-json>`/);
-    assert.match(markdown, /Example command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --condition-key staging_artifacts_archived --value-json '\{"result":"confirmed","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt`/);
+    assert.match(markdown, /Command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md`/);
+    assert.match(markdown, /Example command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --condition-key staging_artifacts_archived --value-json '\{"result":"confirmed","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt --actions-file .*readiness-action-queue\.md`/);
     assert.match(markdown, /10\. \[blocked_after_prior_actions\] `receipt_visibility` -> `launchOpsOverviewStatus`/);
     assert.match(markdown, /Receipt operations: record_post_launch_ops_sweep/);
-    assert.match(markdown, /Example command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --receipt-lane launchOpsOverviewStatus --value-json '\{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/launch-ops-overview-status-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id>`/);
+    assert.match(markdown, /Example command: `npm\.cmd run staging:signoff:backfill -- --input-file .* --receipt-lane launchOpsOverviewStatus --value-json '\{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/launch-ops-overview-status-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file .*readiness-action-queue\.md`/);
     assert.match(markdown, /Status check: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md`/);
     assert.doesNotMatch(markdown, /StrongAdmin|StrongDeveloper|Bearer|password/i);
   } finally {

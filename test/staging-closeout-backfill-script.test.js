@@ -96,11 +96,14 @@ test("staging closeout backfill writes one evidence field without clearing remai
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-backfill-"));
   try {
     const closeoutInputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
     writeCloseoutInput(closeoutInputFile);
 
     const result = runBackfill([
       "--input-file",
       closeoutInputFile,
+      "--actions-file",
+      actionsFile,
       "--key",
       "route_map_gate_result",
       "--value-json",
@@ -119,11 +122,12 @@ test("staging closeout backfill writes one evidence field without clearing remai
       mode: "staging-closeout-backfill",
       inputFile: closeoutInputFile,
       outputFile: closeoutInputFile,
+      actionsFile,
       key: "route_map_gate_result",
       filledFieldCount: 1,
       remainingPlaceholderCount: 6,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
-      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile}`,
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
       nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     });
 

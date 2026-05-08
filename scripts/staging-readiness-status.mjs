@@ -372,16 +372,20 @@ function extractDecisionValue(value) {
   return null;
 }
 
-function commandForCloseoutBackfill(inputFile, key) {
-  return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key} --value-json <redacted-json>`;
-}
-
 function commandValue(value) {
   const text = String(value || "");
   if (/[\s"`]/.test(text)) {
     return `"${text.replace(/"/g, "`\"")}"`;
   }
   return text;
+}
+
+function actionsFileArgs(actionsFile) {
+  return actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
+}
+
+function commandForCloseoutBackfill(inputFile, key, actionsFile = null) {
+  return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key} --value-json <redacted-json>${actionsFileArgs(actionsFile)}`;
 }
 
 function quoteValueJson(value) {
@@ -403,26 +407,26 @@ function evidenceArgs(evidence) {
   ].join("");
 }
 
-function commandForCloseoutBackfillExample(inputFile, key, evidence) {
-  return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key}${evidenceArgs(evidence)}`;
+function commandForCloseoutBackfillExample(inputFile, key, evidence, actionsFile = null) {
+  return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key}${evidenceArgs(evidence)}${actionsFileArgs(actionsFile)}`;
 }
 
-function commandForSignoffCondition(inputFile, key, includeDecision = false) {
+function commandForSignoffCondition(inputFile, key, includeDecision = false, actionsFile = null) {
   const decision = includeDecision ? " --decision ready-for-production-signoff" : "";
-  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key ${key} --value-json <redacted-json>${decision}`;
+  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key ${key} --value-json <redacted-json>${decision}${actionsFileArgs(actionsFile)}`;
 }
 
-function commandForSignoffConditionExample(inputFile, key, evidence, includeDecision = false) {
+function commandForSignoffConditionExample(inputFile, key, evidence, includeDecision = false, actionsFile = null) {
   const decision = includeDecision ? " --decision ready-for-production-signoff" : "";
-  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key ${key}${evidenceArgs(evidence)}${decision}`;
+  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key ${key}${evidenceArgs(evidence)}${decision}${actionsFileArgs(actionsFile)}`;
 }
 
-function commandForReceiptLane(inputFile, key) {
-  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key} --value-json <redacted-json>`;
+function commandForReceiptLane(inputFile, key, actionsFile = null) {
+  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key} --value-json <redacted-json>${actionsFileArgs(actionsFile)}`;
 }
 
-function commandForReceiptLaneExample(inputFile, key, evidence) {
-  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key}${evidenceArgs(evidence)}`;
+function commandForReceiptLaneExample(inputFile, key, evidence, actionsFile = null) {
+  return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key}${evidenceArgs(evidence)}${actionsFileArgs(actionsFile)}`;
 }
 
 function reloadCommand(inputFile) {
@@ -459,8 +463,8 @@ function buildActionQueue({
         phase: "pre_full_test_closeout",
         status: queueStatus(index),
         targetKey: key,
-        command: commandForCloseoutBackfill(inputFile, key),
-        exampleCommand: commandForCloseoutBackfillExample(inputFile, key, evidence),
+        command: commandForCloseoutBackfill(inputFile, key, actionsFile),
+        exampleCommand: commandForCloseoutBackfillExample(inputFile, key, evidence, actionsFile),
         evidence,
         statusCommand: localStatusCommand
       };
@@ -474,8 +478,8 @@ function buildActionQueue({
         phase: "pre_full_test_closeout",
         status: "current",
         targetKey: "operator_go_no_go",
-        command: commandForCloseoutBackfill(inputFile, "operator_go_no_go"),
-        exampleCommand: commandForCloseoutBackfillExample(inputFile, "operator_go_no_go", evidence),
+        command: commandForCloseoutBackfill(inputFile, "operator_go_no_go", actionsFile),
+        exampleCommand: commandForCloseoutBackfillExample(inputFile, "operator_go_no_go", evidence, actionsFile),
         evidence,
         statusCommand: localStatusCommand
       }
@@ -501,8 +505,8 @@ function buildActionQueue({
         status: "current",
         targetKey: "full_test_window_passed",
         command: "npm.cmd test",
-        followUpCommand: commandForSignoffCondition(inputFile, "full_test_window_passed", true),
-        followUpExampleCommand: commandForSignoffConditionExample(inputFile, "full_test_window_passed", evidence, true),
+        followUpCommand: commandForSignoffCondition(inputFile, "full_test_window_passed", true, actionsFile),
+        followUpExampleCommand: commandForSignoffConditionExample(inputFile, "full_test_window_passed", evidence, true, actionsFile),
         evidence,
         statusCommand: localStatusCommand
       }
@@ -517,8 +521,8 @@ function buildActionQueue({
         phase: "production_signoff",
         status: "current",
         targetKey: "productionSignoff.decision",
-        command: commandForSignoffCondition(inputFile, key, true),
-        exampleCommand: commandForSignoffConditionExample(inputFile, key, evidence, true),
+        command: commandForSignoffCondition(inputFile, key, true, actionsFile),
+        exampleCommand: commandForSignoffConditionExample(inputFile, key, evidence, true, actionsFile),
         evidence,
         statusCommand: localStatusCommand
       }
@@ -531,8 +535,8 @@ function buildActionQueue({
       phase: "production_signoff",
       status: queueStatus(index),
       targetKey: key,
-      command: commandForSignoffCondition(inputFile, key),
-      exampleCommand: commandForSignoffConditionExample(inputFile, key, evidence),
+      command: commandForSignoffCondition(inputFile, key, false, actionsFile),
+      exampleCommand: commandForSignoffConditionExample(inputFile, key, evidence, false, actionsFile),
       evidence,
       statusCommand: localStatusCommand
     };
@@ -544,8 +548,8 @@ function buildActionQueue({
       phase: "receipt_visibility",
       status: signoffQueue.length === 0 && index === 0 ? "current" : "blocked_after_prior_actions",
       targetKey: key,
-      command: commandForReceiptLane(inputFile, key),
-      exampleCommand: commandForReceiptLaneExample(inputFile, key, evidence),
+      command: commandForReceiptLane(inputFile, key, actionsFile),
+      exampleCommand: commandForReceiptLaneExample(inputFile, key, evidence, actionsFile),
       evidence,
       statusCommand: localStatusCommand
     };
@@ -636,6 +640,7 @@ function renderActionQueueMarkdown(result) {
 
 function buildNextStep({
   inputFile,
+  actionsFile,
   missingCloseoutKeys,
   closeoutDecision,
   missingSignoffKeys,
@@ -649,7 +654,7 @@ function buildNextStep({
     return {
       key: "backfill_closeout_evidence",
       targetKey,
-      command: commandForCloseoutBackfill(inputFile, targetKey),
+      command: commandForCloseoutBackfill(inputFile, targetKey, actionsFile),
       reloadCommand: reloadCommand(inputFile),
       nextAction: `Backfill ${targetKey}, then run reloadCommand.`
     };
@@ -658,7 +663,7 @@ function buildNextStep({
     return {
       key: "confirm_full_test_go_no_go",
       targetKey: "operator_go_no_go",
-      command: commandForCloseoutBackfill(inputFile, "operator_go_no_go"),
+      command: commandForCloseoutBackfill(inputFile, "operator_go_no_go", actionsFile),
       reloadCommand: reloadCommand(inputFile),
       nextAction: "Set operator_go_no_go to ready-for-full-test-window, then run reloadCommand."
     };
@@ -676,7 +681,7 @@ function buildNextStep({
       key: "run_full_test_window",
       targetKey: "full_test_window_passed",
       command: "npm.cmd test",
-      backfillCommand: commandForSignoffCondition(inputFile, "full_test_window_passed", true),
+      backfillCommand: commandForSignoffCondition(inputFile, "full_test_window_passed", true, actionsFile),
       reloadCommand: reloadCommand(inputFile),
       nextAction: "Run the full test window, backfill full_test_window_passed, then run reloadCommand."
     };
@@ -685,7 +690,7 @@ function buildNextStep({
     return {
       key: "set_production_signoff_decision",
       targetKey: "productionSignoff.decision",
-      command: commandForSignoffCondition(inputFile, missingSignoffKeys[0] || "operator_signoff_recorded", true),
+      command: commandForSignoffCondition(inputFile, missingSignoffKeys[0] || "operator_signoff_recorded", true, actionsFile),
       reloadCommand: reloadCommand(inputFile),
       nextAction: "Set productionSignoff.decision to ready-for-production-signoff while backfilling the next sign-off evidence."
     };
@@ -695,7 +700,7 @@ function buildNextStep({
     return {
       key: "backfill_production_signoff",
       targetKey,
-      command: commandForSignoffCondition(inputFile, targetKey),
+      command: commandForSignoffCondition(inputFile, targetKey, false, actionsFile),
       reloadCommand: reloadCommand(inputFile),
       nextAction: `Backfill ${targetKey}, then run reloadCommand.`
     };
@@ -705,7 +710,7 @@ function buildNextStep({
     return {
       key: "backfill_receipt_visibility",
       targetKey,
-      command: commandForReceiptLane(inputFile, targetKey),
+      command: commandForReceiptLane(inputFile, targetKey, actionsFile),
       reloadCommand: reloadCommand(inputFile),
       nextAction: `Backfill ${targetKey} receipt visibility, then run reloadCommand.`
     };
@@ -769,6 +774,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
   const launchStatus = canSignoffProduction ? "ready_for_launch_day_watch" : "blocked";
   const nextStep = buildNextStep({
     inputFile,
+    actionsFile,
     missingCloseoutKeys,
     closeoutDecision,
     missingSignoffKeys,

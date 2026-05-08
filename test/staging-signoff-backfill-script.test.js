@@ -115,11 +115,14 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-signoff-backfill-"));
   try {
     const closeoutInputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
     writeReadyForFullTestInput(closeoutInputFile);
 
     const signoffResult = runBackfill([
       "--input-file",
       closeoutInputFile,
+      "--actions-file",
+      actionsFile,
       "--condition-key",
       "full_test_window_passed",
       "--value-json",
@@ -139,6 +142,7 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       mode: "staging-signoff-backfill",
       inputFile: closeoutInputFile,
       outputFile: closeoutInputFile,
+      actionsFile,
       targetType: "production_signoff_condition",
       key: "full_test_window_passed",
       productionDecision: "ready-for-production-signoff",
@@ -147,13 +151,15 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       missingConditionCount: 6,
       missingReceiptLaneCount: 5,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
-      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile}`,
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
       nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     });
 
     const receiptResult = runBackfill([
       "--input-file",
       closeoutInputFile,
+      "--actions-file",
+      actionsFile,
       "--receipt-lane",
       "launchMainline",
       "--value-json",
@@ -171,6 +177,7 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       mode: "staging-signoff-backfill",
       inputFile: closeoutInputFile,
       outputFile: closeoutInputFile,
+      actionsFile,
       targetType: "receipt_visibility_lane",
       key: "launchMainline",
       productionDecision: "ready-for-production-signoff",
@@ -179,7 +186,7 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       missingConditionCount: 6,
       missingReceiptLaneCount: 4,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
-      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile}`,
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
       nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     });
 

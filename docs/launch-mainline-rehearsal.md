@@ -84,19 +84,21 @@ Backfill each real evidence item with `staging:closeout:backfill` as the artifac
 ```powershell
 npm.cmd run staging:closeout:backfill -- --json `
   --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --actions-file .\artifacts\staging\SMOKE_ALPHA\stable\readiness-action-queue.md `
   --key route_map_gate_result `
   --value-json '{"result":"pass","exitCode":0}' `
   --artifact-path artifacts/staging/SMOKE_ALPHA/stable/route-map-gate-output.txt `
   --receipt-id receipt-route-map-001
 ```
 
-The JSON output includes both the compatible `nextCommand` rehearsal reload and a shorter `statusCommand`. Prefer running `statusCommand` after each backfill so the next closeout, full-test, sign-off, or receipt visibility action is selected from the current file state.
+The JSON output includes both the compatible `nextCommand` rehearsal reload and a shorter `statusCommand`. When `--actions-file` is supplied, that `statusCommand` keeps the same checklist path, so launch duty can run the generated backfill command and then copy the returned status command to refresh the same action queue.
 
 For the final closeout decision, write `operator_go_no_go` as object evidence so the same record carries the decision, operator, timestamp, and redacted summary. `staging:closeout:backfill`, `staging:readiness:status`, and `staging:rehearsal --closeout-input-file` all treat the object `decision` as the full-test-window gate:
 
 ```powershell
 npm.cmd run staging:closeout:backfill -- --json `
   --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --actions-file .\artifacts\staging\SMOKE_ALPHA\stable\readiness-action-queue.md `
   --key operator_go_no_go `
   --value-json '{"decision":"ready-for-full-test-window","operator":"launch-duty","timestamp":"2026-05-08T10:00:00+08:00","summary":"redacted go/no-go approval"}' `
   --artifact-path artifacts/staging/SMOKE_ALPHA/stable/operator-go-no-go.md
@@ -124,6 +126,7 @@ After the full-test window completes, use `staging:signoff:backfill` to attach p
 ```powershell
 npm.cmd run staging:signoff:backfill -- --json `
   --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --actions-file .\artifacts\staging\SMOKE_ALPHA\stable\readiness-action-queue.md `
   --condition-key full_test_window_passed `
   --value-json '{"result":"pass","command":"npm.cmd test","failureCount":0}' `
   --artifact-path artifacts/staging/SMOKE_ALPHA/stable/full-test-output.txt `
@@ -136,6 +139,7 @@ Then backfill each receipt visibility lane as its latest receipt surface is veri
 ```powershell
 npm.cmd run staging:signoff:backfill -- --json `
   --input-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --actions-file .\artifacts\staging\SMOKE_ALPHA\stable\readiness-action-queue.md `
   --receipt-lane launchMainline `
   --value-json '{"status":"visible","summaryPath":"/developer/launch-mainline?productCode=SMOKE_ALPHA"}' `
   --artifact-path artifacts/staging/SMOKE_ALPHA/stable/launch-mainline-receipt-visibility.json `

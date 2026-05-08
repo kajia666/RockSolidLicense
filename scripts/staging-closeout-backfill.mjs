@@ -8,7 +8,8 @@ const OPTION_FLAGS = {
   "--key": "key",
   "--value-json": "valueJson",
   "--artifact-path": "artifactPath",
-  "--receipt-id": "receiptIds"
+  "--receipt-id": "receiptIds",
+  "--actions-file": "actionsFile"
 };
 
 function requireArgValue(name, value, inlineValue) {
@@ -62,6 +63,11 @@ function commandValue(value) {
     return `"${text.replace(/"/g, "`\"")}"`;
   }
   return text;
+}
+
+function statusCommand(outputFile, actionsFile = null) {
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
+  return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
 }
 
 function buildEvidenceValue(options) {
@@ -156,6 +162,7 @@ function main() {
     const options = parseArgs(process.argv.slice(2));
     const inputFile = path.resolve(options.inputFile);
     const outputFile = path.resolve(options.outputFile || options.inputFile);
+    const actionsFile = options.actionsFile ? path.resolve(options.actionsFile) : null;
     const payload = JSON.parse(readFileSync(inputFile, "utf8"));
     const nextPayload = backfill(payload, options);
     mkdirSync(path.dirname(outputFile), { recursive: true });
@@ -167,11 +174,12 @@ function main() {
       mode: "staging-closeout-backfill",
       inputFile,
       outputFile,
+      ...(actionsFile ? { actionsFile } : {}),
       key: options.key,
       filledFieldCount,
       remainingPlaceholderCount: fields.length - filledFieldCount,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`,
-      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}`,
+      statusCommand: statusCommand(outputFile, actionsFile),
       nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     }, options.json);
   } catch (error) {

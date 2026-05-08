@@ -3384,6 +3384,39 @@ function buildCloseoutBackfillGuide(result) {
   };
 }
 
+function buildFullTestResultCaptureEntry({
+  canRun = false,
+  command = "npm.cmd test",
+  closeoutInput = null,
+  closeout = {},
+  reloadCommand = null
+} = {}) {
+  const resultKey = "full_test_window_passed";
+  const signoffConditions = closeout.productionSignoffConditions || {};
+  const fullTestCondition = (signoffConditions.conditions || []).find((item) => item?.key === resultKey) || {};
+  return {
+    mode: "full-test-result-capture-entry",
+    status: canRun ? "ready_for_full_test_result_capture" : "blocked_until_closeout_reload",
+    willModifyData: false,
+    currentActionKey: canRun ? "run_full_test_window" : "reload_closeout_input",
+    currentCommand: canRun ? command : reloadCommand,
+    resultBackfillTarget: {
+      key: resultKey,
+      status: canRun ? "pending_operator_result" : "blocked_until_full_test_window",
+      closeoutInputPath: closeoutInput?.path || null,
+      reloadCommand,
+      expectedEvidence: fullTestCondition.evidence || "Attach the full `npm.cmd test` output summary and failure count."
+    },
+    productionSignoffTarget: {
+      requiredDecision: signoffConditions.requiredDecision || "ready-for-production-signoff",
+      currentSignoffKey: resultKey
+    },
+    nextAction: canRun
+      ? `Run ${command}, capture the redacted summary, backfill ${resultKey}, then reload closeout input.`
+      : "Backfill closeout input and reload it before capturing full-test results."
+  };
+}
+
 function buildFullTestWindowReadiness(result) {
   const closeout = result.stagingAcceptanceCloseout || {};
   const closeoutInput = result.closeoutInput || null;
@@ -3392,6 +3425,7 @@ function buildFullTestWindowReadiness(result) {
     || (closeout.acceptanceChecks || []).map((item) => item.key).filter(Boolean);
   const canRun = closeoutInput?.readyForFullTestWindow === true;
   const closeoutEvidenceTargets = buildCloseoutEvidenceTargets(closeout, missingCloseoutKeys);
+  const reloadCommand = result.closeoutBackfillGuide?.closeoutInputReload?.command || "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>";
   return {
     status: canRun ? "ready" : "blocked",
     canRun,
@@ -3402,7 +3436,14 @@ function buildFullTestWindowReadiness(result) {
     closeoutInputStatus: closeoutInput?.status || "missing",
     missingCloseoutKeys,
     closeoutEvidenceTargets,
-    reloadCommand: result.closeoutBackfillGuide?.closeoutInputReload?.command || "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+    reloadCommand,
+    resultCaptureEntry: buildFullTestResultCaptureEntry({
+      canRun,
+      command,
+      closeoutInput,
+      closeout,
+      reloadCommand
+    }),
     nextAction: canRun
       ? `Run ${command} in the reserved full test window, then backfill productionSignoff.`
       : `Backfill closeout input and reload it before running ${command}.`
@@ -7445,6 +7486,7 @@ function renderFullTestWindowReadiness(readiness) {
   if (!readiness) {
     return "- Not available";
   }
+  const resultCaptureEntry = readiness.resultCaptureEntry || {};
   const lines = [
     `- Status: ${readiness.status || "-"}`,
     `- Can run: ${readiness.canRun ? "yes" : "no"}`,
@@ -7455,6 +7497,11 @@ function renderFullTestWindowReadiness(readiness) {
     `- Closeout input status: ${readiness.closeoutInputStatus || "-"}`,
     `- Missing closeout keys: ${(readiness.missingCloseoutKeys || []).join(", ") || "-"}`,
     `- Reload command: \`${readiness.reloadCommand || "-"}\``,
+    `- Full-test result capture entry: ${resultCaptureEntry.status || "-"} (action=${resultCaptureEntry.currentActionKey || "-"}, target=${resultCaptureEntry.resultBackfillTarget?.key || "-"})`,
+    `- Full-test result capture command: \`${resultCaptureEntry.currentCommand || "-"}\``,
+    `- Full-test result capture closeout input: ${resultCaptureEntry.resultBackfillTarget?.closeoutInputPath || "-"}`,
+    `- Full-test result capture expected evidence: ${resultCaptureEntry.resultBackfillTarget?.expectedEvidence || "-"}`,
+    `- Full-test result capture next action: ${resultCaptureEntry.nextAction || "-"}`,
     `- Next action: ${readiness.nextAction || "-"}`
   ];
   if (Array.isArray(readiness.closeoutEvidenceTargets) && readiness.closeoutEvidenceTargets.length) {

@@ -459,6 +459,25 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     missingCloseoutKeys: output.stagingAcceptanceCloseout.acceptanceChecks.map((item) => item.key),
     closeoutEvidenceTargets: expectedCloseoutEvidenceTargets(),
     reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+    resultCaptureEntry: {
+      mode: "full-test-result-capture-entry",
+      status: "blocked_until_closeout_reload",
+      willModifyData: false,
+      currentActionKey: "reload_closeout_input",
+      currentCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+      resultBackfillTarget: {
+        key: "full_test_window_passed",
+        status: "blocked_until_full_test_window",
+        closeoutInputPath: null,
+        reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+        expectedEvidence: "Attach the full `npm.cmd test` output summary and failure count."
+      },
+      productionSignoffTarget: {
+        requiredDecision: "ready-for-production-signoff",
+        currentSignoffKey: "full_test_window_passed"
+      },
+      nextAction: "Backfill closeout input and reload it before capturing full-test results."
+    },
     nextAction: "Backfill closeout input and reload it before running npm.cmd test."
   });
   assert.deepEqual(output.productionSignoffReadiness, {
@@ -2931,6 +2950,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /Status: blocked/);
     assert.match(handoff, /Can run: no/);
     assert.match(handoff, /Reload command: `npm\.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout\.json>`/);
+    assert.match(handoff, /## Full Test Window Readiness[\s\S]*Full-test result capture entry: blocked_until_closeout_reload \(action=reload_closeout_input, target=full_test_window_passed\)[\s\S]*Full-test result capture command: `npm\.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout\.json>`[\s\S]*Full-test result capture expected evidence: Attach the full `npm\.cmd test` output summary and failure count\.[\s\S]*## Production Sign-Off Readiness/);
     assert.match(handoff, /## Full Test Window Readiness[\s\S]*Closeout evidence targets:[\s\S]*route_map_gate_result: missing \(run_route_map_gate\)[\s\S]*expectedEvidence: Record the targeted gate exit status, pass count, and redacted output artifact path\.[\s\S]*operator_go_no_go: missing \(backfill_filled_closeout_input\)[\s\S]*expectedEvidence: Record ready-for-full-test-window, hold, or rollback-follow-up with the operator name and timestamp\.[\s\S]*## Production Sign-Off Readiness/);
     assert.match(handoff, /## Production Sign-Off Readiness/);
     assert.match(handoff, /Can sign off: no/);
@@ -3612,6 +3632,25 @@ test("staging rehearsal runner can read a redacted closeout input file to narrow
     assert.equal(output.fullTestWindowReadiness.canRun, true);
     assert.deepEqual(output.fullTestWindowReadiness.missingCloseoutKeys, []);
     assert.deepEqual(output.fullTestWindowReadiness.closeoutEvidenceTargets, expectedCloseoutEvidenceTargets([]));
+    assert.deepEqual(output.fullTestWindowReadiness.resultCaptureEntry, {
+      mode: "full-test-result-capture-entry",
+      status: "ready_for_full_test_result_capture",
+      willModifyData: false,
+      currentActionKey: "run_full_test_window",
+      currentCommand: "npm.cmd test",
+      resultBackfillTarget: {
+        key: "full_test_window_passed",
+        status: "pending_operator_result",
+        closeoutInputPath: closeoutInputFile,
+        reloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout.json>",
+        expectedEvidence: "Attach the full `npm.cmd test` output summary and failure count."
+      },
+      productionSignoffTarget: {
+        requiredDecision: "ready-for-production-signoff",
+        currentSignoffKey: "full_test_window_passed"
+      },
+      nextAction: "Run npm.cmd test, capture the redacted summary, backfill full_test_window_passed, then reload closeout input."
+    });
     assert.deepEqual(output.productionSignoffReadiness.signoffEvidenceTargets, expectedSignoffEvidenceTargets());
     assert.deepEqual(output.productionSignoffReadiness.receiptVisibilityEvidenceTargets, expectedReceiptVisibilityEvidenceTargets());
     assert.equal(output.fullTestWindowReadiness.nextAction, "Run npm.cmd test in the reserved full test window, then backfill productionSignoff.");

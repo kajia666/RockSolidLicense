@@ -200,6 +200,29 @@ const RECEIPT_VISIBILITY_EVIDENCE = {
   launchOpsOverviewStatus: "Confirm Launch Ops Overview Status shows the latest receipt visibility status before cutover."
 };
 
+const LAUNCH_DUTY_FOLLOW_UP_EVIDENCE = {
+  launch_day_watch_summary: {
+    expectedEvidence: "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions.",
+    valueJsonExample: {
+      result: "recorded",
+      watchWindow: "T-30m through T+2h",
+      summary: "<redacted launch-day watch summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/launch-day-watch-summary.md",
+    receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"]
+  },
+  first_wave_closeout: {
+    expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp.",
+    valueJsonExample: {
+      result: "closed",
+      unresolvedIncidents: [],
+      summary: "<redacted first-wave closeout summary>"
+    },
+    artifactPathHint: "artifacts/staging/<productCode>/<channel>/first-wave-closeout.md",
+    receiptOperations: ["record_launch_closeout_review"]
+  }
+};
+
 const OPTION_FLAGS = {
   "--input-file": "inputFile",
   "--actions-file": "actionsFile"
@@ -358,6 +381,10 @@ function evidenceForReceiptLane(key, artifactPathRoot) {
   }, artifactPathRoot));
 }
 
+function evidenceForLaunchDutyFollowUp(key, artifactPathRoot) {
+  return evidenceWithReceiptHint(applyArtifactPathRoot(LAUNCH_DUTY_FOLLOW_UP_EVIDENCE[key], artifactPathRoot));
+}
+
 function extractDecisionValue(value) {
   if (typeof value === "string") {
     return value.trim() || null;
@@ -440,6 +467,43 @@ function statusCommand(inputFile, actionsFile = null) {
 
 function queueStatus(index) {
   return index === 0 ? "current" : "blocked_after_prior_actions";
+}
+
+function buildLaunchDutyReadyActionQueue({ inputFile, actionsFile, artifactPathRoot }) {
+  const localStatusCommand = statusCommand(inputFile, actionsFile);
+  return [
+    {
+      key: "reload_rehearsal_for_launch_day_watch",
+      phase: "launch_day_watch",
+      status: "current",
+      targetKey: null,
+      actionKey: "archive_production_signoff",
+      command: reloadCommand(inputFile),
+      operatorInstruction: "Reload rehearsal, archive the production sign-off packet, then use the generated launch-duty packet for watch evidence.",
+      statusCommand: localStatusCommand
+    },
+    {
+      key: "record_launch_day_watch_summary",
+      phase: "launch_day_watch",
+      status: "blocked_after_prior_actions",
+      targetKey: "launch_day_watch_summary",
+      actionKey: "record_launch_day_watch_summary",
+      evidence: evidenceForLaunchDutyFollowUp("launch_day_watch_summary", artifactPathRoot),
+      operatorInstruction: "Record launch-day watch summary and attach the cutover/readiness receipt IDs after the rehearsal packet is regenerated.",
+      statusCommand: localStatusCommand
+    },
+    {
+      key: "close_first_wave",
+      phase: "first_wave_closeout",
+      status: "blocked_after_prior_actions",
+      targetKey: "first_wave_closeout",
+      actionKey: "close_first_wave",
+      evidence: evidenceForLaunchDutyFollowUp("first_wave_closeout", artifactPathRoot),
+      sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"],
+      operatorInstruction: "Close the first wave after incident, rollback, and stabilization owner records are attached.",
+      statusCommand: localStatusCommand
+    }
+  ];
 }
 
 function buildActionQueue({
@@ -558,15 +622,7 @@ function buildActionQueue({
     return [...signoffQueue, ...receiptQueue];
   }
   if (canSignoffProduction) {
-    return [
-      {
-        key: "reload_rehearsal_for_launch_day_watch",
-        phase: "launch_day_watch",
-        status: "current",
-        targetKey: null,
-        command: reloadCommand(inputFile)
-      }
-    ];
+    return buildLaunchDutyReadyActionQueue({ inputFile, actionsFile, artifactPathRoot });
   }
   return [
     {
@@ -609,6 +665,15 @@ function renderActionQueueMarkdown(result) {
   for (const [index, item] of result.actionQueue.entries()) {
     lines.push(`${index + 1}. [${item.status}] \`${item.phase}\` -> ${renderActionTarget(item.targetKey)}`);
     lines.push(`   Key: \`${item.key}\``);
+    if (item.actionKey) {
+      lines.push(`   Action key: \`${item.actionKey}\``);
+    }
+    if (item.sourceRecordKeys?.length) {
+      lines.push(`   Source records: ${item.sourceRecordKeys.join(", ")}`);
+    }
+    if (item.operatorInstruction) {
+      lines.push(`   Operator instruction: ${item.operatorInstruction}`);
+    }
     if (item.evidence) {
       lines.push(`   Expected evidence: ${item.evidence.expectedEvidence}`);
       lines.push(`   Value JSON example: \`${JSON.stringify(item.evidence.valueJsonExample)}\``);
@@ -618,7 +683,9 @@ function renderActionQueueMarkdown(result) {
       }
       lines.push(`   Receipt ID hint: ${item.evidence.receiptIdHint}`);
     }
-    lines.push(`   Command: \`${item.command}\``);
+    if (item.command) {
+      lines.push(`   Command: \`${item.command}\``);
+    }
     if (item.exampleCommand) {
       lines.push(`   Example command: \`${item.exampleCommand}\``);
     }

@@ -401,7 +401,9 @@ test("staging readiness status can write a redacted markdown action queue", () =
 test("staging readiness status reports launch-day watch readiness after all local gates are clear", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-ready-"));
   try {
-    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const inputFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "readiness-action-queue.md");
+    mkdirSync(dirname(inputFile), { recursive: true });
     writeCloseoutInput(inputFile, {
       filledCloseoutKeys: closeoutKeys,
       decision: "ready-for-full-test-window",
@@ -410,7 +412,7 @@ test("staging readiness status reports launch-day watch readiness after all loca
       visibleReceiptLanes: receiptVisibilityKeys
     });
 
-    const result = runStatus(["--input-file", inputFile]);
+    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile]);
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const output = JSON.parse(result.stdout);
@@ -423,15 +425,41 @@ test("staging readiness status reports launch-day watch readiness after all loca
       output.nextStep.command,
       `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`
     );
-    assert.deepEqual(output.actionQueue, [
-      {
-        key: "reload_rehearsal_for_launch_day_watch",
-        phase: "launch_day_watch",
-        status: "current",
-        targetKey: null,
-        command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`
-      }
-    ]);
+    assert.deepEqual(
+      output.actionQueue.map((item) => [item.key, item.phase, item.status, item.targetKey, item.actionKey]),
+      [
+        ["reload_rehearsal_for_launch_day_watch", "launch_day_watch", "current", null, "archive_production_signoff"],
+        ["record_launch_day_watch_summary", "launch_day_watch", "blocked_after_prior_actions", "launch_day_watch_summary", "record_launch_day_watch_summary"],
+        ["close_first_wave", "first_wave_closeout", "blocked_after_prior_actions", "first_wave_closeout", "close_first_wave"]
+      ]
+    );
+    assert.equal(
+      output.actionQueue[1].evidence.artifactPathHint,
+      "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"
+    );
+    assert.deepEqual(
+      output.actionQueue[1].evidence.receiptOperations,
+      ["record_cutover_walkthrough", "record_launch_day_readiness_review"]
+    );
+    assert.equal(
+      output.actionQueue[2].evidence.artifactPathHint,
+      "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md"
+    );
+    assert.deepEqual(
+      output.actionQueue[2].sourceRecordKeys,
+      ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+    );
+    assert.equal(output.actionsFile.itemCount, 3);
+    const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /1\. \[current\] `launch_day_watch` -> `none`/);
+    assert.match(markdown, /Action key: `archive_production_signoff`/);
+    assert.match(markdown, /2\. \[blocked_after_prior_actions\] `launch_day_watch` -> `launch_day_watch_summary`/);
+    assert.match(markdown, /Action key: `record_launch_day_watch_summary`/);
+    assert.match(markdown, /Artifact path hint: `artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md`/);
+    assert.match(markdown, /Receipt operations: record_cutover_walkthrough, record_launch_day_readiness_review/);
+    assert.match(markdown, /3\. \[blocked_after_prior_actions\] `first_wave_closeout` -> `first_wave_closeout`/);
+    assert.match(markdown, /Action key: `close_first_wave`/);
+    assert.match(markdown, /Source records: first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

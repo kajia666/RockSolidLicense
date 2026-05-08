@@ -18,5 +18,6 @@
   "readinessReviewPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-readiness-review-packet.json",
   "productionSignoffPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json",
   "launchDutyArchiveIndexFile": "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json",
-  "filledCloseoutDraftFile": "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json"
+  "filledCloseoutDraftFile": "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json",
+  "readinessActionQueueFile": "artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md"
 }

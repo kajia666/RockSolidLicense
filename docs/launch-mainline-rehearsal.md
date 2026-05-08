@@ -67,17 +67,18 @@ npm.cmd run staging:profile:init -- --json `
   --output-file .\artifacts\staging\SMOKE_ALPHA\stable\staging-rehearsal-profile.json
 ```
 
-Review the generated JSON, set `$env:RSL_SMOKE_ADMIN_PASSWORD`, `$env:RSL_SMOKE_DEVELOPER_PASSWORD`, and `$env:RSL_DEVELOPER_BEARER_TOKEN` in the shell that will run rehearsal commands, then run `staging:rehearsal --profile-file <generated-profile.json>`. The JSON output also includes `closeoutInitCommand` and `postCloseoutInitStatusCommand`; keep those commands for the moment after rehearsal writes `filled-closeout-input.draft.json`.
+Review the generated JSON, set `$env:RSL_SMOKE_ADMIN_PASSWORD`, `$env:RSL_SMOKE_DEVELOPER_PASSWORD`, and `$env:RSL_DEVELOPER_BEARER_TOKEN` in the shell that will run rehearsal commands, then run `staging:rehearsal --profile-file <generated-profile.json>`. The JSON output also includes `readinessActionQueueFile`, `closeoutInitCommand`, and `postCloseoutInitStatusCommand`; keep those commands for the moment after rehearsal writes `filled-closeout-input.draft.json`.
 
 After the profile-driven rehearsal writes `filled-closeout-input.draft.json`, initialize the real closeout input file from that draft before backfilling evidence:
 
 ```powershell
 npm.cmd run staging:closeout:init -- --json `
   --draft-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.draft.json `
-  --output-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json
+  --output-file .\artifacts\staging\SMOKE_ALPHA\stable\filled-closeout-input.json `
+  --actions-file .\artifacts\staging\SMOKE_ALPHA\stable\readiness-action-queue.md
 ```
 
-This command removes the `exampleOnly` guard so the file can be loaded by `staging:rehearsal --closeout-input-file`, but it keeps every evidence value empty. The JSON output includes a `statusCommand`; run it immediately after initialization to pick the first closeout backfill target. The reload must still report missing fields until real route-map, backup/restore, live-write smoke, receipt visibility, and operator go/no-go evidence are backfilled.
+This command removes the `exampleOnly` guard so the file can be loaded by `staging:rehearsal --closeout-input-file`, but it keeps every evidence value empty. The JSON output includes a `statusCommand`; when `--actions-file` is supplied, that command immediately writes or refreshes the readiness action queue and picks the first closeout backfill target. The reload must still report missing fields until real route-map, backup/restore, live-write smoke, receipt visibility, and operator go/no-go evidence are backfilled.
 
 Backfill each real evidence item with `staging:closeout:backfill` as the artifacts and receipt IDs become available:
 

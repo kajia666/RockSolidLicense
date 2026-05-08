@@ -132,7 +132,8 @@ function buildProfile(options) {
       readinessReviewPacketFile: path.posix.join(archiveRoot, "staging-readiness-review-packet.json"),
       productionSignoffPacketFile: path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
       launchDutyArchiveIndexFile: path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json"),
-      filledCloseoutDraftFile: path.posix.join(archiveRoot, "filled-closeout-input.draft.json")
+      filledCloseoutDraftFile: path.posix.join(archiveRoot, "filled-closeout-input.draft.json"),
+      readinessActionQueueFile: path.posix.join(archiveRoot, "readiness-action-queue.md")
     }
   };
 }
@@ -160,6 +161,7 @@ function main() {
     const { archiveRoot, profile } = buildProfile(options);
     const closeoutDraftFile = profile.filledCloseoutDraftFile;
     const closeoutInputFile = path.posix.join(archiveRoot, "filled-closeout-input.json");
+    const readinessActionQueueFile = profile.readinessActionQueueFile;
     const outputFile = options.outputFile
       ? path.resolve(options.outputFile)
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
@@ -177,8 +179,9 @@ function main() {
       nextCommand: `npm.cmd run staging:rehearsal -- --profile-file ${commandValue(outputFile)}`,
       closeoutDraftFile,
       closeoutInputFile,
-      closeoutInitCommand: `npm.cmd run staging:closeout:init -- --draft-file ${commandValue(closeoutDraftFile)} --output-file ${commandValue(closeoutInputFile)}`,
-      postCloseoutInitStatusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(closeoutInputFile)}`,
+      readinessActionQueueFile,
+      closeoutInitCommand: `npm.cmd run staging:closeout:init -- --draft-file ${commandValue(closeoutDraftFile)} --output-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`,
+      postCloseoutInitStatusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`,
       nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written."
     }, options.json);
   } catch (error) {

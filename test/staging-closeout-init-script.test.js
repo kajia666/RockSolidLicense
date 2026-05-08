@@ -99,13 +99,16 @@ test("staging closeout init promotes a draft without clearing closeout readiness
   try {
     const draftFile = join(tempDir, "filled-closeout-input.draft.json");
     const outputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
     writeDraft(draftFile, outputFile);
 
     const result = runCloseoutInit([
       "--draft-file",
       draftFile,
       "--output-file",
-      outputFile
+      outputFile,
+      "--actions-file",
+      actionsFile
     ]);
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -117,10 +120,11 @@ test("staging closeout init promotes a draft without clearing closeout readiness
       mode: "staging-closeout-init",
       draftFile,
       outputFile,
+      actionsFile,
       acceptanceFieldCount: 7,
       placeholderCount: 7,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`,
-      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile}`,
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
       nextAction: "Run statusCommand to pick the first closeout evidence backfill target."
     });
 

@@ -4,7 +4,8 @@ import path from "node:path";
 
 const OPTION_FLAGS = {
   "--draft-file": "draftFile",
-  "--output-file": "outputFile"
+  "--output-file": "outputFile",
+  "--actions-file": "actionsFile"
 };
 
 function requireArgValue(name, value, inlineValue) {
@@ -53,6 +54,11 @@ function commandValue(value) {
   return text;
 }
 
+function statusCommand(outputFile, actionsFile = null) {
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
+  return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
+}
+
 function promoteDraft(draft, draftFile) {
   if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
     throw new Error("closeout draft must be a JSON object.");
@@ -95,6 +101,7 @@ function main() {
     const draftFile = path.resolve(options.draftFile);
     const draft = JSON.parse(readFileSync(draftFile, "utf8"));
     const outputFile = path.resolve(options.outputFile || draft.copyTo || "filled-closeout-input.json");
+    const actionsFile = options.actionsFile ? path.resolve(options.actionsFile) : null;
     const closeoutInput = promoteDraft(draft, draftFile);
     mkdirSync(path.dirname(outputFile), { recursive: true });
     writeFileSync(outputFile, `${JSON.stringify(closeoutInput, null, 2)}\n`, "utf8");
@@ -105,10 +112,11 @@ function main() {
       mode: "staging-closeout-init",
       draftFile,
       outputFile,
+      ...(actionsFile ? { actionsFile } : {}),
       acceptanceFieldCount: acceptanceFields.length,
       placeholderCount,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`,
-      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}`,
+      statusCommand: statusCommand(outputFile, actionsFile),
       nextAction: "Run statusCommand to pick the first closeout evidence backfill target."
     }, options.json);
   } catch (error) {

@@ -17,6 +17,20 @@ function runProfileInit(args) {
   });
 }
 
+function runRehearsal(args) {
+  return spawnSync(process.execPath, ["scripts/staging-rehearsal.mjs", "--json", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      RSL_DEVELOPER_BEARER_TOKEN: "",
+      RSL_SMOKE_ADMIN_PASSWORD: "ProfileAdmin123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "ProfileDeveloper123!"
+    },
+    timeout: 120_000
+  });
+}
+
 test("staging profile init writes a secret-free profile with launch-duty output paths", () => {
   const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   assert.equal(packageJson.scripts["staging:profile:init"], "node scripts/staging-profile-init.mjs");
@@ -61,13 +75,14 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       productCode: "PILOT_ALPHA",
       channel: "beta",
       archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
-      profileKeyCount: 20,
+      profileKeyCount: 21,
       secretPolicy: "passwords_and_bearer_tokens_must_stay_in_environment_variables",
       nextCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
       closeoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
       closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
-      closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
-      postCloseoutInitStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      postCloseoutInitStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written."
     });
     assert.deepEqual(profile, {
@@ -90,9 +105,40 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       readinessReviewPacketFile: "artifacts/staging/PILOT_ALPHA/beta/staging-readiness-review-packet.json",
       productionSignoffPacketFile: "artifacts/staging/PILOT_ALPHA/beta/staging-production-signoff-packet.json",
       launchDutyArchiveIndexFile: "artifacts/staging/PILOT_ALPHA/beta/staging-launch-duty-archive-index.json",
-      filledCloseoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json"
+      filledCloseoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
+      readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
     });
     assert.doesNotMatch(JSON.stringify(profile), /password|bearer|token/i);
+
+    const rehearsal = runRehearsal([
+      "--profile-file",
+      outputFile,
+      "--handoff-file",
+      join(tempDir, "handoff.md"),
+      "--closeout-file",
+      join(tempDir, "closeout.json"),
+      "--run-record-file",
+      join(tempDir, "run-record-index.json"),
+      "--artifact-manifest-file",
+      join(tempDir, "artifact-manifest.json"),
+      "--backup-restore-packet-file",
+      join(tempDir, "backup-restore-packet.json"),
+      "--closeout-reload-packet-file",
+      join(tempDir, "closeout-reload-packet.json"),
+      "--readiness-review-packet-file",
+      join(tempDir, "readiness-review-packet.json"),
+      "--production-signoff-packet-file",
+      join(tempDir, "production-signoff-packet.json"),
+      "--launch-duty-archive-index-file",
+      join(tempDir, "launch-duty-archive-index.json"),
+      "--filled-closeout-draft-file",
+      join(tempDir, "filled-closeout-input.draft.json")
+    ]);
+    assert.equal(rehearsal.status, 0, rehearsal.stderr || rehearsal.stdout);
+    assert.equal(rehearsal.stderr, "");
+    const rehearsalOutput = JSON.parse(rehearsal.stdout);
+    assert.equal(rehearsalOutput.stagingProfile.loaded, true);
+    assert.equal(rehearsalOutput.stagingProfile.providedKeys.includes("readinessActionQueueFile"), true);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

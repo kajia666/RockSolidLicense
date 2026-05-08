@@ -73,6 +73,7 @@ const PROFILE_ALLOWED_FIELDS = [
   "productionSignoffPacketFile",
   "launchDutyArchiveIndexFile",
   "filledCloseoutDraftFile",
+  "readinessActionQueueFile",
   "closeoutInputFile"
 ];
 

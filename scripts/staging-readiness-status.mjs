@@ -30,6 +30,8 @@ const RECEIPT_VISIBILITY_KEYS = [
   "launchOpsOverviewStatus"
 ];
 
+const DEFAULT_ARTIFACT_PATH_ROOT = "artifacts/staging/<productCode>/<channel>";
+
 const CLOSEOUT_EVIDENCE = {
   route_map_gate_result: {
     expectedEvidence: "Record the targeted gate exit status, pass count, and redacted output artifact path.",
@@ -283,6 +285,34 @@ function fieldsByKey(fields = []) {
   );
 }
 
+function artifactPathRootFromInputFile(inputFile) {
+  const parts = path.resolve(inputFile).replaceAll("\\", "/").split("/").filter(Boolean);
+  for (let index = 0; index < parts.length - 3; index += 1) {
+    if (parts[index] === "artifacts" && parts[index + 1] === "staging" && parts[index + 2] && parts[index + 3]) {
+      return {
+        status: "inferred",
+        path: `artifacts/staging/${parts[index + 2]}/${parts[index + 3]}`,
+        source: "input-file"
+      };
+    }
+  }
+  return {
+    status: "placeholder",
+    path: DEFAULT_ARTIFACT_PATH_ROOT,
+    source: "default"
+  };
+}
+
+function applyArtifactPathRoot(evidence, artifactPathRoot) {
+  if (!evidence) {
+    return null;
+  }
+  return {
+    ...evidence,
+    artifactPathHint: evidence.artifactPathHint.replace(DEFAULT_ARTIFACT_PATH_ROOT, artifactPathRoot.path)
+  };
+}
+
 function receiptIdHint(receiptOperations) {
   if (!receiptOperations.length) {
     return "No Launch Mainline receipt is required for this condition unless your operating process records one.";
@@ -307,16 +337,16 @@ function receiptLaneArtifactPathHint(key) {
   return `artifacts/staging/<productCode>/<channel>/${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}-receipt-visibility.json`;
 }
 
-function evidenceForCloseoutKey(key) {
-  return evidenceWithReceiptHint(CLOSEOUT_EVIDENCE[key]);
+function evidenceForCloseoutKey(key, artifactPathRoot) {
+  return evidenceWithReceiptHint(applyArtifactPathRoot(CLOSEOUT_EVIDENCE[key], artifactPathRoot));
 }
 
-function evidenceForSignoffKey(key) {
-  return evidenceWithReceiptHint(SIGNOFF_EVIDENCE[key]);
+function evidenceForSignoffKey(key, artifactPathRoot) {
+  return evidenceWithReceiptHint(applyArtifactPathRoot(SIGNOFF_EVIDENCE[key], artifactPathRoot));
 }
 
-function evidenceForReceiptLane(key) {
-  return evidenceWithReceiptHint({
+function evidenceForReceiptLane(key, artifactPathRoot) {
+  return evidenceWithReceiptHint(applyArtifactPathRoot({
     expectedEvidence: RECEIPT_VISIBILITY_EVIDENCE[key] || "Confirm the receipt visibility lane shows the latest staging evidence receipts before cutover.",
     valueJsonExample: {
       status: "visible",
@@ -325,7 +355,7 @@ function evidenceForReceiptLane(key) {
     },
     artifactPathHint: receiptLaneArtifactPathHint(key),
     receiptOperations: ["record_post_launch_ops_sweep"]
-  });
+  }, artifactPathRoot));
 }
 
 function extractDecisionValue(value) {
@@ -401,6 +431,7 @@ function queueStatus(index) {
 
 function buildActionQueue({
   inputFile,
+  artifactPathRoot,
   missingCloseoutKeys,
   closeoutDecision,
   missingSignoffKeys,
@@ -412,7 +443,7 @@ function buildActionQueue({
   const localStatusCommand = statusCommand(inputFile);
   if (missingCloseoutKeys.length > 0) {
     return missingCloseoutKeys.map((key, index) => {
-      const evidence = evidenceForCloseoutKey(key);
+      const evidence = evidenceForCloseoutKey(key, artifactPathRoot);
       return {
         key: "backfill_closeout_evidence",
         phase: "pre_full_test_closeout",
@@ -426,7 +457,7 @@ function buildActionQueue({
     });
   }
   if (closeoutDecision !== "ready-for-full-test-window") {
-    const evidence = evidenceForCloseoutKey("operator_go_no_go");
+    const evidence = evidenceForCloseoutKey("operator_go_no_go", artifactPathRoot);
     return [
       {
         key: "confirm_full_test_go_no_go",
@@ -452,7 +483,7 @@ function buildActionQueue({
     ];
   }
   if (missingSignoffKeys.includes("full_test_window_passed")) {
-    const evidence = evidenceForSignoffKey("full_test_window_passed");
+    const evidence = evidenceForSignoffKey("full_test_window_passed", artifactPathRoot);
     return [
       {
         key: "run_full_test_window",
@@ -469,7 +500,7 @@ function buildActionQueue({
   }
   if (productionDecision !== "ready-for-production-signoff") {
     const key = missingSignoffKeys[0] || "operator_signoff_recorded";
-    const evidence = evidenceForSignoffKey(key);
+    const evidence = evidenceForSignoffKey(key, artifactPathRoot);
     return [
       {
         key: "set_production_signoff_decision",
@@ -484,7 +515,7 @@ function buildActionQueue({
     ];
   }
   const signoffQueue = missingSignoffKeys.map((key, index) => {
-    const evidence = evidenceForSignoffKey(key);
+    const evidence = evidenceForSignoffKey(key, artifactPathRoot);
     return {
       key: "backfill_production_signoff",
       phase: "production_signoff",
@@ -497,7 +528,7 @@ function buildActionQueue({
     };
   });
   const receiptQueue = missingReceiptVisibilityKeys.map((key, index) => {
-    const evidence = evidenceForReceiptLane(key);
+    const evidence = evidenceForReceiptLane(key, artifactPathRoot);
     return {
       key: "backfill_receipt_visibility",
       phase: "receipt_visibility",
@@ -692,6 +723,7 @@ function buildStatus(payload, inputFile) {
     throw new Error("Refusing to inspect example closeout input; use a real filled closeout input file.");
   }
 
+  const artifactPathRoot = artifactPathRootFromInputFile(inputFile);
   const closeoutFieldsByKey = fieldsByKey(payload.acceptanceFields);
   const filledCloseoutKeys = REQUIRED_CLOSEOUT_KEYS.filter((key) => isFilledField(closeoutFieldsByKey.get(key)));
   const missingCloseoutKeys = REQUIRED_CLOSEOUT_KEYS.filter((key) => !filledCloseoutKeys.includes(key));
@@ -736,6 +768,7 @@ function buildStatus(payload, inputFile) {
   });
   const actionQueue = buildActionQueue({
     inputFile,
+    artifactPathRoot,
     missingCloseoutKeys,
     closeoutDecision,
     missingSignoffKeys,
@@ -749,6 +782,7 @@ function buildStatus(payload, inputFile) {
     status: "pass",
     mode: "staging-readiness-status",
     inputFile,
+    artifactPathRoot,
     readiness: {
       currentGate,
       launchStatus,

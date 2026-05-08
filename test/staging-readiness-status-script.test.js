@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -310,6 +310,41 @@ test("staging readiness status treats object operator go/no-go evidence as the f
     assert.equal(output.readiness.currentGate, "full_test_window");
     assert.equal(output.readiness.canRunFullTestWindow, true);
     assert.equal(output.actionQueue[0].key, "run_full_test_window");
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging readiness status infers artifact root from a staging closeout input path", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-artifact-root-"));
+  try {
+    const inputFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "readiness-action-queue.md");
+    mkdirSync(dirname(inputFile), { recursive: true });
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: ["route_map_gate_result"]
+    });
+
+    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.artifactPathRoot, {
+      status: "inferred",
+      path: "artifacts/staging/PILOT_ALPHA/stable",
+      source: "input-file"
+    });
+    assert.equal(
+      output.actionQueue[0].evidence.artifactPathHint,
+      "artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt"
+    );
+    assert.equal(
+      output.actionQueue[0].exampleCommand,
+      `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key backup_restore_drill_result --value-json '{"result":"pass","restoreDryRun":"pass","healthcheck":"pass","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/PILOT_ALPHA/stable/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id>`
+    );
+    const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /Artifact path hint: `artifacts\/staging\/PILOT_ALPHA\/stable\/backup-restore-drill\.txt`/);
+    assert.doesNotMatch(markdown, /<productCode>|<channel>/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

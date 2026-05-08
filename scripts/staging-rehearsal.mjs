@@ -4825,6 +4825,17 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
   const currentStabilizationWindow = findLaunchDutyFocusItem(archiveIndex.stabilizationHandoff?.handoffWindows);
   const readyForCutoverWatch = result.launchDayWatchPlan?.canStartCutoverWatch === true;
   const watchArtifactQueue = readyForCutoverWatch ? archiveIndex.watchArtifacts || [] : [];
+  const watchEvidenceExecutionEntry = readyForCutoverWatch
+    ? result.launchDayWatchPlan?.watchEvidenceExecutionEntry || archiveIndex.watchEvidenceExecutionEntry || null
+    : null;
+  const currentWatchEvidence = readyForCutoverWatch && Array.isArray(watchEvidenceExecutionEntry?.evidenceQueue)
+    ? watchEvidenceExecutionEntry.evidenceQueue.find((item) => item.key === watchEvidenceExecutionEntry.currentEvidenceKey)
+      || watchEvidenceExecutionEntry.evidenceQueue[0]
+      || null
+    : null;
+  const currentWatchReceiptQueue = readyForCutoverWatch && Array.isArray(watchEvidenceExecutionEntry?.receiptQueue)
+    ? watchEvidenceExecutionEntry.receiptQueue.filter((item) => item.key === (currentWatchEvidence?.key || watchEvidenceExecutionEntry.currentEvidenceKey))
+    : [];
   const launchWatchNextAction = readyForCutoverWatch && currentPostSignoffTarget
     ? `Archive ${currentPostSignoffTarget.key}, then record launch-day watch artifacts and prepare stabilization handoff.`
     : enrichedCurrentPacket.nextAction || null;
@@ -4839,6 +4850,9 @@ function buildLaunchDutyPacketFocus(result, { closeoutBackfillFocus = null } = {
     currentPostSignoffTarget: readyForCutoverWatch ? currentPostSignoffTarget : null,
     currentWatchArtifact: readyForCutoverWatch ? currentWatchArtifact : null,
     watchArtifactQueue,
+    watchEvidenceExecutionEntry,
+    currentWatchEvidence,
+    currentWatchReceiptQueue,
     currentStabilizationWindow: readyForCutoverWatch ? currentStabilizationWindow : null,
     controlPaths: {
       runRecordIndex: keyedPath(packetSequence, "run_record_index"),
@@ -5077,6 +5091,14 @@ function buildGoLiveExecutionEntry({
   const watchRecordQueue = Array.isArray(launchDutyPacketFocus?.watchArtifactQueue)
     ? launchDutyPacketFocus.watchArtifactQueue.map(normalizeLaunchDutyEntryItem).filter(Boolean)
     : [];
+  const watchEvidenceExecutionEntry = launchDutyPacketFocus?.watchEvidenceExecutionEntry
+    ? {
+      ...launchDutyPacketFocus.watchEvidenceExecutionEntry,
+      receiptQueue: Array.isArray(launchDutyPacketFocus?.currentWatchReceiptQueue)
+        ? launchDutyPacketFocus.currentWatchReceiptQueue
+        : launchDutyPacketFocus.watchEvidenceExecutionEntry.receiptQueue || []
+    }
+    : null;
   const launchDayWatchEntry = canSignoffProduction || launchDutyCurrentAction?.stage === "launch_day_watch_entry"
     ? {
       status,
@@ -5092,6 +5114,7 @@ function buildGoLiveExecutionEntry({
       ),
       evidenceInputs,
       watchRecordQueue,
+      watchEvidenceExecutionEntry,
       confirmationPoints,
       archiveTrace: launchDutyCurrentAction?.archiveTrace || null,
       nextAction: nextAction || launchDutyCurrentAction?.nextAction || null
@@ -5168,6 +5191,12 @@ function buildLaunchDutyCurrentAction({
     const target = launchDutyPacketFocus?.currentPostSignoffTarget || {};
     const watch = launchDutyPacketFocus?.currentWatchArtifact || {};
     const stabilization = launchDutyPacketFocus?.currentStabilizationWindow || {};
+    const watchEvidenceExecutionEntry = launchDutyPacketFocus?.watchEvidenceExecutionEntry || null;
+    const followUpWatchRecord = launchDutyPacketFocus?.currentWatchEvidence || null;
+    const followUpWatchReceiptQueue = Array.isArray(launchDutyPacketFocus?.currentWatchReceiptQueue)
+      ? launchDutyPacketFocus.currentWatchReceiptQueue
+      : [];
+    const followUpStabilizationTarget = watchEvidenceExecutionEntry?.stabilizationHandoff || null;
     const archiveRoot = launchDutyPacketFocus?.archiveRoot || archiveContext?.archiveRoot || null;
     const productionSignoffPacketPath = current.packetPath
       || target.path
@@ -5210,6 +5239,10 @@ function buildLaunchDutyCurrentAction({
       key: current.key || "archive_production_signoff",
       status: current.status || fullTestSignoffFocus.status || target.status || "ready_for_launch_day_watch",
       command: current.command || null,
+      followUpWatchRecord,
+      followUpWatchReceiptQueue,
+      followUpStabilizationTarget,
+      watchEvidenceNextAction: watchEvidenceExecutionEntry?.nextAction || null,
       packetPath: productionSignoffPacketPath,
       artifactPath: target.path || null,
       envKeys: current.envKeys || [],
@@ -7041,18 +7074,82 @@ function buildFinalRehearsalPacket(result) {
   const realStagingRunFocus = buildRealStagingRunFocus(result, { outputFiles: localFiles });
   const closeoutBackfillFocus = buildCloseoutBackfillFocus(result, { outputFiles: localFiles });
   const fullTestSignoffFocus = buildFullTestSignoffFocus(result, { outputFiles: localFiles });
+  const launchDayWatchPlan = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
+  const stabilizationHandoffPlan = result.stabilizationHandoffPlan || buildStabilizationHandoffPlan(result);
+  const launchDutyArchiveIndexPath = localFileByKey.get("launch_duty_archive_index")?.path
+    || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
+  const productionSignoffPacketPath = localFileByKey.get("production_signoff_packet")?.path
+    || path.posix.join(archiveRoot, "staging-production-signoff-packet.json");
+  const watchArtifactQueue = Array.isArray(launchDayWatchPlan.watchRecordDraft?.records)
+    ? launchDayWatchPlan.watchRecordDraft.records.map((item) => ({
+      key: item.key || null,
+      status: item.status || "not_available",
+      path: item.artifactPath || item.path || null,
+      receiptOperations: Array.isArray(item.receiptOperations) ? item.receiptOperations : [],
+      expectedEvidence: item.expectedEvidence || null,
+      operatorNote: item.operatorNote || null
+    }))
+    : [];
+  const watchEvidenceExecutionEntry = launchDayWatchPlan.watchEvidenceExecutionEntry || null;
+  const currentWatchEvidence = Array.isArray(watchEvidenceExecutionEntry?.evidenceQueue)
+    ? watchEvidenceExecutionEntry.evidenceQueue.find((item) => item.key === watchEvidenceExecutionEntry.currentEvidenceKey)
+      || watchEvidenceExecutionEntry.evidenceQueue[0]
+      || null
+    : null;
+  const currentWatchReceiptQueue = Array.isArray(watchEvidenceExecutionEntry?.receiptQueue)
+    ? watchEvidenceExecutionEntry.receiptQueue.filter((item) => item.key === (currentWatchEvidence?.key || watchEvidenceExecutionEntry.currentEvidenceKey))
+    : [];
+  const currentStabilizationWindow = (() => {
+    const handoffWindow = findLaunchDutyFocusItem(stabilizationHandoffPlan.handoffWindows) || {};
+    const watchRecord = watchArtifactQueue.find((item) => item.key === handoffWindow.key)
+      || watchArtifactQueue.find((item) => item.key === "stabilization_owner_handoff")
+      || {};
+    return launchDayWatchPlan.canStartCutoverWatch === true ? {
+      key: handoffWindow.key || watchRecord.key || "stabilization_owner_handoff",
+      label: handoffWindow.label || null,
+      status: handoffWindow.status || "operator_handoff",
+      path: watchRecord.path || path.posix.join(archiveRoot, "stabilization-owner-handoff.md"),
+      summary: handoffWindow.summary || null,
+      receiptOperations: Array.isArray(handoffWindow.receiptOperations) ? handoffWindow.receiptOperations : watchRecord.receiptOperations || [],
+      expectedEvidence: handoffWindow.expectedEvidence || watchRecord.expectedEvidence || null
+    } : null;
+  })();
+  const launchDutyPacketFocus = fullTestSignoffFocus.canSignoffProduction === true ? {
+    archiveRoot,
+    archiveIndexPath: launchDutyArchiveIndexPath,
+    currentPostSignoffTarget: {
+      key: "production_signoff_packet",
+      status: "archive_before_cutover",
+      path: productionSignoffPacketPath,
+      receiptOperations: [],
+      expectedEvidence: "Archive the signed production sign-off packet with full-test status, GO/NO-GO decision, and receipt visibility lanes."
+    },
+    currentWatchArtifact: findLaunchDutyFocusItem(watchArtifactQueue),
+    watchArtifactQueue,
+    watchEvidenceExecutionEntry,
+    currentWatchEvidence,
+    currentWatchReceiptQueue,
+    currentStabilizationWindow,
+    controlPaths: {
+      productionSignoffPacket: productionSignoffPacketPath,
+      launchDutyArchiveIndex: launchDutyArchiveIndexPath
+    },
+    nextAction: launchDayWatchPlan.canStartCutoverWatch === true
+      ? "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."
+      : launchDayWatchPlan.nextAction || null
+  } : null;
   const launchDutyCurrentAction = buildLaunchDutyCurrentAction({
     realStagingRunFocus,
     closeoutBackfillFocus,
     fullTestSignoffFocus,
-    launchDutyPacketFocus: null,
-    archiveContext: buildLaunchDutyArchiveTraceContext(result, { outputFiles: localFiles })
+    launchDutyPacketFocus,
+    archiveContext: buildLaunchDutyArchiveTraceContext(result, { outputFiles: localFiles, launchDutyPacketFocus })
   });
   const goLiveExecutionEntry = buildGoLiveExecutionEntry({
     realStagingRunFocus,
     closeoutBackfillFocus,
     fullTestSignoffFocus,
-    launchDutyPacketFocus: null,
+    launchDutyPacketFocus,
     launchDutyCurrentAction
   });
   return {
@@ -8461,11 +8558,25 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
   lines.push(`- Go-live execution packets: current=${entry.packetFocus?.currentPacketKey || "-"} -> ${entry.packetFocus?.currentPacketPath || "-"}, closeout=${entry.paths?.closeoutReloadPacketFile || "-"}, readiness=${entry.paths?.readinessReviewPacketFile || "-"}, signoff=${entry.paths?.productionSignoffPacketFile || "-"}`);
   lines.push(`- Go-live execution blockers: closeout=${(blockers.missingCloseoutKeys || []).join(", ") || "-"}, signoff=${(blockers.missingSignoffKeys || []).join(", ") || "-"}, receipts=${(blockers.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
   if (launchDayWatchEntry) {
+    const watchEvidenceExecutionEntry = launchDayWatchEntry.watchEvidenceExecutionEntry || {};
+    const watchEvidenceQueue = Array.isArray(watchEvidenceExecutionEntry.evidenceQueue)
+      ? watchEvidenceExecutionEntry.evidenceQueue
+      : [];
+    const currentWatchEvidence = watchEvidenceQueue.find((item) => item.key === watchEvidenceExecutionEntry.currentEvidenceKey)
+      || watchEvidenceQueue[0]
+      || {};
+    const watchEvidenceReceiptQueue = Array.isArray(watchEvidenceExecutionEntry.receiptQueue)
+      ? watchEvidenceExecutionEntry.receiptQueue
+      : [];
     lines.push(`- Go-live launch-day watch entry: ${launchDayWatchEntry.status || "-"} (target=${launchDayWatchEntry.currentPostSignoffTarget?.key || "-"}, watch=${launchDayWatchEntry.currentWatchArtifact?.key || "-"}, stabilization=${launchDayWatchEntry.currentStabilizationWindow?.key || "-"})`);
     lines.push(`- Go-live launch-day evidence inputs: ${renderLaunchDutyActionInputList(launchDayWatchEntry.evidenceInputs)}`);
     lines.push(`- Go-live launch-day watch records: ${renderLaunchDutyRecordUpdates(launchDayWatchEntry.watchRecordQueue)}`);
     lines.push(`- Go-live launch-day receipt operations: ${renderLaunchDutyReceiptOperationList(launchDayWatchEntry.watchRecordQueue)}`);
     lines.push(`- Go-live launch-day expected evidence: ${renderLaunchDutyExpectedEvidenceList(launchDayWatchEntry.watchRecordQueue)}`);
+    lines.push(`- Go-live launch-day evidence current: ${watchEvidenceExecutionEntry.currentEvidenceKey || "-"} (action=${watchEvidenceExecutionEntry.currentActionKey || "-"}, path=${currentWatchEvidence.artifactPath || "-"})`);
+    lines.push(`- Go-live launch-day evidence receipts: ${watchEvidenceReceiptQueue.map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+    lines.push(`- Go-live launch-day evidence stabilization: ${watchEvidenceExecutionEntry.stabilizationHandoff?.key || "-"} -> ${watchEvidenceExecutionEntry.stabilizationHandoff?.path || "-"}`);
+    lines.push(`- Go-live launch-day evidence next action: ${watchEvidenceExecutionEntry.nextAction || "-"}`);
     lines.push(`- Go-live launch-day confirmation points: ${renderLaunchDutyActionConfirmationList(launchDayWatchEntry.confirmationPoints)}`);
     lines.push(`- Go-live launch-day archive trace: ${renderLaunchDutyArchiveTrace(launchDayWatchEntry.archiveTrace)}`);
   }
@@ -8586,6 +8697,10 @@ function renderOperatorExecutionPlan(plan) {
     `- Launch-duty confirmation points: ${renderLaunchDutyActionConfirmationList(currentLaunchDutyAction.confirmationPoints)}`,
     `- Launch-duty archive trace: ${renderLaunchDutyArchiveTrace(currentLaunchDutyAction.archiveTrace)}`,
     `- Launch-duty record updates: ${renderLaunchDutyRecordUpdates(currentLaunchDutyAction.recordUpdates)}`,
+    `- Launch-duty follow-up watch record: ${currentLaunchDutyAction.followUpWatchRecord?.key || "-"} -> ${currentLaunchDutyAction.followUpWatchRecord?.artifactPath || "-"}`,
+    `- Launch-duty follow-up watch receipts: ${(currentLaunchDutyAction.followUpWatchReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Launch-duty follow-up stabilization target: ${currentLaunchDutyAction.followUpStabilizationTarget?.key || "-"} -> ${currentLaunchDutyAction.followUpStabilizationTarget?.path || "-"}`,
+    `- Launch-duty watch evidence next action: ${currentLaunchDutyAction.watchEvidenceNextAction || "-"}`,
     `- Launch-duty current next action: ${currentLaunchDutyAction.nextAction || "-"}`,
     `- Next action: ${plan.nextAction || "-"}`
   ];
@@ -8689,6 +8804,10 @@ function renderOperatorExecutionPlan(plan) {
     }
     if (focus.currentWatchArtifact) {
       lines.push(`- Launch-duty watch artifact: ${focus.currentWatchArtifact.key || "-"} (${focus.currentWatchArtifact.status || "-"})`);
+    }
+    if (focus.currentWatchEvidence) {
+      lines.push(`- Launch-duty watch evidence current: ${focus.currentWatchEvidence.key || "-"} (${focus.currentWatchEvidence.status || "-"}) -> ${focus.currentWatchEvidence.artifactPath || "-"}`);
+      lines.push(`- Launch-duty watch evidence receipts: ${(focus.currentWatchReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
     }
     if (focus.currentStabilizationWindow) {
       lines.push(`- Launch-duty stabilization window: ${focus.currentStabilizationWindow.key || "-"} (${focus.currentStabilizationWindow.status || "-"})`);
@@ -9955,6 +10074,10 @@ function renderFinalRehearsalPacket(packet) {
     `- Final packet launch-duty confirmation points: ${renderLaunchDutyActionConfirmationList(launchDutyCurrentAction.confirmationPoints)}`,
     `- Final packet launch-duty archive trace: ${renderLaunchDutyArchiveTrace(launchDutyCurrentAction.archiveTrace)}`,
     `- Final packet launch-duty record updates: ${renderLaunchDutyRecordUpdates(launchDutyCurrentAction.recordUpdates)}`,
+    `- Final packet launch-duty follow-up watch record: ${launchDutyCurrentAction.followUpWatchRecord?.key || "-"} -> ${launchDutyCurrentAction.followUpWatchRecord?.artifactPath || "-"}`,
+    `- Final packet launch-duty follow-up watch receipts: ${(launchDutyCurrentAction.followUpWatchReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
+    `- Final packet launch-duty follow-up stabilization target: ${launchDutyCurrentAction.followUpStabilizationTarget?.key || "-"} -> ${launchDutyCurrentAction.followUpStabilizationTarget?.path || "-"}`,
+    `- Final packet launch-duty watch evidence next action: ${launchDutyCurrentAction.watchEvidenceNextAction || "-"}`,
     `- Next action: ${packet.nextAction || "-"}`
   ];
   appendGoLiveExecutionEntry(lines, goLiveExecutionEntry);

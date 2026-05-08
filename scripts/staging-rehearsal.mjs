@@ -1502,9 +1502,10 @@ function buildStagingRehearsalRunRecordIndex(result) {
   const watchAndStabilizationKeys = [
     ...new Set([
       ...(result.launchDayWatchPlan?.requiredEvidenceKeys || []),
-      ...(result.stabilizationHandoffPlan?.requiredEvidenceKeys || [])
+      ...(result.stabilizationHandoffPlan?.requiredEvidenceKeys || []),
+      result.stabilizationHandoffPlan?.firstWaveCloseoutCaptureEntry?.key || null
     ])
-  ];
+  ].filter(Boolean);
   const recordsByKey = new Map((runTemplate.records || []).map((item) => [item.key, item]));
   const summarizeRecords = (keys) => keys.map((key) => {
     const record = recordsByKey.get(key) || {};
@@ -5435,6 +5436,15 @@ function buildStagingRunRecordTemplate(result) {
       receiptOperations: ["record_launch_stabilization_review"],
       expectedEvidence: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up.",
       operatorNote: "Record stabilization owner, timestamp, unresolved items, and next-duty follow-up."
+    },
+    {
+      key: "first_wave_closeout",
+      sourcePlan: "stabilizationHandoffPlan",
+      artifactKey: "first_wave_closeout",
+      artifactPath: path.posix.join(archiveRoot, "first-wave-closeout.md"),
+      receiptOperations: ["record_launch_closeout_review"],
+      expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp.",
+      operatorNote: "Record first-wave closeout decision, unresolved incidents, customer impact, next-duty owner, and follow-up timestamp."
     }
   ];
   const records = [...ledgerRecords, ...extraRecords];

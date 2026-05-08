@@ -4542,6 +4542,46 @@ function buildLaunchDayWatchPlan(result) {
   };
 }
 
+function buildStabilizationHandoffExecutionEntry({
+  canStartStabilizationHandoff = false,
+  sourceWatchRecords = [],
+  currentHandoffTarget = null,
+  firstWaveCloseoutWindow = null
+} = {}) {
+  const target = currentHandoffTarget || {};
+  const closeoutWindow = firstWaveCloseoutWindow || {};
+  return {
+    mode: "stabilization-handoff-execution-entry",
+    status: canStartStabilizationHandoff ? "ready_for_stabilization_handoff" : "blocked_until_cutover_watch",
+    willModifyData: false,
+    currentActionKey: canStartStabilizationHandoff ? "handoff_stabilization_owner" : "verify_cutover_watch_records",
+    currentHandoffTarget: {
+      key: target.key || "stabilization_owner_handoff",
+      status: target.status || (canStartStabilizationHandoff ? "operator_handoff" : "blocked_until_cutover_watch"),
+      path: target.path || null,
+      receiptOperations: Array.isArray(target.receiptOperations) ? target.receiptOperations : [],
+      expectedEvidence: target.expectedEvidence || null
+    },
+    requiredSourceRecordKeys: Array.isArray(target.sourceRecordKeys) ? target.sourceRecordKeys : [],
+    sourceRecordQueue: sourceWatchRecords.map((record) => ({
+      key: record.key || null,
+      status: record.status || null,
+      path: record.path || null,
+      receiptOperations: Array.isArray(record.receiptOperations) ? record.receiptOperations : [],
+      expectedEvidence: record.expectedEvidence || null
+    })),
+    firstWaveCloseoutTarget: {
+      key: closeoutWindow.key || "first_wave_closeout",
+      status: closeoutWindow.status || (canStartStabilizationHandoff ? "operator_closeout" : "blocked_until_stabilization_owner_handoff"),
+      path: closeoutWindow.path || null,
+      receiptOperations: Array.isArray(closeoutWindow.receiptOperations) ? closeoutWindow.receiptOperations : []
+    },
+    nextAction: canStartStabilizationHandoff
+      ? "Record stabilization owner handoff, then close first-wave stabilization."
+      : "Complete launch-day watch records before handing off stabilization owner."
+  };
+}
+
 function buildStabilizationHandoffPlan(result) {
   const watchPlan = result.launchDayWatchPlan || buildLaunchDayWatchPlan(result);
   const canStartStabilizationHandoff = watchPlan?.canStartCutoverWatch === true;
@@ -4644,6 +4684,12 @@ function buildStabilizationHandoffPlan(result) {
   ];
   const currentHandoffTarget = findLaunchDutyFocusItem(handoffWindows);
   const firstWaveCloseoutWindow = handoffWindows.find((item) => item.key === "first_wave_closeout") || {};
+  const handoffExecutionEntry = buildStabilizationHandoffExecutionEntry({
+    canStartStabilizationHandoff,
+    sourceWatchRecords,
+    currentHandoffTarget,
+    firstWaveCloseoutWindow
+  });
   const firstWaveCloseoutSourceRecords = (firstWaveCloseoutWindow.sourceRecordKeys || [])
     .map((key) => sourceRecordByKey.get(key))
     .filter(Boolean);
@@ -4668,6 +4714,7 @@ function buildStabilizationHandoffPlan(result) {
     requiredWatchWindows: (watchPlan?.watchWindows || []).map((item) => item.key).filter(Boolean),
     requiredEvidenceKeys,
     currentHandoffTarget,
+    handoffExecutionEntry,
     firstWaveCloseoutGate,
     sourceWatchRecords,
     handoffEvidenceInputs: sourceWatchRecords.map((item) => ({
@@ -7845,6 +7892,7 @@ function renderStabilizationHandoffPlan(plan) {
   const routes = plan.routes || {};
   const handoffWindows = Array.isArray(plan.handoffWindows) ? plan.handoffWindows : [];
   const currentTarget = plan.currentHandoffTarget || {};
+  const handoffExecutionEntry = plan.handoffExecutionEntry || {};
   const firstWaveCloseoutGate = plan.firstWaveCloseoutGate || {};
   const lines = [
     `- Status: ${plan.status || "-"}`,
@@ -7853,6 +7901,11 @@ function renderStabilizationHandoffPlan(plan) {
     `- Required watch windows: ${(plan.requiredWatchWindows || []).join(", ") || "-"}`,
     `- Required evidence keys: ${(plan.requiredEvidenceKeys || []).join(", ") || "-"}`,
     `- Current handoff target: ${currentTarget.key || "-"} (${currentTarget.status || "-"}) -> ${currentTarget.path || "-"}`,
+    `- Stabilization handoff execution entry: ${handoffExecutionEntry.status || "-"} (action=${handoffExecutionEntry.currentActionKey || "-"}, target=${handoffExecutionEntry.currentHandoffTarget?.key || "-"})`,
+    `- Stabilization handoff execution target: ${handoffExecutionEntry.currentHandoffTarget?.key || "-"} -> ${handoffExecutionEntry.currentHandoffTarget?.path || "-"}`,
+    `- Stabilization handoff execution source records: ${renderLaunchDutyRecordUpdates(handoffExecutionEntry.sourceRecordQueue || [])}`,
+    `- Stabilization handoff execution first-wave closeout: ${handoffExecutionEntry.firstWaveCloseoutTarget?.key || "-"} -> ${handoffExecutionEntry.firstWaveCloseoutTarget?.path || "-"}`,
+    `- Stabilization handoff execution next action: ${handoffExecutionEntry.nextAction || "-"}`,
     `- First-wave closeout gate: ${firstWaveCloseoutGate.status || "-"} (owner=${firstWaveCloseoutGate.ownerHandoffPath || "-"}, closeout=${firstWaveCloseoutGate.firstWaveCloseoutPath || "-"})`,
     `- First-wave closeout sources: ${(firstWaveCloseoutGate.sourceRecords || []).map((item) => `${item[0]}=${item[1]} -> ${item[2]}`).join("; ") || "-"}`,
     `- First-wave closeout receipt operations: ${(firstWaveCloseoutGate.receiptOperations || []).join(", ") || "-"}`,

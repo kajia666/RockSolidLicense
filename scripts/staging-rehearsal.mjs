@@ -2284,6 +2284,7 @@ function buildStagingProductionSignoffPacket(result) {
     || runRecordIndex.closeoutProgress?.reloadCommand
     || productionSignoff.reloadCommand
     || `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputPath}`;
+  const fullTestWindowCommand = fullTestWindow.command || readinessReviewPacket.commands?.fullTestWindow || "npm.cmd test";
   const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
     || result.stagingRehearsalExecutionSummary?.operatorFocus?.goLiveExecutionEntry
     || readinessReviewPacket.goLiveExecutionEntry
@@ -2489,6 +2490,25 @@ function buildStagingProductionSignoffPacket(result) {
       ? `Archive ${currentPostSignoffTarget?.key || "production_signoff_packet"}, then record launch-day watch artifacts and prepare stabilization handoff.`
       : launchDayWatch.nextAction || "Complete production sign-off before starting launch-day watch."
   };
+  const packetNextAction = canSignoff
+    ? "Archive production sign-off packet, then start launch-day watch and stabilization handoff."
+    : canRunFullTestWindow
+      ? "Run the full test window, backfill production sign-off conditions, reload closeout input, and re-check this packet."
+      : "Reload closeout input, run the full test window when ready, then backfill production sign-off evidence and receipt visibility.";
+  const signoffExecutionEntry = buildProductionSignoffExecutionEntry({
+    canRunFullTestWindow,
+    canSignoff,
+    fullTestWindow,
+    fullTestWindowCommand,
+    signoffBackfillDraft,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys,
+    packetFile,
+    closeoutInputPath,
+    closeoutReload,
+    launchDayWatchBridge,
+    packetNextAction
+  });
   return {
     mode: "staging-production-signoff-operator-packet",
     status,
@@ -2523,9 +2543,10 @@ function buildStagingProductionSignoffPacket(result) {
     launchDayWatchBridge,
     commands: {
       closeoutReload,
-      fullTestWindow: fullTestWindow.command || readinessReviewPacket.commands?.fullTestWindow || "npm.cmd test"
+      fullTestWindow: fullTestWindowCommand
     },
     goLiveExecutionEntry,
+    signoffExecutionEntry,
     operatorSteps: [
       {
         key: "run_full_test_window",
@@ -2570,11 +2591,7 @@ function buildStagingProductionSignoffPacket(result) {
         expectedEvidence: "Start launch-day watch only after production sign-off and receipt visibility are ready."
       }
     ],
-    nextAction: canSignoff
-      ? "Archive production sign-off packet, then start launch-day watch and stabilization handoff."
-      : canRunFullTestWindow
-        ? "Run the full test window, backfill production sign-off conditions, reload closeout input, and re-check this packet."
-        : "Reload closeout input, run the full test window when ready, then backfill production sign-off evidence and receipt visibility."
+    nextAction: packetNextAction
   };
 }
 
@@ -3525,6 +3542,56 @@ function buildFullTestEntryExecution({
     nextAction: canRunFullTestWindow
       ? `Run ${fullTestWindowCommand}, then backfill production sign-off evidence into the production sign-off packet.`
       : `Reload the filled closeout input, confirm missing closeout keys are empty, then run ${fullTestWindowCommand}.`
+  };
+}
+
+function buildProductionSignoffExecutionEntry({
+  canRunFullTestWindow = false,
+  canSignoff = false,
+  fullTestWindow = {},
+  fullTestWindowCommand = "npm.cmd test",
+  signoffBackfillDraft = {},
+  missingSignoffKeys = [],
+  missingReceiptVisibilityKeys = [],
+  packetFile = null,
+  closeoutInputPath = null,
+  closeoutReload = null,
+  launchDayWatchBridge = {},
+  packetNextAction = null
+} = {}) {
+  const status = canSignoff
+    ? "ready_for_launch_day_watch"
+    : canRunFullTestWindow ? "ready_for_full_test_window" : "blocked_until_full_test_window";
+  return {
+    mode: "production-signoff-execution-entry",
+    status,
+    willModifyData: false,
+    currentActionKey: canSignoff ? "archive_production_signoff" : "run_full_test_window",
+    currentCommand: canSignoff ? null : fullTestWindowCommand,
+    fullTestWindow: {
+      status: fullTestWindow.status || (canRunFullTestWindow ? "ready" : "blocked"),
+      canRun: canRunFullTestWindow,
+      command: fullTestWindowCommand
+    },
+    signoffBackfill: {
+      status: signoffBackfillDraft.status
+        || (canSignoff ? "already_filled" : canRunFullTestWindow ? "ready_for_operator_backfill" : "blocked_until_full_test_window"),
+      packetFile,
+      closeoutInputPath,
+      reloadCommand: closeoutReload,
+      missingSignoffKeys,
+      missingReceiptVisibilityKeys,
+      currentSignoffKey: missingSignoffKeys[0] || null,
+      currentReceiptVisibilityKey: missingReceiptVisibilityKeys[0] || null
+    },
+    launchDayWatch: {
+      status: launchDayWatchBridge.status || (canSignoff ? "ready_for_launch_day_watch" : "blocked_until_signoff_ready"),
+      currentTargetKey: launchDayWatchBridge.currentPostSignoffTarget?.key || "production_signoff_packet",
+      nextAction: launchDayWatchBridge.nextAction || "Complete production sign-off before starting launch-day watch."
+    },
+    nextAction: canSignoff
+      ? (packetNextAction || "Archive production sign-off packet, then start launch-day watch and stabilization handoff.")
+      : "Run the full test window, backfill production sign-off and receipt visibility, then reload closeout input."
   };
 }
 
@@ -7566,6 +7633,7 @@ function renderStagingProductionSignoffPacket(packet) {
   const decision = packet.decision || {};
   const routes = packet.routes || {};
   const signoffDraft = packet.signoffBackfillDraft || {};
+  const signoffExecutionEntry = packet.signoffExecutionEntry || {};
   const productionSignoffCloseoutGate = packet.productionSignoffCloseoutGate || {};
   const launchDayWatchBridge = packet.launchDayWatchBridge || {};
   const lines = [
@@ -7592,6 +7660,14 @@ function renderStagingProductionSignoffPacket(packet) {
     `- Full test window: \`${packet.commands?.fullTestWindow || "-"}\``,
     `- Next action: ${packet.nextAction || "-"}`
   ];
+  if (signoffExecutionEntry.status) {
+    lines.push(`- Production signoff execution entry: ${signoffExecutionEntry.status} (action=${signoffExecutionEntry.currentActionKey || "-"}, canSignoff=${decision.canSignoff ? "yes" : "no"})`);
+    lines.push(`- Production signoff execution current command: \`${signoffExecutionEntry.currentCommand || "-"}\``);
+    lines.push(`- Production signoff execution current signoff key: ${signoffExecutionEntry.signoffBackfill?.currentSignoffKey || "-"}`);
+    lines.push(`- Production signoff execution current receipt visibility: ${signoffExecutionEntry.signoffBackfill?.currentReceiptVisibilityKey || "-"}`);
+    lines.push(`- Production signoff execution launch-day watch: ${signoffExecutionEntry.launchDayWatch?.status || "-"} (target=${signoffExecutionEntry.launchDayWatch?.currentTargetKey || "-"})`);
+    lines.push(`- Production signoff execution next action: ${signoffExecutionEntry.nextAction || "-"}`);
+  }
   if (productionSignoffCloseoutGate.status) {
     lines.push(`- Production signoff closeout gate: ${productionSignoffCloseoutGate.status} (loaded=${productionSignoffCloseoutGate.loadedCloseoutInputPath || "-"}, archive=${productionSignoffCloseoutGate.archiveCloseoutInputPath || "-"})`);
     lines.push(`- Production signoff closeout gate decision: ${productionSignoffCloseoutGate.requiredDecision || "-"} -> ${productionSignoffCloseoutGate.productionDecision || "-"}`);

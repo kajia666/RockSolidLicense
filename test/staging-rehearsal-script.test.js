@@ -630,6 +630,30 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
   assert.equal(output.stagingProductionSignoffPacket.goLiveExecutionEntry.currentActionKey, "route_map_gate_result");
   assert.equal(output.stagingProductionSignoffPacket.goLiveExecutionEntry.commands.closeoutReload, output.stagingProductionSignoffPacket.commands.closeoutReload);
   assert.equal(output.stagingProductionSignoffPacket.goLiveExecutionEntry.commands.fullTestWindow, "npm.cmd test");
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.mode, "production-signoff-execution-entry");
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.status, "blocked_until_full_test_window");
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.willModifyData, false);
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.currentActionKey, "run_full_test_window");
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.currentCommand, "npm.cmd test");
+  assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.fullTestWindow, {
+    status: "blocked",
+    canRun: false,
+    command: "npm.cmd test"
+  });
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.status, "blocked_until_full_test_window");
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.packetFile, output.stagingProductionSignoffPacket.packetFile);
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.closeoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.reloadCommand, output.stagingProductionSignoffPacket.commands.closeoutReload);
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.currentSignoffKey, "full_test_window_passed");
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.currentReceiptVisibilityKey, "launchMainline");
+  assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.missingSignoffKeys, expectedProductionSignoffConditionKeys);
+  assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.missingReceiptVisibilityKeys, expectedReceiptVisibilityKeys);
+  assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.launchDayWatch, {
+    status: "blocked_until_signoff_ready",
+    currentTargetKey: "production_signoff_packet",
+    nextAction: "Do not start launch-day watch until production sign-off readiness is ready."
+  });
+  assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.nextAction, "Run the full test window, backfill production sign-off and receipt visibility, then reload closeout input.");
   assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.status, "blocked_until_full_test_window");
   assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.closeoutInputPath, "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json");
   assert.equal(output.stagingProductionSignoffPacket.signoffBackfillDraft.reloadCommand, output.stagingProductionSignoffPacket.commands.closeoutReload);
@@ -2872,6 +2896,7 @@ test("staging rehearsal runner can write a redacted launch-duty handoff file", (
     assert.match(handoff, /## Staging Production Sign-Off Packet/);
     assert.match(handoff, /Sign-off backfill draft: blocked_until_full_test_window/);
     assert.match(handoff, /## Staging Production Sign-Off Packet[\s\S]*Go-live execution entry: awaiting_closeout_backfill \(phase=full_test_window_entry, source=closeoutBackfillFocus, action=route_map_gate_result\)[\s\S]*## Launch Day Watch Plan/);
+    assert.match(handoff, /## Staging Production Sign-Off Packet[\s\S]*Production signoff execution entry: blocked_until_full_test_window \(action=run_full_test_window, canSignoff=no\)[\s\S]*Production signoff execution current command: `npm\.cmd test`[\s\S]*Production signoff execution current signoff key: full_test_window_passed[\s\S]*Production signoff execution current receipt visibility: launchMainline[\s\S]*Production signoff execution launch-day watch: blocked_until_signoff_ready \(target=production_signoff_packet\)[\s\S]*## Launch Day Watch Plan/);
   assert.match(handoff, /Sign-off draft closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
   assert.match(handoff, /## Staging Production Sign-Off Packet[\s\S]*Sign-off conditions:[\s\S]*full_test_window_passed: missing[\s\S]*expectedEvidence: Attach the full `npm\.cmd test` output summary and failure count\.[\s\S]*Receipt visibility evidence targets:[\s\S]*developerOps: missing[\s\S]*expectedEvidence: Confirm Developer Ops receipt visibility shows the latest staging evidence receipts before cutover\.[\s\S]*Operator steps:[\s\S]*run_full_test_window: blocked_until_closeout_reload[\s\S]*expectedEvidence: Run npm\.cmd test and capture the pass\/fail summary before production sign-off\.[\s\S]*verify_receipt_visibility: operator_backfill[\s\S]*expectedEvidence: Confirm Launch Mainline, Launch Review, Launch Smoke, Developer Ops, and Launch Ops Overview Status receipt visibility before cutover\.[\s\S]*## Launch Day Watch Plan/);
   assert.match(handoff, /Post-signoff targets:/);
@@ -4121,6 +4146,26 @@ test("staging rehearsal runner can read full-test signoff evidence to clear prod
       output.stagingProductionSignoffPacket.launchDayWatchBridge.nextAction,
       "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."
     );
+    assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.mode, "production-signoff-execution-entry");
+    assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.status, "ready_for_launch_day_watch");
+    assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.currentActionKey, "archive_production_signoff");
+    assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.currentCommand, null);
+    assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.fullTestWindow, {
+      status: "ready",
+      canRun: true,
+      command: "npm.cmd test"
+    });
+    assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.status, "already_filled");
+    assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.currentSignoffKey, null);
+    assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.currentReceiptVisibilityKey, null);
+    assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.missingSignoffKeys, []);
+    assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.signoffBackfill.missingReceiptVisibilityKeys, []);
+    assert.deepEqual(output.stagingProductionSignoffPacket.signoffExecutionEntry.launchDayWatch, {
+      status: "ready_for_launch_day_watch",
+      currentTargetKey: "production_signoff_packet",
+      nextAction: "Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff."
+    });
+    assert.equal(output.stagingProductionSignoffPacket.signoffExecutionEntry.nextAction, "Archive production sign-off packet, then start launch-day watch and stabilization handoff.");
     assert.equal(output.stagingProductionSignoffPacket.nextAction, "Archive production sign-off packet, then start launch-day watch and stabilization handoff.");
     assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.key, "launch_duty_archive_index");
     assert.equal(output.operatorExecutionPlan.launchDutyPacketFocus.currentPacket.status, "awaiting_archive_review");

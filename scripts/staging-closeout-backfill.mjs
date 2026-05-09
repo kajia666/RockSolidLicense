@@ -70,23 +70,66 @@ function statusCommand(outputFile, actionsFile = null) {
   return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
 }
 
-function buildOperatorNextCommands({ outputFile, actionsFile, rehearsalCommand, readinessStatusCommand }) {
+function receiptIdArgs(receiptOperations = []) {
+  return receiptOperations
+    .filter(Boolean)
+    .map((operation) => ` --receipt-id <${operation}-receipt-id>`)
+    .join("");
+}
+
+function buildNextBackfillCommand({ outputFile, target, actionsFile = null }) {
+  if (!target?.key) {
+    return null;
+  }
+  const artifactArg = target.artifactPath ? ` --artifact-path ${commandValue(target.artifactPath)}` : "";
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
   return [
+    "npm.cmd run staging:closeout:backfill --",
+    `--input-file ${commandValue(outputFile)}`,
+    `--key ${commandValue(target.key)}`,
+    "--value-json <redacted-json>",
+    artifactArg.trimStart(),
+    receiptIdArgs(Array.isArray(target.receiptOperations) ? target.receiptOperations : []).trimStart(),
+    actionsArg.trimStart()
+  ].filter(Boolean).join(" ");
+}
+
+function buildOperatorNextCommands({
+  outputFile,
+  actionsFile,
+  rehearsalCommand,
+  readinessStatusCommand,
+  nextBackfillCommand,
+  nextBackfillArtifactPath
+}) {
+  const commands = [
     {
       key: "readiness_status",
       status: "current",
       command: readinessStatusCommand,
       artifactPath: actionsFile || null,
       nextAction: "Refresh the readiness action queue after this evidence backfill."
-    },
+    }
+  ];
+  if (nextBackfillCommand) {
+    commands.push({
+      key: "next_closeout_backfill",
+      status: "blocked_after_readiness_status",
+      command: nextBackfillCommand,
+      artifactPath: nextBackfillArtifactPath || null,
+      nextAction: "Backfill the next pending closeout evidence item after the readiness action queue is refreshed."
+    });
+  }
+  commands.push(
     {
       key: "rehearsal_reload",
-      status: "blocked_after_readiness_status",
+      status: nextBackfillCommand ? "blocked_after_next_closeout_backfill" : "blocked_after_readiness_status",
       command: rehearsalCommand,
       artifactPath: outputFile,
       nextAction: "Reload rehearsal after status confirms the next gate or all closeout evidence is ready."
     }
-  ];
+  );
+  return commands;
 }
 
 function buildEvidenceValue(options) {
@@ -160,6 +203,39 @@ function isFilled(field) {
   return true;
 }
 
+function buildEvidenceProgress({ fields, outputFile, actionsFile, readinessStatusCommand }) {
+  const acceptanceFields = Array.isArray(fields) ? fields : [];
+  const pendingFields = acceptanceFields.filter((field) => !isFilled(field));
+  const currentTarget = pendingFields[0] || null;
+  const receiptOperations = Array.isArray(currentTarget?.receiptOperations) ? currentTarget.receiptOperations : [];
+  const nextBackfillCommand = buildNextBackfillCommand({
+    outputFile,
+    target: currentTarget ? { ...currentTarget, receiptOperations } : null,
+    actionsFile
+  });
+  return {
+    status: pendingFields.length === 0 ? "filled" : "awaiting_more_closeout_evidence",
+    requiredCount: acceptanceFields.length,
+    filledCount: acceptanceFields.length - pendingFields.length,
+    pendingCount: pendingFields.length,
+    currentTarget: currentTarget
+      ? {
+        key: currentTarget.key || null,
+        status: currentTarget.status || "pending_operator_entry",
+        artifactPath: currentTarget.artifactPath || null,
+        sourceStep: currentTarget.sourceStep || null,
+        receiptOperations
+      }
+      : null,
+    pendingKeys: pendingFields.map((field) => field.key).filter(Boolean),
+    nextBackfillCommand,
+    statusCommand: readinessStatusCommand,
+    nextAction: nextBackfillCommand
+      ? "Run statusCommand, then run nextBackfillCommand with real redacted evidence."
+      : "Run statusCommand to move to the full-test or sign-off action."
+  };
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -174,8 +250,25 @@ function writeResult(result, json) {
     if (Array.isArray(result.receiptIds) && result.receiptIds.length) {
       console.log(`Backfilled receipt IDs: ${result.receiptIds.join(", ")}`);
     }
+    if (result.evidenceProgress) {
+      const progress = result.evidenceProgress;
+      console.log(`Closeout evidence progress: ${progress.filledCount}/${progress.requiredCount} filled, ${progress.pendingCount} pending`);
+      if (progress.currentTarget) {
+        console.log(`Next closeout target: ${progress.currentTarget.key}`);
+        if (progress.currentTarget.artifactPath) {
+          console.log(`Next target artifact: ${progress.currentTarget.artifactPath}`);
+        }
+        if (progress.currentTarget.sourceStep) {
+          console.log(`Next target source step: ${progress.currentTarget.sourceStep}`);
+        }
+      }
+      if (progress.nextBackfillCommand) {
+        console.log(`Next backfill command: ${progress.nextBackfillCommand}`);
+      }
+    }
     console.log(`Backfilled status refresh: ${result.statusCommand}`);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
+    const nextBackfill = result.operatorNextCommands?.find((item) => item.key === "next_closeout_backfill");
     const rehearsalReload = result.operatorNextCommands?.find((item) => item.key === "rehearsal_reload");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
@@ -184,6 +277,9 @@ function writeResult(result, json) {
       }
     } else {
       console.log(result.statusCommand);
+    }
+    if (nextBackfill) {
+      console.log(`Next backfill after status: ${nextBackfill.command}`);
     }
     if (rehearsalReload) {
       console.log(`Rehearsal reload: ${rehearsalReload.command}`);
@@ -211,6 +307,12 @@ function main() {
     const filledFieldCount = fields.filter(isFilled).length;
     const nextCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`;
     const nextStatusCommand = statusCommand(outputFile, actionsFile);
+    const evidenceProgress = buildEvidenceProgress({
+      fields,
+      outputFile,
+      actionsFile,
+      readinessStatusCommand: nextStatusCommand
+    });
     writeResult({
       status: "written",
       mode: "staging-closeout-backfill",
@@ -223,13 +325,16 @@ function main() {
       receiptIds: options.receiptIds,
       filledFieldCount,
       remainingPlaceholderCount: fields.length - filledFieldCount,
+      evidenceProgress,
       nextCommand,
       statusCommand: nextStatusCommand,
       operatorNextCommands: buildOperatorNextCommands({
         outputFile,
         actionsFile,
         rehearsalCommand: nextCommand,
-        readinessStatusCommand: nextStatusCommand
+        readinessStatusCommand: nextStatusCommand,
+        nextBackfillCommand: evidenceProgress.nextBackfillCommand,
+        nextBackfillArtifactPath: evidenceProgress.currentTarget?.artifactPath
       }),
       nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     }, options.json);

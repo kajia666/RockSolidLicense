@@ -137,6 +137,30 @@ test("staging closeout backfill writes one evidence field without clearing remai
       receiptIds: ["receipt-route-map-001"],
       filledFieldCount: 1,
       remainingPlaceholderCount: 6,
+      evidenceProgress: {
+        status: "awaiting_more_closeout_evidence",
+        requiredCount: 7,
+        filledCount: 1,
+        pendingCount: 6,
+        currentTarget: {
+          key: "backup_restore_drill_result",
+          status: "pending_operator_entry",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/backup_restore_drill_result.txt",
+          sourceStep: "source_backup_restore_drill_result",
+          receiptOperations: []
+        },
+        pendingKeys: [
+          "backup_restore_drill_result",
+          "live_write_smoke_result",
+          "launch_smoke_handoff",
+          "launch_mainline_evidence_receipts",
+          "receipt_visibility_review",
+          "operator_go_no_go"
+        ],
+        nextBackfillCommand: `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/backup_restore_drill_result.txt --actions-file ${actionsFile}`,
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+        nextAction: "Run statusCommand, then run nextBackfillCommand with real redacted evidence."
+      },
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
       operatorNextCommands: [
@@ -148,8 +172,15 @@ test("staging closeout backfill writes one evidence field without clearing remai
           nextAction: "Refresh the readiness action queue after this evidence backfill."
         },
         {
-          key: "rehearsal_reload",
+          key: "next_closeout_backfill",
           status: "blocked_after_readiness_status",
+          command: `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/backup_restore_drill_result.txt --actions-file ${actionsFile}`,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/backup_restore_drill_result.txt",
+          nextAction: "Backfill the next pending closeout evidence item after the readiness action queue is refreshed."
+        },
+        {
+          key: "rehearsal_reload",
+          status: "blocked_after_next_closeout_backfill",
           command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
           artifactPath: closeoutInputFile,
           nextAction: "Reload rehearsal after status confirms the next gate or all closeout evidence is ready."
@@ -212,9 +243,15 @@ test("staging closeout backfill prints ordered next commands in plain output", (
     assert.match(result.stdout, /Backfilled target: closeout_evidence\/route_map_gate_result/);
     assert.match(result.stdout, /Backfilled artifact path: artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
     assert.match(result.stdout, /Backfilled receipt IDs: receipt-route-map-001/);
+    assert.match(result.stdout, /Closeout evidence progress: 1\/7 filled, 6 pending/);
+    assert.match(result.stdout, /Next closeout target: backup_restore_drill_result/);
+    assert.match(result.stdout, /Next target artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt/);
+    assert.match(result.stdout, /Next target source step: source_backup_restore_drill_result/);
+    assert.match(result.stdout, /Next backfill command: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Backfilled status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Next backfill after status: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(result.stdout, /Next action: Run statusCommand to pick the next closeout, full-test, or sign-off action\./);
   } finally {

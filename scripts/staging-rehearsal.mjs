@@ -8794,6 +8794,28 @@ function writeLaunchDutyArchiveReviewPlain(index = {}) {
   console.log(`Archive review next action: ${entry.nextAction || "-"}`);
 }
 
+function writeReadinessReviewPacketPlain(packet = {}) {
+  if (!packet?.status) {
+    return;
+  }
+  const fullTestEntryExecution = packet.fullTestEntryExecution || {};
+  const closeoutReload = fullTestEntryExecution.closeoutReload || {};
+  const fullTestWindow = fullTestEntryExecution.fullTestWindow || {};
+  const postFullTest = fullTestEntryExecution.postFullTest || {};
+  const gates = Array.isArray(packet.gates) ? packet.gates : [];
+  const fullTestGate = gates.find((gate) => gate?.key === "full_test_window") || {};
+  const productionSignoffGate = gates.find((gate) => gate?.key === "production_signoff") || {};
+  console.log(`Readiness review packet: ${packet.status || "-"} (fullTest=${fullTestWindow.canRun ? "yes" : "no"}, signoff=${productionSignoffGate.canProceed ? "yes" : "no"})`);
+  console.log(`Readiness review packet file: ${packet.packetFile || "-"}`);
+  console.log(`Readiness review closeout reload: ${closeoutReload.status || packet.sourceStatuses?.closeoutReloadPacket || "-"} -> \`${closeoutReload.command || packet.commands?.closeoutReload || "-"}\``);
+  console.log(`Readiness review full-test entry: ${fullTestEntryExecution.status || "-"} (action=${fullTestEntryExecution.currentActionKey || "-"}, command=${fullTestEntryExecution.currentCommand || "-"})`);
+  console.log(`Readiness review full-test gate: ${fullTestWindow.status || fullTestGate.status || "-"} (missingCloseout=${(fullTestWindow.missingCloseoutKeys || fullTestGate.missingCloseoutKeys || []).join(", ") || "-"})`);
+  console.log(`Readiness review production signoff packet: ${postFullTest.packetFile || "-"}`);
+  console.log(`Readiness review missing signoff keys: ${(postFullTest.missingSignoffKeys || productionSignoffGate.missingSignoffKeys || []).join(", ") || "-"}`);
+  console.log(`Readiness review missing receipt visibility: ${(postFullTest.missingReceiptVisibilityKeys || productionSignoffGate.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
+  console.log(`Readiness review next action: ${fullTestEntryExecution.nextAction || packet.nextAction || "-"}`);
+}
+
 function writeFullTestSignoffFocusPlain(focus = {}) {
   if (!focus?.status) {
     return;
@@ -11120,6 +11142,7 @@ function writeResult(result, json) {
     const artifactManifest = result.stagingArtifactManifest || {};
     const launchDutyPacketFocus = result.operatorExecutionPlan?.launchDutyPacketFocus || {};
     const launchDutyArchiveIndex = result.stagingLaunchDutyArchiveIndex || {};
+    const readinessReviewPacket = result.stagingReadinessReviewPacket || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -11145,6 +11168,7 @@ function writeResult(result, json) {
     writeLaunchDutyPacketFocusPlain(launchDutyPacketFocus);
     writeLaunchDutyArchiveReviewPlain(launchDutyArchiveIndex);
     writeCloseoutBackfillFocusPlain(closeoutBackfillFocus);
+    writeReadinessReviewPacketPlain(readinessReviewPacket);
     writeFullTestSignoffFocusPlain(fullTestSignoffFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);

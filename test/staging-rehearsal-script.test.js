@@ -3066,6 +3066,15 @@ test("staging rehearsal plain output prints production signoff evidence handoff 
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Readiness review packet: ready_for_full_test_window \(fullTest=yes, signoff=no\)/);
+    assert.match(result.stdout, /Readiness review packet file: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-readiness-review-packet\.json/);
+    assert.match(result.stdout, /Readiness review closeout reload: ready_for_full_test_window -> `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json`/);
+    assert.match(result.stdout, /Readiness review full-test entry: ready_for_full_test_window \(action=run_full_test_window, command=npm\.cmd test\)/);
+    assert.match(result.stdout, /Readiness review full-test gate: ready \(missingCloseout=-\)/);
+    assert.match(result.stdout, /Readiness review production signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(result.stdout, /Readiness review missing signoff keys: full_test_window_passed, staging_artifacts_archived, launch_mainline_receipts_visible/);
+    assert.match(result.stdout, /Readiness review missing receipt visibility: launchMainline, launchReview, launchSmoke, developerOps, launchOpsOverviewStatus/);
+    assert.match(result.stdout, /Readiness review next action: Run npm\.cmd test, then backfill production sign-off evidence into the production sign-off packet\./);
     assert.match(result.stdout, /Full-test signoff focus: ready_for_full_test_window \(fullTest=yes, signoff=no\)/);
     assert.match(result.stdout, /Full-test signoff action: backfill_production_signoff \(ready_for_full_test_window\)/);
     assert.match(result.stdout, /Full-test command: `npm\.cmd test`/);

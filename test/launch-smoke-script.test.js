@@ -148,6 +148,33 @@ test("launch smoke script runs the first-wave operations preflight", () => {
   assert.equal(output.handoff.operatorNextCommands[0].target, output.handoff.nextWorkspace.route);
   assert.equal(output.handoff.operatorNextCommands[3].sourceStatus, "review");
   assert.equal(output.handoff.operatorNextCommands[4].auditLogId, output.handoff.evidence.auditLogId);
+  assert.equal(output.handoff.closeoutBackfill.status, "ready_for_closeout_backfill");
+  assert.equal(output.handoff.closeoutBackfill.filledCloseoutInputFile, "artifacts/staging/SMOKE_ALPHA/stable/filled-closeout-input.json");
+  assert.equal(output.handoff.closeoutBackfill.readinessActionQueueFile, "artifacts/staging/SMOKE_ALPHA/stable/readiness-action-queue.md");
+  assert.equal(
+    output.handoff.closeoutBackfill.statusCommand,
+    "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/SMOKE_ALPHA/stable/filled-closeout-input.json --actions-file artifacts/staging/SMOKE_ALPHA/stable/readiness-action-queue.md"
+  );
+  assert.deepEqual(
+    output.handoff.closeoutBackfill.commands.map((item) => [item.order, item.key, item.status, item.artifactPath]),
+    [
+      [1, "live_write_smoke_result", "current", "artifacts/staging/SMOKE_ALPHA/stable/live-write-smoke-output.json"],
+      [2, "launch_smoke_handoff", "next", "artifacts/staging/SMOKE_ALPHA/stable/launch-smoke-handoff.json"],
+      [3, "launch_mainline_evidence_receipts", "next", "artifacts/staging/SMOKE_ALPHA/stable/launch-mainline-evidence-receipts.json"],
+      [4, "receipt_visibility_review", "next", "artifacts/staging/SMOKE_ALPHA/stable/receipt-visibility-review.txt"]
+    ]
+  );
+  assert.match(output.handoff.closeoutBackfill.commands[0].command, /npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/SMOKE_ALPHA\/stable\/filled-closeout-input\.json --key live_write_smoke_result --value-json/);
+  assert.match(output.handoff.closeoutBackfill.commands[0].command, /--artifact-path artifacts\/staging\/SMOKE_ALPHA\/stable\/live-write-smoke-output\.json/);
+  assert.match(output.handoff.closeoutBackfill.commands[0].command, /--actions-file artifacts\/staging\/SMOKE_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.deepEqual(output.handoff.closeoutBackfill.commands[0].valueJson, {
+    result: "pass",
+    mode: "ephemeral-in-memory",
+    checksPassed: 14,
+    productCode: "SMOKE_ALPHA",
+    channel: "stable",
+    handoffStatus: "ready_for_launch_review"
+  });
 
   const checkNames = output.checks.map((item) => item.name);
   assert.deepEqual(checkNames, [
@@ -188,6 +215,12 @@ test("launch smoke plain output prints the ordered launch-duty handoff queue", (
   assert.match(result.stdout, /4\. verify_launch_ops_overview_status: next download -> \/api\/developer\/ops\/export\/download\?productCode=SMOKE_PLAIN_ALPHA&format=launch-operations-overview-status&limit=20/);
   assert.match(result.stdout, /5\. verify_first_wave_confirmation: next evidence -> auditLogId=/);
   assert.match(result.stdout, /8\. verify_mainline_route_map_overview_evidence: next download -> \/api\/developer\/launch-mainline\/download\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=handoff-download-routes/);
+  assert.match(result.stdout, /Closeout backfill current: live_write_smoke_result/);
+  assert.match(result.stdout, /Closeout backfill command: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json --key live_write_smoke_result --value-json/);
+  assert.match(result.stdout, /Closeout readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Closeout backfill queue:/);
+  assert.match(result.stdout, /2\. launch_smoke_handoff: next -> npm\.cmd run staging:closeout:backfill/);
+  assert.match(result.stdout, /4\. receipt_visibility_review: next -> npm\.cmd run staging:closeout:backfill/);
 });
 
 test("launch smoke script requires explicit consent before remote live writes", () => {

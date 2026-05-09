@@ -32,7 +32,9 @@ function parseArgs(argv) {
     adminUsername: null,
     adminPassword: null,
     developerUsername: null,
-    developerPassword: null
+    developerPassword: null,
+    closeoutInputFile: null,
+    actionsFile: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -103,6 +105,20 @@ function parseArgs(argv) {
     }
     if (name === "--developer-password") {
       options.developerPassword = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--closeout-input-file") {
+      options.closeoutInputFile = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--actions-file") {
+      options.actionsFile = requireArgValue(name, value, inlineValue);
       if (inlineValue === undefined) {
         index += 1;
       }
@@ -212,6 +228,65 @@ function buildHandoffLink(baseUrl, route) {
   };
 }
 
+function commandValue(value) {
+  const text = String(value || "");
+  if (/[\s"`]/.test(text)) {
+    return `"${text.replace(/"/g, "`\"")}"`;
+  }
+  return text;
+}
+
+function defaultStagingArtifactRoot(options) {
+  return path.posix.join("artifacts/staging", options.productCode, options.channel);
+}
+
+function defaultFilledCloseoutInputFile(options) {
+  return path.posix.join(defaultStagingArtifactRoot(options), "filled-closeout-input.json");
+}
+
+function defaultReadinessActionQueueFile(options) {
+  return path.posix.join(defaultStagingArtifactRoot(options), "readiness-action-queue.md");
+}
+
+function buildReadinessStatusCommand({ filledCloseoutInputFile, readinessActionQueueFile }) {
+  return [
+    "npm.cmd run staging:readiness:status --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
+function buildCloseoutBackfillCommand({
+  filledCloseoutInputFile,
+  key,
+  valueJson,
+  artifactPath,
+  receiptIds = [],
+  readinessActionQueueFile
+}) {
+  const parts = [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--key",
+    commandValue(key),
+    "--value-json",
+    commandValue(JSON.stringify(valueJson))
+  ];
+  if (artifactPath) {
+    parts.push("--artifact-path", commandValue(artifactPath));
+  }
+  for (const receiptId of receiptIds) {
+    parts.push("--receipt-id", commandValue(receiptId));
+  }
+  if (readinessActionQueueFile) {
+    parts.push("--actions-file", commandValue(readinessActionQueueFile));
+  }
+  return parts.join(" ");
+}
+
 function launchDutyHandoffKind(item) {
   if (item.route || item.href) {
     return item.fileName ? "download" : "workspace";
@@ -248,6 +323,87 @@ function buildLaunchDutyOperatorNextCommands(operatorChecklist = []) {
   }));
 }
 
+function buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed }) {
+  const artifactRoot = defaultStagingArtifactRoot(options);
+  const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile(options);
+  const readinessActionQueueFile = options.actionsFile || defaultReadinessActionQueueFile(options);
+  const statusCommand = buildReadinessStatusCommand({
+    filledCloseoutInputFile,
+    readinessActionQueueFile
+  });
+  const mode = options.baseUrl ? "remote-live-writes" : "ephemeral-in-memory";
+  const targets = [
+    {
+      key: "live_write_smoke_result",
+      artifactPath: path.posix.join(artifactRoot, "live-write-smoke-output.json"),
+      receiptIds: ["<record_launch_rehearsal_run-receipt-id>"],
+      valueJson: {
+        result: "pass",
+        mode,
+        checksPassed,
+        productCode: options.productCode,
+        channel: options.channel,
+        handoffStatus: handoff.status
+      }
+    },
+    {
+      key: "launch_smoke_handoff",
+      artifactPath: path.posix.join(artifactRoot, "launch-smoke-handoff.json"),
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+      valueJson: {
+        status: handoff.status,
+        nextWorkspace: handoff.nextWorkspace.href || handoff.nextWorkspace.route,
+        operatorNextCommandCount: handoff.operatorNextCommands.length
+      }
+    },
+    {
+      key: "launch_mainline_evidence_receipts",
+      artifactPath: path.posix.join(artifactRoot, "launch-mainline-evidence-receipts.json"),
+      receiptIds: ["<record_launch_rehearsal_run-receipt-id>"],
+      valueJson: {
+        status: "pending_operator_receipts",
+        launchMainline: handoff.reviewWorkspaces.launchMainline.href || handoff.reviewWorkspaces.launchMainline.route,
+        routeMapDownload: handoff.downloads.launchMainlineRouteMap.href || handoff.downloads.launchMainlineRouteMap.route
+      }
+    },
+    {
+      key: "receipt_visibility_review",
+      artifactPath: path.posix.join(artifactRoot, "receipt-visibility-review.txt"),
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+      valueJson: {
+        status: "pending_operator_review",
+        launchReviewSummary: handoff.downloads.launchReviewSummary.href || handoff.downloads.launchReviewSummary.route,
+        launchSmokeSummary: handoff.downloads.launchSmokeSummary.href || handoff.downloads.launchSmokeSummary.route,
+        launchOpsOverviewStatus: handoff.downloads.launchOpsOverviewStatus.href || handoff.downloads.launchOpsOverviewStatus.route
+      }
+    }
+  ];
+  return {
+    version: "launch-smoke-closeout-backfill-handoff/v1",
+    status: "ready_for_closeout_backfill",
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    statusCommand,
+    commands: targets.map((target, index) => ({
+      order: index + 1,
+      key: target.key,
+      status: index === 0 ? "current" : "next",
+      artifactPath: target.artifactPath,
+      receiptIds: target.receiptIds,
+      valueJson: target.valueJson,
+      command: buildCloseoutBackfillCommand({
+        filledCloseoutInputFile,
+        key: target.key,
+        valueJson: target.valueJson,
+        artifactPath: target.artifactPath,
+        receiptIds: target.receiptIds,
+        readinessActionQueueFile
+      })
+    })),
+    nextAction: "Run the current closeout backfill command, refresh readiness status, then continue the remaining post-smoke evidence commands."
+  };
+}
+
 function parseAttachmentFileName(contentDisposition) {
   if (!contentDisposition) {
     return null;
@@ -259,6 +415,7 @@ function parseAttachmentFileName(contentDisposition) {
 function buildLaunchDutyHandoff({
   options,
   handoffBaseUrl,
+  checksPassed,
   afterSetup,
   handoffConfirmation,
   summaryDownload,
@@ -510,6 +667,7 @@ function buildLaunchDutyHandoff({
     ]
   };
   handoff.operatorNextCommands = buildLaunchDutyOperatorNextCommands(handoff.operatorChecklist);
+  handoff.closeoutBackfill = buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed });
   return handoff;
 }
 
@@ -871,6 +1029,7 @@ async function runLaunchSmoke(options) {
     const handoff = buildLaunchDutyHandoff({
       options,
       handoffBaseUrl: options.baseUrl,
+      checksPassed: checks.length,
       afterSetup,
       handoffConfirmation,
       summaryDownload,
@@ -946,6 +1105,17 @@ function writeResult(result, json) {
         console.log("Launch-duty handoff queue:");
         for (const item of operatorNextCommands) {
           console.log(`${item.order}. ${item.key}: ${item.status} ${item.kind} -> ${item.target}`);
+        }
+      }
+      const closeoutBackfill = result.handoff.closeoutBackfill || null;
+      const currentBackfill = closeoutBackfill?.commands?.find((item) => item.status === "current");
+      if (currentBackfill) {
+        console.log(`Closeout backfill current: ${currentBackfill.key}`);
+        console.log(`Closeout backfill command: ${currentBackfill.command}`);
+        console.log(`Closeout readiness status: ${closeoutBackfill.statusCommand}`);
+        console.log("Closeout backfill queue:");
+        for (const item of closeoutBackfill.commands || []) {
+          console.log(`${item.order}. ${item.key}: ${item.status} -> ${item.command}`);
         }
       }
       console.log(`- Open Launch Review: ${result.handoff.nextWorkspace.href || result.handoff.nextWorkspace.route}`);

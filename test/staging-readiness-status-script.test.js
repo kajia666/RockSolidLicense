@@ -262,7 +262,10 @@ test("staging readiness status plain output prints full-test operator next comma
     assert.equal(result.stderr, "");
     assert.match(result.stdout, /Current gate: full_test_window/);
     assert.match(result.stdout, /Operator next current: run_full_test_window -> npm\.cmd test/);
+    assert.match(result.stdout, /Operator next current artifact: artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt/);
     assert.match(result.stdout, /Operator next blocked_after_full_test_window: backfill_full_test_window_passed -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next blocked_after_full_test_window example: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key full_test_window_passed --value-json '\{"result":"pass","command":"npm\.cmd test","failureCount":0,"summary":"<redacted test summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next blocked_after_full_test_window artifact: artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt/);
     assert.match(result.stdout, /Operator next blocked_after_full_test_backfill: refresh_readiness_status -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action file: .*readiness-action-queue\.md/);
   } finally {
@@ -364,6 +367,39 @@ test("staging readiness status reports signoff and receipt visibility gaps befor
       output.actionQueue.at(-1).exampleCommand,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane launchOpsOverviewStatus --value-json '{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/launch-ops-overview-status-receipt-visibility.json --receipt-id <record_post_launch_ops_sweep-receipt-id>`
     );
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging readiness status plain output prints production signoff artifact and example hints", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-signoff-plain-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: closeoutKeys,
+      decision: "ready-for-full-test-window",
+      productionDecision: "ready-for-production-signoff",
+      filledSignoffKeys: ["full_test_window_passed"],
+      visibleReceiptLanes: ["launchMainline"]
+    });
+
+    const result = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Current gate: production_signoff/);
+    assert.match(result.stdout, /Operator next current: backfill_production_signoff -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next current example: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json '\{"result":"confirmed","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next current artifact: artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt/);
+    assert.match(result.stdout, /Operator next current status check: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next current next action: Backfill staging_artifacts_archived, then rerun staging:readiness:status\./);
+    assert.match(result.stdout, /Operator next blocked_after_prior_actions: backfill_receipt_visibility -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --receipt-lane launchOpsOverviewStatus --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next blocked_after_prior_actions example: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --receipt-lane launchOpsOverviewStatus --value-json '\{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/launch-ops-overview-status-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next blocked_after_prior_actions artifact: artifacts\/staging\/<productCode>\/<channel>\/launch-ops-overview-status-receipt-visibility\.json/);
+    assert.match(result.stdout, /Operator next blocked_after_prior_actions receipts: record_post_launch_ops_sweep/);
+    assert.match(result.stdout, /Action file: .*readiness-action-queue\.md/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

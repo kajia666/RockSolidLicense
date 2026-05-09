@@ -1097,6 +1097,12 @@ function writeResult(result, json) {
     if (result.operatorNextCommands?.length) {
       for (const item of result.operatorNextCommands) {
         console.log(`Operator next ${item.status}: ${item.actionKey || item.key} -> ${item.command || item.artifactPathHint || "-"}`);
+        if (item.exampleCommand) {
+          console.log(`Operator next ${item.status} example: ${item.exampleCommand}`);
+        }
+        if (item.artifactPathHint) {
+          console.log(`Operator next ${item.status} artifact: ${item.artifactPathHint}`);
+        }
         if (item.statusCommand) {
           console.log(`Operator next ${item.status} status check: ${item.statusCommand}`);
         }

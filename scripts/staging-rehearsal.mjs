@@ -8675,6 +8675,40 @@ function writeRealStagingRunFocusPlain(focus = {}) {
   console.log(`Real staging full-test entry: ${focus.fullTestEntry?.status || "-"} (command=${focus.fullTestEntry?.command || "-"})`);
 }
 
+function writeBackupRestoreDrillPacketPlain(packet = {}) {
+  if (!packet?.status) {
+    return;
+  }
+  const resultCaptureEntry = packet.resultCaptureEntry || {};
+  const resultBackfillTarget = resultCaptureEntry.resultBackfillTarget || {};
+  const receiptTargets = Array.isArray(resultCaptureEntry.receiptTargets)
+    ? resultCaptureEntry.receiptTargets
+    : [];
+  const executionEntry = packet.executionEntry || {};
+  const executionBackfillTarget = executionEntry.closeoutBackfillTarget || {};
+  const executionCommandSequence = Array.isArray(executionEntry.commandSequence)
+    ? executionEntry.commandSequence
+    : [];
+  const executionReceiptQueue = Array.isArray(executionEntry.receiptQueue)
+    ? executionEntry.receiptQueue
+    : [];
+  const executionReload = executionEntry.closeoutReload || {};
+  console.log(`Backup/restore packet status: ${packet.status || "-"} (closeoutKey=${packet.closeoutKey || "-"})`);
+  console.log(`Backup/restore artifact: ${packet.artifactPath || "-"}`);
+  console.log(`Backup/restore closeout backfill command: \`${packet.closeoutBackfillCommand || "-"}\``);
+  console.log(`Backup/restore readiness status: \`${packet.statusCommand || "-"}\``);
+  console.log(`Backup/restore result capture entry: ${resultCaptureEntry.status || "-"} (action=${resultCaptureEntry.currentActionKey || "-"}, target=${resultBackfillTarget.key || "-"})`);
+  console.log(`Backup/restore result current command: \`${resultCaptureEntry.currentCommand || "-"}\``);
+  console.log(`Backup/restore result backfill: ${resultBackfillTarget.status || "-"} -> ${resultBackfillTarget.artifactPath || "-"} (closeout=${resultBackfillTarget.closeoutInputPath || "-"})`);
+  console.log(`Backup/restore result receipts: ${receiptTargets.map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  console.log(`Backup/restore execution entry: ${executionEntry.status || "-"} (action=${executionEntry.currentActionKey || "-"}, target=${executionBackfillTarget.key || "-"})`);
+  console.log(`Backup/restore execution current command: \`${executionEntry.currentCommand || "-"}\``);
+  console.log(`Backup/restore execution command sequence: ${executionCommandSequence.map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  console.log(`Backup/restore execution receipts: ${executionReceiptQueue.map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  console.log(`Backup/restore execution reload: ${executionReload.status || "-"} -> \`${executionReload.command || "-"}\``);
+  console.log(`Backup/restore next action: ${packet.nextAction || "-"}`);
+}
+
 function renderCloseoutBackfillPlainNextAction(focus = {}, current = {}) {
   if (current?.key) {
     return `Backfill ${current.key}, then rerun staging:readiness:status and staging:rehearsal.`;
@@ -10957,6 +10991,7 @@ function writeResult(result, json) {
     const closeoutBackfillFocus = result.operatorExecutionPlan?.closeoutBackfillFocus
       || result.finalRehearsalPacket?.operatorExecutionPlan?.closeoutBackfillFocus
       || {};
+    const backupRestoreDrillPacket = result.stagingBackupRestoreDrillPacket || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -10977,6 +11012,7 @@ function writeResult(result, json) {
       console.log(`Output write next action: ${outputWriteSummary.nextAction || "-"}`);
     }
     writeRealStagingRunFocusPlain(realStagingRunFocus);
+    writeBackupRestoreDrillPacketPlain(backupRestoreDrillPacket);
     writeCloseoutBackfillFocusPlain(closeoutBackfillFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);

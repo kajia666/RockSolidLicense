@@ -2322,6 +2322,7 @@ function buildStagingBackupRestoreDrillPacket(result) {
   const commands = result.nextCommands?.recovery || {};
   const commandKeys = Object.keys(commands);
   const receiptOperations = ledgerRow.receiptOperations || ["record_recovery_drill", "record_backup_verification"];
+  const preflightCloseoutBackfill = result.preflights?.recovery?.closeoutBackfill || {};
   const closeoutInputPath = bindingFiles.get("filled_closeout_input")?.path
     || runRecordIndex.closeoutProgress?.closeoutInputPath
     || path.posix.join(archiveRoot, "filled-closeout-input.json");
@@ -2381,6 +2382,8 @@ function buildStagingBackupRestoreDrillPacket(result) {
     packetFile,
     closeoutKey: "backup_restore_drill_result",
     artifactPath,
+    closeoutBackfillCommand: preflightCloseoutBackfill.command || null,
+    statusCommand: preflightCloseoutBackfill.statusCommand || null,
     receiptOperations,
     expectedEvidence,
     closeoutBackfill,
@@ -2444,6 +2447,8 @@ function buildStagingBackupRestoreDrillPacket(result) {
       {
         key: "backfill_closeout_key",
         status: backupRestoreBackfilled ? "ready" : "operator_backfill",
+        command: preflightCloseoutBackfill.command || null,
+        statusCommand: preflightCloseoutBackfill.statusCommand || null,
         closeoutKey: "backup_restore_drill_result",
         artifactPath,
         expectedEvidence: "Backfill backup_restore_drill_result with the backup artifact path, restore dry-run result, healthcheck result, and receipt IDs."
@@ -3308,12 +3313,21 @@ function buildStagingPreflightArgs(options) {
 }
 
 function buildRecoveryPreflightArgs(options) {
+  const productCode = sanitizeArtifactPathSegment(options.productCode, "product");
+  const channel = sanitizeArtifactPathSegment(options.channel || "stable", "stable");
+  const archiveRoot = path.posix.join("artifacts", "staging", productCode, channel);
+  const closeoutInputFile = options.closeoutInputFile || path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const readinessActionQueueFile = options.readinessActionQueueFile || path.posix.join(archiveRoot, "readiness-action-queue.md");
   const args = [
     "--target-os", options.targetOs,
     "--storage-profile", options.storageProfile,
     "--target-env-file", options.targetEnvFile,
     "--app-backup-dir", options.appBackupDir,
-    "--base-url", options.baseUrl
+    "--base-url", options.baseUrl,
+    "--product-code", options.productCode,
+    "--channel", options.channel,
+    "--closeout-input-file", closeoutInputFile,
+    "--actions-file", readinessActionQueueFile
   ];
   if (options.postgresBackupDir) {
     args.push("--postgres-backup-dir", options.postgresBackupDir);
@@ -3469,6 +3483,7 @@ function buildLaunchRouteMapGateCommand() {
 
 function buildStagingEnvironmentReadiness(options, { recovery = null, launchRouteMapGate = null } = {}) {
   const recoveryCommandKeys = Object.keys(recovery?.nextCommands || {});
+  const recoveryCloseoutBackfill = recovery?.closeoutBackfill || {};
   return {
     status: "needs_operator_execution",
     willModifyData: false,
@@ -3508,6 +3523,8 @@ function buildStagingEnvironmentReadiness(options, { recovery = null, launchRout
           ? `Recovery command keys: ${recoveryCommandKeys.join(", ")}`
           : "Recovery commands are not available.",
         commandKeys: recoveryCommandKeys,
+        closeoutBackfillCommand: recoveryCloseoutBackfill.command || null,
+        statusCommand: recoveryCloseoutBackfill.statusCommand || null,
         nextAction: "Run the generated backup and restore dry-run commands on a separate restore target before staging sign-off."
       },
       {
@@ -3532,6 +3549,7 @@ function buildStagingEnvironmentReadiness(options, { recovery = null, launchRout
 
 function buildStagingOperatorChecklist(result) {
   const recoveryCommandKeys = Object.keys(result.nextCommands?.recovery || {});
+  const recoveryCloseoutBackfill = result.preflights?.recovery?.closeoutBackfill || {};
   const evidenceOperations = Array.isArray(result.evidenceActionPlan?.items)
     ? result.evidenceActionPlan.items.map((item) => item.operation)
     : [];
@@ -3559,6 +3577,8 @@ function buildStagingOperatorChecklist(result) {
       label: "Run backup and restore drill",
       status: "operator_execute",
       commandKeys: recoveryCommandKeys,
+      closeoutBackfillCommand: recoveryCloseoutBackfill.command || null,
+      statusCommand: recoveryCloseoutBackfill.statusCommand || null,
       summary: "Run generated backup and restore dry-run commands on a separate restore target."
     },
     {
@@ -6662,6 +6682,7 @@ function buildStagingExecutionRunbook(result) {
     || path.posix.join(archiveRoot, "filled-closeout-input.json");
   const filledExample = result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result);
   const closeoutInputReview = summarizeCloseoutInputReview(result.closeoutInput?.backfillReview, closeout);
+  const recoveryCloseoutBackfill = result.preflights?.recovery?.closeoutBackfill || {};
   const commandSequence = [
     {
       key: "prepare_secret_env",
@@ -6701,6 +6722,8 @@ function buildStagingExecutionRunbook(result) {
       commandKeys: Object.keys(result.nextCommands?.recovery || {}),
       closeoutKey: "backup_restore_drill_result",
       artifactPath: ledgerRowsByKey.get("backup_restore_drill_result")?.artifactPath || null,
+      closeoutBackfillCommand: recoveryCloseoutBackfill.command || null,
+      statusCommand: recoveryCloseoutBackfill.statusCommand || null,
       expectedEvidence: expectedEvidenceFor("backup_restore_drill_result"),
       summary: "Run backup, restore dry-run, and healthcheck commands on a separate restore target."
     },
@@ -9250,6 +9273,8 @@ function renderStagingBackupRestoreDrillPacket(packet) {
     `- Receipt operations: ${(packet.receiptOperations || []).join(", ") || "-"}`,
     `- Expected evidence: ${packet.expectedEvidence || "-"}`,
     `- Command keys: ${(packet.commandKeys || []).join(", ") || "-"}`,
+    `- Backup/restore closeout backfill command: \`${packet.closeoutBackfillCommand || "-"}\``,
+    `- Backup/restore readiness status: \`${packet.statusCommand || "-"}\``,
     `- Target OS: ${environment.targetOs || "-"}`,
     `- Storage profile: ${environment.storageProfile || "-"}`,
     `- Target env file: ${environment.targetEnvFile || "-"}`,

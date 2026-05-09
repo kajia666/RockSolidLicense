@@ -101,6 +101,36 @@ function commandValue(value) {
   return text;
 }
 
+function buildRecoveryPreflightCommand({ options, closeoutInputFile, readinessActionQueueFile }) {
+  const parts = [
+    "npm.cmd run recovery:preflight --",
+    "--target-os",
+    commandValue(options.targetOs),
+    "--storage-profile",
+    commandValue(options.storageProfile),
+    "--target-env-file",
+    commandValue(options.targetEnvFile),
+    "--app-backup-dir",
+    commandValue(options.appBackupDir)
+  ];
+  if (options.postgresBackupDir) {
+    parts.push("--postgres-backup-dir", commandValue(options.postgresBackupDir));
+  }
+  parts.push(
+    "--base-url",
+    commandValue(options.baseUrl),
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel || "stable"),
+    "--closeout-input-file",
+    commandValue(closeoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  );
+  return parts.join(" ");
+}
+
 function buildProfile(options) {
   const productCode = sanitizeArtifactSegment(options.productCode, "product");
   const channel = sanitizeArtifactSegment(options.channel || "stable", "stable");
@@ -138,7 +168,16 @@ function buildProfile(options) {
   };
 }
 
-function buildOperatorNextCommands({ outputFile, closeoutInputFile, readinessActionQueueFile, nextCommand, closeoutInitCommand, postCloseoutInitStatusCommand }) {
+function buildOperatorNextCommands({
+  outputFile,
+  closeoutInputFile,
+  readinessActionQueueFile,
+  backupRestoreArtifactFile,
+  nextCommand,
+  closeoutInitCommand,
+  postCloseoutInitStatusCommand,
+  recoveryPreflightCommand
+}) {
   return [
     {
       key: "profile_rehearsal",
@@ -160,6 +199,13 @@ function buildOperatorNextCommands({ outputFile, closeoutInputFile, readinessAct
       command: postCloseoutInitStatusCommand,
       artifactPath: readinessActionQueueFile,
       nextAction: "Refresh the readiness action queue after closeout init."
+    },
+    {
+      key: "recovery_preflight",
+      status: "blocked_after_readiness_status",
+      command: recoveryPreflightCommand,
+      artifactPath: backupRestoreArtifactFile,
+      nextAction: "Run recovery preflight to print backup/restore commands and the backup_restore_drill_result closeout backfill handoff."
     }
   ];
 }
@@ -174,6 +220,7 @@ function writeResult(result, json) {
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const closeoutInit = result.operatorNextCommands?.find((item) => item.key === "closeout_init");
     const readinessStatus = result.operatorNextCommands?.find((item) => item.key === "readiness_status");
+    const recoveryPreflight = result.operatorNextCommands?.find((item) => item.key === "recovery_preflight");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
     } else {
@@ -192,6 +239,9 @@ function writeResult(result, json) {
     } else {
       console.log(result.postCloseoutInitStatusCommand);
     }
+    if (recoveryPreflight) {
+      console.log(`Recovery preflight: ${recoveryPreflight.command}`);
+    }
     console.log(`Next action: ${result.nextAction}`);
     return;
   }
@@ -206,6 +256,7 @@ function main() {
     const closeoutDraftFile = profile.filledCloseoutDraftFile;
     const closeoutInputFile = path.posix.join(archiveRoot, "filled-closeout-input.json");
     const readinessActionQueueFile = profile.readinessActionQueueFile;
+    const backupRestoreArtifactFile = path.posix.join(archiveRoot, "backup-restore-drill.txt");
     const outputFile = options.outputFile
       ? path.resolve(options.outputFile)
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
@@ -214,6 +265,11 @@ function main() {
     const nextCommand = `npm.cmd run staging:rehearsal -- --profile-file ${commandValue(outputFile)}`;
     const closeoutInitCommand = `npm.cmd run staging:closeout:init -- --draft-file ${commandValue(closeoutDraftFile)} --output-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`;
     const postCloseoutInitStatusCommand = `npm.cmd run staging:readiness:status -- --input-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`;
+    const recoveryPreflightCommand = buildRecoveryPreflightCommand({
+      options,
+      closeoutInputFile,
+      readinessActionQueueFile
+    });
     writeResult({
       status: "written",
       mode: "staging-profile-init",
@@ -229,15 +285,18 @@ function main() {
       readinessActionQueueFile,
       closeoutInitCommand,
       postCloseoutInitStatusCommand,
+      recoveryPreflightCommand,
       operatorNextCommands: buildOperatorNextCommands({
         outputFile,
         closeoutInputFile,
         readinessActionQueueFile,
+        backupRestoreArtifactFile,
         nextCommand,
         closeoutInitCommand,
-        postCloseoutInitStatusCommand
+        postCloseoutInitStatusCommand,
+        recoveryPreflightCommand
       }),
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand and recoveryPreflightCommand after the draft is written."
     }, options.json);
   } catch (error) {
     writeResult({

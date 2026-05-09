@@ -76,6 +76,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     assert.equal(existsSync(outputFile), true);
     const output = JSON.parse(result.stdout);
     const profile = JSON.parse(readFileSync(outputFile, "utf8"));
+    const recoveryPreflightCommand = "npm.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/staging.env --app-backup-dir /var/lib/rocksolid/backups --postgres-backup-dir /var/lib/rocksolid/postgres-backups --base-url https://staging.example.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     assert.deepEqual(output, {
       status: "written",
       mode: "staging-profile-init",
@@ -91,6 +92,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       postCloseoutInitStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      recoveryPreflightCommand,
       operatorNextCommands: [
         {
           key: "profile_rehearsal",
@@ -112,9 +114,16 @@ test("staging profile init writes a secret-free profile with launch-duty output 
           command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
           artifactPath: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
           nextAction: "Refresh the readiness action queue after closeout init."
+        },
+        {
+          key: "recovery_preflight",
+          status: "blocked_after_readiness_status",
+          command: recoveryPreflightCommand,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt",
+          nextAction: "Run recovery preflight to print backup/restore commands and the backup_restore_drill_result closeout backfill handoff."
         }
       ],
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand and recoveryPreflightCommand after the draft is written."
     });
     assert.deepEqual(profile, {
       baseUrl: "https://staging.example.com",
@@ -211,7 +220,8 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Closeout init: npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
-    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written\./);
+    assert.match(result.stdout, /Recovery preflight: npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file \/etc\/rocksolidlicense\/staging\.env --app-backup-dir \/var\/lib\/rocksolid\/backups --postgres-backup-dir \/var\/lib\/rocksolid\/postgres-backups --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand and recoveryPreflightCommand after the draft is written\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

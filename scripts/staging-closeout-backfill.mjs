@@ -70,6 +70,25 @@ function statusCommand(outputFile, actionsFile = null) {
   return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
 }
 
+function buildOperatorNextCommands({ outputFile, actionsFile, rehearsalCommand, readinessStatusCommand }) {
+  return [
+    {
+      key: "readiness_status",
+      status: "current",
+      command: readinessStatusCommand,
+      artifactPath: actionsFile || null,
+      nextAction: "Refresh the readiness action queue after this evidence backfill."
+    },
+    {
+      key: "rehearsal_reload",
+      status: "blocked_after_readiness_status",
+      command: rehearsalCommand,
+      artifactPath: outputFile,
+      nextAction: "Reload rehearsal after status confirms the next gate or all closeout evidence is ready."
+    }
+  ];
+}
+
 function buildEvidenceValue(options) {
   const parsed = JSON.parse(options.valueJson);
   const value = parsed && typeof parsed === "object" && !Array.isArray(parsed)
@@ -148,9 +167,22 @@ function writeResult(result, json) {
   }
   if (result.status === "written") {
     console.log(`Closeout evidence backfilled: ${result.key}`);
-    console.log(result.nextCommand);
-    console.log(result.statusCommand);
-    console.log(result.nextAction);
+    const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
+    const rehearsalReload = result.operatorNextCommands?.find((item) => item.key === "rehearsal_reload");
+    if (currentCommand) {
+      console.log(`Current command: ${currentCommand.command}`);
+      if (currentCommand.artifactPath) {
+        console.log(`Action queue file: ${currentCommand.artifactPath}`);
+      }
+    } else {
+      console.log(result.statusCommand);
+    }
+    if (rehearsalReload) {
+      console.log(`Rehearsal reload: ${rehearsalReload.command}`);
+    } else {
+      console.log(result.nextCommand);
+    }
+    console.log(`Next action: ${result.nextAction}`);
     return;
   }
   console.log(`Staging closeout backfill failed: ${result.error.message}`);
@@ -169,6 +201,8 @@ function main() {
     writeFileSync(outputFile, `${JSON.stringify(nextPayload, null, 2)}\n`, "utf8");
     const fields = Array.isArray(nextPayload.acceptanceFields) ? nextPayload.acceptanceFields : [];
     const filledFieldCount = fields.filter(isFilled).length;
+    const nextCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`;
+    const nextStatusCommand = statusCommand(outputFile, actionsFile);
     writeResult({
       status: "written",
       mode: "staging-closeout-backfill",
@@ -178,8 +212,14 @@ function main() {
       key: options.key,
       filledFieldCount,
       remainingPlaceholderCount: fields.length - filledFieldCount,
-      nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`,
-      statusCommand: statusCommand(outputFile, actionsFile),
+      nextCommand,
+      statusCommand: nextStatusCommand,
+      operatorNextCommands: buildOperatorNextCommands({
+        outputFile,
+        actionsFile,
+        rehearsalCommand: nextCommand,
+        readinessStatusCommand: nextStatusCommand
+      }),
       nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     }, options.json);
   } catch (error) {

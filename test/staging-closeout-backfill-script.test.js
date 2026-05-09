@@ -54,6 +54,14 @@ function runBackfill(args) {
   });
 }
 
+function runBackfillPlain(args) {
+  return spawnSync(process.execPath, ["scripts/staging-closeout-backfill.mjs", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 120_000
+  });
+}
+
 function runRehearsal(args) {
   return spawnSync(process.execPath, ["scripts/staging-rehearsal.mjs", "--json", ...args], {
     cwd: repoRoot,
@@ -128,6 +136,22 @@ test("staging closeout backfill writes one evidence field without clearing remai
       remainingPlaceholderCount: 6,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      operatorNextCommands: [
+        {
+          key: "readiness_status",
+          status: "current",
+          command: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+          artifactPath: actionsFile,
+          nextAction: "Refresh the readiness action queue after this evidence backfill."
+        },
+        {
+          key: "rehearsal_reload",
+          status: "blocked_after_readiness_status",
+          command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+          artifactPath: closeoutInputFile,
+          nextAction: "Reload rehearsal after status confirms the next gate or all closeout evidence is ready."
+        }
+      ],
       nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     });
 
@@ -152,6 +176,40 @@ test("staging closeout backfill writes one evidence field without clearing remai
     assert.equal(rehearsalOutput.closeoutInput.backfillReview.filledFieldCount, 1);
     assert.equal(rehearsalOutput.closeoutInput.backfillReview.missingFieldCount, 6);
     assert.equal(rehearsalOutput.operatorExecutionPlan.readinessSummary.canRunFullTestWindow, false);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging closeout backfill prints ordered next commands in plain output", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-backfill-plain-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeCloseoutInput(closeoutInputFile);
+
+    const result = runBackfillPlain([
+      "--input-file",
+      closeoutInputFile,
+      "--actions-file",
+      actionsFile,
+      "--key",
+      "route_map_gate_result",
+      "--value-json",
+      "{\"result\":\"pass\",\"exitCode\":0}",
+      "--artifact-path",
+      "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt",
+      "--receipt-id",
+      "receipt-route-map-001"
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Closeout evidence backfilled: route_map_gate_result/);
+    assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Next action: Run statusCommand to pick the next closeout, full-test, or sign-off action\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

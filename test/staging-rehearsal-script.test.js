@@ -3075,6 +3075,13 @@ test("staging rehearsal plain output prints production signoff evidence handoff 
     assert.match(result.stdout, /Readiness review missing signoff keys: full_test_window_passed, staging_artifacts_archived, launch_mainline_receipts_visible/);
     assert.match(result.stdout, /Readiness review missing receipt visibility: launchMainline, launchReview, launchSmoke, developerOps, launchOpsOverviewStatus/);
     assert.match(result.stdout, /Readiness review next action: Run npm\.cmd test, then backfill production sign-off evidence into the production sign-off packet\./);
+    assert.match(result.stdout, /Full-test result capture entry: ready_for_full_test_result_capture \(action=run_full_test_window, target=full_test_window_passed\)/);
+    assert.match(result.stdout, /Full-test result capture command: `npm\.cmd test`/);
+    assert.match(result.stdout, /Full-test result capture closeout input: .*filled-closeout-ready\.json/);
+    assert.match(result.stdout, /Full-test result capture expected evidence: Attach the full `npm\.cmd test` output summary and failure count\./);
+    assert.match(result.stdout, /Full-test result capture production decision: ready-for-production-signoff \(signoffKey=full_test_window_passed\)/);
+    assert.match(result.stdout, /Full-test result capture reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout\.json>`/);
+    assert.match(result.stdout, /Full-test result capture next action: Run npm\.cmd test, capture the redacted summary, backfill full_test_window_passed, then reload closeout input\./);
     assert.match(result.stdout, /Full-test signoff focus: ready_for_full_test_window \(fullTest=yes, signoff=no\)/);
     assert.match(result.stdout, /Full-test signoff action: backfill_production_signoff \(ready_for_full_test_window\)/);
     assert.match(result.stdout, /Full-test command: `npm\.cmd test`/);

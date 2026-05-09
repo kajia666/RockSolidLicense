@@ -8816,6 +8816,22 @@ function writeReadinessReviewPacketPlain(packet = {}) {
   console.log(`Readiness review next action: ${fullTestEntryExecution.nextAction || packet.nextAction || "-"}`);
 }
 
+function writeFullTestWindowReadinessPlain(readiness = {}) {
+  const resultCaptureEntry = readiness.resultCaptureEntry || {};
+  if (!resultCaptureEntry?.status) {
+    return;
+  }
+  const resultBackfillTarget = resultCaptureEntry.resultBackfillTarget || {};
+  const productionSignoffTarget = resultCaptureEntry.productionSignoffTarget || {};
+  console.log(`Full-test result capture entry: ${resultCaptureEntry.status || "-"} (action=${resultCaptureEntry.currentActionKey || "-"}, target=${resultBackfillTarget.key || "-"})`);
+  console.log(`Full-test result capture command: \`${resultCaptureEntry.currentCommand || "-"}\``);
+  console.log(`Full-test result capture closeout input: ${resultBackfillTarget.closeoutInputPath || "-"}`);
+  console.log(`Full-test result capture expected evidence: ${resultBackfillTarget.expectedEvidence || "-"}`);
+  console.log(`Full-test result capture production decision: ${productionSignoffTarget.requiredDecision || "-"} (signoffKey=${productionSignoffTarget.currentSignoffKey || "-"})`);
+  console.log(`Full-test result capture reload: \`${resultBackfillTarget.reloadCommand || readiness.reloadCommand || "-"}\``);
+  console.log(`Full-test result capture next action: ${resultCaptureEntry.nextAction || readiness.nextAction || "-"}`);
+}
+
 function writeFullTestSignoffFocusPlain(focus = {}) {
   if (!focus?.status) {
     return;
@@ -11143,6 +11159,7 @@ function writeResult(result, json) {
     const launchDutyPacketFocus = result.operatorExecutionPlan?.launchDutyPacketFocus || {};
     const launchDutyArchiveIndex = result.stagingLaunchDutyArchiveIndex || {};
     const readinessReviewPacket = result.stagingReadinessReviewPacket || {};
+    const fullTestWindowReadiness = result.fullTestWindowReadiness || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -11169,6 +11186,7 @@ function writeResult(result, json) {
     writeLaunchDutyArchiveReviewPlain(launchDutyArchiveIndex);
     writeCloseoutBackfillFocusPlain(closeoutBackfillFocus);
     writeReadinessReviewPacketPlain(readinessReviewPacket);
+    writeFullTestWindowReadinessPlain(fullTestWindowReadiness);
     writeFullTestSignoffFocusPlain(fullTestSignoffFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);

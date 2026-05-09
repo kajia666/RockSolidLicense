@@ -645,11 +645,22 @@ test("staging readiness status prints launch-duty next run in plain output", () 
     assert.match(result.stdout, /Launch duty current action: archive_production_signoff/);
     assert.match(result.stdout, /Launch duty reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(result.stdout, /Operator next current: archive_production_signoff -> npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Operator next current status check: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next current next action: Reload rehearsal, archive the production sign-off packet, then use the generated launch-duty packet for watch evidence\./);
     assert.match(result.stdout, /Operator next blocked_after_rehearsal_reload: record_launch_day_watch_summary -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+    assert.match(result.stdout, /Operator next blocked_after_rehearsal_reload receipts: record_cutover_walkthrough, record_launch_day_readiness_review/);
+    assert.match(result.stdout, /Operator next blocked_after_rehearsal_reload next action: Record launch-day watch summary and attach the cutover\/readiness receipt IDs after the rehearsal packet is regenerated\./);
     assert.match(result.stdout, /Operator next blocked_after_launch_day_watch_summary: close_first_wave -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
+    assert.match(result.stdout, /Operator next blocked_after_launch_day_watch_summary receipts: record_launch_closeout_review/);
+    assert.match(result.stdout, /Operator next blocked_after_launch_day_watch_summary source records: first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
+    assert.match(result.stdout, /Operator next blocked_after_launch_day_watch_summary next action: Close the first wave after incident, rollback, and stabilization owner records are attached\./);
     assert.match(result.stdout, /Launch duty follow-up actions: archive_production_signoff -> record_launch_day_watch_summary -> close_first_wave/);
     assert.match(result.stdout, /Launch duty watch artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+    assert.match(result.stdout, /Launch duty watch receipts: record_cutover_walkthrough, record_launch_day_readiness_review/);
     assert.match(result.stdout, /Launch duty first-wave closeout: artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
+    assert.match(result.stdout, /Launch duty first-wave receipts: record_launch_closeout_review/);
+    assert.match(result.stdout, /Launch duty first-wave source records: first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
+    assert.match(result.stdout, /Launch duty next action: Run the rehearsal reload, archive production sign-off, then record launch-day watch summary before first-wave closeout\./);
     assert.match(result.stdout, /Action file: .*readiness-action-queue\.md/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

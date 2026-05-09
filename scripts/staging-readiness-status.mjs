@@ -1097,6 +1097,18 @@ function writeResult(result, json) {
     if (result.operatorNextCommands?.length) {
       for (const item of result.operatorNextCommands) {
         console.log(`Operator next ${item.status}: ${item.actionKey || item.key} -> ${item.command || item.artifactPathHint || "-"}`);
+        if (item.statusCommand) {
+          console.log(`Operator next ${item.status} status check: ${item.statusCommand}`);
+        }
+        if (item.receiptOperations?.length) {
+          console.log(`Operator next ${item.status} receipts: ${item.receiptOperations.join(", ")}`);
+        }
+        if (item.sourceRecordKeys?.length) {
+          console.log(`Operator next ${item.status} source records: ${item.sourceRecordKeys.join(", ")}`);
+        }
+        if (item.nextAction) {
+          console.log(`Operator next ${item.status} next action: ${item.nextAction}`);
+        }
       }
     }
     if (result.launchDutyNextRun) {
@@ -1105,7 +1117,11 @@ function writeResult(result, json) {
       console.log(`Launch duty reload: ${nextRun.reloadCommand}`);
       console.log(`Launch duty follow-up actions: ${(nextRun.actionKeys || []).join(" -> ") || "-"}`);
       console.log(`Launch duty watch artifact: ${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}`);
+      console.log(`Launch duty watch receipts: ${(nextRun.receiptOperations?.launchDayWatchSummary || []).join(", ") || "-"}`);
       console.log(`Launch duty first-wave closeout: ${nextRun.artifactPathHints?.firstWaveCloseout || "-"}`);
+      console.log(`Launch duty first-wave receipts: ${(nextRun.receiptOperations?.firstWaveCloseout || []).join(", ") || "-"}`);
+      console.log(`Launch duty first-wave source records: ${(nextRun.sourceRecordKeys || []).join(", ") || "-"}`);
+      console.log(`Launch duty next action: ${nextRun.nextAction || "-"}`);
     }
     if (result.actionsFile) {
       console.log(`Action file: ${result.actionsFile.path}`);

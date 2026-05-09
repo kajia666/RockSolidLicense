@@ -59,6 +59,25 @@ function statusCommand(outputFile, actionsFile = null) {
   return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
 }
 
+function buildOperatorNextCommands({ outputFile, actionsFile, rehearsalCommand, readinessStatusCommand }) {
+  return [
+    {
+      key: "readiness_status",
+      status: "current",
+      command: readinessStatusCommand,
+      artifactPath: actionsFile || null,
+      nextAction: "Generate or refresh the readiness action queue before backfilling evidence."
+    },
+    {
+      key: "rehearsal_reload",
+      status: "blocked_after_readiness_status",
+      command: rehearsalCommand,
+      artifactPath: outputFile,
+      nextAction: "Reload rehearsal after the current evidence backfill item is recorded."
+    }
+  ];
+}
+
 function promoteDraft(draft, draftFile) {
   if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
     throw new Error("closeout draft must be a JSON object.");
@@ -86,9 +105,22 @@ function writeResult(result, json) {
   }
   if (result.status === "written") {
     console.log(`Filled closeout input initialized: ${result.outputFile}`);
-    console.log(result.nextCommand);
-    console.log(result.statusCommand);
-    console.log(result.nextAction);
+    const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
+    const rehearsalReload = result.operatorNextCommands?.find((item) => item.key === "rehearsal_reload");
+    if (currentCommand) {
+      console.log(`Current command: ${currentCommand.command}`);
+      if (currentCommand.artifactPath) {
+        console.log(`Action queue file: ${currentCommand.artifactPath}`);
+      }
+    } else {
+      console.log(result.statusCommand);
+    }
+    if (rehearsalReload) {
+      console.log(`Rehearsal reload: ${rehearsalReload.command}`);
+    } else {
+      console.log(result.nextCommand);
+    }
+    console.log(`Next action: ${result.nextAction}`);
     return;
   }
   console.log(`Staging closeout init failed: ${result.error.message}`);
@@ -107,6 +139,8 @@ function main() {
     writeFileSync(outputFile, `${JSON.stringify(closeoutInput, null, 2)}\n`, "utf8");
     const acceptanceFields = Array.isArray(closeoutInput.acceptanceFields) ? closeoutInput.acceptanceFields : [];
     const placeholderCount = acceptanceFields.filter((field) => field?.value === null || field?.value === undefined).length;
+    const nextCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`;
+    const nextStatusCommand = statusCommand(outputFile, actionsFile);
     writeResult({
       status: "written",
       mode: "staging-closeout-init",
@@ -115,8 +149,14 @@ function main() {
       ...(actionsFile ? { actionsFile } : {}),
       acceptanceFieldCount: acceptanceFields.length,
       placeholderCount,
-      nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`,
-      statusCommand: statusCommand(outputFile, actionsFile),
+      nextCommand,
+      statusCommand: nextStatusCommand,
+      operatorNextCommands: buildOperatorNextCommands({
+        outputFile,
+        actionsFile,
+        rehearsalCommand: nextCommand,
+        readinessStatusCommand: nextStatusCommand
+      }),
       nextAction: "Run statusCommand to pick the first closeout evidence backfill target."
     }, options.json);
   } catch (error) {

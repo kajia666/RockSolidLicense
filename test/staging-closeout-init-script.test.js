@@ -44,6 +44,14 @@ function runCloseoutInit(args) {
   });
 }
 
+function runCloseoutInitPlain(args) {
+  return spawnSync(process.execPath, ["scripts/staging-closeout-init.mjs", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 120_000
+  });
+}
+
 function runRehearsal(args) {
   return spawnSync(process.execPath, ["scripts/staging-rehearsal.mjs", "--json", ...args], {
     cwd: repoRoot,
@@ -125,6 +133,22 @@ test("staging closeout init promotes a draft without clearing closeout readiness
       placeholderCount: 7,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
+      operatorNextCommands: [
+        {
+          key: "readiness_status",
+          status: "current",
+          command: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
+          artifactPath: actionsFile,
+          nextAction: "Generate or refresh the readiness action queue before backfilling evidence."
+        },
+        {
+          key: "rehearsal_reload",
+          status: "blocked_after_readiness_status",
+          command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`,
+          artifactPath: outputFile,
+          nextAction: "Reload rehearsal after the current evidence backfill item is recorded."
+        }
+      ],
       nextAction: "Run statusCommand to pick the first closeout evidence backfill target."
     });
 
@@ -146,6 +170,35 @@ test("staging closeout init promotes a draft without clearing closeout readiness
     assert.equal(rehearsalOutput.closeoutInput.backfillReview.draftPromotionStatus, "draft_needs_values");
     assert.equal(rehearsalOutput.closeoutInput.backfillReview.safeToEnterFullTestWindow, false);
     assert.equal(rehearsalOutput.operatorExecutionPlan.readinessSummary.canRunFullTestWindow, false);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging closeout init prints ordered next commands in plain output", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-init-plain-"));
+  try {
+    const draftFile = join(tempDir, "filled-closeout-input.draft.json");
+    const outputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeDraft(draftFile, outputFile);
+
+    const result = runCloseoutInitPlain([
+      "--draft-file",
+      draftFile,
+      "--output-file",
+      outputFile,
+      "--actions-file",
+      actionsFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Filled closeout input initialized: .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Next action: Run statusCommand to pick the first closeout evidence backfill target\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

@@ -2887,6 +2887,14 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Launch Mainline: `https:\/\/profile-staging\.example\.com\/developer\/launch-mainline\?productCode=PROFILE_PRODUCT&channel=stable&source=staging-rehearsal&handoff=first-wave`/);
     assert.match(result.stdout, /Environment next action: Complete the operator_confirm and operator_execute items before running the live-write staging smoke command\./);
     assert.match(result.stdout, /Real staging current action: set_required_secret_env \(env=RSL_DEVELOPER_BEARER_TOKEN\)/);
+    assert.match(result.stdout, /Real staging run focus: blocked_until_secret_env \(dryRun=yes, liveWriteSmoke=yes, evidence=no\)/);
+    assert.match(result.stdout, /Real staging execution entry: blocked \(action=set_required_secret_env, outputs=written 10\/10\)/);
+    assert.match(result.stdout, /Real staging execution current command: `npm\.cmd run staging:rehearsal -- --json --base-url https:\/\/profile-staging\.example\.com --product-code PROFILE_PRODUCT --channel stable/);
+    assert.match(result.stdout, /Real staging execution first backfill: route_map_gate_result -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/route-map-gate-output\.txt/);
+    assert.match(result.stdout, /Real staging execution closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json`/);
+    assert.match(result.stdout, /Live-write smoke result capture entry: ready_for_live_write_smoke_result_capture \(action=run_live_write_smoke, target=live_write_smoke_result\)/);
+    assert.match(result.stdout, /Live-write smoke result backfill: pending_operator_result -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/live-write-smoke-output\.json \(closeout=artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json\)/);
+    assert.match(result.stdout, /Live-write smoke result receipts: record_launch_rehearsal_run:pending_operator_receipt/);
     assert.match(result.stdout, /Closeout init: `npm\.cmd run staging:closeout:init -- --draft-file [^`]*profile-filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json --actions-file [^`]*profile-readiness-action-queue\.md`/);
     assert.match(result.stdout, /Readiness status: `npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json --actions-file [^`]*profile-readiness-action-queue\.md`/);
     assert.match(result.stdout, /Closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json`/);

@@ -8648,6 +8648,33 @@ function writePostSignoffActionChecklistPlain(checklist) {
   }
 }
 
+function writeRealStagingRunFocusPlain(focus = {}) {
+  if (!focus?.status) {
+    return;
+  }
+  const executionEntry = focus.executionEntry || {};
+  const executionOutputBundle = executionEntry.preflight?.outputBundle || {};
+  const executionBackfill = executionEntry.evidenceBackfill || {};
+  const executionCurrentTarget = executionBackfill.currentTarget || {};
+  const liveWriteEntry = focus.liveWriteSmokeResultCaptureEntry || {};
+  const liveWriteBackfill = liveWriteEntry.resultBackfillTarget || {};
+  const liveWriteReceipts = Array.isArray(liveWriteEntry.receiptTargets)
+    ? liveWriteEntry.receiptTargets
+    : [];
+  console.log(`Real staging run focus: ${focus.status || "-"} (dryRun=${focus.canRunDryRun ? "yes" : "no"}, liveWriteSmoke=${focus.canRunLiveWriteSmoke ? "yes" : "no"}, evidence=${focus.canRecordEvidence ? "yes" : "no"})`);
+  console.log(`Real staging execution entry: ${executionEntry.status || "-"} (action=${executionEntry.currentActionKey || "-"}, outputs=${executionOutputBundle.status || "-"} ${executionOutputBundle.writtenFileCount ?? 0}/${executionOutputBundle.outputFileCount ?? 0})`);
+  console.log(`Real staging execution current command: \`${executionEntry.currentCommand || "-"}\``);
+  console.log(`Real staging execution first backfill: ${executionCurrentTarget.key || "-"} -> ${executionCurrentTarget.artifactPath || "-"}`);
+  console.log(`Real staging execution closeout reload: \`${executionBackfill.closeoutReloadCommand || "-"}\``);
+  console.log(`Live-write smoke result capture entry: ${liveWriteEntry.status || "-"} (action=${liveWriteEntry.currentActionKey || "-"}, target=${liveWriteBackfill.key || "-"})`);
+  console.log(`Live-write smoke result current command: \`${liveWriteEntry.currentCommand || "-"}\``);
+  console.log(`Live-write smoke result backfill: ${liveWriteBackfill.status || "-"} -> ${liveWriteBackfill.artifactPath || "-"} (closeout=${liveWriteBackfill.closeoutInputPath || "-"})`);
+  console.log(`Live-write smoke result receipts: ${liveWriteReceipts.map((item) => `${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  console.log(`Real staging archive root: ${focus.paths?.artifactArchiveRoot || "-"}`);
+  console.log(`Real staging post-dry-run action: ${focus.postDryRunAction?.key || "-"} (${focus.postDryRunAction?.status || "-"})`);
+  console.log(`Real staging full-test entry: ${focus.fullTestEntry?.status || "-"} (command=${focus.fullTestEntry?.command || "-"})`);
+}
+
 function renderCloseoutBackfillPlainNextAction(focus = {}, current = {}) {
   if (current?.key) {
     return `Backfill ${current.key}, then rerun staging:readiness:status and staging:rehearsal.`;
@@ -10912,8 +10939,9 @@ function writeResult(result, json) {
   }
 
   if (result.status === "pass") {
-    const realStagingCurrentAction = result.operatorExecutionPlan?.realStagingRunFocus?.currentAction || {};
-    const realStagingCommands = result.operatorExecutionPlan?.realStagingRunFocus?.commands || {};
+    const realStagingRunFocus = result.operatorExecutionPlan?.realStagingRunFocus || {};
+    const realStagingCurrentAction = realStagingRunFocus.currentAction || {};
+    const realStagingCommands = realStagingRunFocus.commands || {};
     const launchDutyCurrentAction = result.operatorExecutionPlan?.launchDutyCurrentAction
       || result.finalRehearsalPacket?.launchDutyCurrentAction
       || {};
@@ -10948,6 +10976,7 @@ function writeResult(result, json) {
       console.log(`Output archive entrypoint: ${outputWriteSummary.archiveEntrypoint?.key || "-"} (${outputWriteSummary.archiveEntrypoint?.status || "-"}) -> ${outputWriteSummary.archiveEntrypoint?.path || "-"}`);
       console.log(`Output write next action: ${outputWriteSummary.nextAction || "-"}`);
     }
+    writeRealStagingRunFocusPlain(realStagingRunFocus);
     writeCloseoutBackfillFocusPlain(closeoutBackfillFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);

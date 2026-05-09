@@ -160,6 +160,35 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       visibleReceiptLaneCount: 0,
       missingConditionCount: 6,
       missingReceiptLaneCount: 5,
+      signoffProgress: {
+        status: "awaiting_more_signoff_evidence",
+        requiredConditionCount: 7,
+        filledConditionCount: 1,
+        pendingConditionCount: 6,
+        requiredReceiptLaneCount: 5,
+        visibleReceiptLaneCount: 0,
+        pendingReceiptLaneCount: 5,
+        currentTarget: {
+          type: "production_signoff_condition",
+          key: "staging_artifacts_archived",
+          status: "pending_operator_entry",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt",
+          sourceStep: "archive_staging_artifacts",
+          receiptOperations: []
+        },
+        pendingConditionKeys: [
+          "staging_artifacts_archived",
+          "launch_mainline_receipts_visible",
+          "launch_ops_overview_status_visible",
+          "backup_restore_drill_passed",
+          "rollback_path_confirmed",
+          "operator_signoff_recorded"
+        ],
+        pendingReceiptLaneKeys: receiptVisibilityKeys,
+        nextBackfillCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt --actions-file ${actionsFile}`,
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+        nextAction: "Run statusCommand, then run nextBackfillCommand with real redacted sign-off or receipt evidence."
+      },
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
       operatorNextCommands: [
@@ -171,8 +200,15 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
           nextAction: "Refresh the readiness action queue after this sign-off backfill."
         },
         {
-          key: "rehearsal_reload",
+          key: "next_signoff_backfill",
           status: "blocked_after_readiness_status",
+          command: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt --actions-file ${actionsFile}`,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt",
+          nextAction: "Backfill the next pending production sign-off or receipt visibility item after the readiness action queue is refreshed."
+        },
+        {
+          key: "rehearsal_reload",
+          status: "blocked_after_next_signoff_backfill",
           command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
           artifactPath: closeoutInputFile,
           nextAction: "Reload rehearsal after status confirms the next sign-off, receipt visibility, or launch-day watch gate."
@@ -213,6 +249,35 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       visibleReceiptLaneCount: 1,
       missingConditionCount: 6,
       missingReceiptLaneCount: 4,
+      signoffProgress: {
+        status: "awaiting_more_signoff_evidence",
+        requiredConditionCount: 7,
+        filledConditionCount: 1,
+        pendingConditionCount: 6,
+        requiredReceiptLaneCount: 5,
+        visibleReceiptLaneCount: 1,
+        pendingReceiptLaneCount: 4,
+        currentTarget: {
+          type: "production_signoff_condition",
+          key: "staging_artifacts_archived",
+          status: "pending_operator_entry",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt",
+          sourceStep: "archive_staging_artifacts",
+          receiptOperations: []
+        },
+        pendingConditionKeys: [
+          "staging_artifacts_archived",
+          "launch_mainline_receipts_visible",
+          "launch_ops_overview_status_visible",
+          "backup_restore_drill_passed",
+          "rollback_path_confirmed",
+          "operator_signoff_recorded"
+        ],
+        pendingReceiptLaneKeys: receiptVisibilityKeys.slice(1),
+        nextBackfillCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt --actions-file ${actionsFile}`,
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+        nextAction: "Run statusCommand, then run nextBackfillCommand with real redacted sign-off or receipt evidence."
+      },
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
       operatorNextCommands: [
@@ -224,8 +289,15 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
           nextAction: "Refresh the readiness action queue after this sign-off backfill."
         },
         {
-          key: "rehearsal_reload",
+          key: "next_signoff_backfill",
           status: "blocked_after_readiness_status",
+          command: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt --actions-file ${actionsFile}`,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt",
+          nextAction: "Backfill the next pending production sign-off or receipt visibility item after the readiness action queue is refreshed."
+        },
+        {
+          key: "rehearsal_reload",
+          status: "blocked_after_next_signoff_backfill",
           command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
           artifactPath: closeoutInputFile,
           nextAction: "Reload rehearsal after status confirms the next sign-off, receipt visibility, or launch-day watch gate."
@@ -305,9 +377,15 @@ test("staging signoff backfill prints ordered next commands in plain output", ()
     assert.match(result.stdout, /Backfilled target: production_signoff_condition\/full_test_window_passed/);
     assert.match(result.stdout, /Backfilled artifact path: artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt/);
     assert.match(result.stdout, /Backfilled receipt IDs: receipt-full-test-001/);
+    assert.match(result.stdout, /Sign-off progress: 1\/7 conditions filled, 0\/5 receipt lanes visible/);
+    assert.match(result.stdout, /Next sign-off target: production_signoff_condition\/staging_artifacts_archived/);
+    assert.match(result.stdout, /Next sign-off artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifacts-archive\.txt/);
+    assert.match(result.stdout, /Next sign-off source step: archive_staging_artifacts/);
+    assert.match(result.stdout, /Next sign-off backfill command: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifacts-archive\.txt --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Backfilled status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Next sign-off backfill after status: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifacts-archive\.txt --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(result.stdout, /Next action: Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action\./);
   } finally {

@@ -10,6 +10,46 @@ const RECEIPT_VISIBILITY_KEYS = [
   "launchOpsOverviewStatus"
 ];
 
+const DEFAULT_ARTIFACT_ROOT = "artifacts/staging/<productCode>/<channel>";
+
+const PRODUCTION_SIGNOFF_TARGETS = {
+  full_test_window_passed: {
+    fileName: "full-test-output.txt",
+    sourceStep: "run_full_test_window",
+    receiptOperations: []
+  },
+  staging_artifacts_archived: {
+    fileName: "staging-artifacts-archive.txt",
+    sourceStep: "archive_staging_artifacts",
+    receiptOperations: []
+  },
+  launch_mainline_receipts_visible: {
+    fileName: "launch-mainline-receipts-visible.json",
+    sourceStep: "verify_launch_mainline_receipts",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  launch_ops_overview_status_visible: {
+    fileName: "launch-ops-overview-status-visible.json",
+    sourceStep: "verify_launch_ops_overview_status",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  backup_restore_drill_passed: {
+    fileName: "backup-restore-drill.txt",
+    sourceStep: "review_backup_restore_drill",
+    receiptOperations: ["record_recovery_drill", "record_backup_verification"]
+  },
+  rollback_path_confirmed: {
+    fileName: "rollback-path-confirmed.md",
+    sourceStep: "confirm_rollback_path",
+    receiptOperations: ["record_rollback_walkthrough"]
+  },
+  operator_signoff_recorded: {
+    fileName: "operator-production-signoff.md",
+    sourceStep: "record_operator_signoff",
+    receiptOperations: []
+  }
+};
+
 const OPTION_FLAGS = {
   "--input-file": "inputFile",
   "--output-file": "outputFile",
@@ -83,23 +123,83 @@ function statusCommand(outputFile, actionsFile = null) {
   return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
 }
 
-function buildOperatorNextCommands({ outputFile, actionsFile, rehearsalCommand, readinessStatusCommand }) {
+function receiptIdArgs(receiptOperations = []) {
+  return receiptOperations
+    .filter(Boolean)
+    .map((operation) => ` --receipt-id <${operation}-receipt-id>`)
+    .join("");
+}
+
+function artifactRootFromPath(value) {
+  const normalized = String(value || "").replace(/\\/g, "/");
+  if (!normalized.startsWith("artifacts/") || !normalized.includes("/")) {
+    return null;
+  }
+  return normalized.slice(0, normalized.lastIndexOf("/"));
+}
+
+function receiptLaneFileName(key) {
+  return `${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}-receipt-visibility.json`;
+}
+
+function buildNextBackfillCommand({ outputFile, target, actionsFile = null, includeDecision = false }) {
+  if (!target?.key || !target?.type) {
+    return null;
+  }
+  const keyFlag = target.type === "receipt_visibility_lane" ? "--receipt-lane" : "--condition-key";
+  const artifactArg = target.artifactPath ? ` --artifact-path ${commandValue(target.artifactPath)}` : "";
+  const decisionArg = target.type === "production_signoff_condition" && includeDecision
+    ? " --decision ready-for-production-signoff"
+    : "";
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
   return [
+    "npm.cmd run staging:signoff:backfill --",
+    `--input-file ${commandValue(outputFile)}`,
+    `${keyFlag} ${commandValue(target.key)}`,
+    "--value-json <redacted-json>",
+    artifactArg.trimStart(),
+    receiptIdArgs(Array.isArray(target.receiptOperations) ? target.receiptOperations : []).trimStart(),
+    decisionArg.trimStart(),
+    actionsArg.trimStart()
+  ].filter(Boolean).join(" ");
+}
+
+function buildOperatorNextCommands({
+  outputFile,
+  actionsFile,
+  rehearsalCommand,
+  readinessStatusCommand,
+  nextBackfillCommand,
+  nextBackfillArtifactPath
+}) {
+  const commands = [
     {
       key: "readiness_status",
       status: "current",
       command: readinessStatusCommand,
       artifactPath: actionsFile || null,
       nextAction: "Refresh the readiness action queue after this sign-off backfill."
-    },
+    }
+  ];
+  if (nextBackfillCommand) {
+    commands.push({
+      key: "next_signoff_backfill",
+      status: "blocked_after_readiness_status",
+      command: nextBackfillCommand,
+      artifactPath: nextBackfillArtifactPath || null,
+      nextAction: "Backfill the next pending production sign-off or receipt visibility item after the readiness action queue is refreshed."
+    });
+  }
+  commands.push(
     {
       key: "rehearsal_reload",
-      status: "blocked_after_readiness_status",
+      status: nextBackfillCommand ? "blocked_after_next_signoff_backfill" : "blocked_after_readiness_status",
       command: rehearsalCommand,
       artifactPath: outputFile,
       nextAction: "Reload rehearsal after status confirms the next sign-off, receipt visibility, or launch-day watch gate."
     }
-  ];
+  );
+  return commands;
 }
 
 function buildEvidenceValue(options) {
@@ -154,6 +254,78 @@ function countFilledConditions(productionSignoff) {
 
 function countVisibleReceiptLanes(receiptVisibility = {}) {
   return RECEIPT_VISIBILITY_KEYS.filter((key) => isReceiptVisibilityVisible(receiptVisibility[key])).length;
+}
+
+function buildSignoffProgress({
+  conditions,
+  receiptVisibility,
+  outputFile,
+  actionsFile,
+  artifactRoot,
+  productionDecision,
+  readinessStatusCommand
+}) {
+  const signoffConditions = Array.isArray(conditions) ? conditions : [];
+  const pendingConditions = signoffConditions.filter((condition) => !isFilled(condition));
+  const pendingReceiptLaneKeys = RECEIPT_VISIBILITY_KEYS.filter((key) => !isReceiptVisibilityVisible(receiptVisibility[key]));
+  const currentCondition = pendingConditions[0] || null;
+  const currentTarget = currentCondition
+    ? buildConditionTarget(currentCondition, artifactRoot)
+    : buildReceiptLaneTarget(pendingReceiptLaneKeys[0], artifactRoot);
+  const nextBackfillCommand = buildNextBackfillCommand({
+    outputFile,
+    target: currentTarget,
+    actionsFile,
+    includeDecision: productionDecision !== "ready-for-production-signoff"
+  });
+  return {
+    status: pendingConditions.length > 0 || pendingReceiptLaneKeys.length > 0
+      ? "awaiting_more_signoff_evidence"
+      : "filled",
+    requiredConditionCount: signoffConditions.length,
+    filledConditionCount: signoffConditions.length - pendingConditions.length,
+    pendingConditionCount: pendingConditions.length,
+    requiredReceiptLaneCount: RECEIPT_VISIBILITY_KEYS.length,
+    visibleReceiptLaneCount: RECEIPT_VISIBILITY_KEYS.length - pendingReceiptLaneKeys.length,
+    pendingReceiptLaneCount: pendingReceiptLaneKeys.length,
+    currentTarget,
+    pendingConditionKeys: pendingConditions.map((condition) => condition.key).filter(Boolean),
+    pendingReceiptLaneKeys,
+    nextBackfillCommand,
+    statusCommand: readinessStatusCommand,
+    nextAction: nextBackfillCommand
+      ? "Run statusCommand, then run nextBackfillCommand with real redacted sign-off or receipt evidence."
+      : "Run statusCommand to move into launch-day watch readiness."
+  };
+}
+
+function buildConditionTarget(condition, artifactRoot) {
+  if (!condition?.key) {
+    return null;
+  }
+  const target = PRODUCTION_SIGNOFF_TARGETS[condition.key] || {};
+  return {
+    type: "production_signoff_condition",
+    key: condition.key,
+    status: condition.status || "pending_operator_entry",
+    artifactPath: condition.artifactPath || path.posix.join(artifactRoot, target.fileName || `${condition.key}.txt`),
+    sourceStep: condition.sourceStep || target.sourceStep || "backfill_production_signoff",
+    receiptOperations: Array.isArray(condition.receiptOperations) ? condition.receiptOperations : (target.receiptOperations || [])
+  };
+}
+
+function buildReceiptLaneTarget(key, artifactRoot) {
+  if (!key) {
+    return null;
+  }
+  return {
+    type: "receipt_visibility_lane",
+    key,
+    status: "pending_operator_entry",
+    artifactPath: path.posix.join(artifactRoot, receiptLaneFileName(key)),
+    sourceStep: "verify_receipt_visibility",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  };
 }
 
 function backfillCondition(payload, options, value) {
@@ -238,8 +410,25 @@ function writeResult(result, json) {
     if (Array.isArray(result.receiptIds) && result.receiptIds.length) {
       console.log(`Backfilled receipt IDs: ${result.receiptIds.join(", ")}`);
     }
+    if (result.signoffProgress) {
+      const progress = result.signoffProgress;
+      console.log(`Sign-off progress: ${progress.filledConditionCount}/${progress.requiredConditionCount} conditions filled, ${progress.visibleReceiptLaneCount}/${progress.requiredReceiptLaneCount} receipt lanes visible`);
+      if (progress.currentTarget) {
+        console.log(`Next sign-off target: ${progress.currentTarget.type}/${progress.currentTarget.key}`);
+        if (progress.currentTarget.artifactPath) {
+          console.log(`Next sign-off artifact: ${progress.currentTarget.artifactPath}`);
+        }
+        if (progress.currentTarget.sourceStep) {
+          console.log(`Next sign-off source step: ${progress.currentTarget.sourceStep}`);
+        }
+      }
+      if (progress.nextBackfillCommand) {
+        console.log(`Next sign-off backfill command: ${progress.nextBackfillCommand}`);
+      }
+    }
     console.log(`Backfilled status refresh: ${result.statusCommand}`);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
+    const nextBackfill = result.operatorNextCommands?.find((item) => item.key === "next_signoff_backfill");
     const rehearsalReload = result.operatorNextCommands?.find((item) => item.key === "rehearsal_reload");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
@@ -248,6 +437,9 @@ function writeResult(result, json) {
       }
     } else {
       console.log(result.statusCommand);
+    }
+    if (nextBackfill) {
+      console.log(`Next sign-off backfill after status: ${nextBackfill.command}`);
     }
     if (rehearsalReload) {
       console.log(`Rehearsal reload: ${rehearsalReload.command}`);
@@ -281,6 +473,16 @@ function main() {
     const key = options.conditionKey || options.receiptLane;
     const nextCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`;
     const nextStatusCommand = statusCommand(outputFile, actionsFile);
+    const artifactRoot = artifactRootFromPath(options.artifactPath) || DEFAULT_ARTIFACT_ROOT;
+    const signoffProgress = buildSignoffProgress({
+      conditions,
+      receiptVisibility,
+      outputFile,
+      actionsFile,
+      artifactRoot,
+      productionDecision: productionSignoff.decision || null,
+      readinessStatusCommand: nextStatusCommand
+    });
     writeResult({
       status: "written",
       mode: "staging-signoff-backfill",
@@ -296,13 +498,16 @@ function main() {
       visibleReceiptLaneCount,
       missingConditionCount: conditions.length - filledConditionCount,
       missingReceiptLaneCount: RECEIPT_VISIBILITY_KEYS.length - visibleReceiptLaneCount,
+      signoffProgress,
       nextCommand,
       statusCommand: nextStatusCommand,
       operatorNextCommands: buildOperatorNextCommands({
         outputFile,
         actionsFile,
         rehearsalCommand: nextCommand,
-        readinessStatusCommand: nextStatusCommand
+        readinessStatusCommand: nextStatusCommand,
+        nextBackfillCommand: signoffProgress.nextBackfillCommand,
+        nextBackfillArtifactPath: signoffProgress.currentTarget?.artifactPath
       }),
       nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     }, options.json);

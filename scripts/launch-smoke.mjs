@@ -212,6 +212,42 @@ function buildHandoffLink(baseUrl, route) {
   };
 }
 
+function launchDutyHandoffKind(item) {
+  if (item.route || item.href) {
+    return item.fileName ? "download" : "workspace";
+  }
+  if (item.auditLogId) {
+    return "evidence";
+  }
+  return "note";
+}
+
+function launchDutyHandoffTarget(item) {
+  if (item.href || item.route) {
+    return item.href || item.route;
+  }
+  if (item.auditLogId) {
+    return `auditLogId=${item.auditLogId}`;
+  }
+  return item.fileName || "-";
+}
+
+function buildLaunchDutyOperatorNextCommands(operatorChecklist = []) {
+  return operatorChecklist.map((item, index) => ({
+    order: index + 1,
+    key: item.key,
+    label: item.label,
+    status: index === 0 ? "current" : "next",
+    sourceStatus: item.status || null,
+    kind: launchDutyHandoffKind(item),
+    target: launchDutyHandoffTarget(item),
+    route: item.route || null,
+    href: item.href || null,
+    fileName: item.fileName || null,
+    auditLogId: item.auditLogId || null
+  }));
+}
+
 function parseAttachmentFileName(contentDisposition) {
   if (!contentDisposition) {
     return null;
@@ -321,7 +357,7 @@ function buildLaunchDutyHandoff({
   const firstWaveConfirmation = opsSnapshot.summary.initialLaunchOpsReadiness.firstWaveHandoffConfirmation;
   const auditLogId = handoffConfirmation.auditLogId;
 
-  return {
+  const handoff = {
     version: "launch-smoke-duty-handoff/v1",
     status: "ready_for_launch_review",
     productCode: options.productCode,
@@ -473,6 +509,8 @@ function buildLaunchDutyHandoff({
       }
     ]
   };
+  handoff.operatorNextCommands = buildLaunchDutyOperatorNextCommands(handoff.operatorChecklist);
+  return handoff;
 }
 
 async function requestJson(baseUrl, route, { method = "GET", token = null, body = null } = {}) {
@@ -898,7 +936,18 @@ function writeResult(result, json) {
     console.log(`Ops handoff index: ${result.summary.ops.handoffIndexFileName}`);
     console.log(`Launch Ops overview: ${result.summary.ops.launchOperationsOverviewStatus}`);
     if (result.handoff) {
+      const operatorNextCommands = result.handoff.operatorNextCommands || [];
+      const currentHandoff = operatorNextCommands.find((item) => item.status === "current");
       console.log("Next launch-duty handoff:");
+      if (currentHandoff) {
+        console.log(`Current handoff: ${currentHandoff.key} -> ${currentHandoff.target}`);
+      }
+      if (operatorNextCommands.length) {
+        console.log("Launch-duty handoff queue:");
+        for (const item of operatorNextCommands) {
+          console.log(`${item.order}. ${item.key}: ${item.status} ${item.kind} -> ${item.target}`);
+        }
+      }
       console.log(`- Open Launch Review: ${result.handoff.nextWorkspace.href || result.handoff.nextWorkspace.route}`);
       console.log(`- Verify Launch Review receipt visibility: ${result.handoff.downloads.launchReviewSummary.href || result.handoff.downloads.launchReviewSummary.route}`);
       console.log(`- Verify Launch Smoke receipt visibility: ${result.handoff.downloads.launchSmokeSummary.href || result.handoff.downloads.launchSmokeSummary.route}`);

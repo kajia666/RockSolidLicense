@@ -131,6 +131,23 @@ test("launch smoke script runs the first-wave operations preflight", () => {
   assert.match(mainlineRouteMapCheck.label, /productionSignoffPacket/);
   assert.match(mainlineRouteMapCheck.label, /launchDayWatchEntry/);
   assert.equal(mainlineRouteMapCheck.route, output.handoff.downloads.launchMainlineRouteMap.route);
+  assert.deepEqual(
+    output.handoff.operatorNextCommands.map((item) => [item.order, item.key, item.status, item.kind]),
+    [
+      [1, "open_launch_review", "current", "workspace"],
+      [2, "verify_launch_review_receipt_visibility", "next", "download"],
+      [3, "verify_launch_smoke_receipt_visibility", "next", "download"],
+      [4, "verify_launch_ops_overview_status", "next", "download"],
+      [5, "verify_first_wave_confirmation", "next", "evidence"],
+      [6, "download_ops_handoff_index", "next", "download"],
+      [7, "continue_developer_ops_watch", "next", "workspace"],
+      [8, "verify_mainline_route_map_overview_evidence", "next", "download"],
+      [9, "open_launch_mainline_evidence", "next", "workspace"]
+    ]
+  );
+  assert.equal(output.handoff.operatorNextCommands[0].target, output.handoff.nextWorkspace.route);
+  assert.equal(output.handoff.operatorNextCommands[3].sourceStatus, "review");
+  assert.equal(output.handoff.operatorNextCommands[4].auditLogId, output.handoff.evidence.auditLogId);
 
   const checkNames = output.checks.map((item) => item.name);
   assert.deepEqual(checkNames, [
@@ -150,6 +167,27 @@ test("launch smoke script runs the first-wave operations preflight", () => {
     "ops.launch-operations-overview-status"
   ]);
   assert.ok(output.checks.every((item) => item.status === "pass"));
+});
+
+test("launch smoke plain output prints the ordered launch-duty handoff queue", () => {
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/launch-smoke.mjs", "--product-code", "SMOKE_PLAIN_ALPHA"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 300_000
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Current handoff: open_launch_review -> \/developer\/launch-review\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave/);
+  assert.match(result.stdout, /Launch-duty handoff queue:/);
+  assert.match(result.stdout, /1\. open_launch_review: current workspace -> \/developer\/launch-review\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave/);
+  assert.match(result.stdout, /4\. verify_launch_ops_overview_status: next download -> \/api\/developer\/ops\/export\/download\?productCode=SMOKE_PLAIN_ALPHA&format=launch-operations-overview-status&limit=20/);
+  assert.match(result.stdout, /5\. verify_first_wave_confirmation: next evidence -> auditLogId=/);
+  assert.match(result.stdout, /8\. verify_mainline_route_map_overview_evidence: next download -> \/api\/developer\/launch-mainline\/download\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=handoff-download-routes/);
 });
 
 test("launch smoke script requires explicit consent before remote live writes", () => {

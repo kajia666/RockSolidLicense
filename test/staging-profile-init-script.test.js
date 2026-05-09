@@ -90,6 +90,17 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       closeoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
       closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
       readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      launchLaneFiles: {
+        archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
+        profileFile: outputFile,
+        closeoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
+        closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+        readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+        backupRestoreArtifactFile: "artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt",
+        handoffFile: "artifacts/staging/PILOT_ALPHA/beta/staging-rehearsal-handoff.md",
+        launchDutyArchiveIndexFile: "artifacts/staging/PILOT_ALPHA/beta/staging-launch-duty-archive-index.json",
+        nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, and backup/restore evidence backfill."
+      },
       closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       postCloseoutInitStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       recoveryPreflightCommand,
@@ -216,6 +227,12 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
     assert.match(result.stdout, /Staging profile written: .*staging-profile\.json/);
+    assert.match(result.stdout, /Launch lane archive root: artifacts\/staging\/PILOT_ALPHA\/beta/);
+    assert.match(result.stdout, /Launch lane profile: .*staging-profile\.json/);
+    assert.match(result.stdout, /Launch lane closeout draft: artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json/);
+    assert.match(result.stdout, /Launch lane closeout input: artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json/);
+    assert.match(result.stdout, /Launch lane action queue: artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch lane backup\/restore artifact: artifacts\/staging\/PILOT_ALPHA\/beta\/backup-restore-drill\.txt/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
     assert.match(result.stdout, /Closeout init: npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);

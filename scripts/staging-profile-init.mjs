@@ -210,6 +210,27 @@ function buildOperatorNextCommands({
   ];
 }
 
+function buildLaunchLaneFiles({
+  archiveRoot,
+  outputFile,
+  profile,
+  closeoutInputFile,
+  readinessActionQueueFile,
+  backupRestoreArtifactFile
+}) {
+  return {
+    archiveRoot,
+    profileFile: outputFile,
+    closeoutDraftFile: profile.filledCloseoutDraftFile,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    backupRestoreArtifactFile,
+    handoffFile: profile.handoffFile,
+    launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
+    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, and backup/restore evidence backfill."
+  };
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -217,6 +238,15 @@ function writeResult(result, json) {
   }
   if (result.status === "written") {
     console.log(`Staging profile written: ${result.outputFile}`);
+    if (result.launchLaneFiles) {
+      const files = result.launchLaneFiles;
+      console.log(`Launch lane archive root: ${files.archiveRoot}`);
+      console.log(`Launch lane profile: ${files.profileFile}`);
+      console.log(`Launch lane closeout draft: ${files.closeoutDraftFile}`);
+      console.log(`Launch lane closeout input: ${files.closeoutInputFile}`);
+      console.log(`Launch lane action queue: ${files.readinessActionQueueFile}`);
+      console.log(`Launch lane backup/restore artifact: ${files.backupRestoreArtifactFile}`);
+    }
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const closeoutInit = result.operatorNextCommands?.find((item) => item.key === "closeout_init");
     const readinessStatus = result.operatorNextCommands?.find((item) => item.key === "readiness_status");
@@ -270,6 +300,14 @@ function main() {
       closeoutInputFile,
       readinessActionQueueFile
     });
+    const launchLaneFiles = buildLaunchLaneFiles({
+      archiveRoot,
+      outputFile,
+      profile,
+      closeoutInputFile,
+      readinessActionQueueFile,
+      backupRestoreArtifactFile
+    });
     writeResult({
       status: "written",
       mode: "staging-profile-init",
@@ -283,6 +321,7 @@ function main() {
       closeoutDraftFile,
       closeoutInputFile,
       readinessActionQueueFile,
+      launchLaneFiles,
       closeoutInitCommand,
       postCloseoutInitStatusCommand,
       recoveryPreflightCommand,

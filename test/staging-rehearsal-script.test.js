@@ -3066,6 +3066,15 @@ test("staging rehearsal plain output prints production signoff evidence handoff 
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Full-test signoff focus: ready_for_full_test_window \(fullTest=yes, signoff=no\)/);
+    assert.match(result.stdout, /Full-test signoff action: backfill_production_signoff \(ready_for_full_test_window\)/);
+    assert.match(result.stdout, /Full-test command: `npm\.cmd test`/);
+    assert.match(result.stdout, /Full-test signoff follow-up backfill: `npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-ready\.json --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md`/);
+    assert.match(result.stdout, /Full-test signoff readiness status: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-ready\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md`/);
+    assert.match(result.stdout, /Full-test signoff reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file <filled-closeout\.json>`/);
+    assert.match(result.stdout, /Full-test signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(result.stdout, /Full-test signoff missing signoff keys: full_test_window_passed, staging_artifacts_archived, launch_mainline_receipts_visible/);
+    assert.match(result.stdout, /Full-test signoff missing receipt visibility: launchMainline, launchReview, launchSmoke, developerOps, launchOpsOverviewStatus/);
     assert.match(result.stdout, /Go-live execution entry: ready_for_full_test_window \(phase=full_test_window_entry, source=fullTestSignoffFocus, action=run_full_test_window\)/);
     assert.match(result.stdout, /Production signoff evidence execution entry: awaiting_production_signoff_evidence \(action=run_full_test_window, current=full_test_window_passed\)/);
     assert.match(result.stdout, /Production signoff evidence queue: full_test_window_passed:pending_operator_evidence, staging_artifacts_archived:pending_operator_evidence/);

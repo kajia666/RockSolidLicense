@@ -8794,6 +8794,29 @@ function writeLaunchDutyArchiveReviewPlain(index = {}) {
   console.log(`Archive review next action: ${entry.nextAction || "-"}`);
 }
 
+function writeFullTestSignoffFocusPlain(focus = {}) {
+  if (!focus?.status) {
+    return;
+  }
+  const current = focus.currentAction || {};
+  const lines = [
+    `Full-test signoff focus: ${focus.status || "-"} (fullTest=${focus.canRunFullTestWindow ? "yes" : "no"}, signoff=${focus.canSignoffProduction ? "yes" : "no"})`,
+    `Full-test signoff action: ${current.key || "-"} (${current.status || "-"})`,
+    `Full-test command: \`${focus.commands?.fullTestWindow || "-"}\``,
+    `Full-test signoff follow-up backfill: \`${current.followUpBackfillCommand || focus.commands?.signoffBackfill || "-"}\``,
+    `Full-test signoff readiness status: \`${current.statusCommand || focus.commands?.readinessStatus || "-"}\``,
+    `Full-test signoff reload: \`${focus.commands?.closeoutReload || "-"}\``,
+    `Full-test signoff packet: ${focus.paths?.productionSignoffPacketFile || "-"}`,
+    `Full-test signoff action queue: ${focus.paths?.readinessActionQueueFile || "-"}`,
+    `Full-test signoff missing signoff keys: ${(focus.missingSignoffKeys || []).join(", ") || "-"}`,
+    `Full-test signoff missing receipt visibility: ${(focus.missingReceiptVisibilityKeys || []).join(", ") || "-"}`,
+    `Full-test signoff next action: ${focus.nextAction || "-"}`
+  ];
+  for (const line of lines) {
+    console.log(line);
+  }
+}
+
 function renderCloseoutBackfillPlainNextAction(focus = {}, current = {}) {
   if (current?.key) {
     return `Backfill ${current.key}, then rerun staging:readiness:status and staging:rehearsal.`;
@@ -11082,6 +11105,7 @@ function writeResult(result, json) {
     const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
       || result.finalRehearsalPacket?.goLiveExecutionEntry
       || {};
+    const fullTestSignoffFocus = result.operatorExecutionPlan?.fullTestSignoffFocus || {};
     const postSignoffActionChecklist = result.operatorExecutionPlan?.postSignoffActionChecklist
       || result.finalRehearsalPacket?.postSignoffActionChecklist
       || [];
@@ -11121,6 +11145,7 @@ function writeResult(result, json) {
     writeLaunchDutyPacketFocusPlain(launchDutyPacketFocus);
     writeLaunchDutyArchiveReviewPlain(launchDutyArchiveIndex);
     writeCloseoutBackfillFocusPlain(closeoutBackfillFocus);
+    writeFullTestSignoffFocusPlain(fullTestSignoffFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);

@@ -44,6 +44,7 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     [
       "launch_mainline_action_visibility",
       "launch_route_map_gate_script",
+      "recovery_preflight_script",
       "developer_ops_export_and_mainline_action",
       "launch_download_surface_audit",
       "launch_smoke_script",
@@ -66,6 +67,15 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
   assert.equal(
     routeMapGateScriptCommand.commandLine,
     "node --test --test-concurrency=1 --test-isolation=none test/launch-route-map-gate-script.test.js"
+  );
+
+  const recoveryPreflightCommand = output.commands.find(
+    (command) => command.key === "recovery_preflight_script"
+  );
+  assert.ok(recoveryPreflightCommand);
+  assert.equal(
+    recoveryPreflightCommand.commandLine,
+    "node --test --test-concurrency=1 --test-isolation=none test/recovery-preflight-script.test.js"
   );
 
   const stagingProfileInitCommand = output.commands.find(

@@ -16,7 +16,11 @@ function parseArgs(argv) {
     envFile: null,
     appBackupDir: null,
     postgresBackupDir: null,
-    baseUrl: null
+    baseUrl: null,
+    productCode: "BACKUP_RESTORE_DRILL",
+    channel: "stable",
+    closeoutInputFile: null,
+    actionsFile: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -70,6 +74,34 @@ function parseArgs(argv) {
       }
       continue;
     }
+    if (name === "--product-code") {
+      options.productCode = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--channel") {
+      options.channel = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--closeout-input-file") {
+      options.closeoutInputFile = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--actions-file") {
+      options.actionsFile = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
 
     throw new Error(`Unknown option: ${arg}`);
   }
@@ -113,7 +145,11 @@ function normalizeOptions(options) {
     envFile: readOptionOrEnv(options.envFile, "RSL_RECOVERY_ENV_FILE") || defaultEnvFile,
     appBackupDir: readOptionOrEnv(options.appBackupDir, "RSL_RECOVERY_APP_BACKUP_DIR") || defaultAppBackupDir,
     postgresBackupDir: readOptionOrEnv(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR") || defaultPostgresBackupDir,
-    baseUrl: readOptionOrEnv(options.baseUrl, "RSL_RECOVERY_BASE_URL") || "http://127.0.0.1:3000"
+    baseUrl: readOptionOrEnv(options.baseUrl, "RSL_RECOVERY_BASE_URL") || "http://127.0.0.1:3000",
+    productCode: String(readOptionOrEnv(options.productCode, "RSL_RECOVERY_PRODUCT_CODE") || "BACKUP_RESTORE_DRILL").trim().toUpperCase(),
+    channel: String(readOptionOrEnv(options.channel, "RSL_RECOVERY_CHANNEL") || "stable").trim().toLowerCase(),
+    closeoutInputFile: readOptionOrEnv(options.closeoutInputFile, "RSL_RECOVERY_CLOSEOUT_INPUT_FILE"),
+    actionsFile: readOptionOrEnv(options.actionsFile, "RSL_RECOVERY_ACTIONS_FILE")
   };
 }
 
@@ -214,6 +250,65 @@ function powershellQuote(value) {
   return String(value).replace(/'/g, "''");
 }
 
+function commandValue(value) {
+  const text = String(value || "");
+  if (/[\s"`]/.test(text)) {
+    return `"${text.replace(/"/g, "`\"")}"`;
+  }
+  return text;
+}
+
+function defaultArtifactRoot(options) {
+  return path.posix.join("artifacts", "staging", options.productCode, options.channel);
+}
+
+function buildRecoveryCloseoutBackfill(options) {
+  const artifactRoot = defaultArtifactRoot(options);
+  const filledCloseoutInputFile = options.closeoutInputFile || path.posix.join(artifactRoot, "filled-closeout-input.json");
+  const readinessActionQueueFile = options.actionsFile || path.posix.join(artifactRoot, "readiness-action-queue.md");
+  const artifactPath = path.posix.join(artifactRoot, "backup-restore-drill.txt");
+  const receiptIds = [
+    "<recovery-drill-receipt-id>",
+    "<backup-verification-receipt-id>"
+  ];
+  const commandParts = [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--key",
+    "backup_restore_drill_result",
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(artifactPath)
+  ];
+  for (const receiptId of receiptIds) {
+    commandParts.push("--receipt-id", receiptId);
+  }
+  commandParts.push("--actions-file", commandValue(readinessActionQueueFile));
+  const statusCommand = [
+    "npm.cmd run staging:readiness:status --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+  return {
+    version: "recovery-preflight-closeout-backfill/v1",
+    status: "ready_for_backup_restore_backfill",
+    key: "backup_restore_drill_result",
+    productCode: options.productCode,
+    channel: options.channel,
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    artifactPath,
+    receiptIds,
+    command: commandParts.join(" "),
+    statusCommand,
+    nextAction: "After the backup/restore drill and healthcheck pass, backfill backup_restore_drill_result with redacted evidence and both receipt IDs, then refresh staging readiness status."
+  };
+}
+
 function buildLinuxCommands(options) {
   const appBackup = `ENV_FILE="${shellQuote(options.envFile)}" BACKUP_DIR="${shellQuote(options.appBackupDir)}" LABEL=rehearsal deploy/linux/backup-rocksolid.sh`;
   const healthcheck = `BASE_URL="${shellQuote(options.baseUrl)}" deploy/linux/healthcheck-rocksolid.sh --skip-tcp`;
@@ -283,7 +378,10 @@ function buildResult(options) {
     requiredAssets,
     checks,
     ...(status === "pass"
-      ? { nextCommands: buildNextCommands(options) }
+      ? {
+          nextCommands: buildNextCommands(options),
+          closeoutBackfill: buildRecoveryCloseoutBackfill(options)
+        }
       : { error: { message: failedChecks[0]?.message || "Recovery preflight failed." } })
   };
 }
@@ -302,6 +400,11 @@ function writeResult(result, json) {
       console.log(`PostgreSQL restore drill: ${result.nextCommands.postgresRestoreDryRun}`);
     }
     console.log(`Healthcheck: ${result.nextCommands.healthcheck}`);
+    if (result.closeoutBackfill) {
+      console.log(`Recovery closeout backfill current: ${result.closeoutBackfill.key}`);
+      console.log(`Recovery closeout backfill command: ${result.closeoutBackfill.command}`);
+      console.log(`Recovery readiness status: ${result.closeoutBackfill.statusCommand}`);
+    }
     return;
   }
 

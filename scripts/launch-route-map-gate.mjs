@@ -95,6 +95,18 @@ const commands = [
     ]
   },
   {
+    key: "recovery_preflight_script",
+    label: "Recovery preflight closeout handoff continuity",
+    command: "node",
+    executable: process.execPath,
+    args: [
+      "--test",
+      "--test-concurrency=1",
+      "--test-isolation=none",
+      "test/recovery-preflight-script.test.js"
+    ]
+  },
+  {
     key: "developer_ops_export_and_mainline_action",
     label: "Developer Ops export, Launch Mainline action, and first-batch runtime evidence",
     command: "node",

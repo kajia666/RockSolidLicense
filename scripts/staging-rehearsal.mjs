@@ -8660,7 +8660,28 @@ function writeCloseoutBackfillFocusPlain(focus = {}) {
     return;
   }
   const current = focus.currentBackfillTarget || {};
+  const reloadExecutionEntry = focus.reloadExecutionEntry || {};
+  const reloadQueueItem = Array.isArray(reloadExecutionEntry.backfillQueue)
+    ? reloadExecutionEntry.backfillQueue.find((item) => item.status === "missing") || reloadExecutionEntry.backfillQueue[0]
+    : null;
+  const postReloadReview = reloadExecutionEntry.postReloadReview || {};
+  const postLiveWriteEntries = Array.isArray(focus.postLiveWriteResultCaptureEntries)
+    ? focus.postLiveWriteResultCaptureEntries
+    : [];
   console.log(`Closeout backfill focus: ${focus.status || "-"} (missing=${focus.missingFieldCount ?? "-"}, current=${current.key || "-"})`);
+  console.log(`Closeout reload execution entry: ${reloadExecutionEntry.status || "-"} (current=${reloadExecutionEntry.currentBackfillKey || "-"}, queue=${reloadExecutionEntry.missingBackfillCount ?? 0}/${reloadExecutionEntry.backfillQueueCount ?? 0})`);
+  console.log(`Closeout reload first queue item: ${reloadQueueItem?.key || "-"} -> ${reloadQueueItem?.artifactPath || "-"}`);
+  console.log(`Closeout reload post-reload review: ${postReloadReview.key || "-"} (fullTest=${postReloadReview.canRunFullTestWindow ? "yes" : "no"}, command=${postReloadReview.command || "-"})`);
+  console.log(`Post-live-write closeout result capture entries: ${postLiveWriteEntries.length}`);
+  for (const entry of postLiveWriteEntries) {
+    const target = entry.resultBackfillTarget || {};
+    console.log(`  - ${entry.key || "-"}: ${entry.status || "-"} -> ${target.artifactPath || "-"}`);
+  }
+  const operatorGoNoGoLines = [];
+  appendOperatorGoNoGoResultCaptureEntry(operatorGoNoGoLines, focus.operatorGoNoGoResultCaptureEntry || {});
+  for (const line of operatorGoNoGoLines) {
+    console.log(line.replace(/^- /, ""));
+  }
   console.log(`Closeout missing keys: ${(focus.missingBackfillKeys || []).join(", ") || "-"}`);
   console.log(`Closeout reload command: \`${focus.reloadCommand || "-"}\``);
   console.log(`Current closeout source step: ${current.sourceStep || "-"}`);

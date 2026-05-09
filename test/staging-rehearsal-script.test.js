@@ -2894,6 +2894,16 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Output archive entrypoint: launch_duty_archive_index \(written\) -> .*profile-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Output write next action: Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff\./);
     assert.match(result.stdout, /Closeout backfill focus: awaiting_closeout_backfill \(missing=7, current=route_map_gate_result\)/);
+    assert.match(result.stdout, /Closeout reload execution entry: awaiting_backfill \(current=route_map_gate_result, queue=7\/7\)/);
+    assert.match(result.stdout, /Closeout reload first queue item: route_map_gate_result -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/route-map-gate-output\.txt/);
+    assert.match(result.stdout, /Closeout reload post-reload review: readiness_review_packet \(fullTest=no, command=npm\.cmd test\)/);
+    assert.match(result.stdout, /Post-live-write closeout result capture entries: 3/);
+    assert.match(result.stdout, /launch_smoke_handoff: pending_operator_result -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/launch-smoke-handoff\.json/);
+    assert.match(result.stdout, /launch_mainline_evidence_receipts: pending_operator_result -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/launch-mainline-evidence-receipts\.json/);
+    assert.match(result.stdout, /receipt_visibility_review: pending_operator_result -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/receipt-visibility-review\.txt/);
+    assert.match(result.stdout, /Operator go\/no-go result capture entry: pending_operator_decision \(decision=-, action=backfill_filled_closeout_input\) -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/operator-go-no-go\.md/);
+    assert.match(result.stdout, /Operator go\/no-go allowed decisions: ready-for-full-test-window, hold, rollback-follow-up/);
+    assert.match(result.stdout, /Operator go\/no-go reload command: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json`/);
     assert.match(result.stdout, /Current closeout source step: run_route_map_gate/);
     assert.match(result.stdout, /Current closeout artifact: artifacts\/staging\/PROFILE_PRODUCT\/stable\/route-map-gate-output\.txt/);
     assert.match(result.stdout, /Current closeout backfill command: `npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PROFILE_PRODUCT\/stable\/route-map-gate-output\.txt --actions-file [^`]*profile-readiness-action-queue\.md`/);

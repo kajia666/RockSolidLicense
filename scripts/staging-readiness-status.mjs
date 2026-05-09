@@ -657,6 +657,17 @@ function buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot }) {
       reloadCommand: reload,
       nextAction: "Run reloadCommand, archive the production sign-off packet, then record launch_day_watch_summary."
     },
+    postArchiveEvidenceActions: actionQueue.slice(1).map((item, offset) => ({
+      key: item.key,
+      status: launchDutyOperatorStatus(item, offset + 1),
+      phase: item.phase,
+      actionKey: item.actionKey || null,
+      artifactPath: item.evidence?.artifactPathHint || null,
+      receiptOperations: item.evidence?.receiptOperations || [],
+      sourceRecordKeys: item.sourceRecordKeys || [],
+      expectedEvidence: item.evidence?.expectedEvidence || null,
+      nextAction: item.operatorInstruction || null
+    })),
     receiptOperations: {
       launchDayWatchSummary: watchAction.evidence?.receiptOperations || [],
       firstWaveCloseout: firstWaveAction.evidence?.receiptOperations || []
@@ -921,6 +932,12 @@ function renderActionQueueMarkdown(result) {
     lines.push(`Production sign-off packet: \`${nextRun.productionSignoffArchive?.packetPath || "-"}\``);
     lines.push(`Launch-duty archive index: \`${nextRun.productionSignoffArchive?.archiveIndexPath || "-"}\``);
     lines.push(`Archive next action: ${nextRun.productionSignoffArchive?.nextAction || "-"}`);
+    if (nextRun.postArchiveEvidenceActions?.length) {
+      lines.push(`Post-archive evidence actions: ${nextRun.postArchiveEvidenceActions.map((item) => item.actionKey || item.key).join(" -> ")}`);
+      for (const item of nextRun.postArchiveEvidenceActions) {
+        lines.push(`Post-archive evidence ${item.actionKey || item.key}: \`${item.artifactPath || "-"}\` receipts \`${receiptText(item.receiptOperations)}\` sources \`${receiptText(item.sourceRecordKeys)}\``);
+      }
+    }
     lines.push(`Follow-up action keys: ${(nextRun.actionKeys || []).join(", ") || "-"}`);
     lines.push(`Watch artifact: \`${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}\``);
     lines.push(`First-wave closeout artifact: \`${nextRun.artifactPathHints?.firstWaveCloseout || "-"}\``);
@@ -1270,6 +1287,12 @@ function writeResult(result, json) {
       console.log(`Launch duty production signoff packet: ${nextRun.productionSignoffArchive?.packetPath || "-"}`);
       console.log(`Launch duty archive index: ${nextRun.productionSignoffArchive?.archiveIndexPath || "-"}`);
       console.log(`Launch duty archive next action: ${nextRun.productionSignoffArchive?.nextAction || "-"}`);
+      if (nextRun.postArchiveEvidenceActions?.length) {
+        console.log(`Launch duty post-archive evidence actions: ${nextRun.postArchiveEvidenceActions.map((item) => item.actionKey || item.key).join(" -> ")}`);
+        for (const item of nextRun.postArchiveEvidenceActions) {
+          console.log(`Launch duty post-archive evidence ${item.actionKey || item.key}: artifact=${artifactText(item.artifactPath)} receipts=${receiptText(item.receiptOperations)} sources=${receiptText(item.sourceRecordKeys)}`);
+        }
+      }
       console.log(`Launch duty follow-up actions: ${(nextRun.actionKeys || []).join(" -> ") || "-"}`);
       console.log(`Launch duty watch artifact: ${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}`);
       console.log(`Launch duty watch receipts: ${(nextRun.receiptOperations?.launchDayWatchSummary || []).join(", ") || "-"}`);

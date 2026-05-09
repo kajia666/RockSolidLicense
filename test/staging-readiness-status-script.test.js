@@ -672,6 +672,30 @@ test("staging readiness status reports launch-day watch readiness after all loca
         reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`,
         nextAction: "Run reloadCommand, archive the production sign-off packet, then record launch_day_watch_summary."
       },
+      postArchiveEvidenceActions: [
+        {
+          key: "record_launch_day_watch_summary",
+          status: "blocked_after_rehearsal_reload",
+          phase: "launch_day_watch",
+          actionKey: "record_launch_day_watch_summary",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md",
+          receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+          sourceRecordKeys: [],
+          expectedEvidence: "Record cutover watch start/end time, owner, route checks, and launch-day operator decisions.",
+          nextAction: "Record launch-day watch summary and attach the cutover/readiness receipt IDs after the rehearsal packet is regenerated."
+        },
+        {
+          key: "close_first_wave",
+          status: "blocked_after_launch_day_watch_summary",
+          phase: "first_wave_closeout",
+          actionKey: "close_first_wave",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md",
+          receiptOperations: ["record_launch_closeout_review"],
+          sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"],
+          expectedEvidence: "Record first-wave closeout decision, unresolved incident list, customer impact notes, next-duty owner, and follow-up timestamp.",
+          nextAction: "Close the first wave after incident, rollback, and stabilization owner records are attached."
+        }
+      ],
       receiptOperations: {
         launchDayWatchSummary: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
         firstWaveCloseout: ["record_launch_closeout_review"]
@@ -750,6 +774,9 @@ test("staging readiness status reports launch-day watch readiness after all loca
     assert.match(markdown, /Production sign-off packet: `artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json`/);
     assert.match(markdown, /Launch-duty archive index: `artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json`/);
     assert.match(markdown, /Archive next action: Run reloadCommand, archive the production sign-off packet, then record launch_day_watch_summary\./);
+    assert.match(markdown, /Post-archive evidence actions: record_launch_day_watch_summary -> close_first_wave/);
+    assert.match(markdown, /Post-archive evidence record_launch_day_watch_summary: `artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md` receipts `record_cutover_walkthrough, record_launch_day_readiness_review` sources `-`/);
+    assert.match(markdown, /Post-archive evidence close_first_wave: `artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md` receipts `record_launch_closeout_review` sources `first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff`/);
     assert.match(markdown, /Follow-up action keys: archive_production_signoff, record_launch_day_watch_summary, close_first_wave/);
     assert.match(markdown, /Watch artifact: `artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md`/);
     assert.match(markdown, /First-wave closeout artifact: `artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md`/);
@@ -796,6 +823,9 @@ test("staging readiness status prints launch-duty next run in plain output", () 
     assert.match(result.stdout, /Launch duty production signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(result.stdout, /Launch duty archive index: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Launch duty archive next action: Run reloadCommand, archive the production sign-off packet, then record launch_day_watch_summary\./);
+    assert.match(result.stdout, /Launch duty post-archive evidence actions: record_launch_day_watch_summary -> close_first_wave/);
+    assert.match(result.stdout, /Launch duty post-archive evidence record_launch_day_watch_summary: artifact=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md receipts=record_cutover_walkthrough, record_launch_day_readiness_review sources=-/);
+    assert.match(result.stdout, /Launch duty post-archive evidence close_first_wave: artifact=artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md receipts=record_launch_closeout_review sources=first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
     assert.match(result.stdout, /Operator next current: archive_production_signoff -> npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(result.stdout, /Operator next current status check: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Operator next current next action: Reload rehearsal, archive the production sign-off packet, then use the generated launch-duty packet for watch evidence\./);

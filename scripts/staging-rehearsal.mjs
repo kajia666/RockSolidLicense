@@ -9109,6 +9109,34 @@ function writeLaunchDayWatchPlanPlain(plan = {}) {
   console.log(`Launch-day watch evidence next action: ${watchEvidenceExecutionEntry.nextAction || "-"}`);
 }
 
+function writeStabilizationHandoffPlanPlain(plan = {}) {
+  if (!plan?.status) {
+    return;
+  }
+  const handoffExecutionEntry = plan.handoffExecutionEntry || {};
+  const firstWaveCloseoutGate = plan.firstWaveCloseoutGate || {};
+  const firstWaveCloseoutExecutionEntry = plan.firstWaveCloseoutExecutionEntry || null;
+  const firstWaveCloseoutCaptureEntry = plan.firstWaveCloseoutCaptureEntry || null;
+  const lines = [
+    `Stabilization handoff plan: ${plan.status || "-"} (canStart=${plan.canStartStabilizationHandoff ? "yes" : "no"}, sourceWatch=${plan.sourceWatchStatus || "-"})`,
+    `Stabilization handoff execution entry: ${handoffExecutionEntry.status || "-"} (action=${handoffExecutionEntry.currentActionKey || "-"}, target=${handoffExecutionEntry.currentHandoffTarget?.key || "-"})`,
+    `Stabilization handoff execution target: ${handoffExecutionEntry.currentHandoffTarget?.key || "-"} -> ${handoffExecutionEntry.currentHandoffTarget?.path || "-"}`,
+    `Stabilization handoff execution source records: ${renderLaunchDutyRecordUpdates(handoffExecutionEntry.sourceRecordQueue || [])}`,
+    `Stabilization handoff execution first-wave closeout: ${handoffExecutionEntry.firstWaveCloseoutTarget?.key || "-"} -> ${handoffExecutionEntry.firstWaveCloseoutTarget?.path || "-"}`,
+    `Stabilization handoff execution next action: ${handoffExecutionEntry.nextAction || "-"}`,
+    `First-wave closeout gate: ${firstWaveCloseoutGate.status || "-"} (owner=${firstWaveCloseoutGate.ownerHandoffPath || "-"}, closeout=${firstWaveCloseoutGate.firstWaveCloseoutPath || "-"})`,
+    `First-wave closeout sources: ${(firstWaveCloseoutGate.sourceRecords || []).map((item) => `${item[0]}=${item[1]} -> ${item[2]}`).join("; ") || "-"}`,
+    `First-wave closeout receipt operations: ${(firstWaveCloseoutGate.receiptOperations || []).join(", ") || "-"}`,
+    `First-wave closeout expected evidence: ${firstWaveCloseoutGate.expectedEvidence || "-"}`,
+    `Stabilization handoff next action: ${plan.nextAction || "-"}`
+  ];
+  appendFirstWaveCloseoutExecutionEntry(lines, firstWaveCloseoutExecutionEntry);
+  appendFirstWaveCloseoutCaptureEntry(lines, firstWaveCloseoutCaptureEntry);
+  for (const line of lines) {
+    console.log(line.replace(/^- /, ""));
+  }
+}
+
 function writeProductionSignoffEvidenceExecutionEntryPlain(entry = {}) {
   if (!entry?.status) {
     return;
@@ -11229,6 +11257,7 @@ function writeResult(result, json) {
     const fullTestWindowReadiness = result.fullTestWindowReadiness || {};
     const productionSignoffPacket = result.stagingProductionSignoffPacket || {};
     const launchDayWatchPlan = result.launchDayWatchPlan || {};
+    const stabilizationHandoffPlan = result.stabilizationHandoffPlan || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -11262,6 +11291,7 @@ function writeResult(result, json) {
     writeProductionSignoffCloseoutGatePlain(productionSignoffPacket);
     writeLaunchDayWatchBridgePlain(productionSignoffPacket);
     writeLaunchDayWatchPlanPlain(launchDayWatchPlan);
+    writeStabilizationHandoffPlanPlain(stabilizationHandoffPlan);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);
     writePostSignoffActionChecklistPlain(postSignoffActionChecklist);

@@ -405,6 +405,109 @@ test("staging readiness status plain output prints production signoff artifact a
   }
 });
 
+test("staging readiness status summarizes filled evidence details after backfill", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-evidence-summary-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: ["route_map_gate_result"],
+      filledSignoffKeys: ["full_test_window_passed"],
+      visibleReceiptLanes: ["launchMainline"]
+    });
+    const payload = JSON.parse(readFileSync(inputFile, "utf8"));
+    const routeMapField = payload.acceptanceFields.find((item) => item.key === "route_map_gate_result");
+    routeMapField.value = {
+      result: "pass",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt",
+      receiptIds: ["receipt-route-map-001"]
+    };
+    routeMapField.artifactPath = "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt";
+    routeMapField.receiptIds = ["receipt-route-map-001"];
+    const fullTestField = payload.productionSignoff.conditions.find((item) => item.key === "full_test_window_passed");
+    fullTestField.value = {
+      result: "pass",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt",
+      receiptIds: ["receipt-full-test-001"]
+    };
+    fullTestField.artifactPath = "artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt";
+    fullTestField.receiptIds = ["receipt-full-test-001"];
+    payload.receiptVisibility.launchMainline = {
+      status: "visible",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-mainline-receipt-visibility.json",
+      receiptIds: ["receipt-launch-mainline-001"]
+    };
+    writeFileSync(inputFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+
+    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.evidenceSummary, {
+      closeout: {
+        requiredCount: 7,
+        filledCount: 1,
+        missingCount: 6,
+        filledItems: [
+          {
+            key: "route_map_gate_result",
+            status: "filled",
+            artifactPath: "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt",
+            receiptIds: ["receipt-route-map-001"]
+          }
+        ]
+      },
+      productionSignoff: {
+        requiredConditionCount: 7,
+        filledConditionCount: 1,
+        missingConditionCount: 6,
+        filledConditions: [
+          {
+            key: "full_test_window_passed",
+            status: "filled",
+            artifactPath: "artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt",
+            receiptIds: ["receipt-full-test-001"]
+          }
+        ]
+      },
+      receiptVisibility: {
+        requiredLaneCount: 5,
+        visibleLaneCount: 1,
+        missingLaneCount: 4,
+        visibleLanes: [
+          {
+            key: "launchMainline",
+            status: "visible",
+            artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-mainline-receipt-visibility.json",
+            receiptIds: ["receipt-launch-mainline-001"]
+          }
+        ]
+      }
+    });
+    const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /## Evidence Progress/);
+    assert.match(markdown, /Closeout evidence: `1\/7` filled, `6` missing/);
+    assert.match(markdown, /- closeout `route_map_gate_result`: artifact `artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt`; receipts `receipt-route-map-001`/);
+    assert.match(markdown, /Production sign-off evidence: `1\/7` filled, `6` missing/);
+    assert.match(markdown, /- production sign-off `full_test_window_passed`: artifact `artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt`; receipts `receipt-full-test-001`/);
+    assert.match(markdown, /Receipt visibility: `1\/5` visible, `4` missing/);
+    assert.match(markdown, /- receipt visibility `launchMainline`: artifact `artifacts\/staging\/PILOT_ALPHA\/stable\/launch-mainline-receipt-visibility\.json`; receipts `receipt-launch-mainline-001`/);
+
+    const plain = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(plain.status, 0, plain.stderr || plain.stdout);
+    assert.equal(plain.stderr, "");
+    assert.match(plain.stdout, /Evidence progress closeout: 1\/7 filled, 6 missing/);
+    assert.match(plain.stdout, /Evidence filled closeout route_map_gate_result: artifact=artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt receipts=receipt-route-map-001/);
+    assert.match(plain.stdout, /Evidence progress production signoff: 1\/7 filled, 6 missing/);
+    assert.match(plain.stdout, /Evidence filled production signoff full_test_window_passed: artifact=artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt receipts=receipt-full-test-001/);
+    assert.match(plain.stdout, /Evidence progress receipt visibility: 1\/5 visible, 4 missing/);
+    assert.match(plain.stdout, /Evidence visible receipt launchMainline: artifact=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-mainline-receipt-visibility\.json receipts=receipt-launch-mainline-001/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging readiness status treats object operator go/no-go evidence as the full-test decision", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-go-no-go-object-"));
   try {

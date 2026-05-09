@@ -769,6 +769,81 @@ function buildReadinessOperatorNextCommands({ currentGate, actionQueue }) {
   return null;
 }
 
+function valueObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function evidenceArtifactPath(record) {
+  const value = valueObject(record?.value ?? record);
+  return record?.artifactPath || value.artifactPath || null;
+}
+
+function evidenceReceiptIds(record) {
+  const value = valueObject(record?.value ?? record);
+  if (Array.isArray(record?.receiptIds)) {
+    return record.receiptIds;
+  }
+  if (Array.isArray(value.receiptIds)) {
+    return value.receiptIds;
+  }
+  return [];
+}
+
+function evidenceStatus(record, fallback) {
+  if (typeof record?.status === "string" && record.status.trim()) {
+    return record.status.trim();
+  }
+  if (typeof record === "string" && record.trim()) {
+    return record.trim();
+  }
+  if (record === true) {
+    return fallback;
+  }
+  return fallback;
+}
+
+function evidenceSummaryItem(key, record, fallbackStatus) {
+  return {
+    key,
+    status: evidenceStatus(record, fallbackStatus),
+    artifactPath: evidenceArtifactPath(record),
+    receiptIds: evidenceReceiptIds(record)
+  };
+}
+
+function buildEvidenceSummary({
+  closeoutFieldsByKey,
+  signoffFieldsByKey,
+  receiptVisibility,
+  filledCloseoutKeys,
+  missingCloseoutKeys,
+  filledSignoffKeys,
+  missingSignoffKeys,
+  visibleReceiptVisibilityKeys,
+  missingReceiptVisibilityKeys
+}) {
+  return {
+    closeout: {
+      requiredCount: REQUIRED_CLOSEOUT_KEYS.length,
+      filledCount: filledCloseoutKeys.length,
+      missingCount: missingCloseoutKeys.length,
+      filledItems: filledCloseoutKeys.map((key) => evidenceSummaryItem(key, closeoutFieldsByKey.get(key), "filled"))
+    },
+    productionSignoff: {
+      requiredConditionCount: REQUIRED_SIGNOFF_KEYS.length,
+      filledConditionCount: filledSignoffKeys.length,
+      missingConditionCount: missingSignoffKeys.length,
+      filledConditions: filledSignoffKeys.map((key) => evidenceSummaryItem(key, signoffFieldsByKey.get(key), "filled"))
+    },
+    receiptVisibility: {
+      requiredLaneCount: RECEIPT_VISIBILITY_KEYS.length,
+      visibleLaneCount: visibleReceiptVisibilityKeys.length,
+      missingLaneCount: missingReceiptVisibilityKeys.length,
+      visibleLanes: visibleReceiptVisibilityKeys.map((key) => evidenceSummaryItem(key, receiptVisibility[key], "visible"))
+    }
+  };
+}
+
 function buildActionsFileSummary(actionsFile, actionQueue, inputFile) {
   return {
     path: actionsFile,
@@ -784,6 +859,35 @@ function renderActionTarget(targetKey) {
   return targetKey ? `\`${targetKey}\`` : "`none`";
 }
 
+function receiptText(receiptIds = []) {
+  return receiptIds.length ? receiptIds.join(", ") : "-";
+}
+
+function artifactText(artifactPath) {
+  return artifactPath || "-";
+}
+
+function renderEvidenceSummaryMarkdown(result) {
+  const summary = result.evidenceSummary;
+  const lines = [
+    "## Evidence Progress",
+    "",
+    `Closeout evidence: \`${summary.closeout.filledCount}/${summary.closeout.requiredCount}\` filled, \`${summary.closeout.missingCount}\` missing`
+  ];
+  for (const item of summary.closeout.filledItems) {
+    lines.push(`- closeout \`${item.key}\`: artifact \`${artifactText(item.artifactPath)}\`; receipts \`${receiptText(item.receiptIds)}\``);
+  }
+  lines.push(`Production sign-off evidence: \`${summary.productionSignoff.filledConditionCount}/${summary.productionSignoff.requiredConditionCount}\` filled, \`${summary.productionSignoff.missingConditionCount}\` missing`);
+  for (const item of summary.productionSignoff.filledConditions) {
+    lines.push(`- production sign-off \`${item.key}\`: artifact \`${artifactText(item.artifactPath)}\`; receipts \`${receiptText(item.receiptIds)}\``);
+  }
+  lines.push(`Receipt visibility: \`${summary.receiptVisibility.visibleLaneCount}/${summary.receiptVisibility.requiredLaneCount}\` visible, \`${summary.receiptVisibility.missingLaneCount}\` missing`);
+  for (const item of summary.receiptVisibility.visibleLanes) {
+    lines.push(`- receipt visibility \`${item.key}\`: artifact \`${artifactText(item.artifactPath)}\`; receipts \`${receiptText(item.receiptIds)}\``);
+  }
+  return lines;
+}
+
 function renderActionQueueMarkdown(result) {
   const lines = [
     "# Staging Readiness Action Queue",
@@ -791,6 +895,8 @@ function renderActionQueueMarkdown(result) {
     `Input file: \`${result.inputFile}\``,
     `Current gate: \`${result.readiness.currentGate}\``,
     `Launch status: \`${result.readiness.launchStatus}\``,
+    "",
+    ...renderEvidenceSummaryMarkdown(result),
     "",
     "Complete only `[current]` items first. Items marked `[blocked_after_prior_actions]` become safe after the earlier items are backfilled and the status command is rerun.",
     ""
@@ -1037,6 +1143,17 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     ? buildLaunchDutyNextRun({ inputFile, actionQueue })
     : null;
   const operatorNextCommands = buildReadinessOperatorNextCommands({ currentGate, actionQueue });
+  const evidenceSummary = buildEvidenceSummary({
+    closeoutFieldsByKey,
+    signoffFieldsByKey,
+    receiptVisibility,
+    filledCloseoutKeys,
+    missingCloseoutKeys,
+    filledSignoffKeys,
+    missingSignoffKeys,
+    visibleReceiptVisibilityKeys,
+    missingReceiptVisibilityKeys
+  });
 
   return {
     status: "pass",
@@ -1067,6 +1184,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
         missingReceiptVisibilityKeys
       }
     },
+    evidenceSummary,
     ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
     ...(operatorNextCommands?.length ? { operatorNextCommands } : {}),
     nextStep,
@@ -1085,6 +1203,21 @@ function writeActionsFile(result, actionsFile) {
   return nextResult;
 }
 
+function writeEvidenceSummaryPlain(summary) {
+  console.log(`Evidence progress closeout: ${summary.closeout.filledCount}/${summary.closeout.requiredCount} filled, ${summary.closeout.missingCount} missing`);
+  for (const item of summary.closeout.filledItems) {
+    console.log(`Evidence filled closeout ${item.key}: artifact=${artifactText(item.artifactPath)} receipts=${receiptText(item.receiptIds)}`);
+  }
+  console.log(`Evidence progress production signoff: ${summary.productionSignoff.filledConditionCount}/${summary.productionSignoff.requiredConditionCount} filled, ${summary.productionSignoff.missingConditionCount} missing`);
+  for (const item of summary.productionSignoff.filledConditions) {
+    console.log(`Evidence filled production signoff ${item.key}: artifact=${artifactText(item.artifactPath)} receipts=${receiptText(item.receiptIds)}`);
+  }
+  console.log(`Evidence progress receipt visibility: ${summary.receiptVisibility.visibleLaneCount}/${summary.receiptVisibility.requiredLaneCount} visible, ${summary.receiptVisibility.missingLaneCount} missing`);
+  for (const item of summary.receiptVisibility.visibleLanes) {
+    console.log(`Evidence visible receipt ${item.key}: artifact=${artifactText(item.artifactPath)} receipts=${receiptText(item.receiptIds)}`);
+  }
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -1094,6 +1227,7 @@ function writeResult(result, json) {
     console.log(`Current gate: ${result.readiness.currentGate}`);
     console.log(`Next step: ${result.nextStep.key}`);
     console.log(result.nextStep.command);
+    writeEvidenceSummaryPlain(result.evidenceSummary);
     if (result.operatorNextCommands?.length) {
       for (const item of result.operatorNextCommands) {
         console.log(`Operator next ${item.status}: ${item.actionKey || item.key} -> ${item.command || item.artifactPathHint || "-"}`);

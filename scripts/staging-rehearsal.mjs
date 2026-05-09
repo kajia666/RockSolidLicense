@@ -9060,6 +9060,32 @@ function writeProductionSignoffExecutionEntryPlain(packet = {}) {
   console.log(`Production signoff execution next action: ${entry.nextAction || "-"}`);
 }
 
+function writeProductionSignoffCloseoutGatePlain(packet = {}) {
+  const gate = packet.productionSignoffCloseoutGate || {};
+  if (!gate?.status) {
+    return;
+  }
+  console.log(`Production signoff closeout gate: ${gate.status || "-"} (loaded=${gate.loadedCloseoutInputPath || "-"}, archive=${gate.archiveCloseoutInputPath || "-"})`);
+  console.log(`Production signoff closeout gate decision: ${gate.requiredDecision || "-"} -> ${gate.productionDecision || "-"}`);
+  console.log(`Production signoff closeout gate missing signoff keys: ${(gate.missingSignoffKeys || []).join(", ") || "-"}`);
+  console.log(`Production signoff closeout gate missing receipt visibility keys: ${(gate.missingReceiptVisibilityKeys || []).join(", ") || "-"}`);
+  console.log(`Production signoff closeout gate next action: ${gate.nextAction || "-"}`);
+}
+
+function writeLaunchDayWatchBridgePlain(packet = {}) {
+  const bridge = packet.launchDayWatchBridge || {};
+  if (!bridge?.status) {
+    return;
+  }
+  console.log(`Launch-day watch bridge: ${bridge.status || "-"} (source=${bridge.sourceStatus || "-"}, watchDraft=${bridge.watchRecordDraftStatus || "-"}, target=${bridge.currentPostSignoffTarget?.key || "-"})`);
+  console.log(`Launch-day watch bridge decision: ${bridge.requiredDecision || "-"} -> ${bridge.productionDecision || "-"}`);
+  console.log(`Launch-day watch bridge closeout input: ${bridge.closeoutInputStatus || "-"}`);
+  console.log(`Launch-day watch bridge loaded closeout input: ${bridge.loadedCloseoutInputPath || "-"}`);
+  console.log(`Launch-day watch bridge archive closeout input: ${bridge.archiveCloseoutInputPath || "-"}`);
+  console.log(`Launch-day watch bridge archive index: ${bridge.launchDutyArchiveIndexPath || "-"}`);
+  console.log(`Launch-day watch bridge next action: ${bridge.nextAction || "-"}`);
+}
+
 function writeProductionSignoffEvidenceExecutionEntryPlain(entry = {}) {
   if (!entry?.status) {
     return;
@@ -11209,6 +11235,8 @@ function writeResult(result, json) {
     writeFullTestSignoffFocusPlain(fullTestSignoffFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffExecutionEntryPlain(productionSignoffPacket);
+    writeProductionSignoffCloseoutGatePlain(productionSignoffPacket);
+    writeLaunchDayWatchBridgePlain(productionSignoffPacket);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);
     writePostSignoffActionChecklistPlain(postSignoffActionChecklist);

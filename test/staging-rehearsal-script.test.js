@@ -3020,6 +3020,18 @@ test("staging rehearsal plain output prints launch-day watch operator handoff af
     assert.match(result.stdout, /Production signoff execution readiness status: `npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md`/);
     assert.match(result.stdout, /Production signoff execution launch-day watch: ready_for_launch_day_watch \(target=production_signoff_packet\)/);
     assert.match(result.stdout, /Production signoff execution next action: Archive production sign-off packet, then start launch-day watch and stabilization handoff\./);
+    assert.match(result.stdout, /Production signoff closeout gate: ready_for_launch_day_watch \(loaded=.*filled-signoff-closeout\.json, archive=artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json\)/);
+    assert.match(result.stdout, /Production signoff closeout gate decision: ready-for-production-signoff -> ready-for-production-signoff/);
+    assert.match(result.stdout, /Production signoff closeout gate missing signoff keys: -/);
+    assert.match(result.stdout, /Production signoff closeout gate missing receipt visibility keys: -/);
+    assert.match(result.stdout, /Production signoff closeout gate next action: Production sign-off evidence is loaded from the actual closeout input; archive the sign-off packet and start launch-day watch\./);
+    assert.match(result.stdout, /Launch-day watch bridge: ready_for_launch_day_watch \(source=ready, watchDraft=ready_for_operator_watch, target=production_signoff_packet\)/);
+    assert.match(result.stdout, /Launch-day watch bridge decision: ready-for-production-signoff -> ready-for-production-signoff/);
+    assert.match(result.stdout, /Launch-day watch bridge closeout input: loaded/);
+    assert.match(result.stdout, /Launch-day watch bridge loaded closeout input: .*filled-signoff-closeout\.json/);
+    assert.match(result.stdout, /Launch-day watch bridge archive closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
+    assert.match(result.stdout, /Launch-day watch bridge archive index: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(result.stdout, /Launch-day watch bridge next action: Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff\./);
     assert.match(result.stdout, /Launch duty current action: archive_production_signoff \(stage=launch_day_watch_entry, source=launchDutyPacketFocus\)/);
     assert.match(result.stdout, /Launch duty current packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(result.stdout, /Launch duty evidence inputs: production_signoff_packet=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);

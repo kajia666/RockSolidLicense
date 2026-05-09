@@ -635,18 +635,27 @@ function buildActionQueue({
   ];
 }
 
-function buildLaunchDutyNextRun({ inputFile, actionQueue }) {
+function buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot }) {
   const reloadAction = actionQueue.find((item) => item.key === "reload_rehearsal_for_launch_day_watch") || {};
   const watchAction = actionQueue.find((item) => item.key === "record_launch_day_watch_summary") || {};
   const firstWaveAction = actionQueue.find((item) => item.key === "close_first_wave") || {};
+  const archiveRoot = artifactPathRoot?.path || DEFAULT_ARTIFACT_PATH_ROOT;
+  const reload = reloadAction.command || reloadCommand(inputFile);
   return {
     status: "ready_for_launch_day_watch",
     currentActionKey: reloadAction.actionKey || "archive_production_signoff",
-    reloadCommand: reloadAction.command || reloadCommand(inputFile),
+    reloadCommand: reload,
     actionKeys: actionQueue.map((item) => item.actionKey).filter(Boolean),
     artifactPathHints: {
       launchDayWatchSummary: watchAction.evidence?.artifactPathHint || null,
       firstWaveCloseout: firstWaveAction.evidence?.artifactPathHint || null
+    },
+    productionSignoffArchive: {
+      actionKey: reloadAction.actionKey || "archive_production_signoff",
+      packetPath: path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
+      archiveIndexPath: path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json"),
+      reloadCommand: reload,
+      nextAction: "Run reloadCommand, archive the production sign-off packet, then record launch_day_watch_summary."
     },
     receiptOperations: {
       launchDayWatchSummary: watchAction.evidence?.receiptOperations || [],
@@ -909,6 +918,9 @@ function renderActionQueueMarkdown(result) {
     lines.push(`Launch-duty status: \`${nextRun.status || "-"}\``);
     lines.push(`Current action key: \`${nextRun.currentActionKey || "-"}\``);
     lines.push(`Reload command: \`${nextRun.reloadCommand || "-"}\``);
+    lines.push(`Production sign-off packet: \`${nextRun.productionSignoffArchive?.packetPath || "-"}\``);
+    lines.push(`Launch-duty archive index: \`${nextRun.productionSignoffArchive?.archiveIndexPath || "-"}\``);
+    lines.push(`Archive next action: ${nextRun.productionSignoffArchive?.nextAction || "-"}`);
     lines.push(`Follow-up action keys: ${(nextRun.actionKeys || []).join(", ") || "-"}`);
     lines.push(`Watch artifact: \`${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}\``);
     lines.push(`First-wave closeout artifact: \`${nextRun.artifactPathHints?.firstWaveCloseout || "-"}\``);
@@ -1140,7 +1152,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     canSignoffProduction
   });
   const launchDutyNextRun = canSignoffProduction
-    ? buildLaunchDutyNextRun({ inputFile, actionQueue })
+    ? buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot })
     : null;
   const operatorNextCommands = buildReadinessOperatorNextCommands({ currentGate, actionQueue });
   const evidenceSummary = buildEvidenceSummary({
@@ -1255,6 +1267,9 @@ function writeResult(result, json) {
       const nextRun = result.launchDutyNextRun;
       console.log(`Launch duty current action: ${nextRun.currentActionKey}`);
       console.log(`Launch duty reload: ${nextRun.reloadCommand}`);
+      console.log(`Launch duty production signoff packet: ${nextRun.productionSignoffArchive?.packetPath || "-"}`);
+      console.log(`Launch duty archive index: ${nextRun.productionSignoffArchive?.archiveIndexPath || "-"}`);
+      console.log(`Launch duty archive next action: ${nextRun.productionSignoffArchive?.nextAction || "-"}`);
       console.log(`Launch duty follow-up actions: ${(nextRun.actionKeys || []).join(" -> ") || "-"}`);
       console.log(`Launch duty watch artifact: ${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}`);
       console.log(`Launch duty watch receipts: ${(nextRun.receiptOperations?.launchDayWatchSummary || []).join(", ") || "-"}`);

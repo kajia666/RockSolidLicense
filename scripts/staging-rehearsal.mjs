@@ -8891,11 +8891,26 @@ function writeLaunchDutyCurrentActionPlain(action = {}) {
   if (action.followUpStabilizationTarget) {
     console.log(`Launch duty follow-up stabilization target: ${action.followUpStabilizationTarget.key || "-"} -> ${action.followUpStabilizationTarget.path || "-"}`);
   }
+  if (Array.isArray(action.followUpStabilizationSourceQueue) && action.followUpStabilizationSourceQueue.length) {
+    console.log(`Launch duty follow-up stabilization sources: ${action.followUpStabilizationSourceQueue.map((item) => `${item.key || "-"}=${item.status || "-"} -> ${item.path || "-"}`).join("; ")}`);
+  }
   if (action.followUpFirstWaveCloseoutTarget) {
     console.log(`Launch duty follow-up first-wave closeout: ${action.followUpFirstWaveCloseoutTarget.key || "-"} -> ${action.followUpFirstWaveCloseoutTarget.path || "-"}`);
   }
   if (action.followUpFirstWaveCloseoutAction) {
     console.log(`Launch duty follow-up first-wave action: ${action.followUpFirstWaveCloseoutAction.key || "-"} (action=${action.followUpFirstWaveCloseoutAction.currentActionKey || "-"}) -> ${action.followUpFirstWaveCloseoutAction.artifactPath || "-"}`);
+  }
+  if (Array.isArray(action.followUpFirstWaveReceiptQueue) && action.followUpFirstWaveReceiptQueue.length) {
+    console.log(`Launch duty follow-up first-wave receipts: ${action.followUpFirstWaveReceiptQueue.map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ")}`);
+  }
+  if (action.stabilizationHandoffNextAction) {
+    console.log(`Launch duty stabilization next action: ${action.stabilizationHandoffNextAction}`);
+  }
+  if (action.firstWaveCloseoutNextAction) {
+    console.log(`Launch duty first-wave closeout next action: ${action.firstWaveCloseoutNextAction}`);
+  }
+  if (action.watchEvidenceNextAction) {
+    console.log(`Launch duty watch evidence next action: ${action.watchEvidenceNextAction}`);
   }
   console.log(`Launch duty next action: ${action.nextAction || "-"}`);
 }

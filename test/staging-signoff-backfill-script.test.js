@@ -153,6 +153,8 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       actionsFile,
       targetType: "production_signoff_condition",
       key: "full_test_window_passed",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt",
+      receiptIds: ["receipt-full-test-001"],
       productionDecision: "ready-for-production-signoff",
       filledConditionCount: 1,
       visibleReceiptLaneCount: 0,
@@ -204,6 +206,8 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       actionsFile,
       targetType: "receipt_visibility_lane",
       key: "launchMainline",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-mainline-receipt-visibility.json",
+      receiptIds: ["receipt-launch-mainline-001"],
       productionDecision: "ready-for-production-signoff",
       filledConditionCount: 1,
       visibleReceiptLaneCount: 1,
@@ -298,6 +302,10 @@ test("staging signoff backfill prints ordered next commands in plain output", ()
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
     assert.match(result.stdout, /Production sign-off evidence backfilled: full_test_window_passed/);
+    assert.match(result.stdout, /Backfilled target: production_signoff_condition\/full_test_window_passed/);
+    assert.match(result.stdout, /Backfilled artifact path: artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt/);
+    assert.match(result.stdout, /Backfilled receipt IDs: receipt-full-test-001/);
+    assert.match(result.stdout, /Backfilled status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);

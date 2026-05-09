@@ -131,7 +131,10 @@ test("staging closeout backfill writes one evidence field without clearing remai
       inputFile: closeoutInputFile,
       outputFile: closeoutInputFile,
       actionsFile,
+      targetType: "closeout_evidence",
       key: "route_map_gate_result",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt",
+      receiptIds: ["receipt-route-map-001"],
       filledFieldCount: 1,
       remainingPlaceholderCount: 6,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
@@ -206,6 +209,10 @@ test("staging closeout backfill prints ordered next commands in plain output", (
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
     assert.match(result.stdout, /Closeout evidence backfilled: route_map_gate_result/);
+    assert.match(result.stdout, /Backfilled target: closeout_evidence\/route_map_gate_result/);
+    assert.match(result.stdout, /Backfilled artifact path: artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt/);
+    assert.match(result.stdout, /Backfilled receipt IDs: receipt-route-map-001/);
+    assert.match(result.stdout, /Backfilled status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);

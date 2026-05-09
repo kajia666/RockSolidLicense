@@ -167,6 +167,14 @@ function writeResult(result, json) {
   }
   if (result.status === "written") {
     console.log(`Closeout evidence backfilled: ${result.key}`);
+    console.log(`Backfilled target: ${result.targetType}/${result.key}`);
+    if (result.artifactPath) {
+      console.log(`Backfilled artifact path: ${result.artifactPath}`);
+    }
+    if (Array.isArray(result.receiptIds) && result.receiptIds.length) {
+      console.log(`Backfilled receipt IDs: ${result.receiptIds.join(", ")}`);
+    }
+    console.log(`Backfilled status refresh: ${result.statusCommand}`);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const rehearsalReload = result.operatorNextCommands?.find((item) => item.key === "rehearsal_reload");
     if (currentCommand) {
@@ -209,7 +217,10 @@ function main() {
       inputFile,
       outputFile,
       ...(actionsFile ? { actionsFile } : {}),
+      targetType: "closeout_evidence",
       key: options.key,
+      artifactPath: options.artifactPath || null,
+      receiptIds: options.receiptIds,
       filledFieldCount,
       remainingPlaceholderCount: fields.length - filledFieldCount,
       nextCommand,

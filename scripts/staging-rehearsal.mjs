@@ -8752,6 +8752,17 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
   lines.push(`- Go-live execution next action: ${entry.nextAction || "-"}`);
 }
 
+function writeGoLiveExecutionEntryPlain(entry = {}) {
+  if (!entry?.status) {
+    return;
+  }
+  const lines = [];
+  appendGoLiveExecutionEntry(lines, entry);
+  for (const line of lines) {
+    console.log(line.replace(/^- /, ""));
+  }
+}
+
 function appendOperatorGoNoGoResultCaptureEntry(lines, entry = {}) {
   if (!entry?.status) {
     return;
@@ -10828,6 +10839,9 @@ function writeResult(result, json) {
     const launchDutyCurrentAction = result.operatorExecutionPlan?.launchDutyCurrentAction
       || result.finalRehearsalPacket?.launchDutyCurrentAction
       || {};
+    const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+      || result.finalRehearsalPacket?.goLiveExecutionEntry
+      || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -10847,6 +10861,7 @@ function writeResult(result, json) {
       console.log(`Output archive entrypoint: ${outputWriteSummary.archiveEntrypoint?.key || "-"} (${outputWriteSummary.archiveEntrypoint?.status || "-"}) -> ${outputWriteSummary.archiveEntrypoint?.path || "-"}`);
       console.log(`Output write next action: ${outputWriteSummary.nextAction || "-"}`);
     }
+    writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);
     return;
   }

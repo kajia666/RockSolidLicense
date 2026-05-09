@@ -8637,6 +8637,17 @@ function appendPostSignoffActionChecklist(lines, checklist) {
   }
 }
 
+function writePostSignoffActionChecklistPlain(checklist) {
+  if (!Array.isArray(checklist) || checklist.length === 0) {
+    return;
+  }
+  const lines = [];
+  appendPostSignoffActionChecklist(lines, checklist);
+  for (const line of lines) {
+    console.log(line.replace(/^- /, ""));
+  }
+}
+
 function renderLaunchDutyActionInputList(items = []) {
   return items
     .map((item) => `${item.key || "-"}=${item.path || item.command || item.status || "-"}`)
@@ -10842,6 +10853,9 @@ function writeResult(result, json) {
     const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
       || result.finalRehearsalPacket?.goLiveExecutionEntry
       || {};
+    const postSignoffActionChecklist = result.operatorExecutionPlan?.postSignoffActionChecklist
+      || result.finalRehearsalPacket?.postSignoffActionChecklist
+      || [];
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -10863,6 +10877,7 @@ function writeResult(result, json) {
     }
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);
+    writePostSignoffActionChecklistPlain(postSignoffActionChecklist);
     return;
   }
 

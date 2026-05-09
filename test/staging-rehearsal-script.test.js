@@ -2969,6 +2969,10 @@ test("staging rehearsal plain output prints launch-day watch operator handoff af
     assert.match(result.stdout, /Launch duty follow-up watch action: launch_day_watch_summary \(action=record_launch_day_watch_summary\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
     assert.match(result.stdout, /Launch duty follow-up first-wave closeout: first_wave_closeout -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch duty next action: Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff\./);
+    assert.match(result.stdout, /Post-signoff action checklist:/);
+    assert.match(result.stdout, /production_signoff_packet: archive_before_cutover \(action=archive_production_signoff\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(result.stdout, /launch_day_watch_summary: record_during_cutover_watch \(action=record_launch_day_watch_summary\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md[\s\S]*receiptOperations: record_cutover_walkthrough, record_launch_day_readiness_review/);
+    assert.match(result.stdout, /first_wave_closeout: close_after_stabilization_handoff \(action=close_first_wave\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md[\s\S]*receiptOperations: record_launch_closeout_review/);
     assert.doesNotMatch(result.stdout, /StrongAdmin123!|StrongDeveloper123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

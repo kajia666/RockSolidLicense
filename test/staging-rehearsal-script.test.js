@@ -2902,6 +2902,74 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
   }
 });
 
+test("staging rehearsal plain output prints launch-day watch operator handoff after signoff is ready", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-launch-duty-plain-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-signoff-closeout.json");
+    const acceptanceFields = [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review",
+      "operator_go_no_go"
+    ].map((key) => ({
+      key,
+      status: "filled",
+      value: key === "operator_go_no_go" ? "ready-for-full-test-window" : { result: "pass" }
+    }));
+    const signoffConditions = expectedProductionSignoffConditionKeys.map((key) => ({
+      key,
+      status: "filled",
+      value: key === "full_test_window_passed"
+        ? { result: "pass", command: "npm.cmd test", failureCount: 0 }
+        : { result: "confirmed" }
+    }));
+    writeFileSync(closeoutInputFile, `${JSON.stringify({
+      mode: "staging-closeout-template",
+      decision: "ready-for-full-test-window",
+      acceptanceFields,
+      receiptVisibility: {
+        launchMainline: "visible",
+        launchReview: "visible",
+        launchSmoke: "visible",
+        developerOps: {
+          status: "filled",
+          value: "visible"
+        },
+        launchOpsOverviewStatus: {
+          status: "filled",
+          value: "visible"
+        }
+      },
+      productionSignoff: {
+        decision: "ready-for-production-signoff",
+        conditions: signoffConditions
+      }
+    }, null, 2)}\n`, "utf8");
+
+    const result = runRehearsalPlain([
+      ...validArgs,
+      "--closeout-input-file",
+      closeoutInputFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Launch duty current action: archive_production_signoff \(stage=launch_day_watch_entry, source=launchDutyPacketFocus\)/);
+    assert.match(result.stdout, /Launch duty current packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(result.stdout, /Launch duty evidence inputs: production_signoff_packet=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+    assert.match(result.stdout, /Launch duty archive trace: group=launch_day_watch_and_stabilization, runRecord=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-run-record-index\.json, archiveIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(result.stdout, /Launch duty follow-up watch action: launch_day_watch_summary \(action=record_launch_day_watch_summary\) -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+    assert.match(result.stdout, /Launch duty follow-up first-wave closeout: first_wave_closeout -> artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
+    assert.match(result.stdout, /Launch duty next action: Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff\./);
+    assert.doesNotMatch(result.stdout, /StrongAdmin123!|StrongDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging rehearsal runner focuses closeout reload after real staging inputs are ready", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-real-ready-"));
   const profileFile = join(tempDir, "staging-profile.json");

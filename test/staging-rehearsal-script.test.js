@@ -2893,6 +2893,13 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Output write summary: written \(written=10\/10, pending=0\)/);
     assert.match(result.stdout, /Output archive entrypoint: launch_duty_archive_index \(written\) -> .*profile-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Output write next action: Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff\./);
+    assert.match(result.stdout, /Closeout backfill focus: awaiting_closeout_backfill \(missing=7, current=route_map_gate_result\)/);
+    assert.match(result.stdout, /Current closeout source step: run_route_map_gate/);
+    assert.match(result.stdout, /Current closeout artifact: artifacts\/staging\/PROFILE_PRODUCT\/stable\/route-map-gate-output\.txt/);
+    assert.match(result.stdout, /Current closeout backfill command: `npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PROFILE_PRODUCT\/stable\/route-map-gate-output\.txt --actions-file [^`]*profile-readiness-action-queue\.md`/);
+    assert.match(result.stdout, /Current closeout status command: `npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json --actions-file [^`]*profile-readiness-action-queue\.md`/);
+    assert.match(result.stdout, /Closeout missing keys: route_map_gate_result, backup_restore_drill_result, live_write_smoke_result, launch_smoke_handoff, launch_mainline_evidence_receipts, receipt_visibility_review, operator_go_no_go/);
+    assert.match(result.stdout, /Closeout focus next action: Backfill route_map_gate_result, then rerun staging:readiness:status and staging:rehearsal\./);
     assert.match(result.stdout, /Launch Review summary: `https:\/\/profile-staging\.example\.com\/api\/developer\/launch-review\/download\?productCode=PROFILE_PRODUCT&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`/);
     assert.match(result.stdout, /Launch Smoke summary: `https:\/\/profile-staging\.example\.com\/api\/developer\/launch-smoke-kit\/download\?productCode=PROFILE_PRODUCT&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`/);
     assert.match(result.stdout, /Launch Ops overview status: `https:\/\/profile-staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PROFILE_PRODUCT&format=launch-operations-overview-status&limit=20`/);

@@ -8648,6 +8648,31 @@ function writePostSignoffActionChecklistPlain(checklist) {
   }
 }
 
+function renderCloseoutBackfillPlainNextAction(focus = {}, current = {}) {
+  if (current?.key) {
+    return `Backfill ${current.key}, then rerun staging:readiness:status and staging:rehearsal.`;
+  }
+  return focus.nextAction || "-";
+}
+
+function writeCloseoutBackfillFocusPlain(focus = {}) {
+  if (!focus?.status) {
+    return;
+  }
+  const current = focus.currentBackfillTarget || {};
+  console.log(`Closeout backfill focus: ${focus.status || "-"} (missing=${focus.missingFieldCount ?? "-"}, current=${current.key || "-"})`);
+  console.log(`Closeout missing keys: ${(focus.missingBackfillKeys || []).join(", ") || "-"}`);
+  console.log(`Closeout reload command: \`${focus.reloadCommand || "-"}\``);
+  console.log(`Current closeout source step: ${current.sourceStep || "-"}`);
+  console.log(`Current closeout artifact: ${current.artifactPath || "-"}`);
+  console.log(`Current closeout backfill command: \`${current.backfillCommand || "-"}\``);
+  console.log(`Current closeout status command: \`${current.statusCommand || "-"}\``);
+  console.log(`Filled closeout input: ${focus.paths?.filledCloseoutInputFile || "-"}`);
+  console.log(`Full test focus: ${focus.fullTestWindow?.status || "-"} (canRun=${focus.fullTestWindow?.canRun ? "yes" : "no"}, command=${focus.fullTestWindow?.command || "-"})`);
+  console.log(`Production sign-off focus: ${focus.productionSignoff?.status || "-"} (canSignoff=${focus.productionSignoff?.canSignoff ? "yes" : "no"})`);
+  console.log(`Closeout focus next action: ${renderCloseoutBackfillPlainNextAction(focus, current)}`);
+}
+
 function renderLaunchDutyActionInputList(items = []) {
   return items
     .map((item) => `${item.key || "-"}=${item.path || item.command || item.status || "-"}`)
@@ -10880,6 +10905,9 @@ function writeResult(result, json) {
     const productionSignoffEvidenceExecutionEntry = result.operatorExecutionPlan?.fullTestSignoffFocus?.productionSignoffEvidenceExecutionEntry
       || result.stagingProductionSignoffPacket?.productionSignoffEvidenceExecutionEntry
       || {};
+    const closeoutBackfillFocus = result.operatorExecutionPlan?.closeoutBackfillFocus
+      || result.finalRehearsalPacket?.operatorExecutionPlan?.closeoutBackfillFocus
+      || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -10899,6 +10927,7 @@ function writeResult(result, json) {
       console.log(`Output archive entrypoint: ${outputWriteSummary.archiveEntrypoint?.key || "-"} (${outputWriteSummary.archiveEntrypoint?.status || "-"}) -> ${outputWriteSummary.archiveEntrypoint?.path || "-"}`);
       console.log(`Output write next action: ${outputWriteSummary.nextAction || "-"}`);
     }
+    writeCloseoutBackfillFocusPlain(closeoutBackfillFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);

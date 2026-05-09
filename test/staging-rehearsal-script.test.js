@@ -2907,6 +2907,14 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Output write summary: written \(written=10\/10, pending=0\)/);
     assert.match(result.stdout, /Output archive entrypoint: launch_duty_archive_index \(written\) -> .*profile-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Output write next action: Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff\./);
+    assert.match(result.stdout, /Run record index status: awaiting_evidence_backfill \(records=13\)/);
+    assert.match(result.stdout, /Run record closeout progress: missing=7, filled=0/);
+    assert.match(result.stdout, /Run record groups: pre_full_test_closeout:awaiting_operator_evidence:7, production_signoff:blocked_until_full_test_window:7, launch_day_watch_and_stabilization:blocked_until_production_signoff:6/);
+    assert.match(result.stdout, /Run record next action: Collect the missing pre-full-test record artifacts, backfill filled-closeout-input\.json, then reload closeout input\./);
+    assert.match(result.stdout, /Artifact manifest status: awaiting_artifact_generation \(files=14\)/);
+    assert.match(result.stdout, /Artifact manifest source statuses: profilePreflight=blocked_until_secret_env, executionSummary=blocked_until_secret_env, runRecordIndex=awaiting_evidence_backfill, finalPacket=ready_for_operator_rehearsal/);
+    assert.match(result.stdout, /Artifact manifest key files: run_record_index=.*profile-run-record-index\.json; artifact_manifest=.*profile-artifact-manifest\.json; backup_restore_packet=.*profile-backup-restore-drill-packet\.json; closeout_reload_packet=.*profile-closeout-reload-packet\.json; readiness_review_packet=.*profile-readiness-review-packet\.json; production_signoff_packet=.*profile-production-signoff-packet\.json; launch_duty_archive_index=.*profile-launch-duty-archive-index\.json/);
+    assert.match(result.stdout, /Artifact manifest next action: Generate and archive the listed rehearsal artifacts, then fill closeout evidence from the draft before reloading closeout input\./);
     assert.match(result.stdout, /Closeout backfill focus: awaiting_closeout_backfill \(missing=7, current=route_map_gate_result\)/);
     assert.match(result.stdout, /Closeout reload execution entry: awaiting_backfill \(current=route_map_gate_result, queue=7\/7\)/);
     assert.match(result.stdout, /Closeout reload first queue item: route_map_gate_result -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/route-map-gate-output\.txt/);

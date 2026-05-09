@@ -8709,6 +8709,40 @@ function writeBackupRestoreDrillPacketPlain(packet = {}) {
   console.log(`Backup/restore next action: ${packet.nextAction || "-"}`);
 }
 
+function writeRunRecordArchiveSummaryPlain(index = {}, manifest = {}) {
+  if (index?.status) {
+    const closeout = index.closeoutProgress || {};
+    const groups = Array.isArray(index.recordGroups) ? index.recordGroups : [];
+    console.log(`Run record index status: ${index.status || "-"} (records=${index.recordCount ?? 0})`);
+    console.log(`Run record closeout progress: missing=${closeout.missingRecordCount ?? 0}, filled=${(closeout.filledRecordKeys || []).length}`);
+    console.log(`Run record missing closeout keys: ${(closeout.missingRecordKeys || []).join(", ") || "-"}`);
+    console.log(`Run record groups: ${groups.map((item) => `${item.key || "-"}:${item.status || "-"}:${item.recordCount ?? 0}`).join(", ") || "-"}`);
+    console.log(`Run record reload command: \`${closeout.reloadCommand || "-"}\``);
+    console.log(`Run record next action: ${index.nextAction || "-"}`);
+  }
+  if (manifest?.status) {
+    const statuses = manifest.sourceStatuses || {};
+    const files = Array.isArray(manifest.files) ? manifest.files : [];
+    const keyFiles = [
+      "run_record_index",
+      "artifact_manifest",
+      "backup_restore_packet",
+      "closeout_reload_packet",
+      "readiness_review_packet",
+      "production_signoff_packet",
+      "launch_duty_archive_index"
+    ].map((key) => {
+      const file = files.find((item) => item.key === key) || {};
+      return `${key}=${file.path || "-"}`;
+    });
+    console.log(`Artifact manifest status: ${manifest.status || "-"} (files=${files.length})`);
+    console.log(`Artifact manifest source statuses: profilePreflight=${statuses.profilePreflight || "-"}, executionSummary=${statuses.executionSummary || "-"}, runRecordIndex=${statuses.runRecordIndex || "-"}, finalPacket=${statuses.finalPacket || "-"}`);
+    console.log(`Artifact manifest key files: ${keyFiles.join("; ")}`);
+    console.log(`Artifact manifest closeout reload: \`${manifest.commands?.closeoutReload || "-"}\``);
+    console.log(`Artifact manifest next action: ${manifest.nextAction || "-"}`);
+  }
+}
+
 function renderCloseoutBackfillPlainNextAction(focus = {}, current = {}) {
   if (current?.key) {
     return `Backfill ${current.key}, then rerun staging:readiness:status and staging:rehearsal.`;
@@ -10992,6 +11026,8 @@ function writeResult(result, json) {
       || result.finalRehearsalPacket?.operatorExecutionPlan?.closeoutBackfillFocus
       || {};
     const backupRestoreDrillPacket = result.stagingBackupRestoreDrillPacket || {};
+    const runRecordIndex = result.stagingRehearsalRunRecordIndex || {};
+    const artifactManifest = result.stagingArtifactManifest || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -11013,6 +11049,7 @@ function writeResult(result, json) {
     }
     writeRealStagingRunFocusPlain(realStagingRunFocus);
     writeBackupRestoreDrillPacketPlain(backupRestoreDrillPacket);
+    writeRunRecordArchiveSummaryPlain(runRecordIndex, artifactManifest);
     writeCloseoutBackfillFocusPlain(closeoutBackfillFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);

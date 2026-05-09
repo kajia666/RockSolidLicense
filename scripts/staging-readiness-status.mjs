@@ -685,6 +685,90 @@ function buildLaunchDutyOperatorNextCommands(actionQueue) {
   }));
 }
 
+function buildFullTestOperatorNextCommands(actionQueue) {
+  const item = actionQueue.find((entry) => entry.key === "run_full_test_window");
+  if (!item) {
+    return [];
+  }
+  return [
+    {
+      key: "run_full_test_window",
+      status: "current",
+      phase: item.phase,
+      actionKey: "run_full_test_window",
+      targetKey: item.targetKey || "full_test_window_passed",
+      command: item.command || "npm.cmd test",
+      statusCommand: item.statusCommand || null,
+      artifactPathHint: item.evidence?.artifactPathHint || null,
+      receiptOperations: item.evidence?.receiptOperations || [],
+      nextAction: "Run the full test window and save the redacted output artifact before backfilling full_test_window_passed."
+    },
+    {
+      key: "backfill_full_test_result",
+      status: "blocked_after_full_test_window",
+      phase: "production_signoff",
+      actionKey: "backfill_full_test_window_passed",
+      targetKey: item.targetKey || "full_test_window_passed",
+      command: item.followUpCommand || null,
+      exampleCommand: item.followUpExampleCommand || null,
+      statusCommand: item.statusCommand || null,
+      artifactPathHint: item.evidence?.artifactPathHint || null,
+      receiptOperations: item.evidence?.receiptOperations || [],
+      nextAction: "Backfill full_test_window_passed, then rerun staging:readiness:status."
+    },
+    {
+      key: "refresh_readiness_status",
+      status: "blocked_after_full_test_backfill",
+      phase: "production_signoff",
+      actionKey: "refresh_readiness_status",
+      targetKey: null,
+      command: item.statusCommand || null,
+      statusCommand: item.statusCommand || null,
+      artifactPathHint: null,
+      receiptOperations: [],
+      nextAction: "Refresh readiness status to continue production sign-off evidence."
+    }
+  ];
+}
+
+function productionSignoffActionKey(item) {
+  if (item.key === "set_production_signoff_decision") {
+    return "set_production_signoff_decision";
+  }
+  return item.key;
+}
+
+function buildProductionSignoffOperatorNextCommands(actionQueue) {
+  return actionQueue.map((item) => ({
+    key: item.key,
+    status: item.status || "blocked_after_prior_actions",
+    phase: item.phase,
+    actionKey: productionSignoffActionKey(item),
+    targetKey: item.targetKey || null,
+    command: item.command || null,
+    exampleCommand: item.exampleCommand || null,
+    statusCommand: item.statusCommand || null,
+    artifactPathHint: item.evidence?.artifactPathHint || null,
+    receiptOperations: item.evidence?.receiptOperations || [],
+    nextAction: item.targetKey
+      ? `Backfill ${item.targetKey}, then rerun staging:readiness:status.`
+      : "Complete the current production sign-off action, then rerun staging:readiness:status."
+  }));
+}
+
+function buildReadinessOperatorNextCommands({ currentGate, actionQueue }) {
+  if (currentGate === "launch_day_watch") {
+    return buildLaunchDutyOperatorNextCommands(actionQueue);
+  }
+  if (currentGate === "full_test_window") {
+    return buildFullTestOperatorNextCommands(actionQueue);
+  }
+  if (currentGate === "production_signoff") {
+    return buildProductionSignoffOperatorNextCommands(actionQueue);
+  }
+  return null;
+}
+
 function buildActionsFileSummary(actionsFile, actionQueue, inputFile) {
   return {
     path: actionsFile,
@@ -726,6 +810,24 @@ function renderActionQueueMarkdown(result) {
       lines.push("Operator next commands:");
       for (const item of result.operatorNextCommands) {
         lines.push(`- ${item.status}: ${item.actionKey || item.key} -> \`${item.command || item.artifactPathHint || "-"}\``);
+      }
+    }
+    lines.push("");
+  }
+
+  if (!result.launchDutyNextRun && result.operatorNextCommands?.length) {
+    lines.push("## Operator Next Commands");
+    lines.push("");
+    for (const item of result.operatorNextCommands) {
+      lines.push(`- ${item.status}: ${item.actionKey || item.key} -> \`${item.command || item.artifactPathHint || "-"}\``);
+      if (item.exampleCommand) {
+        lines.push(`  - Example: \`${item.exampleCommand}\``);
+      }
+      if (item.statusCommand) {
+        lines.push(`  - Status check: \`${item.statusCommand}\``);
+      }
+      if (item.nextAction) {
+        lines.push(`  - Next action: ${item.nextAction}`);
       }
     }
     lines.push("");
@@ -934,9 +1036,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
   const launchDutyNextRun = canSignoffProduction
     ? buildLaunchDutyNextRun({ inputFile, actionQueue })
     : null;
-  const operatorNextCommands = canSignoffProduction
-    ? buildLaunchDutyOperatorNextCommands(actionQueue)
-    : null;
+  const operatorNextCommands = buildReadinessOperatorNextCommands({ currentGate, actionQueue });
 
   return {
     status: "pass",
@@ -968,7 +1068,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
       }
     },
     ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
-    ...(operatorNextCommands ? { operatorNextCommands } : {}),
+    ...(operatorNextCommands?.length ? { operatorNextCommands } : {}),
     nextStep,
     actionQueue
   };
@@ -994,15 +1094,15 @@ function writeResult(result, json) {
     console.log(`Current gate: ${result.readiness.currentGate}`);
     console.log(`Next step: ${result.nextStep.key}`);
     console.log(result.nextStep.command);
+    if (result.operatorNextCommands?.length) {
+      for (const item of result.operatorNextCommands) {
+        console.log(`Operator next ${item.status}: ${item.actionKey || item.key} -> ${item.command || item.artifactPathHint || "-"}`);
+      }
+    }
     if (result.launchDutyNextRun) {
       const nextRun = result.launchDutyNextRun;
       console.log(`Launch duty current action: ${nextRun.currentActionKey}`);
       console.log(`Launch duty reload: ${nextRun.reloadCommand}`);
-      if (result.operatorNextCommands?.length) {
-        for (const item of result.operatorNextCommands) {
-          console.log(`Operator next ${item.status}: ${item.actionKey || item.key} -> ${item.command || item.artifactPathHint || "-"}`);
-        }
-      }
       console.log(`Launch duty follow-up actions: ${(nextRun.actionKeys || []).join(" -> ") || "-"}`);
       console.log(`Launch duty watch artifact: ${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}`);
       console.log(`Launch duty first-wave closeout: ${nextRun.artifactPathHints?.firstWaveCloseout || "-"}`);

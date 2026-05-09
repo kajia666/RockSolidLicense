@@ -178,6 +178,45 @@ test("staging readiness status points to full-test window after closeout is read
       output.nextStep.backfillCommand,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`
     );
+    assert.deepEqual(output.operatorNextCommands, [
+      {
+        key: "run_full_test_window",
+        status: "current",
+        phase: "full_test_window",
+        actionKey: "run_full_test_window",
+        targetKey: "full_test_window_passed",
+        command: "npm.cmd test",
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+        artifactPathHint: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
+        receiptOperations: [],
+        nextAction: "Run the full test window and save the redacted output artifact before backfilling full_test_window_passed."
+      },
+      {
+        key: "backfill_full_test_result",
+        status: "blocked_after_full_test_window",
+        phase: "production_signoff",
+        actionKey: "backfill_full_test_window_passed",
+        targetKey: "full_test_window_passed",
+        command: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`,
+        exampleCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json '{"result":"pass","command":"npm.cmd test","failureCount":0,"summary":"<redacted test summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/full-test-output.txt --decision ready-for-production-signoff`,
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+        artifactPathHint: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
+        receiptOperations: [],
+        nextAction: "Backfill full_test_window_passed, then rerun staging:readiness:status."
+      },
+      {
+        key: "refresh_readiness_status",
+        status: "blocked_after_full_test_backfill",
+        phase: "production_signoff",
+        actionKey: "refresh_readiness_status",
+        targetKey: null,
+        command: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+        artifactPathHint: null,
+        receiptOperations: [],
+        nextAction: "Refresh readiness status to continue production sign-off evidence."
+      }
+    ]);
     assert.deepEqual(output.actionQueue, [
       {
         key: "run_full_test_window",
@@ -202,6 +241,30 @@ test("staging readiness status points to full-test window after closeout is read
         }
       }
     ]);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging readiness status plain output prints full-test operator next commands", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-full-test-plain-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: closeoutKeys,
+      decision: "ready-for-full-test-window"
+    });
+
+    const result = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Current gate: full_test_window/);
+    assert.match(result.stdout, /Operator next current: run_full_test_window -> npm\.cmd test/);
+    assert.match(result.stdout, /Operator next blocked_after_full_test_window: backfill_full_test_window_passed -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator next blocked_after_full_test_backfill: refresh_readiness_status -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Action file: .*readiness-action-queue\.md/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -234,6 +297,23 @@ test("staging readiness status reports signoff and receipt visibility gaps befor
       output.nextStep.command,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json>`
     );
+    assert.equal(output.operatorNextCommands.length, 10);
+    assert.deepEqual(output.operatorNextCommands[0], {
+      key: "backfill_production_signoff",
+      status: "current",
+      phase: "production_signoff",
+      actionKey: "backfill_production_signoff",
+      targetKey: "staging_artifacts_archived",
+      command: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json>`,
+      exampleCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json '{"result":"confirmed","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt`,
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+      artifactPathHint: "artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt",
+      receiptOperations: [],
+      nextAction: "Backfill staging_artifacts_archived, then rerun staging:readiness:status."
+    });
+    assert.equal(output.operatorNextCommands.at(-1).key, "backfill_receipt_visibility");
+    assert.equal(output.operatorNextCommands.at(-1).targetKey, "launchOpsOverviewStatus");
+    assert.equal(output.operatorNextCommands.at(-1).status, "blocked_after_prior_actions");
     assert.deepEqual(
       output.actionQueue.map((item) => [item.key, item.phase, item.status, item.targetKey]),
       [

@@ -9042,6 +9042,24 @@ function writeGoLiveExecutionEntryPlain(entry = {}) {
   }
 }
 
+function writeProductionSignoffExecutionEntryPlain(packet = {}) {
+  const entry = packet.signoffExecutionEntry || {};
+  if (!entry?.status) {
+    return;
+  }
+  const decision = packet.decision || {};
+  const signoffBackfill = entry.signoffBackfill || {};
+  const launchDayWatch = entry.launchDayWatch || {};
+  console.log(`Production signoff execution entry: ${entry.status || "-"} (action=${entry.currentActionKey || "-"}, canSignoff=${decision.canSignoff ? "yes" : "no"})`);
+  console.log(`Production signoff execution current command: \`${entry.currentCommand || "-"}\``);
+  console.log(`Production signoff execution current signoff key: ${signoffBackfill.currentSignoffKey || "-"}`);
+  console.log(`Production signoff execution current receipt visibility: ${signoffBackfill.currentReceiptVisibilityKey || "-"}`);
+  console.log(`Production signoff execution current backfill: \`${signoffBackfill.currentBackfillCommand || "-"}\``);
+  console.log(`Production signoff execution readiness status: \`${signoffBackfill.statusCommand || "-"}\``);
+  console.log(`Production signoff execution launch-day watch: ${launchDayWatch.status || "-"} (target=${launchDayWatch.currentTargetKey || "-"})`);
+  console.log(`Production signoff execution next action: ${entry.nextAction || "-"}`);
+}
+
 function writeProductionSignoffEvidenceExecutionEntryPlain(entry = {}) {
   if (!entry?.status) {
     return;
@@ -11160,6 +11178,7 @@ function writeResult(result, json) {
     const launchDutyArchiveIndex = result.stagingLaunchDutyArchiveIndex || {};
     const readinessReviewPacket = result.stagingReadinessReviewPacket || {};
     const fullTestWindowReadiness = result.fullTestWindowReadiness || {};
+    const productionSignoffPacket = result.stagingProductionSignoffPacket || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -11189,6 +11208,7 @@ function writeResult(result, json) {
     writeFullTestWindowReadinessPlain(fullTestWindowReadiness);
     writeFullTestSignoffFocusPlain(fullTestSignoffFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
+    writeProductionSignoffExecutionEntryPlain(productionSignoffPacket);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);
     writePostSignoffActionChecklistPlain(postSignoffActionChecklist);

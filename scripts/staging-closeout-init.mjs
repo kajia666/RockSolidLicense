@@ -59,23 +59,66 @@ function statusCommand(outputFile, actionsFile = null) {
   return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
 }
 
-function buildOperatorNextCommands({ outputFile, actionsFile, rehearsalCommand, readinessStatusCommand }) {
+function receiptIdArgs(receiptOperations = []) {
+  return receiptOperations
+    .filter(Boolean)
+    .map((operation) => ` --receipt-id <${operation}-receipt-id>`)
+    .join("");
+}
+
+function buildFirstBackfillCommand({ outputFile, target, actionsFile = null }) {
+  if (!target?.key) {
+    return null;
+  }
+  const artifactArg = target.artifactPath ? ` --artifact-path ${commandValue(target.artifactPath)}` : "";
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
   return [
+    "npm.cmd run staging:closeout:backfill --",
+    `--input-file ${commandValue(outputFile)}`,
+    `--key ${commandValue(target.key)}`,
+    "--value-json <redacted-json>",
+    artifactArg.trimStart(),
+    receiptIdArgs(Array.isArray(target.receiptOperations) ? target.receiptOperations : []).trimStart(),
+    actionsArg.trimStart()
+  ].filter(Boolean).join(" ");
+}
+
+function buildOperatorNextCommands({
+  outputFile,
+  actionsFile,
+  rehearsalCommand,
+  readinessStatusCommand,
+  firstBackfillCommand,
+  firstBackfillArtifactPath
+}) {
+  const commands = [
     {
       key: "readiness_status",
       status: "current",
       command: readinessStatusCommand,
       artifactPath: actionsFile || null,
       nextAction: "Generate or refresh the readiness action queue before backfilling evidence."
-    },
+    }
+  ];
+  if (firstBackfillCommand) {
+    commands.push({
+      key: "first_closeout_backfill",
+      status: "blocked_after_readiness_status",
+      command: firstBackfillCommand,
+      artifactPath: firstBackfillArtifactPath || null,
+      nextAction: "Backfill the first pending closeout evidence item after the readiness action queue is refreshed."
+    });
+  }
+  commands.push(
     {
       key: "rehearsal_reload",
-      status: "blocked_after_readiness_status",
+      status: firstBackfillCommand ? "blocked_after_first_closeout_backfill" : "blocked_after_readiness_status",
       command: rehearsalCommand,
       artifactPath: outputFile,
       nextAction: "Reload rehearsal after the current evidence backfill item is recorded."
     }
-  ];
+  );
+  return commands;
 }
 
 function isFilledValue(value) {
@@ -94,10 +137,16 @@ function isFilledValue(value) {
   return true;
 }
 
-function buildEvidenceProgress({ acceptanceFields, statusCommand }) {
+function buildEvidenceProgress({ acceptanceFields, statusCommand, outputFile, actionsFile }) {
   const fields = Array.isArray(acceptanceFields) ? acceptanceFields : [];
   const pendingFields = fields.filter((field) => !isFilledValue(field?.value));
   const currentTarget = pendingFields[0] || null;
+  const receiptOperations = Array.isArray(currentTarget?.receiptOperations) ? currentTarget.receiptOperations : [];
+  const firstBackfillCommand = buildFirstBackfillCommand({
+    outputFile,
+    target: currentTarget ? { ...currentTarget, receiptOperations } : null,
+    actionsFile
+  });
   return {
     status: pendingFields.length === 0 ? "filled" : "awaiting_real_evidence",
     requiredCount: fields.length,
@@ -108,12 +157,16 @@ function buildEvidenceProgress({ acceptanceFields, statusCommand }) {
         key: currentTarget.key || null,
         status: currentTarget.status || "pending_operator_entry",
         artifactPath: currentTarget.artifactPath || null,
-        sourceStep: currentTarget.sourceStep || null
+        sourceStep: currentTarget.sourceStep || null,
+        receiptOperations
       }
       : null,
     pendingKeys: pendingFields.map((field) => field.key).filter(Boolean),
+    firstBackfillCommand,
     statusCommand,
-    nextAction: "Run statusCommand, then backfill the currentTarget with real redacted evidence."
+    nextAction: firstBackfillCommand
+      ? "Run statusCommand, then run firstBackfillCommand with real redacted evidence."
+      : "Run statusCommand, then backfill the currentTarget with real redacted evidence."
   };
 }
 
@@ -156,9 +209,13 @@ function writeResult(result, json) {
           console.log(`First target source step: ${progress.currentTarget.sourceStep}`);
         }
       }
+      if (progress.firstBackfillCommand) {
+        console.log(`First backfill command: ${progress.firstBackfillCommand}`);
+      }
       console.log(`First target status check: ${progress.statusCommand}`);
     }
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
+    const firstBackfill = result.operatorNextCommands?.find((item) => item.key === "first_closeout_backfill");
     const rehearsalReload = result.operatorNextCommands?.find((item) => item.key === "rehearsal_reload");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
@@ -167,6 +224,9 @@ function writeResult(result, json) {
       }
     } else {
       console.log(result.statusCommand);
+    }
+    if (firstBackfill) {
+      console.log(`First backfill after status: ${firstBackfill.command}`);
     }
     if (rehearsalReload) {
       console.log(`Rehearsal reload: ${rehearsalReload.command}`);
@@ -196,7 +256,9 @@ function main() {
     const nextStatusCommand = statusCommand(outputFile, actionsFile);
     const evidenceProgress = buildEvidenceProgress({
       acceptanceFields,
-      statusCommand: nextStatusCommand
+      statusCommand: nextStatusCommand,
+      outputFile,
+      actionsFile
     });
     writeResult({
       status: "written",
@@ -213,7 +275,9 @@ function main() {
         outputFile,
         actionsFile,
         rehearsalCommand: nextCommand,
-        readinessStatusCommand: nextStatusCommand
+        readinessStatusCommand: nextStatusCommand,
+        firstBackfillCommand: evidenceProgress.firstBackfillCommand,
+        firstBackfillArtifactPath: evidenceProgress.currentTarget?.artifactPath
       }),
       nextAction: "Run statusCommand to pick the first closeout evidence backfill target."
     }, options.json);

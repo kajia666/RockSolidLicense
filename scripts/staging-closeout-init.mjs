@@ -78,6 +78,45 @@ function buildOperatorNextCommands({ outputFile, actionsFile, rehearsalCommand, 
   ];
 }
 
+function isFilledValue(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === "string") {
+    return value.trim() !== "";
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (typeof value === "object") {
+    return Object.keys(value).length > 0;
+  }
+  return true;
+}
+
+function buildEvidenceProgress({ acceptanceFields, statusCommand }) {
+  const fields = Array.isArray(acceptanceFields) ? acceptanceFields : [];
+  const pendingFields = fields.filter((field) => !isFilledValue(field?.value));
+  const currentTarget = pendingFields[0] || null;
+  return {
+    status: pendingFields.length === 0 ? "filled" : "awaiting_real_evidence",
+    requiredCount: fields.length,
+    filledCount: fields.length - pendingFields.length,
+    pendingCount: pendingFields.length,
+    currentTarget: currentTarget
+      ? {
+        key: currentTarget.key || null,
+        status: currentTarget.status || "pending_operator_entry",
+        artifactPath: currentTarget.artifactPath || null,
+        sourceStep: currentTarget.sourceStep || null
+      }
+      : null,
+    pendingKeys: pendingFields.map((field) => field.key).filter(Boolean),
+    statusCommand,
+    nextAction: "Run statusCommand, then backfill the currentTarget with real redacted evidence."
+  };
+}
+
 function promoteDraft(draft, draftFile) {
   if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
     throw new Error("closeout draft must be a JSON object.");
@@ -105,6 +144,20 @@ function writeResult(result, json) {
   }
   if (result.status === "written") {
     console.log(`Filled closeout input initialized: ${result.outputFile}`);
+    if (result.evidenceProgress) {
+      const progress = result.evidenceProgress;
+      console.log(`Evidence progress: ${progress.filledCount}/${progress.requiredCount} filled, ${progress.pendingCount} pending`);
+      if (progress.currentTarget) {
+        console.log(`First backfill target: ${progress.currentTarget.key}`);
+        if (progress.currentTarget.artifactPath) {
+          console.log(`First target artifact: ${progress.currentTarget.artifactPath}`);
+        }
+        if (progress.currentTarget.sourceStep) {
+          console.log(`First target source step: ${progress.currentTarget.sourceStep}`);
+        }
+      }
+      console.log(`First target status check: ${progress.statusCommand}`);
+    }
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const rehearsalReload = result.operatorNextCommands?.find((item) => item.key === "rehearsal_reload");
     if (currentCommand) {
@@ -141,6 +194,10 @@ function main() {
     const placeholderCount = acceptanceFields.filter((field) => field?.value === null || field?.value === undefined).length;
     const nextCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`;
     const nextStatusCommand = statusCommand(outputFile, actionsFile);
+    const evidenceProgress = buildEvidenceProgress({
+      acceptanceFields,
+      statusCommand: nextStatusCommand
+    });
     writeResult({
       status: "written",
       mode: "staging-closeout-init",
@@ -149,6 +206,7 @@ function main() {
       ...(actionsFile ? { actionsFile } : {}),
       acceptanceFieldCount: acceptanceFields.length,
       placeholderCount,
+      evidenceProgress,
       nextCommand,
       statusCommand: nextStatusCommand,
       operatorNextCommands: buildOperatorNextCommands({

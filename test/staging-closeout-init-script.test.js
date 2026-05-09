@@ -131,6 +131,29 @@ test("staging closeout init promotes a draft without clearing closeout readiness
       actionsFile,
       acceptanceFieldCount: 7,
       placeholderCount: 7,
+      evidenceProgress: {
+        status: "awaiting_real_evidence",
+        requiredCount: 7,
+        filledCount: 0,
+        pendingCount: 7,
+        currentTarget: {
+          key: "route_map_gate_result",
+          status: "pending_operator_entry",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/route_map_gate_result.txt",
+          sourceStep: "source_route_map_gate_result"
+        },
+        pendingKeys: [
+          "route_map_gate_result",
+          "backup_restore_drill_result",
+          "live_write_smoke_result",
+          "launch_smoke_handoff",
+          "launch_mainline_evidence_receipts",
+          "receipt_visibility_review",
+          "operator_go_no_go"
+        ],
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
+        nextAction: "Run statusCommand, then backfill the currentTarget with real redacted evidence."
+      },
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
       operatorNextCommands: [
@@ -195,6 +218,11 @@ test("staging closeout init prints ordered next commands in plain output", () =>
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
     assert.match(result.stdout, /Filled closeout input initialized: .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Evidence progress: 0\/7 filled, 7 pending/);
+    assert.match(result.stdout, /First backfill target: route_map_gate_result/);
+    assert.match(result.stdout, /First target artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/route_map_gate_result\.txt/);
+    assert.match(result.stdout, /First target source step: source_route_map_gate_result/);
+    assert.match(result.stdout, /First target status check: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);

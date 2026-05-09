@@ -10760,14 +10760,27 @@ function writeResult(result, json) {
   }
 
   if (result.status === "pass") {
+    const realStagingCurrentAction = result.operatorExecutionPlan?.realStagingRunFocus?.currentAction || {};
+    const realStagingCommands = result.operatorExecutionPlan?.realStagingRunFocus?.commands || {};
+    const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
+    const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
-    console.log(result.nextCommands.launchSmoke);
-    console.log(result.nextCommands.launchRouteMapGate?.command || "");
-    console.log(result.nextCommands.launchMainline);
-    console.log(result.environmentReadiness?.nextAction || "");
-    console.log(result.nextCommands.receiptVisibilitySummaries?.launchReviewSummary || "");
-    console.log(result.nextCommands.receiptVisibilitySummaries?.launchSmokeSummary || "");
-    console.log(result.nextCommands.receiptVisibilitySummaries?.launchOpsOverviewStatus || "");
+    console.log(`Current command: \`${result.nextCommands.launchSmoke}\``);
+    console.log(`Route-map gate: \`${result.nextCommands.launchRouteMapGate?.command || "-"}\``);
+    console.log(`Launch Mainline: \`${result.nextCommands.launchMainline || "-"}\``);
+    console.log(`Environment next action: ${result.environmentReadiness?.nextAction || "-"}`);
+    console.log(`Real staging current action: ${realStagingCurrentAction.key || "-"} (env=${(realStagingCurrentAction.envKeys || []).join(", ") || "-"})`);
+    console.log(`Closeout init: \`${realStagingCommands.closeoutInit || "-"}\``);
+    console.log(`Readiness status: \`${realStagingCommands.readinessStatus || "-"}\``);
+    console.log(`Closeout reload: \`${realStagingCommands.closeoutReload || "-"}\``);
+    console.log(`Launch Review summary: \`${receiptVisibilitySummaries?.launchReviewSummary || "-"}\``);
+    console.log(`Launch Smoke summary: \`${receiptVisibilitySummaries?.launchSmokeSummary || "-"}\``);
+    console.log(`Launch Ops overview status: \`${receiptVisibilitySummaries?.launchOpsOverviewStatus || "-"}\``);
+    if (outputWriteSummary) {
+      console.log(`Output write summary: ${outputWriteSummary.status || "-"} (written=${outputWriteSummary.writtenFileCount ?? 0}/${outputWriteSummary.outputFileCount ?? 0}, pending=${outputWriteSummary.pendingWriteCount ?? 0})`);
+      console.log(`Output archive entrypoint: ${outputWriteSummary.archiveEntrypoint?.key || "-"} (${outputWriteSummary.archiveEntrypoint?.status || "-"}) -> ${outputWriteSummary.archiveEntrypoint?.path || "-"}`);
+      console.log(`Output write next action: ${outputWriteSummary.nextAction || "-"}`);
+    }
     return;
   }
 

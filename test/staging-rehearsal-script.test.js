@@ -109,6 +109,19 @@ function runRehearsal(args, env = {}) {
   });
 }
 
+function runRehearsalPlain(args, env = {}) {
+  return spawnSync(process.execPath, ["scripts/staging-rehearsal.mjs", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      RSL_DEVELOPER_BEARER_TOKEN: "",
+      ...env
+    },
+    timeout: 120_000
+  });
+}
+
 const validArgs = [
   "--base-url",
   "https://staging.example.com",
@@ -2788,6 +2801,87 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.doesNotMatch(JSON.stringify(output), /ProfileAdmin123!|ProfileDeveloper123!/);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("staging rehearsal plain output labels the real staging launch-duty chain for operators", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-plain-output-"));
+  const profileFile = join(tempDir, "staging-profile.json");
+  try {
+    const handoffFile = join(tempDir, "profile-handoff.md");
+    const closeoutFile = join(tempDir, "profile-closeout.json");
+    const runRecordFile = join(tempDir, "profile-run-record-index.json");
+    const artifactManifestFile = join(tempDir, "profile-artifact-manifest.json");
+    const backupRestorePacketFile = join(tempDir, "profile-backup-restore-drill-packet.json");
+    const closeoutReloadPacketFile = join(tempDir, "profile-closeout-reload-packet.json");
+    const readinessReviewPacketFile = join(tempDir, "profile-readiness-review-packet.json");
+    const productionSignoffPacketFile = join(tempDir, "profile-production-signoff-packet.json");
+    const launchDutyArchiveIndexFile = join(tempDir, "profile-launch-duty-archive-index.json");
+    const filledCloseoutDraftFile = join(tempDir, "profile-filled-closeout-input.draft.json");
+    const readinessActionQueueFile = join(tempDir, "profile-readiness-action-queue.md");
+    writeFileSync(profileFile, JSON.stringify({
+      baseUrl: "https://profile-staging.example.com",
+      productCode: "PROFILE_PRODUCT",
+      channel: "beta",
+      adminUsername: "profile-admin@example.com",
+      developerUsername: "profile.developer",
+      targetOs: "linux",
+      storageProfile: "postgres-preview",
+      targetEnvFile: "/etc/rocksolidlicense/profile.env",
+      appBackupDir: "/var/lib/rocksolid/profile-backups",
+      postgresBackupDir: "/var/lib/rocksolid/profile-postgres-backups",
+      readinessActionQueueFile
+    }, null, 2));
+
+    const result = runRehearsalPlain([
+      "--profile-file",
+      profileFile,
+      "--channel",
+      "stable",
+      "--handoff-file",
+      handoffFile,
+      "--closeout-file",
+      closeoutFile,
+      "--run-record-file",
+      runRecordFile,
+      "--artifact-manifest-file",
+      artifactManifestFile,
+      "--backup-restore-packet-file",
+      backupRestorePacketFile,
+      "--closeout-reload-packet-file",
+      closeoutReloadPacketFile,
+      "--readiness-review-packet-file",
+      readinessReviewPacketFile,
+      "--production-signoff-packet-file",
+      productionSignoffPacketFile,
+      "--launch-duty-archive-index-file",
+      launchDutyArchiveIndexFile,
+      "--filled-closeout-draft-file",
+      filledCloseoutDraftFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "ProfileAdmin123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "ProfileDeveloper123!"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Current command: `npm\.cmd(?: --silent)? run launch:smoke:staging/);
+    assert.match(result.stdout, /Route-map gate: `npm\.cmd run launch:route-map-gate`/);
+    assert.match(result.stdout, /Launch Mainline: `https:\/\/profile-staging\.example\.com\/developer\/launch-mainline\?productCode=PROFILE_PRODUCT&channel=stable&source=staging-rehearsal&handoff=first-wave`/);
+    assert.match(result.stdout, /Environment next action: Complete the operator_confirm and operator_execute items before running the live-write staging smoke command\./);
+    assert.match(result.stdout, /Real staging current action: set_required_secret_env \(env=RSL_DEVELOPER_BEARER_TOKEN\)/);
+    assert.match(result.stdout, /Closeout init: `npm\.cmd run staging:closeout:init -- --draft-file [^`]*profile-filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json --actions-file [^`]*profile-readiness-action-queue\.md`/);
+    assert.match(result.stdout, /Readiness status: `npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json --actions-file [^`]*profile-readiness-action-queue\.md`/);
+    assert.match(result.stdout, /Closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json`/);
+    assert.match(result.stdout, /Output write summary: written \(written=10\/10, pending=0\)/);
+    assert.match(result.stdout, /Output archive entrypoint: launch_duty_archive_index \(written\) -> .*profile-launch-duty-archive-index\.json/);
+    assert.match(result.stdout, /Output write next action: Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff\./);
+    assert.match(result.stdout, /Launch Review summary: `https:\/\/profile-staging\.example\.com\/api\/developer\/launch-review\/download\?productCode=PROFILE_PRODUCT&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`/);
+    assert.match(result.stdout, /Launch Smoke summary: `https:\/\/profile-staging\.example\.com\/api\/developer\/launch-smoke-kit\/download\?productCode=PROFILE_PRODUCT&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`/);
+    assert.match(result.stdout, /Launch Ops overview status: `https:\/\/profile-staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PROFILE_PRODUCT&format=launch-operations-overview-status&limit=20`/);
+    assert.doesNotMatch(result.stdout, /ProfileAdmin123!|ProfileDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
   }
 });
 

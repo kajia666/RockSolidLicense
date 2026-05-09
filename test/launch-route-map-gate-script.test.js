@@ -26,10 +26,24 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
   assert.equal(output.dryRun, true);
   assert.equal(output.summary.willRunFullSuite, false);
   assert.match(output.summary.scope, /first-batch runtime evidence/i);
+  assert.equal(output.closeoutBackfill.status, "ready_for_route_map_gate_backfill");
+  assert.equal(output.closeoutBackfill.key, "route_map_gate_result");
+  assert.equal(output.closeoutBackfill.filledCloseoutInputFile, "artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json");
+  assert.equal(output.closeoutBackfill.readinessActionQueueFile, "artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md");
+  assert.equal(output.closeoutBackfill.artifactPath, "artifacts/staging/ROUTE_MAP_GATE/stable/route-map-gate-output.txt");
+  assert.equal(
+    output.closeoutBackfill.command,
+    "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/ROUTE_MAP_GATE/stable/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md"
+  );
+  assert.equal(
+    output.closeoutBackfill.statusCommand,
+    "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md"
+  );
   assert.deepEqual(
     output.commands.map((command) => command.key),
     [
       "launch_mainline_action_visibility",
+      "launch_route_map_gate_script",
       "developer_ops_export_and_mainline_action",
       "launch_download_surface_audit",
       "launch_smoke_script",
@@ -43,6 +57,15 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
       "services_syntax_check",
       "diff_whitespace_check"
     ]
+  );
+
+  const routeMapGateScriptCommand = output.commands.find(
+    (command) => command.key === "launch_route_map_gate_script"
+  );
+  assert.ok(routeMapGateScriptCommand);
+  assert.equal(
+    routeMapGateScriptCommand.commandLine,
+    "node --test --test-concurrency=1 --test-isolation=none test/launch-route-map-gate-script.test.js"
   );
 
   const stagingProfileInitCommand = output.commands.find(
@@ -126,4 +149,23 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
   assert.match(downloadPattern, /developer integration package export is scoped/);
   assert.match(downloadPattern, /developer operators can manage scoped authorization operations/);
   assert.match(downloadPattern, /admin ops export bundles platform snapshots/);
+});
+
+test("launch route map gate dry run prints the closeout backfill handoff", () => {
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/launch-route-map-gate.mjs", "--dry-run", "--product-code", "PILOT_ALPHA", "--channel", "stable"],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 60_000
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Launch route-map targeted gate dry run:/);
+  assert.match(result.stdout, /Route-map closeout backfill current: route_map_gate_result/);
+  assert.match(result.stdout, /Route-map closeout backfill command: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Route-map readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
 });

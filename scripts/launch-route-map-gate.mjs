@@ -10,6 +10,51 @@ const dryRun = rawArgs.includes("--dry-run");
 const json = rawArgs.includes("--json");
 const help = rawArgs.includes("--help") || rawArgs.includes("-h");
 
+function requireArgValue(name, value, inlineValue) {
+  const missingValue = value === undefined
+    || value === null
+    || String(value).trim() === ""
+    || (inlineValue === undefined && String(value).startsWith("--"));
+  if (missingValue) {
+    throw new Error(`${name} requires a value.`);
+  }
+  return String(value).trim();
+}
+
+function parseOptions(argv) {
+  const options = {
+    productCode: "ROUTE_MAP_GATE",
+    channel: "stable",
+    closeoutInputFile: null,
+    actionsFile: null
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (["--dry-run", "--json", "--help", "-h"].includes(arg)) {
+      continue;
+    }
+    const [name, inlineValue] = arg.split("=", 2);
+    const value = requireArgValue(name, inlineValue ?? argv[index + 1], inlineValue);
+    if (name === "--product-code") {
+      options.productCode = value.toUpperCase();
+    } else if (name === "--channel") {
+      options.channel = value.toLowerCase();
+    } else if (name === "--closeout-input-file") {
+      options.closeoutInputFile = value;
+    } else if (name === "--actions-file") {
+      options.actionsFile = value;
+    } else {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+    if (inlineValue === undefined) {
+      index += 1;
+    }
+  }
+  return options;
+}
+
+const options = parseOptions(rawArgs);
+
 const launchMainlinePattern = [
   "developer ops export bundles scoped data and downloadable assets",
   "developer launch mainline action can record a first-wave ops sweep and refresh post-launch evidence",
@@ -35,6 +80,18 @@ const commands = [
       "--test-concurrency=1",
       "--test-isolation=none",
       "test/launch-mainline-action-visibility.test.js"
+    ]
+  },
+  {
+    key: "launch_route_map_gate_script",
+    label: "Launch route-map gate script continuity",
+    command: "node",
+    executable: process.execPath,
+    args: [
+      "--test",
+      "--test-concurrency=1",
+      "--test-isolation=none",
+      "test/launch-route-map-gate-script.test.js"
     ]
   },
   {
@@ -193,6 +250,58 @@ function publicCommand(command) {
   };
 }
 
+function commandValue(value) {
+  const text = String(value || "");
+  if (/[\s"`]/.test(text)) {
+    return `"${text.replace(/"/g, "`\"")}"`;
+  }
+  return text;
+}
+
+function defaultArtifactRoot() {
+  return `artifacts/staging/${options.productCode}/${options.channel}`;
+}
+
+function buildRouteMapCloseoutBackfill() {
+  const artifactRoot = defaultArtifactRoot();
+  const filledCloseoutInputFile = options.closeoutInputFile || `${artifactRoot}/filled-closeout-input.json`;
+  const readinessActionQueueFile = options.actionsFile || `${artifactRoot}/readiness-action-queue.md`;
+  const artifactPath = `${artifactRoot}/route-map-gate-output.txt`;
+  const command = [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--key",
+    "route_map_gate_result",
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(artifactPath),
+    "--receipt-id",
+    "<route-map-gate-receipt-id>",
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+  const statusCommand = [
+    "npm.cmd run staging:readiness:status --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+  return {
+    version: "launch-route-map-gate-closeout-backfill/v1",
+    status: "ready_for_route_map_gate_backfill",
+    key: "route_map_gate_result",
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    artifactPath,
+    command,
+    statusCommand,
+    nextAction: "After the route-map gate passes, backfill route_map_gate_result, then refresh staging readiness status."
+  };
+}
+
 function payload(status = "pass") {
   return {
     status,
@@ -203,6 +312,7 @@ function payload(status = "pass") {
       willRunFullSuite: false,
       scope: "Launch Mainline / Launch Smoke / Developer Ops route-map visibility, first-batch runtime evidence, and launch download surface targeted gate"
     },
+    closeoutBackfill: buildRouteMapCloseoutBackfill(),
     commands: commands.map(publicCommand)
   };
 }
@@ -216,6 +326,10 @@ function printHelp() {
     "Options:",
     "  --dry-run  Print the commands without executing them.",
     "  --json     Print machine-readable output. Intended for --dry-run.",
+    "  --product-code <code>  Product code used for default staging artifact paths.",
+    "  --channel <channel>    Channel used for default staging artifact paths.",
+    "  --closeout-input-file <path>  Override the filled closeout input path.",
+    "  --actions-file <path>  Override the readiness action queue path.",
     "  --help     Show this help."
   ];
   console.log(lines.join("\n"));
@@ -230,7 +344,11 @@ if (dryRun) {
   if (json) {
     console.log(JSON.stringify(payload(), null, 2));
   } else {
+    const closeoutBackfill = buildRouteMapCloseoutBackfill();
     console.log("Launch route-map targeted gate dry run:");
+    console.log(`Route-map closeout backfill current: ${closeoutBackfill.key}`);
+    console.log(`Route-map closeout backfill command: ${closeoutBackfill.command}`);
+    console.log(`Route-map readiness status: ${closeoutBackfill.statusCommand}`);
     for (const [index, command] of commands.entries()) {
       console.log(`${index + 1}. ${command.label}`);
       console.log(`   ${commandLine(command)}`);

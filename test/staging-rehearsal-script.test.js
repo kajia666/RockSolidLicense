@@ -2915,6 +2915,17 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Artifact manifest source statuses: profilePreflight=blocked_until_secret_env, executionSummary=blocked_until_secret_env, runRecordIndex=awaiting_evidence_backfill, finalPacket=ready_for_operator_rehearsal/);
     assert.match(result.stdout, /Artifact manifest key files: run_record_index=.*profile-run-record-index\.json; artifact_manifest=.*profile-artifact-manifest\.json; backup_restore_packet=.*profile-backup-restore-drill-packet\.json; closeout_reload_packet=.*profile-closeout-reload-packet\.json; readiness_review_packet=.*profile-readiness-review-packet\.json; production_signoff_packet=.*profile-production-signoff-packet\.json; launch_duty_archive_index=.*profile-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Artifact manifest next action: Generate and archive the listed rehearsal artifacts, then fill closeout evidence from the draft before reloading closeout input\./);
+    assert.match(result.stdout, /Launch-duty packet focus: closeout_reload_packet \(awaiting_closeout_backfill\)/);
+    assert.match(result.stdout, /Launch-duty current packet path: .*profile-closeout-reload-packet\.json/);
+    assert.match(result.stdout, /Launch-duty archive index: .*profile-launch-duty-archive-index\.json/);
+    assert.match(result.stdout, /Launch-duty packet sequence: run_record_index -> artifact_manifest -> backup_restore_packet -> closeout_reload_packet -> readiness_review_packet -> production_signoff_packet/);
+    assert.match(result.stdout, /Launch-duty packet closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json`/);
+    assert.match(result.stdout, /Launch-duty packet next action: Backfill the real filled closeout input, reload it, then review full-test-window readiness before running npm\.cmd test\./);
+    assert.match(result.stdout, /Archive review execution entry: awaiting_closeout_reload_packet_review \(phase=pre_launch_archive_review, action=review_closeout_reload_packet, target=closeout_reload_packet\)/);
+    assert.match(result.stdout, /Archive review current packet: closeout_reload_packet -> .*profile-closeout-reload-packet\.json/);
+    assert.match(result.stdout, /Archive review packet queue: run_record_index:awaiting_evidence_backfill, artifact_manifest:awaiting_artifact_generation, backup_restore_packet:awaiting_backup_restore_drill, closeout_reload_packet:awaiting_closeout_backfill, readiness_review_packet:blocked_until_closeout_reload, production_signoff_packet:blocked_until_closeout_reload/);
+    assert.match(result.stdout, /Archive review closeout reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/filled-closeout-input\.json`/);
+    assert.match(result.stdout, /Archive review next action: Open closeout_reload_packet, backfill closeout evidence, then reload the filled closeout input\./);
     assert.match(result.stdout, /Closeout backfill focus: awaiting_closeout_backfill \(missing=7, current=route_map_gate_result\)/);
     assert.match(result.stdout, /Closeout reload execution entry: awaiting_backfill \(current=route_map_gate_result, queue=7\/7\)/);
     assert.match(result.stdout, /Closeout reload first queue item: route_map_gate_result -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/route-map-gate-output\.txt/);

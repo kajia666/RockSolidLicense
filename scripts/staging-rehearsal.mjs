@@ -8743,6 +8743,57 @@ function writeRunRecordArchiveSummaryPlain(index = {}, manifest = {}) {
   }
 }
 
+function writeLaunchDutyPacketFocusPlain(focus = {}) {
+  if (!focus?.currentPacket) {
+    return;
+  }
+  const current = focus.currentPacket || {};
+  const packetKeys = (focus.packetSequence || []).map((item) => item.key).filter(Boolean);
+  console.log(`Launch-duty packet focus: ${current.key || "-"} (${current.status || "-"})`);
+  console.log(`Launch-duty current packet path: ${current.path || "-"}`);
+  console.log(`Launch-duty archive index: ${focus.archiveIndexPath || "-"}`);
+  console.log(`Launch-duty packet sequence: ${packetKeys.join(" -> ") || "-"}`);
+  if (focus.currentPostSignoffTarget) {
+    console.log(`Launch-duty post-signoff target: ${focus.currentPostSignoffTarget.key || "-"} (${focus.currentPostSignoffTarget.status || "-"})`);
+  }
+  if (focus.currentWatchArtifact) {
+    console.log(`Launch-duty watch artifact: ${focus.currentWatchArtifact.key || "-"} (${focus.currentWatchArtifact.status || "-"})`);
+  }
+  if (focus.currentStabilizationWindow) {
+    console.log(`Launch-duty stabilization window: ${focus.currentStabilizationWindow.key || "-"} (${focus.currentStabilizationWindow.status || "-"})`);
+  }
+  console.log(`Launch-duty packet closeout reload: \`${focus.commands?.closeoutReload || "-"}\``);
+  console.log(`Launch-duty packet full test: \`${focus.commands?.fullTestWindow || "-"}\``);
+  console.log(`Launch-duty packet next action: ${focus.nextAction || "-"}`);
+}
+
+function renderArchiveReviewQueue(queue = []) {
+  return queue.map((item) => {
+    if (Array.isArray(item)) {
+      return `${item[0] || "-"}:${item[1] || "-"}`;
+    }
+    return `${item.key || "-"}:${item.status || "-"}`;
+  }).join(", ") || "-";
+}
+
+function writeLaunchDutyArchiveReviewPlain(index = {}) {
+  const entry = index.archiveReviewExecutionEntry || {};
+  if (!entry?.status) {
+    return;
+  }
+  const target = entry.currentTarget || {};
+  const packet = entry.currentPacket || {};
+  console.log(`Archive review execution entry: ${entry.status || "-"} (phase=${entry.currentPhase || "-"}, action=${entry.currentActionKey || "-"}, target=${target.key || "-"})`);
+  console.log(`Archive review current packet: ${packet.key || "-"} -> ${packet.path || "-"}`);
+  console.log(`Archive review packet queue: ${renderArchiveReviewQueue(entry.packetQueue || [])}`);
+  console.log(`Archive review post-signoff queue: ${renderArchiveReviewQueue(entry.postSignoffQueue || [])}`);
+  console.log(`Archive review watch queue: ${renderArchiveReviewQueue(entry.watchArtifactQueue || [])}`);
+  console.log(`Archive review stabilization queue: ${renderArchiveReviewQueue(entry.stabilizationWindowQueue || [])}`);
+  console.log(`Archive review closeout reload: \`${entry.commands?.closeoutReload || index.commands?.closeoutReload || "-"}\``);
+  console.log(`Archive review full test: \`${entry.commands?.fullTestWindow || index.commands?.fullTestWindow || "-"}\``);
+  console.log(`Archive review next action: ${entry.nextAction || "-"}`);
+}
+
 function renderCloseoutBackfillPlainNextAction(focus = {}, current = {}) {
   if (current?.key) {
     return `Backfill ${current.key}, then rerun staging:readiness:status and staging:rehearsal.`;
@@ -11028,6 +11079,8 @@ function writeResult(result, json) {
     const backupRestoreDrillPacket = result.stagingBackupRestoreDrillPacket || {};
     const runRecordIndex = result.stagingRehearsalRunRecordIndex || {};
     const artifactManifest = result.stagingArtifactManifest || {};
+    const launchDutyPacketFocus = result.operatorExecutionPlan?.launchDutyPacketFocus || {};
+    const launchDutyArchiveIndex = result.stagingLaunchDutyArchiveIndex || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -11050,6 +11103,8 @@ function writeResult(result, json) {
     writeRealStagingRunFocusPlain(realStagingRunFocus);
     writeBackupRestoreDrillPacketPlain(backupRestoreDrillPacket);
     writeRunRecordArchiveSummaryPlain(runRecordIndex, artifactManifest);
+    writeLaunchDutyPacketFocusPlain(launchDutyPacketFocus);
+    writeLaunchDutyArchiveReviewPlain(launchDutyArchiveIndex);
     writeCloseoutBackfillFocusPlain(closeoutBackfillFocus);
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);

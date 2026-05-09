@@ -72,6 +72,14 @@ function runBackfill(args) {
   });
 }
 
+function runBackfillPlain(args) {
+  return spawnSync(process.execPath, ["scripts/staging-signoff-backfill.mjs", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 120_000
+  });
+}
+
 function runRehearsal(args) {
   return spawnSync(process.execPath, ["scripts/staging-rehearsal.mjs", "--json", ...args], {
     cwd: repoRoot,
@@ -152,6 +160,22 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       missingReceiptLaneCount: 5,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      operatorNextCommands: [
+        {
+          key: "readiness_status",
+          status: "current",
+          command: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+          artifactPath: actionsFile,
+          nextAction: "Refresh the readiness action queue after this sign-off backfill."
+        },
+        {
+          key: "rehearsal_reload",
+          status: "blocked_after_readiness_status",
+          command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+          artifactPath: closeoutInputFile,
+          nextAction: "Reload rehearsal after status confirms the next sign-off, receipt visibility, or launch-day watch gate."
+        }
+      ],
       nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     });
 
@@ -187,6 +211,22 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
       missingReceiptLaneCount: 4,
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      operatorNextCommands: [
+        {
+          key: "readiness_status",
+          status: "current",
+          command: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+          artifactPath: actionsFile,
+          nextAction: "Refresh the readiness action queue after this sign-off backfill."
+        },
+        {
+          key: "rehearsal_reload",
+          status: "blocked_after_readiness_status",
+          command: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+          artifactPath: closeoutInputFile,
+          nextAction: "Reload rehearsal after status confirms the next sign-off, receipt visibility, or launch-day watch gate."
+        }
+      ],
       nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     });
 
@@ -226,6 +266,42 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
     assert.equal(rehearsalOutput.closeoutInput.readyForProductionSignoff, false);
     assert.deepEqual(rehearsalOutput.closeoutInput.signoffFilledKeys, ["full_test_window_passed"]);
     assert.deepEqual(rehearsalOutput.closeoutInput.missingReceiptVisibilityKeys, receiptVisibilityKeys.slice(1));
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging signoff backfill prints ordered next commands in plain output", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-signoff-backfill-plain-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeReadyForFullTestInput(closeoutInputFile);
+
+    const result = runBackfillPlain([
+      "--input-file",
+      closeoutInputFile,
+      "--actions-file",
+      actionsFile,
+      "--condition-key",
+      "full_test_window_passed",
+      "--value-json",
+      "{\"result\":\"pass\",\"command\":\"npm.cmd test\",\"failureCount\":0}",
+      "--artifact-path",
+      "artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt",
+      "--receipt-id",
+      "receipt-full-test-001",
+      "--decision",
+      "ready-for-production-signoff"
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Production sign-off evidence backfilled: full_test_window_passed/);
+    assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Next action: Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

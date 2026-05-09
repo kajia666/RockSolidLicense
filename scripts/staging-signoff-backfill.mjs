@@ -83,6 +83,25 @@ function statusCommand(outputFile, actionsFile = null) {
   return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
 }
 
+function buildOperatorNextCommands({ outputFile, actionsFile, rehearsalCommand, readinessStatusCommand }) {
+  return [
+    {
+      key: "readiness_status",
+      status: "current",
+      command: readinessStatusCommand,
+      artifactPath: actionsFile || null,
+      nextAction: "Refresh the readiness action queue after this sign-off backfill."
+    },
+    {
+      key: "rehearsal_reload",
+      status: "blocked_after_readiness_status",
+      command: rehearsalCommand,
+      artifactPath: outputFile,
+      nextAction: "Reload rehearsal after status confirms the next sign-off, receipt visibility, or launch-day watch gate."
+    }
+  ];
+}
+
 function buildEvidenceValue(options) {
   const parsed = JSON.parse(options.valueJson);
   const value = parsed && typeof parsed === "object" && !Array.isArray(parsed)
@@ -212,9 +231,22 @@ function writeResult(result, json) {
   }
   if (result.status === "written") {
     console.log(`Production sign-off evidence backfilled: ${result.key}`);
-    console.log(result.nextCommand);
-    console.log(result.statusCommand);
-    console.log(result.nextAction);
+    const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
+    const rehearsalReload = result.operatorNextCommands?.find((item) => item.key === "rehearsal_reload");
+    if (currentCommand) {
+      console.log(`Current command: ${currentCommand.command}`);
+      if (currentCommand.artifactPath) {
+        console.log(`Action queue file: ${currentCommand.artifactPath}`);
+      }
+    } else {
+      console.log(result.statusCommand);
+    }
+    if (rehearsalReload) {
+      console.log(`Rehearsal reload: ${rehearsalReload.command}`);
+    } else {
+      console.log(result.nextCommand);
+    }
+    console.log(`Next action: ${result.nextAction}`);
     return;
   }
   console.log(`Staging signoff backfill failed: ${result.error.message}`);
@@ -239,6 +271,8 @@ function main() {
     const visibleReceiptLaneCount = countVisibleReceiptLanes(receiptVisibility);
     const targetType = options.conditionKey ? "production_signoff_condition" : "receipt_visibility_lane";
     const key = options.conditionKey || options.receiptLane;
+    const nextCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`;
+    const nextStatusCommand = statusCommand(outputFile, actionsFile);
     writeResult({
       status: "written",
       mode: "staging-signoff-backfill",
@@ -252,8 +286,14 @@ function main() {
       visibleReceiptLaneCount,
       missingConditionCount: conditions.length - filledConditionCount,
       missingReceiptLaneCount: RECEIPT_VISIBILITY_KEYS.length - visibleReceiptLaneCount,
-      nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`,
-      statusCommand: statusCommand(outputFile, actionsFile),
+      nextCommand,
+      statusCommand: nextStatusCommand,
+      operatorNextCommands: buildOperatorNextCommands({
+        outputFile,
+        actionsFile,
+        rehearsalCommand: nextCommand,
+        readinessStatusCommand: nextStatusCommand
+      }),
       nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     }, options.json);
   } catch (error) {

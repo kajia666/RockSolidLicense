@@ -138,6 +138,32 @@ function buildProfile(options) {
   };
 }
 
+function buildOperatorNextCommands({ outputFile, closeoutInputFile, readinessActionQueueFile, nextCommand, closeoutInitCommand, postCloseoutInitStatusCommand }) {
+  return [
+    {
+      key: "profile_rehearsal",
+      status: "current",
+      command: nextCommand,
+      artifactPath: outputFile,
+      nextAction: "Run the profile-driven rehearsal to write launch-duty artifacts and the closeout draft."
+    },
+    {
+      key: "closeout_init",
+      status: "blocked_after_profile_rehearsal",
+      command: closeoutInitCommand,
+      artifactPath: closeoutInputFile,
+      nextAction: "Promote the generated closeout draft into the real filled closeout input."
+    },
+    {
+      key: "readiness_status",
+      status: "blocked_after_closeout_init",
+      command: postCloseoutInitStatusCommand,
+      artifactPath: readinessActionQueueFile,
+      nextAction: "Refresh the readiness action queue after closeout init."
+    }
+  ];
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -145,10 +171,28 @@ function writeResult(result, json) {
   }
   if (result.status === "written") {
     console.log(`Staging profile written: ${result.outputFile}`);
-    console.log(result.nextCommand);
-    console.log(result.closeoutInitCommand);
-    console.log(result.postCloseoutInitStatusCommand);
-    console.log(result.nextAction);
+    const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
+    const closeoutInit = result.operatorNextCommands?.find((item) => item.key === "closeout_init");
+    const readinessStatus = result.operatorNextCommands?.find((item) => item.key === "readiness_status");
+    if (currentCommand) {
+      console.log(`Current command: ${currentCommand.command}`);
+    } else {
+      console.log(result.nextCommand);
+    }
+    if (closeoutInit) {
+      console.log(`Closeout init: ${closeoutInit.command}`);
+    } else {
+      console.log(result.closeoutInitCommand);
+    }
+    if (readinessStatus) {
+      console.log(`Readiness status: ${readinessStatus.command}`);
+      if (readinessStatus.artifactPath) {
+        console.log(`Action queue file: ${readinessStatus.artifactPath}`);
+      }
+    } else {
+      console.log(result.postCloseoutInitStatusCommand);
+    }
+    console.log(`Next action: ${result.nextAction}`);
     return;
   }
   console.log(`Staging profile init failed: ${result.error.message}`);
@@ -167,6 +211,9 @@ function main() {
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
     mkdirSync(path.dirname(outputFile), { recursive: true });
     writeFileSync(outputFile, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
+    const nextCommand = `npm.cmd run staging:rehearsal -- --profile-file ${commandValue(outputFile)}`;
+    const closeoutInitCommand = `npm.cmd run staging:closeout:init -- --draft-file ${commandValue(closeoutDraftFile)} --output-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`;
+    const postCloseoutInitStatusCommand = `npm.cmd run staging:readiness:status -- --input-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`;
     writeResult({
       status: "written",
       mode: "staging-profile-init",
@@ -176,12 +223,20 @@ function main() {
       archiveRoot,
       profileKeyCount: Object.keys(profile).length,
       secretPolicy: "passwords_and_bearer_tokens_must_stay_in_environment_variables",
-      nextCommand: `npm.cmd run staging:rehearsal -- --profile-file ${commandValue(outputFile)}`,
+      nextCommand,
       closeoutDraftFile,
       closeoutInputFile,
       readinessActionQueueFile,
-      closeoutInitCommand: `npm.cmd run staging:closeout:init -- --draft-file ${commandValue(closeoutDraftFile)} --output-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`,
-      postCloseoutInitStatusCommand: `npm.cmd run staging:readiness:status -- --input-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`,
+      closeoutInitCommand,
+      postCloseoutInitStatusCommand,
+      operatorNextCommands: buildOperatorNextCommands({
+        outputFile,
+        closeoutInputFile,
+        readinessActionQueueFile,
+        nextCommand,
+        closeoutInitCommand,
+        postCloseoutInitStatusCommand
+      }),
       nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written."
     }, options.json);
   } catch (error) {

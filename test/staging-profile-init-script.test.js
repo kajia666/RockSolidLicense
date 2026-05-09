@@ -17,6 +17,14 @@ function runProfileInit(args) {
   });
 }
 
+function runProfileInitPlain(args) {
+  return spawnSync(process.execPath, ["scripts/staging-profile-init.mjs", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 120_000
+  });
+}
+
 function runRehearsal(args) {
   return spawnSync(process.execPath, ["scripts/staging-rehearsal.mjs", "--json", ...args], {
     cwd: repoRoot,
@@ -83,6 +91,29 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       postCloseoutInitStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      operatorNextCommands: [
+        {
+          key: "profile_rehearsal",
+          status: "current",
+          command: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+          artifactPath: outputFile,
+          nextAction: "Run the profile-driven rehearsal to write launch-duty artifacts and the closeout draft."
+        },
+        {
+          key: "closeout_init",
+          status: "blocked_after_profile_rehearsal",
+          command: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+          nextAction: "Promote the generated closeout draft into the real filled closeout input."
+        },
+        {
+          key: "readiness_status",
+          status: "blocked_after_closeout_init",
+          command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+          nextAction: "Refresh the readiness action queue after closeout init."
+        }
+      ],
       nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written."
     });
     assert.deepEqual(profile, {
@@ -139,6 +170,48 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     const rehearsalOutput = JSON.parse(rehearsal.stdout);
     assert.equal(rehearsalOutput.stagingProfile.loaded, true);
     assert.equal(rehearsalOutput.stagingProfile.providedKeys.includes("readinessActionQueueFile"), true);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging profile init prints ordered next commands in plain output", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-profile-init-plain-"));
+  try {
+    const outputFile = join(tempDir, "staging-profile.json");
+    const result = runProfileInitPlain([
+      "--base-url",
+      "https://staging.example.com",
+      "--product-code",
+      "PILOT_ALPHA",
+      "--channel",
+      "beta",
+      "--admin-username",
+      "admin@example.com",
+      "--developer-username",
+      "launch.smoke.owner",
+      "--target-os",
+      "linux",
+      "--storage-profile",
+      "postgres-preview",
+      "--target-env-file",
+      "/etc/rocksolidlicense/staging.env",
+      "--app-backup-dir",
+      "/var/lib/rocksolid/backups",
+      "--postgres-backup-dir",
+      "/var/lib/rocksolid/postgres-backups",
+      "--output-file",
+      outputFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Staging profile written: .*staging-profile\.json/);
+    assert.match(result.stdout, /Current command: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
+    assert.match(result.stdout, /Closeout init: npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Action queue file: artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand after the draft is written\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

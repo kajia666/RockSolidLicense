@@ -8774,6 +8774,27 @@ function writeGoLiveExecutionEntryPlain(entry = {}) {
   }
 }
 
+function writeProductionSignoffEvidenceExecutionEntryPlain(entry = {}) {
+  if (!entry?.status) {
+    return;
+  }
+  const evidenceQueue = Array.isArray(entry.evidenceQueue) ? entry.evidenceQueue : [];
+  const signoffConditionQueue = Array.isArray(entry.signoffConditionQueue) ? entry.signoffConditionQueue : [];
+  const receiptVisibilityQueue = Array.isArray(entry.receiptVisibilityQueue) ? entry.receiptVisibilityQueue : [];
+  const reload = entry.closeoutReload || {};
+  const currentPacket = evidenceQueue.find((item) => item.key === entry.currentEvidenceKey)?.productionSignoffPacketFile
+    || evidenceQueue[0]?.productionSignoffPacketFile
+    || "-";
+  console.log(`Production signoff evidence execution entry: ${entry.status || "-"} (action=${entry.currentActionKey || "-"}, current=${entry.currentEvidenceKey || "-"})`);
+  console.log(`Production signoff evidence queue: ${signoffConditionQueue.map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  console.log(`Production signoff receipt visibility queue: ${receiptVisibilityQueue.map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  console.log(`Production signoff evidence current backfill: \`${entry.currentBackfillCommand || "-"}\``);
+  console.log(`Production signoff evidence readiness status: \`${entry.statusCommand || "-"}\``);
+  console.log(`Production signoff evidence reload: ${reload.status || "-"} -> \`${reload.command || "-"}\``);
+  console.log(`Production signoff evidence current packet: ${currentPacket}`);
+  console.log(`Production signoff evidence next action: ${entry.nextAction || "-"}`);
+}
+
 function appendOperatorGoNoGoResultCaptureEntry(lines, entry = {}) {
   if (!entry?.status) {
     return;
@@ -10856,6 +10877,9 @@ function writeResult(result, json) {
     const postSignoffActionChecklist = result.operatorExecutionPlan?.postSignoffActionChecklist
       || result.finalRehearsalPacket?.postSignoffActionChecklist
       || [];
+    const productionSignoffEvidenceExecutionEntry = result.operatorExecutionPlan?.fullTestSignoffFocus?.productionSignoffEvidenceExecutionEntry
+      || result.stagingProductionSignoffPacket?.productionSignoffEvidenceExecutionEntry
+      || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -10876,6 +10900,7 @@ function writeResult(result, json) {
       console.log(`Output write next action: ${outputWriteSummary.nextAction || "-"}`);
     }
     writeGoLiveExecutionEntryPlain(goLiveExecutionEntry);
+    writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);
     writePostSignoffActionChecklistPlain(postSignoffActionChecklist);
     return;

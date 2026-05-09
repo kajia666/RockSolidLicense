@@ -2979,6 +2979,51 @@ test("staging rehearsal plain output prints launch-day watch operator handoff af
   }
 });
 
+test("staging rehearsal plain output prints production signoff evidence handoff after closeout is ready", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-signoff-plain-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-closeout-ready.json");
+    const acceptanceFields = [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review",
+      "operator_go_no_go"
+    ].map((key) => ({
+      key,
+      status: "filled",
+      value: key === "operator_go_no_go" ? "ready-for-full-test-window" : { result: "pass" }
+    }));
+    writeFileSync(closeoutInputFile, `${JSON.stringify({
+      mode: "staging-closeout-template",
+      decision: "ready-for-full-test-window",
+      acceptanceFields
+    }, null, 2)}\n`, "utf8");
+
+    const result = runRehearsalPlain([
+      ...validArgs,
+      "--closeout-input-file",
+      closeoutInputFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Go-live execution entry: ready_for_full_test_window \(phase=full_test_window_entry, source=fullTestSignoffFocus, action=run_full_test_window\)/);
+    assert.match(result.stdout, /Production signoff evidence execution entry: awaiting_production_signoff_evidence \(action=run_full_test_window, current=full_test_window_passed\)/);
+    assert.match(result.stdout, /Production signoff evidence queue: full_test_window_passed:pending_operator_evidence, staging_artifacts_archived:pending_operator_evidence/);
+    assert.match(result.stdout, /Production signoff receipt visibility queue: launchMainline:pending_visibility_review, launchReview:pending_visibility_review, launchSmoke:pending_visibility_review, developerOps:pending_visibility_review, launchOpsOverviewStatus:pending_visibility_review/);
+    assert.match(result.stdout, /Production signoff evidence current backfill: `npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-ready\.json --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md`/);
+    assert.match(result.stdout, /Production signoff evidence readiness status: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-ready\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md`/);
+    assert.match(result.stdout, /Production signoff evidence reload: blocked_until_production_signoff_backfill -> `npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-ready\.json`/);
+    assert.match(result.stdout, /Production signoff evidence current packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.doesNotMatch(result.stdout, /StrongAdmin123!|StrongDeveloper123!/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging rehearsal runner focuses closeout reload after real staging inputs are ready", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-rehearsal-real-ready-"));
   const profileFile = join(tempDir, "staging-profile.json");

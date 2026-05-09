@@ -657,6 +657,34 @@ function buildLaunchDutyNextRun({ inputFile, actionQueue }) {
   };
 }
 
+function launchDutyOperatorStatus(item, index) {
+  if (index === 0) {
+    return "current";
+  }
+  if (item.key === "record_launch_day_watch_summary") {
+    return "blocked_after_rehearsal_reload";
+  }
+  if (item.key === "close_first_wave") {
+    return "blocked_after_launch_day_watch_summary";
+  }
+  return item.status || "blocked_after_prior_actions";
+}
+
+function buildLaunchDutyOperatorNextCommands(actionQueue) {
+  return actionQueue.map((item, index) => ({
+    key: item.key,
+    status: launchDutyOperatorStatus(item, index),
+    phase: item.phase,
+    actionKey: item.actionKey || null,
+    command: item.command || null,
+    statusCommand: item.statusCommand || null,
+    artifactPathHint: item.evidence?.artifactPathHint || null,
+    receiptOperations: item.evidence?.receiptOperations || [],
+    sourceRecordKeys: item.sourceRecordKeys || [],
+    nextAction: item.operatorInstruction || null
+  }));
+}
+
 function buildActionsFileSummary(actionsFile, actionQueue, inputFile) {
   return {
     path: actionsFile,
@@ -694,6 +722,12 @@ function renderActionQueueMarkdown(result) {
     lines.push(`Follow-up action keys: ${(nextRun.actionKeys || []).join(", ") || "-"}`);
     lines.push(`Watch artifact: \`${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}\``);
     lines.push(`First-wave closeout artifact: \`${nextRun.artifactPathHints?.firstWaveCloseout || "-"}\``);
+    if (result.operatorNextCommands?.length) {
+      lines.push("Operator next commands:");
+      for (const item of result.operatorNextCommands) {
+        lines.push(`- ${item.status}: ${item.actionKey || item.key} -> \`${item.command || item.artifactPathHint || "-"}\``);
+      }
+    }
     lines.push("");
   }
 
@@ -900,6 +934,9 @@ function buildStatus(payload, inputFile, actionsFile = null) {
   const launchDutyNextRun = canSignoffProduction
     ? buildLaunchDutyNextRun({ inputFile, actionQueue })
     : null;
+  const operatorNextCommands = canSignoffProduction
+    ? buildLaunchDutyOperatorNextCommands(actionQueue)
+    : null;
 
   return {
     status: "pass",
@@ -931,6 +968,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
       }
     },
     ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
+    ...(operatorNextCommands ? { operatorNextCommands } : {}),
     nextStep,
     actionQueue
   };
@@ -960,6 +998,11 @@ function writeResult(result, json) {
       const nextRun = result.launchDutyNextRun;
       console.log(`Launch duty current action: ${nextRun.currentActionKey}`);
       console.log(`Launch duty reload: ${nextRun.reloadCommand}`);
+      if (result.operatorNextCommands?.length) {
+        for (const item of result.operatorNextCommands) {
+          console.log(`Operator next ${item.status}: ${item.actionKey || item.key} -> ${item.command || item.artifactPathHint || "-"}`);
+        }
+      }
       console.log(`Launch duty follow-up actions: ${(nextRun.actionKeys || []).join(" -> ") || "-"}`);
       console.log(`Launch duty watch artifact: ${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}`);
       console.log(`Launch duty first-wave closeout: ${nextRun.artifactPathHints?.firstWaveCloseout || "-"}`);

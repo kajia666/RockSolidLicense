@@ -9086,6 +9086,29 @@ function writeLaunchDayWatchBridgePlain(packet = {}) {
   console.log(`Launch-day watch bridge next action: ${bridge.nextAction || "-"}`);
 }
 
+function writeLaunchDayWatchPlanPlain(plan = {}) {
+  const watchExecutionEntry = plan.watchExecutionEntry || {};
+  const watchEvidenceExecutionEntry = plan.watchEvidenceExecutionEntry || {};
+  if (!watchExecutionEntry?.status && !watchEvidenceExecutionEntry?.status) {
+    return;
+  }
+  const watchEvidenceQueue = Array.isArray(watchEvidenceExecutionEntry.evidenceQueue)
+    ? watchEvidenceExecutionEntry.evidenceQueue
+    : [];
+  const watchEvidenceReceiptQueue = Array.isArray(watchEvidenceExecutionEntry.receiptQueue)
+    ? watchEvidenceExecutionEntry.receiptQueue
+    : [];
+  console.log(`Launch-day watch execution entry: ${watchExecutionEntry.status || "-"} (action=${watchExecutionEntry.currentActionKey || "-"}, record=${watchExecutionEntry.currentRecord?.key || "-"})`);
+  console.log(`Launch-day watch execution current record: ${watchExecutionEntry.currentRecord?.key || "-"} -> ${watchExecutionEntry.currentRecord?.path || "-"}`);
+  console.log(`Launch-day watch execution stabilization target: ${watchExecutionEntry.stabilizationTarget?.key || "-"} -> ${watchExecutionEntry.stabilizationTarget?.path || "-"}`);
+  console.log(`Launch-day watch execution next action: ${watchExecutionEntry.nextAction || "-"}`);
+  console.log(`Launch-day watch evidence execution entry: ${watchEvidenceExecutionEntry.status || "-"} (action=${watchEvidenceExecutionEntry.currentActionKey || "-"}, current=${watchEvidenceExecutionEntry.currentEvidenceKey || "-"})`);
+  console.log(`Launch-day watch evidence queue: ${watchEvidenceQueue.map((item) => `${item.key || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  console.log(`Launch-day watch evidence receipt queue: ${watchEvidenceReceiptQueue.map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`);
+  console.log(`Launch-day watch evidence stabilization handoff: ${watchEvidenceExecutionEntry.stabilizationHandoff?.key || "-"} -> ${watchEvidenceExecutionEntry.stabilizationHandoff?.path || "-"}`);
+  console.log(`Launch-day watch evidence next action: ${watchEvidenceExecutionEntry.nextAction || "-"}`);
+}
+
 function writeProductionSignoffEvidenceExecutionEntryPlain(entry = {}) {
   if (!entry?.status) {
     return;
@@ -11205,6 +11228,7 @@ function writeResult(result, json) {
     const readinessReviewPacket = result.stagingReadinessReviewPacket || {};
     const fullTestWindowReadiness = result.fullTestWindowReadiness || {};
     const productionSignoffPacket = result.stagingProductionSignoffPacket || {};
+    const launchDayWatchPlan = result.launchDayWatchPlan || {};
     const outputWriteSummary = result.operatorExecutionPlan?.outputWriteSummary || result.stagingOutputWriteSummary || null;
     const receiptVisibilitySummaries = result.nextCommands?.receiptVisibilitySummaries || null;
     console.log("Staging rehearsal gates passed. No data was modified.");
@@ -11237,6 +11261,7 @@ function writeResult(result, json) {
     writeProductionSignoffExecutionEntryPlain(productionSignoffPacket);
     writeProductionSignoffCloseoutGatePlain(productionSignoffPacket);
     writeLaunchDayWatchBridgePlain(productionSignoffPacket);
+    writeLaunchDayWatchPlanPlain(launchDayWatchPlan);
     writeProductionSignoffEvidenceExecutionEntryPlain(productionSignoffEvidenceExecutionEntry);
     writeLaunchDutyCurrentActionPlain(launchDutyCurrentAction);
     writePostSignoffActionChecklistPlain(postSignoffActionChecklist);

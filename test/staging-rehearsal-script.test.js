@@ -3032,6 +3032,15 @@ test("staging rehearsal plain output prints launch-day watch operator handoff af
     assert.match(result.stdout, /Launch-day watch bridge archive closeout input: artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
     assert.match(result.stdout, /Launch-day watch bridge archive index: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Launch-day watch bridge next action: Archive production_signoff_packet, then record launch-day watch artifacts and prepare stabilization handoff\./);
+    assert.match(result.stdout, /Launch-day watch execution entry: ready_for_operator_watch \(action=record_launch_day_watch_summary, record=launch_day_watch_summary\)/);
+    assert.match(result.stdout, /Launch-day watch execution current record: launch_day_watch_summary -> artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md/);
+    assert.match(result.stdout, /Launch-day watch execution stabilization target: stabilization_owner_handoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+    assert.match(result.stdout, /Launch-day watch execution next action: Record launch-day watch summary, receipt visibility snapshot, incidents, rollback review, and stabilization owner handoff\./);
+    assert.match(result.stdout, /Launch-day watch evidence execution entry: awaiting_launch_day_watch_evidence \(action=record_launch_day_watch_summary, current=launch_day_watch_summary\)/);
+    assert.match(result.stdout, /Launch-day watch evidence queue: launch_day_watch_summary:pending_operator_entry, receipt_visibility_snapshot:pending_operator_entry, first_wave_incident_log:pending_operator_entry, rollback_signal_review:pending_operator_entry, stabilization_owner_handoff:pending_operator_entry/);
+    assert.match(result.stdout, /Launch-day watch evidence receipt queue: launch_day_watch_summary=record_cutover_walkthrough:pending_operator_receipt, launch_day_watch_summary=record_launch_day_readiness_review:pending_operator_receipt/);
+    assert.match(result.stdout, /Launch-day watch evidence stabilization handoff: stabilization_owner_handoff -> artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);
+    assert.match(result.stdout, /Launch-day watch evidence next action: Record launch_day_watch_summary, attach receipt IDs, then continue launch-day watch evidence before stabilization handoff\./);
     assert.match(result.stdout, /Launch duty current action: archive_production_signoff \(stage=launch_day_watch_entry, source=launchDutyPacketFocus\)/);
     assert.match(result.stdout, /Launch duty current packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(result.stdout, /Launch duty evidence inputs: production_signoff_packet=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json; launch_day_watch_summary=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md; stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md/);

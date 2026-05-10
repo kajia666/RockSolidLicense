@@ -261,6 +261,38 @@ function buildEvidenceProgress({ fields, outputFile, actionsFile, readinessStatu
   };
 }
 
+function buildNextCloseoutEvidenceHandoff({
+  backfilledKey,
+  evidenceProgress,
+  actionsFile,
+  rehearsalCommand
+}) {
+  if (!evidenceProgress?.nextBackfillCommand || !evidenceProgress.currentTarget) {
+    return null;
+  }
+  return {
+    status: "ready_for_next_closeout_backfill",
+    currentActionKey: "backfill_closeout_evidence",
+    backfilledKey,
+    progress: {
+      requiredCount: evidenceProgress.requiredCount,
+      filledCount: evidenceProgress.filledCount,
+      pendingCount: evidenceProgress.pendingCount
+    },
+    statusCommand: evidenceProgress.statusCommand,
+    nextBackfillCommand: evidenceProgress.nextBackfillCommand,
+    nextBackfillTarget: {
+      key: evidenceProgress.currentTarget.key,
+      artifactPath: evidenceProgress.currentTarget.artifactPath,
+      sourceStep: evidenceProgress.currentTarget.sourceStep,
+      receiptOperations: evidenceProgress.currentTarget.receiptOperations
+    },
+    actionQueueFile: actionsFile || null,
+    reloadCommand: rehearsalCommand,
+    nextAction: "Run statusCommand, then nextBackfillCommand with real redacted evidence before the rehearsal reload."
+  };
+}
+
 function buildFullTestReadyHandoff({
   outputFile,
   actionsFile,
@@ -316,6 +348,19 @@ function writeResult(result, json) {
       if (progress.nextBackfillCommand) {
         console.log(`Next backfill command: ${progress.nextBackfillCommand}`);
       }
+    }
+    if (result.nextCloseoutEvidenceHandoff) {
+      const handoff = result.nextCloseoutEvidenceHandoff;
+      console.log(`Next closeout handoff: ${handoff.status}`);
+      console.log(`Next closeout status refresh: ${handoff.statusCommand}`);
+      console.log(`Next closeout backfill: ${handoff.nextBackfillCommand}`);
+      console.log(`Next closeout target: ${handoff.nextBackfillTarget.key} -> ${handoff.nextBackfillTarget.artifactPath || "-"}`);
+      if (handoff.nextBackfillTarget.sourceStep) {
+        console.log(`Next closeout source step: ${handoff.nextBackfillTarget.sourceStep}`);
+      }
+      console.log(`Next closeout progress: ${handoff.progress.filledCount}/${handoff.progress.requiredCount} filled, ${handoff.progress.pendingCount} pending`);
+      console.log(`Next closeout rehearsal reload: ${handoff.reloadCommand}`);
+      console.log(`Next closeout next action: ${handoff.nextAction}`);
     }
     if (result.fullTestReadyHandoff) {
       const handoff = result.fullTestReadyHandoff;
@@ -376,6 +421,12 @@ function main() {
       actionsFile,
       readinessStatusCommand: nextStatusCommand
     });
+    const nextCloseoutEvidenceHandoff = buildNextCloseoutEvidenceHandoff({
+      backfilledKey: options.key,
+      evidenceProgress,
+      actionsFile,
+      rehearsalCommand: nextCommand
+    });
     const fullTestReadyHandoff = buildFullTestReadyHandoff({
       outputFile,
       actionsFile,
@@ -398,6 +449,7 @@ function main() {
       filledFieldCount,
       remainingPlaceholderCount: fields.length - filledFieldCount,
       evidenceProgress,
+      ...(nextCloseoutEvidenceHandoff ? { nextCloseoutEvidenceHandoff } : {}),
       ...(fullTestReadyHandoff ? { fullTestReadyHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,

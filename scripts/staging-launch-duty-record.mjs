@@ -137,10 +137,15 @@ function receiptIdArgs(receiptOperations = []) {
     .join("");
 }
 
-function sourceRecordArgs(sourceRecordKeys = []) {
+function sourceRecordArgs(sourceRecordKeys = [], sourceRecordPaths = {}) {
   return sourceRecordKeys
     .filter(Boolean)
-    .map((key) => ` --source-record ${key}=<${key}-artifact-path>`)
+    .map((key) => {
+      const value = sourceRecordPaths[key]
+        ? `${key}=${sourceRecordPaths[key]}`
+        : `${key}=<${key}-artifact-path>`;
+      return ` --source-record ${commandValue(value)}`;
+    })
     .join("");
 }
 
@@ -174,7 +179,7 @@ function defaultRecordIndexFile(artifactPath) {
   return path.join(path.dirname(artifactPath), RECORD_INDEX_FILE_NAME);
 }
 
-function buildRecordCommand({ closeoutInputFile, actionsFile, key, artifactPath, recordIndexFile }) {
+function buildRecordCommand({ closeoutInputFile, actionsFile, key, artifactPath, recordIndexFile, sourceRecordPaths }) {
   const target = LAUNCH_DUTY_RECORDS[key];
   if (!target) {
     return null;
@@ -188,7 +193,7 @@ function buildRecordCommand({ closeoutInputFile, actionsFile, key, artifactPath,
     `--artifact-path ${commandValue(artifactPath)}`,
     "--value-json <redacted-json>",
     receiptIdArgs(target.receiptOperations).trimStart(),
-    sourceRecordArgs(target.sourceRecordKeys).trimStart(),
+    sourceRecordArgs(target.sourceRecordKeys, sourceRecordPaths).trimStart(),
     recordIndexArg.trimStart(),
     actionsArg.trimStart()
   ].filter(Boolean).join(" ");
@@ -279,39 +284,52 @@ function recordIndexProgress(records) {
   };
 }
 
-function buildIndexNextRecordCommand({ progress, options, recordIndexFile }) {
+function sourceRecordPathsFromRecords(sourceRecordKeys = [], records = {}) {
+  return Object.fromEntries(
+    sourceRecordKeys
+      .map((key) => [key, records[key]?.artifactPath])
+      .filter(([, artifactPath]) => artifactPath)
+  );
+}
+
+function buildIndexNextRecordCommand({ progress, options, recordIndexFile, records }) {
   if (!progress.nextRecordKey) {
     return null;
   }
+  const target = LAUNCH_DUTY_RECORDS[progress.nextRecordKey];
   return buildRecordCommand({
     closeoutInputFile: options.closeoutInputFile,
     actionsFile: options.actionsFile,
     key: progress.nextRecordKey,
     artifactPath: nextArtifactPath(options.artifactPath, progress.nextRecordKey),
-    recordIndexFile
+    recordIndexFile,
+    sourceRecordPaths: sourceRecordPathsFromRecords(target?.sourceRecordKeys, records)
   });
 }
 
-function buildRecordIndex({ options, target, value, sourceRecords, recordIndexFile, recordedAt, statusRefreshCommand, rehearsalReloadCommand }) {
-  const existingIndex = loadRecordIndex(recordIndexFile);
+function buildRecordIndexEntry({ options, target, value, sourceRecords, recordedAt }) {
+  return {
+    key: options.key,
+    status: "recorded",
+    actionKey: target.actionKey,
+    category: target.category,
+    artifactPath: options.artifactPath,
+    receiptOperations: target.receiptOperations,
+    receiptIds: options.receiptIds,
+    sourceRecords,
+    expectedEvidence: target.expectedEvidence,
+    value,
+    recordedAt
+  };
+}
+
+function buildRecordIndex({ existingIndex, recordEntry, options, recordIndexFile, statusRefreshCommand, rehearsalReloadCommand }) {
   const records = {
     ...existingIndex.records,
-    [options.key]: {
-      key: options.key,
-      status: "recorded",
-      actionKey: target.actionKey,
-      category: target.category,
-      artifactPath: options.artifactPath,
-      receiptOperations: target.receiptOperations,
-      receiptIds: options.receiptIds,
-      sourceRecords,
-      expectedEvidence: target.expectedEvidence,
-      value,
-      recordedAt
-    }
+    [options.key]: recordEntry
   };
   const progress = recordIndexProgress(records);
-  const nextRecordCommand = buildIndexNextRecordCommand({ progress, options, recordIndexFile });
+  const nextRecordCommand = buildIndexNextRecordCommand({ progress, options, recordIndexFile, records });
   return {
     ...existingIndex,
     mode: "staging-launch-duty-record-index",
@@ -321,7 +339,7 @@ function buildRecordIndex({ options, target, value, sourceRecords, recordIndexFi
     actionsFile: options.actionsFile || null,
     recordIndexFile,
     updatedRecordKey: options.key,
-    updatedAt: recordedAt,
+    updatedAt: recordEntry.recordedAt,
     recordedKeys: progress.recordedKeys,
     pendingKeys: progress.pendingKeys,
     recordedCount: progress.recordedCount,
@@ -386,6 +404,18 @@ function buildResult(options) {
   }
   const recordIndexFile = options.recordIndexFile || defaultRecordIndexFile(options.artifactPath);
   const recordedAt = new Date().toISOString();
+  const existingIndex = loadRecordIndex(recordIndexFile);
+  const recordIndexEntry = buildRecordIndexEntry({
+    options,
+    target,
+    value,
+    sourceRecords,
+    recordedAt
+  });
+  const recordsForNextCommand = {
+    ...existingIndex.records,
+    [options.key]: recordIndexEntry
+  };
   const artifactPath = path.resolve(options.artifactPath);
   mkdirSync(path.dirname(artifactPath), { recursive: true });
   writeFileSync(artifactPath, renderArtifactMarkdown({
@@ -415,18 +445,17 @@ function buildResult(options) {
       actionsFile: options.actionsFile,
       key: nextRecord.key,
       artifactPath: nextRecord.artifactPath,
-      recordIndexFile
+      recordIndexFile,
+      sourceRecordPaths: sourceRecordPathsFromRecords(nextRecord.sourceRecordKeys, recordsForNextCommand)
     })
     : null;
   const statusRefreshCommand = statusCommand(options.closeoutInputFile, options.actionsFile);
   const rehearsalReloadCommand = reloadCommand(options.closeoutInputFile);
   const recordIndex = buildRecordIndex({
+    existingIndex,
+    recordEntry: recordIndexEntry,
     options,
-    target,
-    value,
-    sourceRecords,
     recordIndexFile,
-    recordedAt,
     statusRefreshCommand,
     rehearsalReloadCommand
   });

@@ -116,6 +116,39 @@ function writeReadyForFullTestInput(file) {
   writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
+function writeReadyForLaunchDutyInput(file) {
+  const payload = {
+    mode: "staging-closeout-template",
+    decision: "ready-for-full-test-window",
+    acceptanceFields: closeoutKeys.map((key) => ({
+      key,
+      status: "filled",
+      value: key === "operator_go_no_go"
+        ? "ready-for-full-test-window"
+        : { result: "pass" }
+    })),
+    receiptVisibility: Object.fromEntries(
+      receiptVisibilityKeys.slice(0, -1).map((key) => [
+        key,
+        {
+          status: "visible",
+          artifactPath: `artifacts/staging/PILOT_ALPHA/stable/${key}.json`
+        }
+      ])
+    ),
+    productionSignoff: {
+      decision: "ready-for-production-signoff",
+      conditions: signoffKeys.map((key) => ({
+        key,
+        status: "filled",
+        value: { result: "pass" },
+        artifactPath: `artifacts/staging/PILOT_ALPHA/stable/${key}.json`
+      }))
+    }
+  };
+  writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
 test("staging signoff backfill writes one signoff condition and one receipt visibility lane", () => {
   const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   assert.equal(packageJson.scripts["staging:signoff:backfill"], "node scripts/staging-signoff-backfill.mjs");
@@ -388,6 +421,71 @@ test("staging signoff backfill prints ordered next commands in plain output", ()
     assert.match(result.stdout, /Next sign-off backfill after status: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifacts-archive\.txt --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(result.stdout, /Next action: Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action\./);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging signoff backfill prints launch-duty ready handoff after final receipt lane", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-signoff-backfill-ready-"));
+  try {
+    const closeoutInputFile = join(tempDir, "filled-closeout-input.json");
+    const plainCloseoutInputFile = join(tempDir, "filled-closeout-input-plain.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeReadyForLaunchDutyInput(closeoutInputFile);
+    writeReadyForLaunchDutyInput(plainCloseoutInputFile);
+
+    const backfillArgs = [
+      "--actions-file",
+      actionsFile,
+      "--receipt-lane",
+      "launchOpsOverviewStatus",
+      "--value-json",
+      "{\"status\":\"visible\",\"summaryPath\":\"/developer/launch-ops-overview-status?productCode=PILOT_ALPHA\"}",
+      "--artifact-path",
+      "artifacts/staging/PILOT_ALPHA/stable/launch-ops-overview-status-receipt-visibility.json",
+      "--receipt-id",
+      "receipt-launch-ops-overview-001"
+    ];
+    const result = runBackfill([
+      "--input-file",
+      closeoutInputFile,
+      ...backfillArgs
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.missingConditionCount, 0);
+    assert.equal(output.missingReceiptLaneCount, 0);
+    assert.equal(output.signoffProgress.status, "filled");
+    assert.equal(output.signoffProgress.nextBackfillCommand, null);
+    assert.deepEqual(output.launchDutyReadyHandoff, {
+      status: "ready_for_launch_day_watch",
+      currentActionKey: "archive_production_signoff",
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      actionQueueFile: actionsFile,
+      productionSignoffPacketPath: "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json",
+      launchDutyArchiveIndexPath: "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json",
+      nextAction: "Run statusCommand to confirm launch-day watch readiness, then run reloadCommand and archive the production sign-off packet."
+    });
+
+    const plainResult = runBackfillPlain([
+      "--input-file",
+      plainCloseoutInputFile,
+      ...backfillArgs
+    ]);
+
+    assert.equal(plainResult.status, 0, plainResult.stderr || plainResult.stdout);
+    assert.equal(plainResult.stderr, "");
+    assert.match(plainResult.stdout, /Sign-off progress: 7\/7 conditions filled, 5\/5 receipt lanes visible/);
+    assert.match(plainResult.stdout, /Launch duty readiness: ready_for_launch_day_watch/);
+    assert.match(plainResult.stdout, /Launch duty status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input-plain\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(plainResult.stdout, /Launch duty reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input-plain\.json/);
+    assert.match(plainResult.stdout, /Launch duty production signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(plainResult.stdout, /Launch duty archive index: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(plainResult.stdout, /Launch duty next action: Run statusCommand to confirm launch-day watch readiness, then run reloadCommand and archive the production sign-off packet\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

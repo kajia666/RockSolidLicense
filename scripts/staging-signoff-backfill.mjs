@@ -299,6 +299,30 @@ function buildSignoffProgress({
   };
 }
 
+function buildLaunchDutyReadyHandoff({
+  outputFile,
+  actionsFile,
+  artifactRoot,
+  productionDecision,
+  readinessStatusCommand,
+  rehearsalCommand,
+  signoffProgress
+}) {
+  if (productionDecision !== "ready-for-production-signoff" || signoffProgress?.status !== "filled") {
+    return null;
+  }
+  return {
+    status: "ready_for_launch_day_watch",
+    currentActionKey: "archive_production_signoff",
+    statusCommand: readinessStatusCommand,
+    reloadCommand: rehearsalCommand,
+    actionQueueFile: actionsFile || null,
+    productionSignoffPacketPath: path.posix.join(artifactRoot, "staging-production-signoff-packet.json"),
+    launchDutyArchiveIndexPath: path.posix.join(artifactRoot, "staging-launch-duty-archive-index.json"),
+    nextAction: "Run statusCommand to confirm launch-day watch readiness, then run reloadCommand and archive the production sign-off packet."
+  };
+}
+
 function buildConditionTarget(condition, artifactRoot) {
   if (!condition?.key) {
     return null;
@@ -426,6 +450,15 @@ function writeResult(result, json) {
         console.log(`Next sign-off backfill command: ${progress.nextBackfillCommand}`);
       }
     }
+    if (result.launchDutyReadyHandoff) {
+      const handoff = result.launchDutyReadyHandoff;
+      console.log(`Launch duty readiness: ${handoff.status}`);
+      console.log(`Launch duty status refresh: ${handoff.statusCommand}`);
+      console.log(`Launch duty reload: ${handoff.reloadCommand}`);
+      console.log(`Launch duty production signoff packet: ${handoff.productionSignoffPacketPath}`);
+      console.log(`Launch duty archive index: ${handoff.launchDutyArchiveIndexPath}`);
+      console.log(`Launch duty next action: ${handoff.nextAction}`);
+    }
     console.log(`Backfilled status refresh: ${result.statusCommand}`);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const nextBackfill = result.operatorNextCommands?.find((item) => item.key === "next_signoff_backfill");
@@ -483,6 +516,15 @@ function main() {
       productionDecision: productionSignoff.decision || null,
       readinessStatusCommand: nextStatusCommand
     });
+    const launchDutyReadyHandoff = buildLaunchDutyReadyHandoff({
+      outputFile,
+      actionsFile,
+      artifactRoot,
+      productionDecision: productionSignoff.decision || null,
+      readinessStatusCommand: nextStatusCommand,
+      rehearsalCommand: nextCommand,
+      signoffProgress
+    });
     writeResult({
       status: "written",
       mode: "staging-signoff-backfill",
@@ -499,6 +541,7 @@ function main() {
       missingConditionCount: conditions.length - filledConditionCount,
       missingReceiptLaneCount: RECEIPT_VISIBILITY_KEYS.length - visibleReceiptLaneCount,
       signoffProgress,
+      ...(launchDutyReadyHandoff ? { launchDutyReadyHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,
       operatorNextCommands: buildOperatorNextCommands({

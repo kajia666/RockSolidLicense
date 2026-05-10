@@ -411,6 +411,10 @@ function actionsFileArgs(actionsFile) {
   return actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
 }
 
+function recordIndexFileArgs(recordIndexFile) {
+  return recordIndexFile ? ` --record-index-file ${commandValue(recordIndexFile)}` : "";
+}
+
 function commandForCloseoutBackfill(inputFile, key, actionsFile = null) {
   return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key} --value-json <redacted-json>${actionsFileArgs(actionsFile)}`;
 }
@@ -456,11 +460,7 @@ function commandForReceiptLaneExample(inputFile, key, evidence, actionsFile = nu
   return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key}${evidenceArgs(evidence)}${actionsFileArgs(actionsFile)}`;
 }
 
-function sourceRecordArgs(sourceRecordKeys = []) {
-  return sourceRecordKeys.map((key) => ` --source-record ${key}=<${key}-artifact-path>`).join("");
-}
-
-function commandForLaunchDutyRecord(inputFile, key, evidence, actionsFile = null, sourceRecordKeys = []) {
+function commandForLaunchDutyRecord(inputFile, key, evidence, actionsFile = null, recordIndexFile = null) {
   const artifactArg = evidence?.artifactPathHint ? ` --artifact-path ${evidence.artifactPathHint}` : "";
   return [
     "npm.cmd run staging:launch-duty:record --",
@@ -469,12 +469,12 @@ function commandForLaunchDutyRecord(inputFile, key, evidence, actionsFile = null
     artifactArg.trimStart(),
     "--value-json <redacted-json>",
     receiptIdArgs(evidence?.receiptOperations || []).trimStart(),
-    sourceRecordArgs(sourceRecordKeys).trimStart(),
+    recordIndexFileArgs(recordIndexFile).trimStart(),
     actionsFileArgs(actionsFile).trimStart()
   ].filter(Boolean).join(" ");
 }
 
-function commandForLaunchDutyRecordExample(inputFile, key, evidence, actionsFile = null, sourceRecordKeys = []) {
+function commandForLaunchDutyRecordExample(inputFile, key, evidence, actionsFile = null, recordIndexFile = null) {
   const artifactArg = evidence?.artifactPathHint ? ` --artifact-path ${evidence.artifactPathHint}` : "";
   return [
     "npm.cmd run staging:launch-duty:record --",
@@ -483,7 +483,7 @@ function commandForLaunchDutyRecordExample(inputFile, key, evidence, actionsFile
     artifactArg.trimStart(),
     `--value-json ${quoteValueJson(evidence?.valueJsonExample || { result: "recorded" })}`,
     receiptIdArgs(evidence?.receiptOperations || []).trimStart(),
-    sourceRecordArgs(sourceRecordKeys).trimStart(),
+    recordIndexFileArgs(recordIndexFile).trimStart(),
     actionsFileArgs(actionsFile).trimStart()
   ].filter(Boolean).join(" ");
 }
@@ -505,6 +505,7 @@ function buildLaunchDutyReadyActionQueue({ inputFile, actionsFile, artifactPathR
   const watchEvidence = evidenceForLaunchDutyFollowUp("launch_day_watch_summary", artifactPathRoot);
   const firstWaveEvidence = evidenceForLaunchDutyFollowUp("first_wave_closeout", artifactPathRoot);
   const firstWaveSourceRecordKeys = ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"];
+  const recordIndexFile = path.posix.join(artifactPathRoot.path, "launch-duty-record-index.json");
   const localStatusCommand = statusCommand(inputFile, actionsFile);
   return [
     {
@@ -523,9 +524,10 @@ function buildLaunchDutyReadyActionQueue({ inputFile, actionsFile, artifactPathR
       status: "blocked_after_prior_actions",
       targetKey: "launch_day_watch_summary",
       actionKey: "record_launch_day_watch_summary",
-      command: commandForLaunchDutyRecord(inputFile, "launch_day_watch_summary", watchEvidence, actionsFile),
-      exampleCommand: commandForLaunchDutyRecordExample(inputFile, "launch_day_watch_summary", watchEvidence, actionsFile),
+      command: commandForLaunchDutyRecord(inputFile, "launch_day_watch_summary", watchEvidence, actionsFile, recordIndexFile),
+      exampleCommand: commandForLaunchDutyRecordExample(inputFile, "launch_day_watch_summary", watchEvidence, actionsFile, recordIndexFile),
       evidence: watchEvidence,
+      recordIndexFile,
       operatorInstruction: "Record launch-day watch summary and attach the cutover/readiness receipt IDs after the rehearsal packet is regenerated.",
       statusCommand: localStatusCommand
     },
@@ -535,9 +537,10 @@ function buildLaunchDutyReadyActionQueue({ inputFile, actionsFile, artifactPathR
       status: "blocked_after_prior_actions",
       targetKey: "first_wave_closeout",
       actionKey: "close_first_wave",
-      command: commandForLaunchDutyRecord(inputFile, "first_wave_closeout", firstWaveEvidence, actionsFile, firstWaveSourceRecordKeys),
-      exampleCommand: commandForLaunchDutyRecordExample(inputFile, "first_wave_closeout", firstWaveEvidence, actionsFile, firstWaveSourceRecordKeys),
+      command: commandForLaunchDutyRecord(inputFile, "first_wave_closeout", firstWaveEvidence, actionsFile, recordIndexFile),
+      exampleCommand: commandForLaunchDutyRecordExample(inputFile, "first_wave_closeout", firstWaveEvidence, actionsFile, recordIndexFile),
       evidence: firstWaveEvidence,
+      recordIndexFile,
       sourceRecordKeys: firstWaveSourceRecordKeys,
       operatorInstruction: "Close the first wave after incident, rollback, and stabilization owner records are attached.",
       statusCommand: localStatusCommand

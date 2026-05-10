@@ -682,11 +682,13 @@ function buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot }) {
   const watchAction = actionQueue.find((item) => item.key === "record_launch_day_watch_summary") || {};
   const firstWaveAction = actionQueue.find((item) => item.key === "close_first_wave") || {};
   const archiveRoot = artifactPathRoot?.path || DEFAULT_ARTIFACT_PATH_ROOT;
+  const recordIndexFile = watchAction.recordIndexFile || firstWaveAction.recordIndexFile || path.posix.join(archiveRoot, "launch-duty-record-index.json");
   const reload = reloadAction.command || reloadCommand(inputFile);
   return {
     status: "ready_for_launch_day_watch",
     currentActionKey: reloadAction.actionKey || "archive_production_signoff",
     reloadCommand: reload,
+    recordIndexFile,
     actionKeys: actionQueue.map((item) => item.actionKey).filter(Boolean),
     artifactPathHints: {
       launchDayWatchSummary: watchAction.evidence?.artifactPathHint || null,
@@ -707,6 +709,7 @@ function buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot }) {
       recordCommand: item.command || null,
       exampleCommand: item.exampleCommand || null,
       artifactPath: item.evidence?.artifactPathHint || null,
+      recordIndexFile: item.recordIndexFile || recordIndexFile,
       receiptOperations: item.evidence?.receiptOperations || [],
       sourceRecordKeys: item.sourceRecordKeys || [],
       expectedEvidence: item.evidence?.expectedEvidence || null,
@@ -734,10 +737,12 @@ function buildLaunchDutyWatchHandoff({ inputFile, actionsFile, launchDutyNextRun
     actionQueueFile: actionsFile || null,
     productionSignoffPacketPath: launchDutyNextRun.productionSignoffArchive?.packetPath || null,
     archiveIndexPath: launchDutyNextRun.productionSignoffArchive?.archiveIndexPath || null,
+    recordIndexFile: launchDutyNextRun.recordIndexFile || null,
     watchSummary: {
       actionKey: watchAction.actionKey || "record_launch_day_watch_summary",
       artifactPath: watchAction.artifactPath || launchDutyNextRun.artifactPathHints?.launchDayWatchSummary || null,
       recordCommand: watchAction.recordCommand || null,
+      recordIndexFile: watchAction.recordIndexFile || launchDutyNextRun.recordIndexFile || null,
       receiptOperations: watchAction.receiptOperations || launchDutyNextRun.receiptOperations?.launchDayWatchSummary || [],
       expectedEvidence: watchAction.expectedEvidence || null,
       nextAction: watchAction.nextAction || null
@@ -746,6 +751,7 @@ function buildLaunchDutyWatchHandoff({ inputFile, actionsFile, launchDutyNextRun
       actionKey: firstWaveAction.actionKey || "close_first_wave",
       artifactPath: firstWaveAction.artifactPath || launchDutyNextRun.artifactPathHints?.firstWaveCloseout || null,
       recordCommand: firstWaveAction.recordCommand || null,
+      recordIndexFile: firstWaveAction.recordIndexFile || launchDutyNextRun.recordIndexFile || null,
       receiptOperations: firstWaveAction.receiptOperations || launchDutyNextRun.receiptOperations?.firstWaveCloseout || [],
       sourceRecordKeys: firstWaveAction.sourceRecordKeys || launchDutyNextRun.sourceRecordKeys || [],
       expectedEvidence: firstWaveAction.expectedEvidence || null,
@@ -777,6 +783,7 @@ function buildLaunchDutyOperatorNextCommands(actionQueue) {
     command: item.command || null,
     statusCommand: item.statusCommand || null,
     artifactPathHint: item.evidence?.artifactPathHint || null,
+    recordIndexFile: item.recordIndexFile || null,
     receiptOperations: item.evidence?.receiptOperations || [],
     sourceRecordKeys: item.sourceRecordKeys || [],
     nextAction: item.operatorInstruction || null
@@ -1084,11 +1091,15 @@ function renderActionQueueMarkdown(result) {
     lines.push(`Reload command: \`${nextRun.reloadCommand || "-"}\``);
     lines.push(`Production sign-off packet: \`${nextRun.productionSignoffArchive?.packetPath || "-"}\``);
     lines.push(`Launch-duty archive index: \`${nextRun.productionSignoffArchive?.archiveIndexPath || "-"}\``);
+    lines.push(`Launch-duty record index: \`${nextRun.recordIndexFile || "-"}\``);
     lines.push(`Archive next action: ${nextRun.productionSignoffArchive?.nextAction || "-"}`);
     if (nextRun.postArchiveEvidenceActions?.length) {
       lines.push(`Post-archive evidence actions: ${nextRun.postArchiveEvidenceActions.map((item) => item.actionKey || item.key).join(" -> ")}`);
       for (const item of nextRun.postArchiveEvidenceActions) {
         lines.push(`Post-archive evidence ${item.actionKey || item.key}: \`${item.artifactPath || "-"}\` receipts \`${receiptText(item.receiptOperations)}\` sources \`${receiptText(item.sourceRecordKeys)}\``);
+        if (item.recordIndexFile) {
+          lines.push(`Post-archive evidence ${item.actionKey || item.key} record index: \`${item.recordIndexFile}\``);
+        }
       }
     }
     lines.push(`Follow-up action keys: ${(nextRun.actionKeys || []).join(", ") || "-"}`);
@@ -1104,6 +1115,7 @@ function renderActionQueueMarkdown(result) {
       lines.push(`Handoff reload command: \`${handoff.reloadCommand || "-"}\``);
       lines.push(`Handoff production sign-off packet: \`${handoff.productionSignoffPacketPath || "-"}\``);
       lines.push(`Handoff archive index: \`${handoff.archiveIndexPath || "-"}\``);
+      lines.push(`Handoff record index: \`${handoff.recordIndexFile || "-"}\``);
       lines.push(`Watch summary artifact: \`${handoff.watchSummary?.artifactPath || "-"}\``);
       lines.push(`Watch summary command: \`${handoff.watchSummary?.recordCommand || "-"}\``);
       lines.push(`Watch summary receipts: ${receiptText(handoff.watchSummary?.receiptOperations)}`);
@@ -1117,6 +1129,9 @@ function renderActionQueueMarkdown(result) {
       lines.push("Operator next commands:");
       for (const item of result.operatorNextCommands) {
         lines.push(`- ${item.status}: ${item.actionKey || item.key} -> \`${item.command || item.artifactPathHint || "-"}\``);
+        if (item.recordIndexFile) {
+          lines.push(`  - Record index: \`${item.recordIndexFile}\``);
+        }
       }
     }
     lines.push("");
@@ -1133,6 +1148,9 @@ function renderActionQueueMarkdown(result) {
       if (item.statusCommand) {
         lines.push(`  - Status check: \`${item.statusCommand}\``);
       }
+      if (item.recordIndexFile) {
+        lines.push(`  - Record index: \`${item.recordIndexFile}\``);
+      }
       if (item.nextAction) {
         lines.push(`  - Next action: ${item.nextAction}`);
       }
@@ -1148,6 +1166,9 @@ function renderActionQueueMarkdown(result) {
     }
     if (item.sourceRecordKeys?.length) {
       lines.push(`   Source records: ${item.sourceRecordKeys.join(", ")}`);
+    }
+    if (item.recordIndexFile) {
+      lines.push(`   Record index: \`${item.recordIndexFile}\``);
     }
     if (item.operatorInstruction) {
       lines.push(`   Operator instruction: ${item.operatorInstruction}`);
@@ -1502,6 +1523,9 @@ function writeResult(result, json) {
         if (item.artifactPathHint) {
           console.log(`Operator next ${item.status} artifact: ${item.artifactPathHint}`);
         }
+        if (item.recordIndexFile) {
+          console.log(`Operator next ${item.status} record index: ${item.recordIndexFile}`);
+        }
         if (item.statusCommand) {
           console.log(`Operator next ${item.status} status check: ${item.statusCommand}`);
         }
@@ -1522,11 +1546,15 @@ function writeResult(result, json) {
       console.log(`Launch duty reload: ${nextRun.reloadCommand}`);
       console.log(`Launch duty production signoff packet: ${nextRun.productionSignoffArchive?.packetPath || "-"}`);
       console.log(`Launch duty archive index: ${nextRun.productionSignoffArchive?.archiveIndexPath || "-"}`);
+      console.log(`Launch duty record index: ${nextRun.recordIndexFile || "-"}`);
       console.log(`Launch duty archive next action: ${nextRun.productionSignoffArchive?.nextAction || "-"}`);
       if (nextRun.postArchiveEvidenceActions?.length) {
         console.log(`Launch duty post-archive evidence actions: ${nextRun.postArchiveEvidenceActions.map((item) => item.actionKey || item.key).join(" -> ")}`);
         for (const item of nextRun.postArchiveEvidenceActions) {
           console.log(`Launch duty post-archive evidence ${item.actionKey || item.key}: artifact=${artifactText(item.artifactPath)} receipts=${receiptText(item.receiptOperations)} sources=${receiptText(item.sourceRecordKeys)}`);
+          if (item.recordIndexFile) {
+            console.log(`Launch duty post-archive evidence ${item.actionKey || item.key} record index: ${item.recordIndexFile}`);
+          }
         }
       }
       console.log(`Launch duty follow-up actions: ${(nextRun.actionKeys || []).join(" -> ") || "-"}`);
@@ -1544,6 +1572,7 @@ function writeResult(result, json) {
       console.log(`Launch duty watch reload: ${handoff.reloadCommand}`);
       console.log(`Launch duty watch production signoff packet: ${handoff.productionSignoffPacketPath || "-"}`);
       console.log(`Launch duty watch archive index: ${handoff.archiveIndexPath || "-"}`);
+      console.log(`Launch duty watch record index: ${handoff.recordIndexFile || "-"}`);
       console.log(`Launch duty watch summary artifact: ${handoff.watchSummary?.artifactPath || "-"}`);
       console.log(`Launch duty watch summary command: ${handoff.watchSummary?.recordCommand || "-"}`);
       console.log(`Launch duty watch summary receipts: ${(handoff.watchSummary?.receiptOperations || []).join(", ") || "-"}`);

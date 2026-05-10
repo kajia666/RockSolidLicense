@@ -2784,6 +2784,9 @@ function buildStagingProductionSignoffPacket(result) {
   const launchDutyArchiveIndexPath = result.launchDutyArchiveIndexFile?.path
     || bindingFiles.get("launch_duty_archive_index")?.path
     || path.posix.join(archiveRoot, "staging-launch-duty-archive-index.json");
+  const launchDutyRecordIndexPath = result.launchDutyRecordIndexFile?.path
+    || bindingFiles.get("launch_duty_record_index")?.path
+    || path.posix.join(archiveRoot, "launch-duty-record-index.json");
   const canRunFullTestWindow = fullTestWindow.canRun === true;
   const canSignoff = productionSignoff.canSignoff === true;
   let status = "blocked_until_closeout_reload";
@@ -2922,6 +2925,7 @@ function buildStagingProductionSignoffPacket(result) {
     watchRecordDraftStatus: launchDayWatch.watchRecordDraft?.status || "not_available",
     archiveRoot,
     launchDutyArchiveIndexPath,
+    launchDutyRecordIndexPath,
     watchStartGate: launchDayWatch.watchStartGate || "production_signoff_readiness",
     requiredDecision: launchDayWatch.requiredDecision || productionSignoff.requiredDecision || "ready-for-production-signoff",
     productionDecision: launchDayWatch.productionDecision || productionSignoff.productionDecision || null,
@@ -5571,6 +5575,7 @@ function buildLaunchDutyArchiveTraceContext(result, { outputFiles = [], launchDu
     runRecordIndexPath: pathFor("run_record_index", "staging-run-record-index.json"),
     launchDutyArchiveIndexPath: launchDutyPacketFocus?.archiveIndexPath
       || pathFor("launch_duty_archive_index", "staging-launch-duty-archive-index.json"),
+    launchDutyRecordIndexPath: pathFor("launch_duty_record_index", "launch-duty-record-index.json"),
     productionSignoffPacketPath: launchDutyPacketFocus?.controlPaths?.productionSignoffPacket
       || pathFor("production_signoff_packet", "staging-production-signoff-packet.json"),
     runRecordIndexStatus: runRecordIndex?.status || null,
@@ -5599,6 +5604,7 @@ function attachLaunchDutyArchiveTrace(action, archiveContext = null) {
     archiveRoot: archiveContext.archiveRoot || null,
     runRecordIndexPath: archiveContext.runRecordIndexPath || null,
     launchDutyArchiveIndexPath: archiveContext.launchDutyArchiveIndexPath || null,
+    launchDutyRecordIndexPath: archiveContext.launchDutyRecordIndexPath || null,
     currentPacketPath: action.packetPath || null,
     currentRecordGroupKey,
     currentRecordGroupStatus: recordGroup.status || null,
@@ -8914,7 +8920,7 @@ function renderLaunchDutyActionConfirmationList(items = []) {
 }
 
 function renderLaunchDutyArchiveTrace(trace = {}) {
-  return `group=${trace.currentRecordGroupKey || "-"}, runRecord=${trace.runRecordIndexPath || "-"}, archiveIndex=${trace.launchDutyArchiveIndexPath || "-"}`;
+  return `group=${trace.currentRecordGroupKey || "-"}, runRecord=${trace.runRecordIndexPath || "-"}, archiveIndex=${trace.launchDutyArchiveIndexPath || "-"}, recordIndex=${trace.launchDutyRecordIndexPath || "-"}`;
 }
 
 function renderLaunchDutyRecordUpdates(items = []) {
@@ -9083,6 +9089,7 @@ function writeLaunchDayWatchBridgePlain(packet = {}) {
   console.log(`Launch-day watch bridge loaded closeout input: ${bridge.loadedCloseoutInputPath || "-"}`);
   console.log(`Launch-day watch bridge archive closeout input: ${bridge.archiveCloseoutInputPath || "-"}`);
   console.log(`Launch-day watch bridge archive index: ${bridge.launchDutyArchiveIndexPath || "-"}`);
+  console.log(`Launch-day watch bridge record index: ${bridge.launchDutyRecordIndexPath || "-"}`);
   console.log(`Launch-day watch bridge next action: ${bridge.nextAction || "-"}`);
 }
 
@@ -10062,6 +10069,7 @@ function renderStagingProductionSignoffPacket(packet) {
     lines.push(`- Launch-day watch bridge loaded closeout input: ${launchDayWatchBridge.loadedCloseoutInputPath || "-"}`);
     lines.push(`- Launch-day watch bridge archive closeout input: ${launchDayWatchBridge.archiveCloseoutInputPath || "-"}`);
     lines.push(`- Launch-day watch bridge archive index: ${launchDayWatchBridge.launchDutyArchiveIndexPath || "-"}`);
+    lines.push(`- Launch-day watch bridge record index: ${launchDayWatchBridge.launchDutyRecordIndexPath || "-"}`);
     lines.push(`- Launch-day watch evidence inputs: ${renderLaunchDutyRecordUpdates(launchDayWatchBridge.evidenceInputs || [])}`);
     if (Array.isArray(launchDayWatchBridge.escalationTriggers) && launchDayWatchBridge.escalationTriggers.length) {
       lines.push(`- Launch-day watch escalation triggers: ${launchDayWatchBridge.escalationTriggers.join(", ")}`);

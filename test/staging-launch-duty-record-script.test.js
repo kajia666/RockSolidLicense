@@ -237,6 +237,69 @@ test("staging launch duty record carries indexed source records into first-wave 
   }
 });
 
+test("staging launch duty record auto-fills first-wave closeout source records from index", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-launch-duty-record-closeout-autosource-"));
+  try {
+    const closeoutInputFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "filled-closeout-input.json");
+    const recordIndexFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "launch-duty-record-index.json");
+    const artifactRoot = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable");
+    const incidentPath = join(artifactRoot, "first-wave-incident-log.md");
+    const rollbackPath = join(artifactRoot, "rollback-signal-review.md");
+    const handoffPath = join(artifactRoot, "stabilization-owner-handoff.md");
+
+    for (const [key, artifactPath] of [
+      ["first_wave_incident_log", incidentPath],
+      ["rollback_signal_review", rollbackPath],
+      ["stabilization_owner_handoff", handoffPath]
+    ]) {
+      const result = runRecord([
+        "--closeout-input-file",
+        closeoutInputFile,
+        "--key",
+        key,
+        "--artifact-path",
+        artifactPath,
+        "--value-json",
+        `{"result":"recorded","summary":"redacted ${key}"}`,
+        "--record-index-file",
+        recordIndexFile
+      ]);
+
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+    }
+
+    const closeoutArtifactPath = join(artifactRoot, "first-wave-closeout.md");
+    const result = runRecord([
+      "--closeout-input-file",
+      closeoutInputFile,
+      "--key",
+      "first_wave_closeout",
+      "--artifact-path",
+      closeoutArtifactPath,
+      "--value-json",
+      "{\"result\":\"closed\",\"summary\":\"redacted closeout\"}",
+      "--record-index-file",
+      recordIndexFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.sourceRecords, [
+      { key: "first_wave_incident_log", path: incidentPath },
+      { key: "rollback_signal_review", path: rollbackPath },
+      { key: "stabilization_owner_handoff", path: handoffPath }
+    ]);
+
+    const artifact = readFileSync(closeoutArtifactPath, "utf8");
+    assert.match(artifact, /Source records: `first_wave_incident_log=.*first-wave-incident-log\.md; rollback_signal_review=.*rollback-signal-review\.md; stabilization_owner_handoff=.*stabilization-owner-handoff\.md`/);
+
+    const recordIndex = JSON.parse(readFileSync(recordIndexFile, "utf8"));
+    assert.deepEqual(recordIndex.records.first_wave_closeout.sourceRecords, output.sourceRecords);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging launch duty record writes first-wave closeout with source records in plain output", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-launch-duty-record-closeout-"));
   try {

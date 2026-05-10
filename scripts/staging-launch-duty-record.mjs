@@ -225,6 +225,19 @@ function requiredSourceRecordKeysMissing(target, sourceRecords) {
   return (target.sourceRecordKeys || []).filter((key) => !providedKeys.has(key));
 }
 
+function sourceRecordsWithIndexFallback(target, sourceRecords, records = {}) {
+  const sourceRecordsByKey = new Map(sourceRecords.map((item) => [item.key, item]));
+  for (const key of target.sourceRecordKeys || []) {
+    if (!sourceRecordsByKey.has(key) && records[key]?.artifactPath) {
+      sourceRecordsByKey.set(key, {
+        key,
+        path: records[key].artifactPath
+      });
+    }
+  }
+  return [...sourceRecordsByKey.values()];
+}
+
 function renderArtifactMarkdown({ key, target, artifactPath, value, receiptIds, sourceRecords }) {
   const lines = [
     "# Staging Launch Duty Record",
@@ -397,14 +410,18 @@ function buildResult(options) {
     throw new Error(`Unknown launch duty record key: ${options.key}`);
   }
   const value = JSON.parse(options.valueJson);
-  const sourceRecords = options.sourceRecords.map(parseSourceRecord);
+  const recordIndexFile = options.recordIndexFile || defaultRecordIndexFile(options.artifactPath);
+  const existingIndex = loadRecordIndex(recordIndexFile);
+  const sourceRecords = sourceRecordsWithIndexFallback(
+    target,
+    options.sourceRecords.map(parseSourceRecord),
+    existingIndex.records
+  );
   const missingSourceRecordKeys = requiredSourceRecordKeysMissing(target, sourceRecords);
   if (missingSourceRecordKeys.length) {
     throw new Error(`Missing required source records for ${options.key}: ${missingSourceRecordKeys.join(", ")}`);
   }
-  const recordIndexFile = options.recordIndexFile || defaultRecordIndexFile(options.artifactPath);
   const recordedAt = new Date().toISOString();
-  const existingIndex = loadRecordIndex(recordIndexFile);
   const recordIndexEntry = buildRecordIndexEntry({
     options,
     target,

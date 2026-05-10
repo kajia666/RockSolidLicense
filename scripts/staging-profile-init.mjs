@@ -227,6 +227,7 @@ function buildLaunchLaneFiles({
     backupRestoreArtifactFile,
     handoffFile: profile.handoffFile,
     launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
+    launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
     nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, and backup/restore evidence backfill."
   };
 }
@@ -246,6 +247,7 @@ function writeResult(result, json) {
       console.log(`Launch lane closeout input: ${files.closeoutInputFile}`);
       console.log(`Launch lane action queue: ${files.readinessActionQueueFile}`);
       console.log(`Launch lane backup/restore artifact: ${files.backupRestoreArtifactFile}`);
+      console.log(`Launch lane record index: ${files.launchDutyRecordIndexFile}`);
     }
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const closeoutInit = result.operatorNextCommands?.find((item) => item.key === "closeout_init");

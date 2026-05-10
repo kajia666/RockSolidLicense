@@ -468,6 +468,7 @@ test("staging signoff backfill prints launch-duty ready handoff after final rece
       actionQueueFile: actionsFile,
       productionSignoffPacketPath: "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json",
       launchDutyArchiveIndexPath: "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json",
+      launchDutyRecordIndexPath: "artifacts/staging/PILOT_ALPHA/stable/launch-duty-record-index.json",
       nextAction: "Run statusCommand to confirm launch-day watch readiness, then run reloadCommand and archive the production sign-off packet."
     });
 
@@ -485,6 +486,7 @@ test("staging signoff backfill prints launch-duty ready handoff after final rece
     assert.match(plainResult.stdout, /Launch duty reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input-plain\.json/);
     assert.match(plainResult.stdout, /Launch duty production signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(plainResult.stdout, /Launch duty archive index: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
+    assert.match(plainResult.stdout, /Launch duty record index: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
     assert.match(plainResult.stdout, /Launch duty next action: Run statusCommand to confirm launch-day watch readiness, then run reloadCommand and archive the production sign-off packet\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

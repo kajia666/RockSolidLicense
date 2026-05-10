@@ -319,6 +319,7 @@ function buildLaunchDutyReadyHandoff({
     actionQueueFile: actionsFile || null,
     productionSignoffPacketPath: path.posix.join(artifactRoot, "staging-production-signoff-packet.json"),
     launchDutyArchiveIndexPath: path.posix.join(artifactRoot, "staging-launch-duty-archive-index.json"),
+    launchDutyRecordIndexPath: path.posix.join(artifactRoot, "launch-duty-record-index.json"),
     nextAction: "Run statusCommand to confirm launch-day watch readiness, then run reloadCommand and archive the production sign-off packet."
   };
 }
@@ -457,6 +458,7 @@ function writeResult(result, json) {
       console.log(`Launch duty reload: ${handoff.reloadCommand}`);
       console.log(`Launch duty production signoff packet: ${handoff.productionSignoffPacketPath}`);
       console.log(`Launch duty archive index: ${handoff.launchDutyArchiveIndexPath}`);
+      console.log(`Launch duty record index: ${handoff.launchDutyRecordIndexPath}`);
       console.log(`Launch duty next action: ${handoff.nextAction}`);
     }
     console.log(`Backfilled status refresh: ${result.statusCommand}`);

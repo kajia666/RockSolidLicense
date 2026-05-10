@@ -178,6 +178,21 @@ test("staging readiness status points to full-test window after closeout is read
       output.nextStep.backfillCommand,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`
     );
+    assert.deepEqual(output.fullTestWindowHandoff, {
+      status: "ready_for_full_test_window",
+      currentActionKey: "run_full_test_window",
+      targetKey: "full_test_window_passed",
+      fullTestCommand: "npm.cmd test",
+      fullTestResultArtifactPath: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
+      signoffBackfillCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`,
+      signoffBackfillExampleCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json '{"result":"pass","command":"npm.cmd test","failureCount":0,"summary":"<redacted test summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/full-test-output.txt --decision ready-for-production-signoff`,
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+      reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`,
+      actionQueueFile: null,
+      expectedEvidence: "Attach the full `npm.cmd test` output summary and failure count.",
+      receiptOperations: [],
+      nextAction: "Run fullTestCommand, save fullTestResultArtifactPath, run signoffBackfillCommand with the redacted full-test result, then statusCommand."
+    });
     assert.deepEqual(output.operatorNextCommands, [
       {
         key: "run_full_test_window",
@@ -267,6 +282,15 @@ test("staging readiness status plain output prints full-test operator next comma
     assert.match(result.stdout, /Operator next blocked_after_full_test_window example: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key full_test_window_passed --value-json '\{"result":"pass","command":"npm\.cmd test","failureCount":0,"summary":"<redacted test summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Operator next blocked_after_full_test_window artifact: artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt/);
     assert.match(result.stdout, /Operator next blocked_after_full_test_backfill: refresh_readiness_status -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Full-test handoff: ready_for_full_test_window/);
+    assert.match(result.stdout, /Full-test current action: run_full_test_window/);
+    assert.match(result.stdout, /Full-test command: npm\.cmd test/);
+    assert.match(result.stdout, /Full-test result artifact: artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt/);
+    assert.match(result.stdout, /Full-test signoff backfill: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Full-test signoff example: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key full_test_window_passed --value-json '\{"result":"pass","command":"npm\.cmd test","failureCount":0,"summary":"<redacted test summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Full-test status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Full-test rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Full-test next action: Run fullTestCommand, save fullTestResultArtifactPath, run signoffBackfillCommand with the redacted full-test result, then statusCommand\./);
     assert.match(result.stdout, /Action file: .*readiness-action-queue\.md/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

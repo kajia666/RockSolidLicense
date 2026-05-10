@@ -751,6 +751,28 @@ function buildFullTestOperatorNextCommands(actionQueue) {
   ];
 }
 
+function buildFullTestWindowHandoff({ inputFile, actionsFile, actionQueue }) {
+  const item = actionQueue.find((entry) => entry.key === "run_full_test_window");
+  if (!item) {
+    return null;
+  }
+  return {
+    status: "ready_for_full_test_window",
+    currentActionKey: "run_full_test_window",
+    targetKey: item.targetKey || "full_test_window_passed",
+    fullTestCommand: item.command || "npm.cmd test",
+    fullTestResultArtifactPath: item.evidence?.artifactPathHint || null,
+    signoffBackfillCommand: item.followUpCommand || null,
+    signoffBackfillExampleCommand: item.followUpExampleCommand || null,
+    statusCommand: item.statusCommand || statusCommand(inputFile, actionsFile),
+    reloadCommand: reloadCommand(inputFile),
+    actionQueueFile: actionsFile || null,
+    expectedEvidence: item.evidence?.expectedEvidence || null,
+    receiptOperations: item.evidence?.receiptOperations || [],
+    nextAction: "Run fullTestCommand, save fullTestResultArtifactPath, run signoffBackfillCommand with the redacted full-test result, then statusCommand."
+  };
+}
+
 function productionSignoffActionKey(item) {
   if (item.key === "set_production_signoff_decision") {
     return "set_production_signoff_decision";
@@ -1172,6 +1194,9 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     ? buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot })
     : null;
   const operatorNextCommands = buildReadinessOperatorNextCommands({ currentGate, actionQueue });
+  const fullTestWindowHandoff = currentGate === "full_test_window"
+    ? buildFullTestWindowHandoff({ inputFile, actionsFile, actionQueue })
+    : null;
   const evidenceSummary = buildEvidenceSummary({
     closeoutFieldsByKey,
     signoffFieldsByKey,
@@ -1214,6 +1239,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
       }
     },
     evidenceSummary,
+    ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
     ...(operatorNextCommands?.length ? { operatorNextCommands } : {}),
     nextStep,
@@ -1257,6 +1283,20 @@ function writeResult(result, json) {
     console.log(`Next step: ${result.nextStep.key}`);
     console.log(result.nextStep.command);
     writeEvidenceSummaryPlain(result.evidenceSummary);
+    if (result.fullTestWindowHandoff) {
+      const handoff = result.fullTestWindowHandoff;
+      console.log(`Full-test handoff: ${handoff.status}`);
+      console.log(`Full-test current action: ${handoff.currentActionKey}`);
+      console.log(`Full-test command: ${handoff.fullTestCommand}`);
+      console.log(`Full-test result artifact: ${handoff.fullTestResultArtifactPath || "-"}`);
+      console.log(`Full-test signoff backfill: ${handoff.signoffBackfillCommand || "-"}`);
+      if (handoff.signoffBackfillExampleCommand) {
+        console.log(`Full-test signoff example: ${handoff.signoffBackfillExampleCommand}`);
+      }
+      console.log(`Full-test status refresh: ${handoff.statusCommand}`);
+      console.log(`Full-test rehearsal reload: ${handoff.reloadCommand}`);
+      console.log(`Full-test next action: ${handoff.nextAction}`);
+    }
     if (result.operatorNextCommands?.length) {
       for (const item of result.operatorNextCommands) {
         console.log(`Operator next ${item.status}: ${item.actionKey || item.key} -> ${item.command || item.artifactPathHint || "-"}`);

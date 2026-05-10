@@ -170,6 +170,31 @@ function buildEvidenceProgress({ acceptanceFields, statusCommand, outputFile, ac
   };
 }
 
+function buildFirstEvidenceBackfillHandoff({
+  evidenceProgress,
+  actionsFile,
+  rehearsalCommand
+}) {
+  if (!evidenceProgress?.firstBackfillCommand || !evidenceProgress.currentTarget) {
+    return null;
+  }
+  return {
+    status: "ready_for_first_closeout_backfill",
+    currentActionKey: "backfill_closeout_evidence",
+    statusCommand: evidenceProgress.statusCommand,
+    firstBackfillCommand: evidenceProgress.firstBackfillCommand,
+    firstBackfillTarget: {
+      key: evidenceProgress.currentTarget.key,
+      artifactPath: evidenceProgress.currentTarget.artifactPath,
+      sourceStep: evidenceProgress.currentTarget.sourceStep,
+      receiptOperations: evidenceProgress.currentTarget.receiptOperations
+    },
+    actionQueueFile: actionsFile || null,
+    reloadCommand: rehearsalCommand,
+    nextAction: "Run statusCommand, then firstBackfillCommand with real redacted evidence before the rehearsal reload."
+  };
+}
+
 function promoteDraft(draft, draftFile) {
   if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
     throw new Error("closeout draft must be a JSON object.");
@@ -213,6 +238,18 @@ function writeResult(result, json) {
         console.log(`First backfill command: ${progress.firstBackfillCommand}`);
       }
       console.log(`First target status check: ${progress.statusCommand}`);
+    }
+    if (result.firstEvidenceBackfillHandoff) {
+      const handoff = result.firstEvidenceBackfillHandoff;
+      console.log(`First evidence handoff: ${handoff.status}`);
+      console.log(`First evidence status refresh: ${handoff.statusCommand}`);
+      console.log(`First evidence backfill: ${handoff.firstBackfillCommand}`);
+      console.log(`First evidence target: ${handoff.firstBackfillTarget.key} -> ${handoff.firstBackfillTarget.artifactPath || "-"}`);
+      if (handoff.firstBackfillTarget.sourceStep) {
+        console.log(`First evidence source step: ${handoff.firstBackfillTarget.sourceStep}`);
+      }
+      console.log(`First evidence rehearsal reload: ${handoff.reloadCommand}`);
+      console.log(`First evidence next action: ${handoff.nextAction}`);
     }
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const firstBackfill = result.operatorNextCommands?.find((item) => item.key === "first_closeout_backfill");
@@ -260,6 +297,11 @@ function main() {
       outputFile,
       actionsFile
     });
+    const firstEvidenceBackfillHandoff = buildFirstEvidenceBackfillHandoff({
+      evidenceProgress,
+      actionsFile,
+      rehearsalCommand: nextCommand
+    });
     writeResult({
       status: "written",
       mode: "staging-closeout-init",
@@ -269,6 +311,7 @@ function main() {
       acceptanceFieldCount: acceptanceFields.length,
       placeholderCount,
       evidenceProgress,
+      ...(firstEvidenceBackfillHandoff ? { firstEvidenceBackfillHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,
       operatorNextCommands: buildOperatorNextCommands({

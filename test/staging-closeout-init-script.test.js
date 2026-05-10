@@ -156,6 +156,21 @@ test("staging closeout init promotes a draft without clearing closeout readiness
         statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
         nextAction: "Run statusCommand, then run firstBackfillCommand with real redacted evidence."
       },
+      firstEvidenceBackfillHandoff: {
+        status: "ready_for_first_closeout_backfill",
+        currentActionKey: "backfill_closeout_evidence",
+        statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
+        firstBackfillCommand: `npm.cmd run staging:closeout:backfill -- --input-file ${outputFile} --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/route_map_gate_result.txt --actions-file ${actionsFile}`,
+        firstBackfillTarget: {
+          key: "route_map_gate_result",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/route_map_gate_result.txt",
+          sourceStep: "source_route_map_gate_result",
+          receiptOperations: []
+        },
+        actionQueueFile: actionsFile,
+        reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`,
+        nextAction: "Run statusCommand, then firstBackfillCommand with real redacted evidence before the rehearsal reload."
+      },
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
       operatorNextCommands: [
@@ -233,6 +248,13 @@ test("staging closeout init prints ordered next commands in plain output", () =>
     assert.match(result.stdout, /First target source step: source_route_map_gate_result/);
     assert.match(result.stdout, /First backfill command: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route_map_gate_result\.txt --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /First target status check: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /First evidence handoff: ready_for_first_closeout_backfill/);
+    assert.match(result.stdout, /First evidence status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /First evidence backfill: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route_map_gate_result\.txt --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /First evidence target: route_map_gate_result -> artifacts\/staging\/PILOT_ALPHA\/stable\/route_map_gate_result\.txt/);
+    assert.match(result.stdout, /First evidence source step: source_route_map_gate_result/);
+    assert.match(result.stdout, /First evidence rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /First evidence next action: Run statusCommand, then firstBackfillCommand with real redacted evidence before the rehearsal reload\./);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
     assert.match(result.stdout, /First backfill after status: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route_map_gate_result\.txt --actions-file .*readiness-action-queue\.md/);

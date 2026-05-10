@@ -115,6 +115,14 @@ test("staging launch duty record writes a watch summary artifact and next comman
         ["rehearsal_reload", "blocked_after_readiness_status"]
       ]
     );
+    assert.deepEqual(
+      output.operatorNextCommands.map((item) => [item.key, item.recordIndexFile]),
+      [
+        ["next_launch_duty_record", recordIndexFile],
+        ["readiness_status", recordIndexFile],
+        ["rehearsal_reload", recordIndexFile]
+      ]
+    );
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -346,6 +354,10 @@ test("staging launch duty record writes first-wave closeout with source records 
     assert.match(result.stdout, /Launch duty record next command: -/);
     assert.match(result.stdout, /Launch duty record status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Launch duty record rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Launch duty operator next current: readiness_status -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch duty operator next current record index: .*launch-duty-record-index\.json/);
+    assert.match(result.stdout, /Launch duty operator next blocked_after_readiness_status: rehearsal_reload -> npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Launch duty operator next blocked_after_readiness_status record index: .*launch-duty-record-index\.json/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

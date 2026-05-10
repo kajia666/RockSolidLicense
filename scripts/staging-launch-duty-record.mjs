@@ -374,7 +374,7 @@ function writeRecordIndex(recordIndexFile, recordIndex) {
   writeFileSync(resolvedRecordIndexFile, `${JSON.stringify(recordIndex, null, 2)}\n`, "utf8");
 }
 
-function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefreshCommand, rehearsalReloadCommand, actionsFile, closeoutInputFile }) {
+function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefreshCommand, rehearsalReloadCommand, actionsFile, closeoutInputFile, recordIndexFile }) {
   const commands = [];
   if (nextRecordCommand) {
     commands.push({
@@ -382,6 +382,7 @@ function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefres
       status: "current",
       command: nextRecordCommand,
       artifactPath: nextRecord?.artifactPath || null,
+      recordIndexFile,
       nextAction: `Record ${nextRecord?.key || "the next launch-duty artifact"} before refreshing readiness status.`
     });
   }
@@ -391,6 +392,7 @@ function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefres
       status: nextRecordCommand ? "blocked_after_next_record" : "current",
       command: statusRefreshCommand,
       artifactPath: actionsFile || null,
+      recordIndexFile,
       nextAction: "Refresh the readiness action queue after this launch-duty record is written."
     },
     {
@@ -398,6 +400,7 @@ function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefres
       status: "blocked_after_readiness_status",
       command: rehearsalReloadCommand,
       artifactPath: closeoutInputFile,
+      recordIndexFile,
       nextAction: "Reload rehearsal so the launch-duty packet and archive index point at the latest record artifacts."
     }
   );
@@ -509,7 +512,8 @@ function buildResult(options) {
       statusRefreshCommand,
       rehearsalReloadCommand,
       actionsFile: options.actionsFile,
-      closeoutInputFile: options.closeoutInputFile
+      closeoutInputFile: options.closeoutInputFile,
+      recordIndexFile
     }),
     nextAction: nextRecord
       ? `Run nextRecordCommand for ${nextRecord.key}, then refresh readiness status.`
@@ -535,6 +539,10 @@ function writeResult(result, json) {
     console.log(`Launch duty record next command: ${result.nextRecordCommand || "-"}`);
     console.log(`Launch duty record status refresh: ${result.statusCommand}`);
     console.log(`Launch duty record rehearsal reload: ${result.rehearsalReloadCommand}`);
+    for (const item of result.operatorNextCommands || []) {
+      console.log(`Launch duty operator next ${item.status || "-"}: ${item.key || "-"} -> ${item.command || "-"}`);
+      console.log(`Launch duty operator next ${item.status || "-"} record index: ${item.recordIndexFile || "-"}`);
+    }
     console.log(`Launch duty record next action: ${result.nextAction}`);
     return;
   }

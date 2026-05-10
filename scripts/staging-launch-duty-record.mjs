@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+
+const RECORD_INDEX_FILE_NAME = "launch-duty-record-index.json";
 
 const RECORD_SEQUENCE = [
   "launch_day_watch_summary",
@@ -69,6 +71,7 @@ const OPTION_FLAGS = {
   "--key": "key",
   "--artifact-path": "artifactPath",
   "--value-json": "valueJson",
+  "--record-index-file": "recordIndexFile",
   "--receipt-id": "receiptIds",
   "--source-record": "sourceRecords"
 };
@@ -161,12 +164,23 @@ function nextArtifactPath(currentArtifactPath, nextKey) {
   return path.join(path.dirname(currentArtifactPath), target.fileName);
 }
 
-function buildRecordCommand({ closeoutInputFile, actionsFile, key, artifactPath }) {
+function defaultRecordIndexFile(artifactPath) {
+  if (!artifactPath) {
+    return RECORD_INDEX_FILE_NAME;
+  }
+  if (!path.isAbsolute(artifactPath) && artifactPath.includes("/")) {
+    return path.posix.join(path.posix.dirname(artifactPath.replaceAll("\\", "/")), RECORD_INDEX_FILE_NAME);
+  }
+  return path.join(path.dirname(artifactPath), RECORD_INDEX_FILE_NAME);
+}
+
+function buildRecordCommand({ closeoutInputFile, actionsFile, key, artifactPath, recordIndexFile }) {
   const target = LAUNCH_DUTY_RECORDS[key];
   if (!target) {
     return null;
   }
   const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
+  const recordIndexArg = recordIndexFile ? ` --record-index-file ${commandValue(recordIndexFile)}` : "";
   return [
     "npm.cmd run staging:launch-duty:record --",
     `--closeout-input-file ${commandValue(closeoutInputFile)}`,
@@ -175,6 +189,7 @@ function buildRecordCommand({ closeoutInputFile, actionsFile, key, artifactPath 
     "--value-json <redacted-json>",
     receiptIdArgs(target.receiptOperations).trimStart(),
     sourceRecordArgs(target.sourceRecordKeys).trimStart(),
+    recordIndexArg.trimStart(),
     actionsArg.trimStart()
   ].filter(Boolean).join(" ");
 }
@@ -225,6 +240,104 @@ function renderArtifactMarkdown({ key, target, artifactPath, value, receiptIds, 
   return `${lines.join("\n")}\n`;
 }
 
+function loadRecordIndex(recordIndexFile) {
+  const resolvedRecordIndexFile = path.resolve(recordIndexFile);
+  if (!existsSync(resolvedRecordIndexFile)) {
+    return {
+      mode: "staging-launch-duty-record-index",
+      version: 1,
+      records: {}
+    };
+  }
+  const payload = JSON.parse(readFileSync(resolvedRecordIndexFile, "utf8"));
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error(`launch duty record index must be a JSON object: ${recordIndexFile}`);
+  }
+  return {
+    ...payload,
+    records: payload.records && typeof payload.records === "object" && !Array.isArray(payload.records)
+      ? payload.records
+      : {}
+  };
+}
+
+function recordIndexProgress(records) {
+  const recordedKeys = RECORD_SEQUENCE.filter((key) => records[key]?.status === "recorded");
+  const pendingKeys = RECORD_SEQUENCE.filter((key) => !recordedKeys.includes(key));
+  return {
+    status: pendingKeys.length === 0 ? "complete" : "in_progress",
+    recordedKeys,
+    pendingKeys,
+    recordedCount: recordedKeys.length,
+    pendingCount: pendingKeys.length,
+    nextRecordKey: pendingKeys[0] || null
+  };
+}
+
+function buildIndexNextRecordCommand({ progress, options, recordIndexFile }) {
+  if (!progress.nextRecordKey) {
+    return null;
+  }
+  return buildRecordCommand({
+    closeoutInputFile: options.closeoutInputFile,
+    actionsFile: options.actionsFile,
+    key: progress.nextRecordKey,
+    artifactPath: nextArtifactPath(options.artifactPath, progress.nextRecordKey),
+    recordIndexFile
+  });
+}
+
+function buildRecordIndex({ options, target, value, sourceRecords, recordIndexFile, recordedAt, statusRefreshCommand, rehearsalReloadCommand }) {
+  const existingIndex = loadRecordIndex(recordIndexFile);
+  const records = {
+    ...existingIndex.records,
+    [options.key]: {
+      key: options.key,
+      status: "recorded",
+      actionKey: target.actionKey,
+      category: target.category,
+      artifactPath: options.artifactPath,
+      receiptOperations: target.receiptOperations,
+      receiptIds: options.receiptIds,
+      sourceRecords,
+      expectedEvidence: target.expectedEvidence,
+      value,
+      recordedAt
+    }
+  };
+  const progress = recordIndexProgress(records);
+  const nextRecordCommand = buildIndexNextRecordCommand({ progress, options, recordIndexFile });
+  return {
+    ...existingIndex,
+    mode: "staging-launch-duty-record-index",
+    version: 1,
+    status: progress.status,
+    closeoutInputFile: options.closeoutInputFile,
+    actionsFile: options.actionsFile || null,
+    recordIndexFile,
+    updatedRecordKey: options.key,
+    updatedAt: recordedAt,
+    recordedKeys: progress.recordedKeys,
+    pendingKeys: progress.pendingKeys,
+    recordedCount: progress.recordedCount,
+    pendingCount: progress.pendingCount,
+    nextRecordKey: progress.nextRecordKey,
+    nextRecordCommand,
+    statusCommand: statusRefreshCommand,
+    rehearsalReloadCommand,
+    records,
+    nextAction: nextRecordCommand
+      ? `Run nextRecordCommand for ${progress.nextRecordKey}, then refresh readiness status.`
+      : "Refresh readiness status, then reload rehearsal for the latest launch-duty archive."
+  };
+}
+
+function writeRecordIndex(recordIndexFile, recordIndex) {
+  const resolvedRecordIndexFile = path.resolve(recordIndexFile);
+  mkdirSync(path.dirname(resolvedRecordIndexFile), { recursive: true });
+  writeFileSync(resolvedRecordIndexFile, `${JSON.stringify(recordIndex, null, 2)}\n`, "utf8");
+}
+
 function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefreshCommand, rehearsalReloadCommand, actionsFile, closeoutInputFile }) {
   const commands = [];
   if (nextRecordCommand) {
@@ -262,6 +375,8 @@ function buildResult(options) {
   }
   const value = JSON.parse(options.valueJson);
   const sourceRecords = options.sourceRecords.map(parseSourceRecord);
+  const recordIndexFile = options.recordIndexFile || defaultRecordIndexFile(options.artifactPath);
+  const recordedAt = new Date().toISOString();
   const artifactPath = path.resolve(options.artifactPath);
   mkdirSync(path.dirname(artifactPath), { recursive: true });
   writeFileSync(artifactPath, renderArtifactMarkdown({
@@ -290,11 +405,23 @@ function buildResult(options) {
       closeoutInputFile: options.closeoutInputFile,
       actionsFile: options.actionsFile,
       key: nextRecord.key,
-      artifactPath: nextRecord.artifactPath
+      artifactPath: nextRecord.artifactPath,
+      recordIndexFile
     })
     : null;
   const statusRefreshCommand = statusCommand(options.closeoutInputFile, options.actionsFile);
   const rehearsalReloadCommand = reloadCommand(options.closeoutInputFile);
+  const recordIndex = buildRecordIndex({
+    options,
+    target,
+    value,
+    sourceRecords,
+    recordIndexFile,
+    recordedAt,
+    statusRefreshCommand,
+    rehearsalReloadCommand
+  });
+  writeRecordIndex(recordIndexFile, recordIndex);
   return {
     status: "written",
     mode: "staging-launch-duty-record",
@@ -309,6 +436,14 @@ function buildResult(options) {
     sourceRecords,
     expectedEvidence: target.expectedEvidence,
     value,
+    recordedAt,
+    recordIndex: {
+      path: recordIndexFile,
+      status: recordIndex.status,
+      recordedCount: recordIndex.recordedCount,
+      pendingCount: recordIndex.pendingCount,
+      nextRecordKey: recordIndex.nextRecordKey
+    },
     nextRecord,
     nextRecordCommand,
     statusCommand: statusRefreshCommand,
@@ -338,6 +473,10 @@ function writeResult(result, json) {
     console.log(`Launch duty record artifact: ${result.artifactPath}`);
     console.log(`Launch duty record receipts: ${result.receiptIds.join(", ") || "-"}`);
     console.log(`Launch duty record source records: ${renderSourceRecords(result.sourceRecords)}`);
+    console.log(`Launch duty record index: ${result.recordIndex?.path || "-"}`);
+    console.log(`Launch duty record index status: ${result.recordIndex?.status || "-"}`);
+    console.log(`Launch duty record index progress: ${result.recordIndex?.recordedCount || 0}/6 recorded, ${result.recordIndex?.pendingCount || 0} pending`);
+    console.log(`Launch duty record index next key: ${result.recordIndex?.nextRecordKey || "-"}`);
     console.log(`Launch duty record next command: ${result.nextRecordCommand || "-"}`);
     console.log(`Launch duty record status refresh: ${result.statusCommand}`);
     console.log(`Launch duty record rehearsal reload: ${result.rehearsalReloadCommand}`);

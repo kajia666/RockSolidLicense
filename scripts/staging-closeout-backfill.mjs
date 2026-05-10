@@ -12,6 +12,8 @@ const OPTION_FLAGS = {
   "--actions-file": "actionsFile"
 };
 
+const DEFAULT_ARTIFACT_ROOT = "artifacts/staging/<productCode>/<channel>";
+
 function requireArgValue(name, value, inlineValue) {
   const missingValue = value === undefined
     || value === null
@@ -68,6 +70,29 @@ function commandValue(value) {
 function statusCommand(outputFile, actionsFile = null) {
   const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
   return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(outputFile)}${actionsArg}`;
+}
+
+function artifactRootFromPath(value) {
+  const parts = path.resolve(value).replaceAll("\\", "/").split("/").filter(Boolean);
+  for (let index = 0; index < parts.length - 3; index += 1) {
+    if (parts[index] === "artifacts" && parts[index + 1] === "staging" && parts[index + 2] && parts[index + 3]) {
+      return `artifacts/staging/${parts[index + 2]}/${parts[index + 3]}`;
+    }
+  }
+  return DEFAULT_ARTIFACT_ROOT;
+}
+
+function signoffBackfillCommand({ outputFile, artifactRoot, actionsFile = null }) {
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
+  return [
+    "npm.cmd run staging:signoff:backfill --",
+    `--input-file ${commandValue(outputFile)}`,
+    "--condition-key full_test_window_passed",
+    "--value-json <redacted-json>",
+    `--artifact-path ${path.posix.join(artifactRoot, "full-test-output.txt")}`,
+    "--decision ready-for-production-signoff",
+    actionsArg.trimStart()
+  ].filter(Boolean).join(" ");
 }
 
 function receiptIdArgs(receiptOperations = []) {
@@ -236,6 +261,32 @@ function buildEvidenceProgress({ fields, outputFile, actionsFile, readinessStatu
   };
 }
 
+function buildFullTestReadyHandoff({
+  outputFile,
+  actionsFile,
+  artifactRoot,
+  closeoutDecision,
+  readinessStatusCommand,
+  rehearsalCommand,
+  evidenceProgress
+}) {
+  if (closeoutDecision !== "ready-for-full-test-window" || evidenceProgress?.status !== "filled") {
+    return null;
+  }
+  return {
+    status: "ready_for_full_test_window",
+    currentActionKey: "run_full_test_window",
+    statusCommand: readinessStatusCommand,
+    reloadCommand: rehearsalCommand,
+    actionQueueFile: actionsFile || null,
+    fullTestCommand: "npm.cmd test",
+    fullTestResultArtifactPath: path.posix.join(artifactRoot, "full-test-output.txt"),
+    productionSignoffPacketPath: path.posix.join(artifactRoot, "staging-production-signoff-packet.json"),
+    signoffBackfillCommand: signoffBackfillCommand({ outputFile, artifactRoot, actionsFile }),
+    nextAction: "Run statusCommand to confirm full-test readiness, run fullTestCommand, then use signoffBackfillCommand with the redacted full-test result."
+  };
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -265,6 +316,17 @@ function writeResult(result, json) {
       if (progress.nextBackfillCommand) {
         console.log(`Next backfill command: ${progress.nextBackfillCommand}`);
       }
+    }
+    if (result.fullTestReadyHandoff) {
+      const handoff = result.fullTestReadyHandoff;
+      console.log(`Full-test readiness: ${handoff.status}`);
+      console.log(`Full-test status refresh: ${handoff.statusCommand}`);
+      console.log(`Full-test rehearsal reload: ${handoff.reloadCommand}`);
+      console.log(`Full-test command: ${handoff.fullTestCommand}`);
+      console.log(`Full-test result artifact: ${handoff.fullTestResultArtifactPath}`);
+      console.log(`Production signoff packet: ${handoff.productionSignoffPacketPath}`);
+      console.log(`Full-test signoff backfill: ${handoff.signoffBackfillCommand}`);
+      console.log(`Full-test next action: ${handoff.nextAction}`);
     }
     console.log(`Backfilled status refresh: ${result.statusCommand}`);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
@@ -307,11 +369,21 @@ function main() {
     const filledFieldCount = fields.filter(isFilled).length;
     const nextCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(outputFile)}`;
     const nextStatusCommand = statusCommand(outputFile, actionsFile);
+    const artifactRoot = artifactRootFromPath(outputFile);
     const evidenceProgress = buildEvidenceProgress({
       fields,
       outputFile,
       actionsFile,
       readinessStatusCommand: nextStatusCommand
+    });
+    const fullTestReadyHandoff = buildFullTestReadyHandoff({
+      outputFile,
+      actionsFile,
+      artifactRoot,
+      closeoutDecision: nextPayload.decision || null,
+      readinessStatusCommand: nextStatusCommand,
+      rehearsalCommand: nextCommand,
+      evidenceProgress
     });
     writeResult({
       status: "written",
@@ -326,6 +398,7 @@ function main() {
       filledFieldCount,
       remainingPlaceholderCount: fields.length - filledFieldCount,
       evidenceProgress,
+      ...(fullTestReadyHandoff ? { fullTestReadyHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,
       operatorNextCommands: buildOperatorNextCommands({

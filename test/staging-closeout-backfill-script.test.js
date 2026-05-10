@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,6 +83,29 @@ function writeCloseoutInput(file) {
       key,
       status: "pending_operator_entry",
       value: null,
+      sourceStep: key === "operator_go_no_go" ? "backfill_filled_closeout_input" : `source_${key}`,
+      artifactPath: `artifacts/staging/PILOT_ALPHA/stable/${key}.txt`,
+      receiptOperations: [],
+      operatorNote: "Replace null with real redacted staging evidence."
+    })),
+    receiptVisibility: {},
+    productionSignoff: {
+      decision: null,
+      conditions: []
+    }
+  };
+  writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+function writeAlmostFullTestReadyInput(file) {
+  const payload = {
+    mode: "staging-closeout-input-draft",
+    status: "awaiting_go_no_go",
+    decision: null,
+    acceptanceFields: closeoutKeys.map((key) => ({
+      key,
+      status: key === "operator_go_no_go" ? "pending_operator_entry" : "filled",
+      value: key === "operator_go_no_go" ? null : { result: "pass" },
       sourceStep: key === "operator_go_no_go" ? "backfill_filled_closeout_input" : `source_${key}`,
       artifactPath: `artifacts/staging/PILOT_ALPHA/stable/${key}.txt`,
       receiptOperations: [],
@@ -287,6 +310,73 @@ test("staging closeout backfill promotes object operator go/no-go evidence to th
       summary: "redacted go/no-go approval",
       artifactPath: "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md"
     });
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging closeout backfill prints full-test handoff after final go/no-go evidence", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-backfill-full-test-ready-"));
+  try {
+    const closeoutInputFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "filled-closeout-input.json");
+    const plainCloseoutInputFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "filled-closeout-input-plain.json");
+    const actionsFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "readiness-action-queue.md");
+    mkdirSync(dirname(closeoutInputFile), { recursive: true });
+    writeAlmostFullTestReadyInput(closeoutInputFile);
+    writeAlmostFullTestReadyInput(plainCloseoutInputFile);
+
+    const backfillArgs = [
+      "--actions-file",
+      actionsFile,
+      "--key",
+      "operator_go_no_go",
+      "--value-json",
+      "{\"decision\":\"ready-for-full-test-window\",\"operator\":\"launch-duty\",\"summary\":\"redacted go/no-go approval\"}",
+      "--artifact-path",
+      "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md"
+    ];
+    const result = runBackfill([
+      "--input-file",
+      closeoutInputFile,
+      ...backfillArgs
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.remainingPlaceholderCount, 0);
+    assert.equal(output.evidenceProgress.status, "filled");
+    assert.equal(output.evidenceProgress.nextBackfillCommand, null);
+    assert.deepEqual(output.fullTestReadyHandoff, {
+      status: "ready_for_full_test_window",
+      currentActionKey: "run_full_test_window",
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      actionQueueFile: actionsFile,
+      fullTestCommand: "npm.cmd test",
+      fullTestResultArtifactPath: "artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt",
+      productionSignoffPacketPath: "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json",
+      signoffBackfillCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt --decision ready-for-production-signoff --actions-file ${actionsFile}`,
+      nextAction: "Run statusCommand to confirm full-test readiness, run fullTestCommand, then use signoffBackfillCommand with the redacted full-test result."
+    });
+
+    const plainResult = runBackfillPlain([
+      "--input-file",
+      plainCloseoutInputFile,
+      ...backfillArgs
+    ]);
+
+    assert.equal(plainResult.status, 0, plainResult.stderr || plainResult.stdout);
+    assert.equal(plainResult.stderr, "");
+    assert.match(plainResult.stdout, /Closeout evidence progress: 7\/7 filled, 0 pending/);
+    assert.match(plainResult.stdout, /Full-test readiness: ready_for_full_test_window/);
+    assert.match(plainResult.stdout, /Full-test status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input-plain\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(plainResult.stdout, /Full-test rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input-plain\.json/);
+    assert.match(plainResult.stdout, /Full-test command: npm\.cmd test/);
+    assert.match(plainResult.stdout, /Full-test result artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt/);
+    assert.match(plainResult.stdout, /Production signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(plainResult.stdout, /Full-test signoff backfill: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input-plain\.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
+    assert.match(plainResult.stdout, /Full-test next action: Run statusCommand to confirm full-test readiness, run fullTestCommand, then use signoffBackfillCommand with the redacted full-test result\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

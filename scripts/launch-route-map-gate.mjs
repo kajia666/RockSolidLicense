@@ -207,6 +207,18 @@ const commands = [
     ]
   },
   {
+    key: "staging_launch_duty_record_script",
+    label: "Staging launch-duty record artifact continuity",
+    command: "node",
+    executable: process.execPath,
+    args: [
+      "--test",
+      "--test-concurrency=1",
+      "--test-isolation=none",
+      "test/staging-launch-duty-record-script.test.js"
+    ]
+  },
+  {
     key: "staging_rehearsal_syntax_check",
     label: "Staging rehearsal script syntax check",
     command: "node",

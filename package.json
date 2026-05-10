@@ -18,6 +18,7 @@
     "staging:closeout:init": "node scripts/staging-closeout-init.mjs",
     "staging:closeout:backfill": "node scripts/staging-closeout-backfill.mjs",
     "staging:signoff:backfill": "node scripts/staging-signoff-backfill.mjs",
+    "staging:launch-duty:record": "node scripts/staging-launch-duty-record.mjs",
     "staging:readiness:status": "node scripts/staging-readiness-status.mjs",
     "launch:smoke": "node scripts/launch-smoke.mjs",
     "launch:smoke:staging": "node scripts/launch-smoke.mjs --require-https",

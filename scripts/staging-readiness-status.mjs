@@ -456,6 +456,38 @@ function commandForReceiptLaneExample(inputFile, key, evidence, actionsFile = nu
   return `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane ${key}${evidenceArgs(evidence)}${actionsFileArgs(actionsFile)}`;
 }
 
+function sourceRecordArgs(sourceRecordKeys = []) {
+  return sourceRecordKeys.map((key) => ` --source-record ${key}=<${key}-artifact-path>`).join("");
+}
+
+function commandForLaunchDutyRecord(inputFile, key, evidence, actionsFile = null, sourceRecordKeys = []) {
+  const artifactArg = evidence?.artifactPathHint ? ` --artifact-path ${evidence.artifactPathHint}` : "";
+  return [
+    "npm.cmd run staging:launch-duty:record --",
+    `--closeout-input-file ${inputFile}`,
+    `--key ${key}`,
+    artifactArg.trimStart(),
+    "--value-json <redacted-json>",
+    receiptIdArgs(evidence?.receiptOperations || []).trimStart(),
+    sourceRecordArgs(sourceRecordKeys).trimStart(),
+    actionsFileArgs(actionsFile).trimStart()
+  ].filter(Boolean).join(" ");
+}
+
+function commandForLaunchDutyRecordExample(inputFile, key, evidence, actionsFile = null, sourceRecordKeys = []) {
+  const artifactArg = evidence?.artifactPathHint ? ` --artifact-path ${evidence.artifactPathHint}` : "";
+  return [
+    "npm.cmd run staging:launch-duty:record --",
+    `--closeout-input-file ${inputFile}`,
+    `--key ${key}`,
+    artifactArg.trimStart(),
+    `--value-json ${quoteValueJson(evidence?.valueJsonExample || { result: "recorded" })}`,
+    receiptIdArgs(evidence?.receiptOperations || []).trimStart(),
+    sourceRecordArgs(sourceRecordKeys).trimStart(),
+    actionsFileArgs(actionsFile).trimStart()
+  ].filter(Boolean).join(" ");
+}
+
 function reloadCommand(inputFile) {
   return `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`;
 }
@@ -470,6 +502,9 @@ function queueStatus(index) {
 }
 
 function buildLaunchDutyReadyActionQueue({ inputFile, actionsFile, artifactPathRoot }) {
+  const watchEvidence = evidenceForLaunchDutyFollowUp("launch_day_watch_summary", artifactPathRoot);
+  const firstWaveEvidence = evidenceForLaunchDutyFollowUp("first_wave_closeout", artifactPathRoot);
+  const firstWaveSourceRecordKeys = ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"];
   const localStatusCommand = statusCommand(inputFile, actionsFile);
   return [
     {
@@ -488,7 +523,9 @@ function buildLaunchDutyReadyActionQueue({ inputFile, actionsFile, artifactPathR
       status: "blocked_after_prior_actions",
       targetKey: "launch_day_watch_summary",
       actionKey: "record_launch_day_watch_summary",
-      evidence: evidenceForLaunchDutyFollowUp("launch_day_watch_summary", artifactPathRoot),
+      command: commandForLaunchDutyRecord(inputFile, "launch_day_watch_summary", watchEvidence, actionsFile),
+      exampleCommand: commandForLaunchDutyRecordExample(inputFile, "launch_day_watch_summary", watchEvidence, actionsFile),
+      evidence: watchEvidence,
       operatorInstruction: "Record launch-day watch summary and attach the cutover/readiness receipt IDs after the rehearsal packet is regenerated.",
       statusCommand: localStatusCommand
     },
@@ -498,8 +535,10 @@ function buildLaunchDutyReadyActionQueue({ inputFile, actionsFile, artifactPathR
       status: "blocked_after_prior_actions",
       targetKey: "first_wave_closeout",
       actionKey: "close_first_wave",
-      evidence: evidenceForLaunchDutyFollowUp("first_wave_closeout", artifactPathRoot),
-      sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"],
+      command: commandForLaunchDutyRecord(inputFile, "first_wave_closeout", firstWaveEvidence, actionsFile, firstWaveSourceRecordKeys),
+      exampleCommand: commandForLaunchDutyRecordExample(inputFile, "first_wave_closeout", firstWaveEvidence, actionsFile, firstWaveSourceRecordKeys),
+      evidence: firstWaveEvidence,
+      sourceRecordKeys: firstWaveSourceRecordKeys,
       operatorInstruction: "Close the first wave after incident, rollback, and stabilization owner records are attached.",
       statusCommand: localStatusCommand
     }
@@ -662,6 +701,8 @@ function buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot }) {
       status: launchDutyOperatorStatus(item, offset + 1),
       phase: item.phase,
       actionKey: item.actionKey || null,
+      recordCommand: item.command || null,
+      exampleCommand: item.exampleCommand || null,
       artifactPath: item.evidence?.artifactPathHint || null,
       receiptOperations: item.evidence?.receiptOperations || [],
       sourceRecordKeys: item.sourceRecordKeys || [],
@@ -693,6 +734,7 @@ function buildLaunchDutyWatchHandoff({ inputFile, actionsFile, launchDutyNextRun
     watchSummary: {
       actionKey: watchAction.actionKey || "record_launch_day_watch_summary",
       artifactPath: watchAction.artifactPath || launchDutyNextRun.artifactPathHints?.launchDayWatchSummary || null,
+      recordCommand: watchAction.recordCommand || null,
       receiptOperations: watchAction.receiptOperations || launchDutyNextRun.receiptOperations?.launchDayWatchSummary || [],
       expectedEvidence: watchAction.expectedEvidence || null,
       nextAction: watchAction.nextAction || null
@@ -700,6 +742,7 @@ function buildLaunchDutyWatchHandoff({ inputFile, actionsFile, launchDutyNextRun
     firstWaveCloseout: {
       actionKey: firstWaveAction.actionKey || "close_first_wave",
       artifactPath: firstWaveAction.artifactPath || launchDutyNextRun.artifactPathHints?.firstWaveCloseout || null,
+      recordCommand: firstWaveAction.recordCommand || null,
       receiptOperations: firstWaveAction.receiptOperations || launchDutyNextRun.receiptOperations?.firstWaveCloseout || [],
       sourceRecordKeys: firstWaveAction.sourceRecordKeys || launchDutyNextRun.sourceRecordKeys || [],
       expectedEvidence: firstWaveAction.expectedEvidence || null,
@@ -1059,8 +1102,10 @@ function renderActionQueueMarkdown(result) {
       lines.push(`Handoff production sign-off packet: \`${handoff.productionSignoffPacketPath || "-"}\``);
       lines.push(`Handoff archive index: \`${handoff.archiveIndexPath || "-"}\``);
       lines.push(`Watch summary artifact: \`${handoff.watchSummary?.artifactPath || "-"}\``);
+      lines.push(`Watch summary command: \`${handoff.watchSummary?.recordCommand || "-"}\``);
       lines.push(`Watch summary receipts: ${receiptText(handoff.watchSummary?.receiptOperations)}`);
       lines.push(`Handoff first-wave closeout artifact: \`${handoff.firstWaveCloseout?.artifactPath || "-"}\``);
+      lines.push(`Handoff first-wave closeout command: \`${handoff.firstWaveCloseout?.recordCommand || "-"}\``);
       lines.push(`Handoff first-wave closeout receipts: ${receiptText(handoff.firstWaveCloseout?.receiptOperations)}`);
       lines.push(`Handoff first-wave source records: ${receiptText(handoff.firstWaveCloseout?.sourceRecordKeys)}`);
       lines.push(`Handoff next action: ${handoff.nextAction || "-"}`);
@@ -1497,8 +1542,10 @@ function writeResult(result, json) {
       console.log(`Launch duty watch production signoff packet: ${handoff.productionSignoffPacketPath || "-"}`);
       console.log(`Launch duty watch archive index: ${handoff.archiveIndexPath || "-"}`);
       console.log(`Launch duty watch summary artifact: ${handoff.watchSummary?.artifactPath || "-"}`);
+      console.log(`Launch duty watch summary command: ${handoff.watchSummary?.recordCommand || "-"}`);
       console.log(`Launch duty watch summary receipts: ${(handoff.watchSummary?.receiptOperations || []).join(", ") || "-"}`);
       console.log(`Launch duty first-wave closeout artifact: ${handoff.firstWaveCloseout?.artifactPath || "-"}`);
+      console.log(`Launch duty first-wave closeout command: ${handoff.firstWaveCloseout?.recordCommand || "-"}`);
       console.log(`Launch duty first-wave closeout receipts: ${(handoff.firstWaveCloseout?.receiptOperations || []).join(", ") || "-"}`);
       console.log(`Launch duty first-wave source records: ${(handoff.firstWaveCloseout?.sourceRecordKeys || []).join(", ") || "-"}`);
       console.log(`Launch duty watch next action: ${handoff.nextAction}`);

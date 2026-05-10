@@ -677,6 +677,38 @@ function buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot }) {
   };
 }
 
+function buildLaunchDutyWatchHandoff({ inputFile, actionsFile, launchDutyNextRun }) {
+  if (!launchDutyNextRun) {
+    return null;
+  }
+  const watchAction = launchDutyNextRun.postArchiveEvidenceActions?.find((item) => item.actionKey === "record_launch_day_watch_summary") || {};
+  const firstWaveAction = launchDutyNextRun.postArchiveEvidenceActions?.find((item) => item.actionKey === "close_first_wave") || {};
+  return {
+    status: "ready_for_launch_day_watch",
+    currentActionKey: launchDutyNextRun.currentActionKey || "archive_production_signoff",
+    reloadCommand: launchDutyNextRun.reloadCommand || reloadCommand(inputFile),
+    actionQueueFile: actionsFile || null,
+    productionSignoffPacketPath: launchDutyNextRun.productionSignoffArchive?.packetPath || null,
+    archiveIndexPath: launchDutyNextRun.productionSignoffArchive?.archiveIndexPath || null,
+    watchSummary: {
+      actionKey: watchAction.actionKey || "record_launch_day_watch_summary",
+      artifactPath: watchAction.artifactPath || launchDutyNextRun.artifactPathHints?.launchDayWatchSummary || null,
+      receiptOperations: watchAction.receiptOperations || launchDutyNextRun.receiptOperations?.launchDayWatchSummary || [],
+      expectedEvidence: watchAction.expectedEvidence || null,
+      nextAction: watchAction.nextAction || null
+    },
+    firstWaveCloseout: {
+      actionKey: firstWaveAction.actionKey || "close_first_wave",
+      artifactPath: firstWaveAction.artifactPath || launchDutyNextRun.artifactPathHints?.firstWaveCloseout || null,
+      receiptOperations: firstWaveAction.receiptOperations || launchDutyNextRun.receiptOperations?.firstWaveCloseout || [],
+      sourceRecordKeys: firstWaveAction.sourceRecordKeys || launchDutyNextRun.sourceRecordKeys || [],
+      expectedEvidence: firstWaveAction.expectedEvidence || null,
+      nextAction: firstWaveAction.nextAction || null
+    },
+    nextAction: "Run reloadCommand, archive production sign-off, record launch_day_watch_summary, then close first-wave."
+  };
+}
+
 function launchDutyOperatorStatus(item, index) {
   if (index === 0) {
     return "current";
@@ -1016,6 +1048,23 @@ function renderActionQueueMarkdown(result) {
     lines.push(`Follow-up action keys: ${(nextRun.actionKeys || []).join(", ") || "-"}`);
     lines.push(`Watch artifact: \`${nextRun.artifactPathHints?.launchDayWatchSummary || "-"}\``);
     lines.push(`First-wave closeout artifact: \`${nextRun.artifactPathHints?.firstWaveCloseout || "-"}\``);
+    if (result.launchDutyWatchHandoff) {
+      const handoff = result.launchDutyWatchHandoff;
+      lines.push("");
+      lines.push("## Launch Duty Watch Handoff");
+      lines.push("");
+      lines.push(`Handoff status: \`${handoff.status || "-"}\``);
+      lines.push(`Handoff current action: \`${handoff.currentActionKey || "-"}\``);
+      lines.push(`Handoff reload command: \`${handoff.reloadCommand || "-"}\``);
+      lines.push(`Handoff production sign-off packet: \`${handoff.productionSignoffPacketPath || "-"}\``);
+      lines.push(`Handoff archive index: \`${handoff.archiveIndexPath || "-"}\``);
+      lines.push(`Watch summary artifact: \`${handoff.watchSummary?.artifactPath || "-"}\``);
+      lines.push(`Watch summary receipts: ${receiptText(handoff.watchSummary?.receiptOperations)}`);
+      lines.push(`Handoff first-wave closeout artifact: \`${handoff.firstWaveCloseout?.artifactPath || "-"}\``);
+      lines.push(`Handoff first-wave closeout receipts: ${receiptText(handoff.firstWaveCloseout?.receiptOperations)}`);
+      lines.push(`Handoff first-wave source records: ${receiptText(handoff.firstWaveCloseout?.sourceRecordKeys)}`);
+      lines.push(`Handoff next action: ${handoff.nextAction || "-"}`);
+    }
     if (result.operatorNextCommands?.length) {
       lines.push("Operator next commands:");
       for (const item of result.operatorNextCommands) {
@@ -1246,6 +1295,9 @@ function buildStatus(payload, inputFile, actionsFile = null) {
   const launchDutyNextRun = canSignoffProduction
     ? buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot })
     : null;
+  const launchDutyWatchHandoff = launchDutyNextRun
+    ? buildLaunchDutyWatchHandoff({ inputFile, actionsFile, launchDutyNextRun })
+    : null;
   const operatorNextCommands = buildReadinessOperatorNextCommands({ currentGate, actionQueue });
   const fullTestWindowHandoff = currentGate === "full_test_window"
     ? buildFullTestWindowHandoff({ inputFile, actionsFile, actionQueue })
@@ -1302,6 +1354,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
     ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
     ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
+    ...(launchDutyWatchHandoff ? { launchDutyWatchHandoff } : {}),
     ...(operatorNextCommands?.length ? { operatorNextCommands } : {}),
     nextStep,
     actionQueue
@@ -1435,6 +1488,20 @@ function writeResult(result, json) {
       console.log(`Launch duty first-wave receipts: ${(nextRun.receiptOperations?.firstWaveCloseout || []).join(", ") || "-"}`);
       console.log(`Launch duty first-wave source records: ${(nextRun.sourceRecordKeys || []).join(", ") || "-"}`);
       console.log(`Launch duty next action: ${nextRun.nextAction || "-"}`);
+    }
+    if (result.launchDutyWatchHandoff) {
+      const handoff = result.launchDutyWatchHandoff;
+      console.log(`Launch duty watch handoff: ${handoff.status}`);
+      console.log(`Launch duty watch current action: ${handoff.currentActionKey}`);
+      console.log(`Launch duty watch reload: ${handoff.reloadCommand}`);
+      console.log(`Launch duty watch production signoff packet: ${handoff.productionSignoffPacketPath || "-"}`);
+      console.log(`Launch duty watch archive index: ${handoff.archiveIndexPath || "-"}`);
+      console.log(`Launch duty watch summary artifact: ${handoff.watchSummary?.artifactPath || "-"}`);
+      console.log(`Launch duty watch summary receipts: ${(handoff.watchSummary?.receiptOperations || []).join(", ") || "-"}`);
+      console.log(`Launch duty first-wave closeout artifact: ${handoff.firstWaveCloseout?.artifactPath || "-"}`);
+      console.log(`Launch duty first-wave closeout receipts: ${(handoff.firstWaveCloseout?.receiptOperations || []).join(", ") || "-"}`);
+      console.log(`Launch duty first-wave source records: ${(handoff.firstWaveCloseout?.sourceRecordKeys || []).join(", ") || "-"}`);
+      console.log(`Launch duty watch next action: ${handoff.nextAction}`);
     }
     if (result.actionsFile) {
       console.log(`Action file: ${result.actionsFile.path}`);

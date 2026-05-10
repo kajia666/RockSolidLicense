@@ -215,6 +215,11 @@ function renderSourceRecords(sourceRecords = []) {
   return sourceRecords.map((item) => `${item.key}${item.path ? `=${item.path}` : ""}`).join("; ");
 }
 
+function requiredSourceRecordKeysMissing(target, sourceRecords) {
+  const providedKeys = new Set(sourceRecords.map((item) => item.key).filter(Boolean));
+  return (target.sourceRecordKeys || []).filter((key) => !providedKeys.has(key));
+}
+
 function renderArtifactMarkdown({ key, target, artifactPath, value, receiptIds, sourceRecords }) {
   const lines = [
     "# Staging Launch Duty Record",
@@ -375,6 +380,10 @@ function buildResult(options) {
   }
   const value = JSON.parse(options.valueJson);
   const sourceRecords = options.sourceRecords.map(parseSourceRecord);
+  const missingSourceRecordKeys = requiredSourceRecordKeysMissing(target, sourceRecords);
+  if (missingSourceRecordKeys.length) {
+    throw new Error(`Missing required source records for ${options.key}: ${missingSourceRecordKeys.join(", ")}`);
+  }
   const recordIndexFile = options.recordIndexFile || defaultRecordIndexFile(options.artifactPath);
   const recordedAt = new Date().toISOString();
   const artifactPath = path.resolve(options.artifactPath);

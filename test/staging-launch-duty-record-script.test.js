@@ -237,6 +237,39 @@ test("staging launch duty record writes first-wave closeout with source records 
   }
 });
 
+test("staging launch duty record refuses first-wave closeout without required source records", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-launch-duty-record-missing-sources-"));
+  try {
+    const closeoutInputFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "filled-closeout-input.json");
+    const artifactPath = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "first-wave-closeout.md");
+    const recordIndexFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "launch-duty-record-index.json");
+
+    const result = runRecord([
+      "--closeout-input-file",
+      closeoutInputFile,
+      "--key",
+      "first_wave_closeout",
+      "--artifact-path",
+      artifactPath,
+      "--value-json",
+      "{\"result\":\"closed\",\"summary\":\"redacted closeout\"}",
+      "--source-record",
+      "first_wave_incident_log=artifacts/staging/PILOT_ALPHA/stable/first-wave-incident-log.md",
+      "--record-index-file",
+      recordIndexFile
+    ]);
+
+    assert.equal(result.status, 1);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "fail");
+    assert.match(output.error.message, /Missing required source records for first_wave_closeout: rollback_signal_review, stabilization_owner_handoff/);
+    assert.equal(existsSync(artifactPath), false);
+    assert.equal(existsSync(recordIndexFile), false);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging launch duty record refuses unknown keys", () => {
   const result = runRecord([
     "--closeout-input-file",

@@ -324,6 +324,21 @@ test("staging readiness status reports signoff and receipt visibility gaps befor
       output.nextStep.command,
       `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json>`
     );
+    assert.deepEqual(output.productionSignoffEvidenceHandoff, {
+      status: "ready_for_production_signoff_evidence",
+      currentActionKey: "backfill_production_signoff",
+      targetType: "production_signoff_condition",
+      targetKey: "staging_artifacts_archived",
+      command: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json>`,
+      exampleCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json '{"result":"confirmed","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt`,
+      artifactPathHint: "artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt",
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+      reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`,
+      actionQueueFile: null,
+      expectedEvidence: "Confirm the artifact/receipt ledger archive paths exist and contain redacted artifacts.",
+      receiptOperations: [],
+      nextAction: "Run command with real redacted evidence, then statusCommand to continue production sign-off."
+    });
     assert.equal(output.operatorNextCommands.length, 10);
     assert.deepEqual(output.operatorNextCommands[0], {
       key: "backfill_production_signoff",
@@ -419,6 +434,15 @@ test("staging readiness status plain output prints production signoff artifact a
     assert.match(result.stdout, /Operator next current artifact: artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt/);
     assert.match(result.stdout, /Operator next current status check: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Operator next current next action: Backfill staging_artifacts_archived, then rerun staging:readiness:status\./);
+    assert.match(result.stdout, /Production signoff handoff: ready_for_production_signoff_evidence/);
+    assert.match(result.stdout, /Production signoff current action: backfill_production_signoff/);
+    assert.match(result.stdout, /Production signoff target: production_signoff_condition\/staging_artifacts_archived/);
+    assert.match(result.stdout, /Production signoff command: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Production signoff example: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json '\{"result":"confirmed","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Production signoff artifact: artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt/);
+    assert.match(result.stdout, /Production signoff status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Production signoff rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Production signoff next action: Run command with real redacted evidence, then statusCommand to continue production sign-off\./);
     assert.match(result.stdout, /Operator next blocked_after_prior_actions: backfill_receipt_visibility -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --receipt-lane launchOpsOverviewStatus --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Operator next blocked_after_prior_actions example: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --receipt-lane launchOpsOverviewStatus --value-json '\{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/launch-ops-overview-status-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Operator next blocked_after_prior_actions artifact: artifacts\/staging\/<productCode>\/<channel>\/launch-ops-overview-status-receipt-visibility\.json/);

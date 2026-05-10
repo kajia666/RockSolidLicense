@@ -780,6 +780,38 @@ function productionSignoffActionKey(item) {
   return item.key;
 }
 
+function productionSignoffTargetType(item) {
+  if (item.key === "backfill_receipt_visibility") {
+    return "receipt_visibility_lane";
+  }
+  if (item.key === "set_production_signoff_decision") {
+    return "production_signoff_decision";
+  }
+  return "production_signoff_condition";
+}
+
+function buildProductionSignoffEvidenceHandoff({ inputFile, actionsFile, actionQueue }) {
+  const item = actionQueue.find((entry) => entry.status === "current") || actionQueue[0];
+  if (!item) {
+    return null;
+  }
+  return {
+    status: "ready_for_production_signoff_evidence",
+    currentActionKey: productionSignoffActionKey(item),
+    targetType: productionSignoffTargetType(item),
+    targetKey: item.targetKey || null,
+    command: item.command || null,
+    exampleCommand: item.exampleCommand || null,
+    artifactPathHint: item.evidence?.artifactPathHint || null,
+    statusCommand: item.statusCommand || statusCommand(inputFile, actionsFile),
+    reloadCommand: reloadCommand(inputFile),
+    actionQueueFile: actionsFile || null,
+    expectedEvidence: item.evidence?.expectedEvidence || null,
+    receiptOperations: item.evidence?.receiptOperations || [],
+    nextAction: "Run command with real redacted evidence, then statusCommand to continue production sign-off."
+  };
+}
+
 function buildProductionSignoffOperatorNextCommands(actionQueue) {
   return actionQueue.map((item) => ({
     key: item.key,
@@ -1197,6 +1229,9 @@ function buildStatus(payload, inputFile, actionsFile = null) {
   const fullTestWindowHandoff = currentGate === "full_test_window"
     ? buildFullTestWindowHandoff({ inputFile, actionsFile, actionQueue })
     : null;
+  const productionSignoffEvidenceHandoff = currentGate === "production_signoff"
+    ? buildProductionSignoffEvidenceHandoff({ inputFile, actionsFile, actionQueue })
+    : null;
   const evidenceSummary = buildEvidenceSummary({
     closeoutFieldsByKey,
     signoffFieldsByKey,
@@ -1240,6 +1275,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     },
     evidenceSummary,
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
+    ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
     ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
     ...(operatorNextCommands?.length ? { operatorNextCommands } : {}),
     nextStep,
@@ -1296,6 +1332,23 @@ function writeResult(result, json) {
       console.log(`Full-test status refresh: ${handoff.statusCommand}`);
       console.log(`Full-test rehearsal reload: ${handoff.reloadCommand}`);
       console.log(`Full-test next action: ${handoff.nextAction}`);
+    }
+    if (result.productionSignoffEvidenceHandoff) {
+      const handoff = result.productionSignoffEvidenceHandoff;
+      console.log(`Production signoff handoff: ${handoff.status}`);
+      console.log(`Production signoff current action: ${handoff.currentActionKey}`);
+      console.log(`Production signoff target: ${handoff.targetType}/${handoff.targetKey || "-"}`);
+      console.log(`Production signoff command: ${handoff.command || "-"}`);
+      if (handoff.exampleCommand) {
+        console.log(`Production signoff example: ${handoff.exampleCommand}`);
+      }
+      console.log(`Production signoff artifact: ${handoff.artifactPathHint || "-"}`);
+      console.log(`Production signoff status refresh: ${handoff.statusCommand}`);
+      console.log(`Production signoff rehearsal reload: ${handoff.reloadCommand}`);
+      if (handoff.receiptOperations?.length) {
+        console.log(`Production signoff receipts: ${handoff.receiptOperations.join(", ")}`);
+      }
+      console.log(`Production signoff next action: ${handoff.nextAction}`);
     }
     if (result.operatorNextCommands?.length) {
       for (const item of result.operatorNextCommands) {

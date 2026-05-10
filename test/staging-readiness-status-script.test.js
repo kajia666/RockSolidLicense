@@ -453,6 +453,59 @@ test("staging readiness status plain output prints production signoff artifact a
   }
 });
 
+test("staging readiness status prints receipt visibility handoff before launch watch", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-receipt-handoff-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: closeoutKeys,
+      decision: "ready-for-full-test-window",
+      productionDecision: "ready-for-production-signoff",
+      filledSignoffKeys: signoffKeys,
+      visibleReceiptLanes: ["launchMainline"]
+    });
+
+    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.readiness.currentGate, "production_signoff");
+    assert.deepEqual(output.receiptVisibilityHandoff, {
+      status: "ready_for_receipt_visibility_evidence",
+      currentActionKey: "backfill_receipt_visibility",
+      targetLane: "launchReview",
+      command: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane launchReview --value-json <redacted-json> --actions-file ${actionsFile}`,
+      exampleCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane launchReview --value-json '{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/launch-review-receipt-visibility.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file ${actionsFile}`,
+      artifactPathHint: "artifacts/staging/<productCode>/<channel>/launch-review-receipt-visibility.json",
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile} --actions-file ${actionsFile}`,
+      reloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`,
+      actionQueueFile: actionsFile,
+      expectedEvidence: "Confirm Launch Review summary download shows the latest staging evidence receipts before cutover.",
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      nextAction: "Run command with the latest receipt visibility summary, then statusCommand to continue toward launch-day watch."
+    });
+
+    const plain = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(plain.status, 0, plain.stderr || plain.stdout);
+    assert.equal(plain.stderr, "");
+    assert.match(plain.stdout, /Receipt visibility handoff: ready_for_receipt_visibility_evidence/);
+    assert.match(plain.stdout, /Receipt visibility current action: backfill_receipt_visibility/);
+    assert.match(plain.stdout, /Receipt visibility lane: launchReview/);
+    assert.match(plain.stdout, /Receipt visibility command: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --receipt-lane launchReview --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
+    assert.match(plain.stdout, /Receipt visibility example: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --receipt-lane launchReview --value-json '\{"status":"visible","summaryPath":"<redacted receipt visibility summary path>","summary":"<redacted operator summary>"\}' --artifact-path artifacts\/staging\/<productCode>\/<channel>\/launch-review-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file .*readiness-action-queue\.md/);
+    assert.match(plain.stdout, /Receipt visibility artifact: artifacts\/staging\/<productCode>\/<channel>\/launch-review-receipt-visibility\.json/);
+    assert.match(plain.stdout, /Receipt visibility status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(plain.stdout, /Receipt visibility rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(plain.stdout, /Receipt visibility receipts: record_post_launch_ops_sweep/);
+    assert.match(plain.stdout, /Receipt visibility next action: Run command with the latest receipt visibility summary, then statusCommand to continue toward launch-day watch\./);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging readiness status summarizes filled evidence details after backfill", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-evidence-summary-"));
   try {

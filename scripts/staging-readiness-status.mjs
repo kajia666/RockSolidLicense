@@ -812,6 +812,27 @@ function buildProductionSignoffEvidenceHandoff({ inputFile, actionsFile, actionQ
   };
 }
 
+function buildReceiptVisibilityHandoff({ inputFile, actionsFile, actionQueue }) {
+  const item = actionQueue.find((entry) => entry.status === "current" && entry.key === "backfill_receipt_visibility");
+  if (!item) {
+    return null;
+  }
+  return {
+    status: "ready_for_receipt_visibility_evidence",
+    currentActionKey: "backfill_receipt_visibility",
+    targetLane: item.targetKey || null,
+    command: item.command || null,
+    exampleCommand: item.exampleCommand || null,
+    artifactPathHint: item.evidence?.artifactPathHint || null,
+    statusCommand: item.statusCommand || statusCommand(inputFile, actionsFile),
+    reloadCommand: reloadCommand(inputFile),
+    actionQueueFile: actionsFile || null,
+    expectedEvidence: item.evidence?.expectedEvidence || null,
+    receiptOperations: item.evidence?.receiptOperations || [],
+    nextAction: "Run command with the latest receipt visibility summary, then statusCommand to continue toward launch-day watch."
+  };
+}
+
 function buildProductionSignoffOperatorNextCommands(actionQueue) {
   return actionQueue.map((item) => ({
     key: item.key,
@@ -1232,6 +1253,9 @@ function buildStatus(payload, inputFile, actionsFile = null) {
   const productionSignoffEvidenceHandoff = currentGate === "production_signoff"
     ? buildProductionSignoffEvidenceHandoff({ inputFile, actionsFile, actionQueue })
     : null;
+  const receiptVisibilityHandoff = currentGate === "production_signoff"
+    ? buildReceiptVisibilityHandoff({ inputFile, actionsFile, actionQueue })
+    : null;
   const evidenceSummary = buildEvidenceSummary({
     closeoutFieldsByKey,
     signoffFieldsByKey,
@@ -1276,6 +1300,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     evidenceSummary,
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
+    ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
     ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
     ...(operatorNextCommands?.length ? { operatorNextCommands } : {}),
     nextStep,
@@ -1349,6 +1374,23 @@ function writeResult(result, json) {
         console.log(`Production signoff receipts: ${handoff.receiptOperations.join(", ")}`);
       }
       console.log(`Production signoff next action: ${handoff.nextAction}`);
+    }
+    if (result.receiptVisibilityHandoff) {
+      const handoff = result.receiptVisibilityHandoff;
+      console.log(`Receipt visibility handoff: ${handoff.status}`);
+      console.log(`Receipt visibility current action: ${handoff.currentActionKey}`);
+      console.log(`Receipt visibility lane: ${handoff.targetLane || "-"}`);
+      console.log(`Receipt visibility command: ${handoff.command || "-"}`);
+      if (handoff.exampleCommand) {
+        console.log(`Receipt visibility example: ${handoff.exampleCommand}`);
+      }
+      console.log(`Receipt visibility artifact: ${handoff.artifactPathHint || "-"}`);
+      console.log(`Receipt visibility status refresh: ${handoff.statusCommand}`);
+      console.log(`Receipt visibility rehearsal reload: ${handoff.reloadCommand}`);
+      if (handoff.receiptOperations?.length) {
+        console.log(`Receipt visibility receipts: ${handoff.receiptOperations.join(", ")}`);
+      }
+      console.log(`Receipt visibility next action: ${handoff.nextAction}`);
     }
     if (result.operatorNextCommands?.length) {
       for (const item of result.operatorNextCommands) {

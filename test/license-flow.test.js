@@ -19688,12 +19688,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(evidenceStageByKey.steady_state_duty_plan_receipt.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
     assert.equal(evidenceStageByKey.steady_state_duty_plan_receipt.action, "download");
     assert.equal(evidenceStageByKey.steady_state_duty_plan_receipt.launchOpsOverviewDownloadKey, "ops_launch_operations_overview_status");
+    assert.equal(
+      evidenceStageByKey.steady_state_duty_plan_receipt.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.equal(launchOperationsEvidenceChain.latestStage.key, "steady_state_duty_plan_receipt");
     assert.ok(launchOperationsEvidenceChain.nextReviewAction);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Steady-State Duty Plan Receipts:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`audit=${steadyStateDutyPlanReceipt.auditLogId}`));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Steady-State Duty Plan Receipts:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:[\s\S]*steady_state_duty_plan_receipt=recorded[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:[\s\S]*steady_state_duty_plan_receipt=recorded[\s\S]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /receiptVisibility=visible/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:/);
@@ -19783,6 +19788,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, /RockSolid Developer Ops Launch Operations Handoff Summary/);
     assert.match(launchOperationsHandoffDownload.body, /Evidence Chain:/);
     assert.match(launchOperationsHandoffDownload.body, /steady_state_duty_plan_receipt/);
+    assert.match(launchOperationsHandoffDownload.body, /Evidence Chain:[\s\S]*- steady_state_duty_plan_receipt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:/);
     assert.match(launchOperationsHandoffDownload.body, /receiptVisibilitySummary=visible/);
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);

@@ -25652,7 +25652,11 @@ function buildDeveloperOpsLaunchOperationsEvidenceChain({
       launchOpsOverviewDownloadKey: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadKey || null,
       launchOpsOverviewDownloadFileName: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadFileName || null,
       launchOpsOverviewDownloadFormat: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadFormat || null,
-      launchOpsOverviewDownloadHref: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadHref || null
+      launchOpsOverviewDownloadHref: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewDownloadHref || null,
+      launchOpsOverviewContextLaunchDutyRecordIndexPath: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewContextLaunchDutyRecordIndexPath || null,
+      launchDutyRecordIndexPath: latestSteadyStateDutyPlanReceipt?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+        || latestSteadyStateDutyPlanReceipt?.launchReadinessNextGateLaunchDutyRecordIndexPath
+        || null
     }
   ];
   const completedStages = stages.filter((item) => item.auditLogId && item.status !== "missing");
@@ -32118,6 +32122,8 @@ function appendDeveloperOpsLaunchOperationsEvidenceChainLines(lines, chain = nul
       + (item.launchOpsOverviewDownloadKey ? ` | launchOpsOverviewDownloadKey=${item.launchOpsOverviewDownloadKey}` : "")
       + (item.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${item.launchOpsOverviewDownloadFileName}` : "")
       + (item.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${item.launchOpsOverviewDownloadHref}` : "")
+      + (item.launchOpsOverviewContextLaunchDutyRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${item.launchOpsOverviewContextLaunchDutyRecordIndexPath}` : "")
+      + (item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : "")
     );
   }
   if (chain.nextReviewAction) {
@@ -34264,6 +34270,8 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
         + ` | audit=${item.auditLogId || "-"}`
         + ` | action=${item.action || item.operation || "-"}`
         + ` | file=${item.fileName || item.format || "-"}`
+        + (item.launchOpsOverviewContextLaunchDutyRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${item.launchOpsOverviewContextLaunchDutyRecordIndexPath}` : "")
+        + (item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : "")
       );
     }
     lines.push("");

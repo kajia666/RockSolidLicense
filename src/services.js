@@ -32354,6 +32354,10 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const launchReceiptNextFollowUpAction = launchReceiptNextFollowUp?.recommendedAction || null;
   const launchReceiptNextFollowUpWorkspace = launchReceiptNextFollowUpAction?.workspaceAction || null;
   const launchReceiptNextFollowUpDownload = launchReceiptNextFollowUp?.recommendedDownload || null;
+  const launchReceiptNextFollowUpRecordIndex = resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp)
+    || launchReceiptNextFollowUpDownload?.launchDutyRecordIndexPath
+    || launchReceiptNextFollowUpDownload?.readinessGateRecordIndex
+    || "";
   const initialLaunchOpsReadiness = summary.initialLaunchOpsReadiness || null;
   const overview = payload.overview || {};
   const routeReview = payload.routeReview || {};
@@ -32390,10 +32394,10 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`,
     `Receipt Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(launchReceiptFollowUpPriorities)}`,
     `Receipt Next Follow-up: ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`,
-    `Receipt Next Follow-up Record Index: ${resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp) || "-"}`,
+    `Receipt Next Follow-up Record Index: ${launchReceiptNextFollowUpRecordIndex || "-"}`,
     `Receipt Next Follow-up Action: ${launchReceiptNextFollowUpAction?.key || "-"} (${launchReceiptNextFollowUpAction?.operation || "-"})`,
     `Receipt Next Follow-up Workspace: ${launchReceiptNextFollowUpWorkspace?.label || "-"}@${launchReceiptNextFollowUpWorkspace?.autofocus || "-"}`,
-    `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"}) | href=${launchReceiptNextFollowUpDownload?.href || "-"}`
+    `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"}) | href=${launchReceiptNextFollowUpDownload?.href || "-"}${launchReceiptNextFollowUpRecordIndex ? ` | launchDutyRecordIndex=${launchReceiptNextFollowUpRecordIndex}` : ""}`
   ];
   appendLaunchReadinessNextGateHandoffText(
     lines,
@@ -32427,7 +32431,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     lines.push(`- followUps: ${initialLaunchOpsReadiness.followUpCount ?? 0}`);
     lines.push(`- next: ${formatLaunchReceiptNextFollowUp(initialLaunchOpsReadiness.nextFollowUp)}`);
     lines.push(`- workspace: ${initialLaunchOpsReadiness.primaryWorkspaceAction?.label || "-"}@${initialLaunchOpsReadiness.primaryWorkspaceAction?.autofocus || "-"}`);
-    lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"}) | href=${initialLaunchOpsReadiness.primaryDownload?.href || "-"}`);
+    const initialLaunchOpsReadinessDownloadRecordIndex = initialLaunchOpsReadiness.primaryDownload?.launchDutyRecordIndexPath
+      || initialLaunchOpsReadiness.primaryDownload?.readinessGateRecordIndex
+      || resolveLaunchReadinessGateRecordIndexPath(initialLaunchOpsReadiness.nextFollowUp)
+      || "";
+    lines.push(`- download: ${initialLaunchOpsReadiness.primaryDownload?.fileName || "-"} (${initialLaunchOpsReadiness.primaryDownload?.format || "-"}) | href=${initialLaunchOpsReadiness.primaryDownload?.href || "-"}${initialLaunchOpsReadinessDownloadRecordIndex ? ` | launchDutyRecordIndex=${initialLaunchOpsReadinessDownloadRecordIndex}` : ""}`);
     lines.push(`- firstLaunchHandoff: ${initialLaunchOpsReadiness.firstLaunchHandoffDownload?.fileName || "-"}`);
     if (initialLaunchOpsReadiness.firstLaunchOperatingChain) {
       lines.push("");

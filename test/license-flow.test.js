@@ -6589,6 +6589,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.equal(mainlineLaunchRunway.status, "ready_for_closeout_reload");
       assert.equal(mainlineLaunchRunway.currentGate, "ready_for_closeout_reload");
       assert.equal(mainlineLaunchRunway.launchDayWatchEntry, "enter_after_production_signoff");
+      const expectedLaunchDutyRecordIndexPath = "artifacts/staging/RELPKG_ALPHA/stable/launch-duty-record-index.json";
       assert.deepEqual(
         mainlineLaunchRunway.launchReadinessNextGate
           ? {
@@ -6597,7 +6598,8 @@ test("developer release package export bundles integration, versions, and notice
               canEnterInitialLaunch: mainlineLaunchRunway.launchReadinessNextGate.canEnterInitialLaunch,
               currentGate: mainlineLaunchRunway.launchReadinessNextGate.currentGate,
               fullTestWindowCommand: mainlineLaunchRunway.launchReadinessNextGate.fullTestWindowCommand,
-              productionSignoffPacket: mainlineLaunchRunway.launchReadinessNextGate.productionSignoffPacket
+              productionSignoffPacket: mainlineLaunchRunway.launchReadinessNextGate.productionSignoffPacket,
+              launchDutyRecordIndexPath: mainlineLaunchRunway.launchReadinessNextGate.launchDutyRecordIndexPath
             }
           : null,
         {
@@ -6606,7 +6608,8 @@ test("developer release package export bundles integration, versions, and notice
           canEnterInitialLaunch: false,
           currentGate: "ready_for_closeout_reload",
           fullTestWindowCommand: "npm.cmd test",
-          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json"
+          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json",
+          launchDutyRecordIndexPath: expectedLaunchDutyRecordIndexPath
         }
       );
       assert.equal(mainlineLaunchRunway.launchReadinessNextGateStatus, "awaiting_launch_readiness");
@@ -6751,7 +6754,8 @@ test("developer release package export bundles integration, versions, and notice
               canEnterInitialLaunch: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.canEnterInitialLaunch,
               currentGate: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.currentGate,
               fullTestWindowCommand: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.fullTestWindowCommand,
-              productionSignoffPacket: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.productionSignoffPacket
+              productionSignoffPacket: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.productionSignoffPacket,
+              launchDutyRecordIndexPath: launchMainline.mainlineSummary.launchDayWatchPanel.launchReadinessNextGate.launchDutyRecordIndexPath
             }
           : null,
         launchReadinessNextGateStatus: launchMainline.mainlineSummary.launchDayWatchPanel?.launchReadinessNextGateStatus,
@@ -6832,7 +6836,8 @@ test("developer release package export bundles integration, versions, and notice
           canEnterInitialLaunch: false,
           currentGate: "ready_for_closeout_reload",
           fullTestWindowCommand: "npm.cmd test",
-          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json"
+          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json",
+          launchDutyRecordIndexPath: expectedLaunchDutyRecordIndexPath
         },
         launchReadinessNextGateStatus: "awaiting_launch_readiness",
         launchReadinessNextGateDecision: "no_go",
@@ -6933,7 +6938,8 @@ test("developer release package export bundles integration, versions, and notice
               canEnterInitialLaunch: stabilizationHandoffPanel.launchReadinessNextGate.canEnterInitialLaunch,
               currentGate: stabilizationHandoffPanel.launchReadinessNextGate.currentGate,
               fullTestWindowCommand: stabilizationHandoffPanel.launchReadinessNextGate.fullTestWindowCommand,
-              productionSignoffPacket: stabilizationHandoffPanel.launchReadinessNextGate.productionSignoffPacket
+              productionSignoffPacket: stabilizationHandoffPanel.launchReadinessNextGate.productionSignoffPacket,
+              launchDutyRecordIndexPath: stabilizationHandoffPanel.launchReadinessNextGate.launchDutyRecordIndexPath
             }
           : null,
         launchReadinessNextGateStatus: stabilizationHandoffPanel?.launchReadinessNextGateStatus,
@@ -6997,7 +7003,8 @@ test("developer release package export bundles integration, versions, and notice
           canEnterInitialLaunch: false,
           currentGate: "ready_for_closeout_reload",
           fullTestWindowCommand: "npm.cmd test",
-          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json"
+          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json",
+          launchDutyRecordIndexPath: expectedLaunchDutyRecordIndexPath
         },
         launchReadinessNextGateStatus: "awaiting_launch_readiness",
         launchReadinessNextGateDecision: "no_go",
@@ -7085,7 +7092,8 @@ test("developer release package export bundles integration, versions, and notice
               canEnterInitialLaunch: operationalReadiness.launchReadinessNextGate.canEnterInitialLaunch,
               currentGate: operationalReadiness.launchReadinessNextGate.currentGate,
               fullTestWindowCommand: operationalReadiness.launchReadinessNextGate.fullTestWindowCommand,
-              productionSignoffPacket: operationalReadiness.launchReadinessNextGate.productionSignoffPacket
+              productionSignoffPacket: operationalReadiness.launchReadinessNextGate.productionSignoffPacket,
+              launchDutyRecordIndexPath: operationalReadiness.launchReadinessNextGate.launchDutyRecordIndexPath
             }
           : null,
         launchReadinessNextGateStatus: operationalReadiness.launchReadinessNextGateStatus,
@@ -7125,7 +7133,8 @@ test("developer release package export bundles integration, versions, and notice
           canEnterInitialLaunch: false,
           currentGate: "ready_for_closeout_reload",
           fullTestWindowCommand: "npm.cmd test",
-          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json"
+          productionSignoffPacket: "artifacts/staging/RELPKG_ALPHA/stable/staging-production-signoff-packet.json",
+          launchDutyRecordIndexPath: expectedLaunchDutyRecordIndexPath
         },
         launchReadinessNextGateStatus: "awaiting_launch_readiness",
         launchReadinessNextGateDecision: "no_go",
@@ -7154,6 +7163,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /watchRecordDraft=blocked_until_runway_evidence/);
       assert.match(launchMainline.summaryText, /Operational Readiness:[\s\S]*- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainline.summaryText, /Operational Readiness:[\s\S]*- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
+      assert.match(launchMainline.summaryText, /Operational Readiness:[\s\S]*- launchReadinessNextGateRecordIndex: artifacts\/staging\/RELPKG_ALPHA\/stable\/launch-duty-record-index\.json/);
       assert.ok(launchMainline.mainlineSummary.heroControls.some((item) =>
         item?.label === "Record Next Runway Evidence"
         && item?.setupAction?.operation === "record_launch_rehearsal_run"
@@ -7204,6 +7214,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- ready: false \| watchEntry=enter_after_production_signoff \| pendingEvidence=6 \| pendingEvidenceOperations=3/);
       assert.match(launchMainline.summaryText, /Launch-Day Watch Panel:[\s\S]*- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainline.summaryText, /Launch-Day Watch Panel:[\s\S]*- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
+      assert.match(launchMainline.summaryText, /Launch-Day Watch Panel:[\s\S]*- launchReadinessNextGateRecordIndex: artifacts\/staging\/RELPKG_ALPHA\/stable\/launch-duty-record-index\.json/);
       assert.match(launchMainline.summaryText, /- productionSignoffPacket: artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchMainline.summaryText, /- nextAction: launch_mainline_record_launch_rehearsal_run \| operation=record_launch_rehearsal_run/);
       assert.match(launchMainline.summaryText, /- watchCheckIn: status=waiting_for_runway_evidence \| action=launch_mainline_record_post_launch_ops_sweep \| operation=record_post_launch_ops_sweep \| evidence=post_launch_ops_sweep \| recordedAt=-/);
@@ -7215,6 +7226,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- status: pending_next_action/);
       assert.match(launchMainline.summaryText, /Stabilization Handoff Panel:[\s\S]*- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainline.summaryText, /Stabilization Handoff Panel:[\s\S]*- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
+      assert.match(launchMainline.summaryText, /Stabilization Handoff Panel:[\s\S]*- launchReadinessNextGateRecordIndex: artifacts\/staging\/RELPKG_ALPHA\/stable\/launch-duty-record-index\.json/);
       assert.match(launchMainline.summaryText, /- primaryDownload: Launch mainline stabilization handoff/);
       assert.match(launchMainline.summaryText, /- indexDownload: Launch Mainline post-launch handoff index/);
       assert.match(launchMainline.summaryText, /- routeMapDownload: Launch Mainline handoff download routes/);
@@ -7232,6 +7244,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Mainline Launch Runway:/);
       assert.match(launchMainline.summaryText, /- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainline.summaryText, /- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
+      assert.match(launchMainline.summaryText, /- launchReadinessNextGateRecordIndex: artifacts\/staging\/RELPKG_ALPHA\/stable\/launch-duty-record-index\.json/);
       assert.match(launchMainline.summaryText, /- sequence: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
       assert.match(launchMainline.summaryText, /- action=Copy Closeout Reload \| kind=command \| value=npm\.cmd run staging:rehearsal -- --profile-file docs\/staging-rehearsal-profile\.example\.json --product-code RELPKG_ALPHA --channel stable --closeout-input-file artifacts\/staging\/RELPKG_ALPHA\/stable\/filled-closeout-input\.json/);
       assert.match(launchMainline.summaryText, /- action=Copy Full Test Window \| kind=command \| value=npm\.cmd test/);
@@ -7309,6 +7322,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Mainline Launch Runway:/);
       assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGateFullTestWindow: npm\.cmd test/);
+      assert.match(launchMainlineSummaryDownload.body, /launchReadinessNextGateRecordIndex: artifacts\/staging\/RELPKG_ALPHA\/stable\/launch-duty-record-index\.json/);
       assert.match(launchMainlineSummaryDownload.body, /Launch-Day Watch Panel:[\s\S]*launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainlineSummaryDownload.body, /Stabilization Handoff Panel:[\s\S]*launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
       assert.match(launchMainlineSummaryDownload.body, /Operational Readiness:[\s\S]*launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
@@ -9313,7 +9327,8 @@ test("developer launch mainline action can record a launch rehearsal run and ref
             canEnterInitialLaunch: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.canEnterInitialLaunch,
             currentGate: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.currentGate,
             fullTestWindowCommand: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.fullTestWindowCommand,
-            productionSignoffPacket: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.productionSignoffPacket
+            productionSignoffPacket: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.productionSignoffPacket,
+            launchDutyRecordIndexPath: actionResult.receipt.mainlineOperationalReadiness.launchReadinessNextGate.launchDutyRecordIndexPath
           }
         : null,
       {
@@ -9322,7 +9337,8 @@ test("developer launch mainline action can record a launch rehearsal run and ref
         canEnterInitialLaunch: false,
         currentGate: "ready_for_closeout_reload",
         fullTestWindowCommand: "npm.cmd test",
-        productionSignoffPacket: "artifacts/staging/MAINLINE_REHEARSAL/stable/staging-production-signoff-packet.json"
+        productionSignoffPacket: "artifacts/staging/MAINLINE_REHEARSAL/stable/staging-production-signoff-packet.json",
+        launchDutyRecordIndexPath: "artifacts/staging/MAINLINE_REHEARSAL/stable/launch-duty-record-index.json"
       }
     );
     assert.equal(actionResult.receipt?.mainlineOperationalReadiness?.launchReadinessNextGateStatus, "awaiting_launch_readiness");
@@ -9351,6 +9367,7 @@ test("developer launch mainline action can record a launch rehearsal run and ref
     assert.match(actionResult.receipt?.handoffText || "", /watchRecordDraft=blocked_until_runway_evidence/);
     assert.match(actionResult.receipt?.handoffText || "", /Operational Readiness After Action:[\s\S]*- launchReadinessNextGate: awaiting_launch_readiness \| decision=no_go \| canEnterInitialLaunch=false \| currentGate=ready_for_closeout_reload/);
     assert.match(actionResult.receipt?.handoffText || "", /Operational Readiness After Action:[\s\S]*- launchReadinessNextGateFullTestWindow: npm\.cmd test/);
+    assert.match(actionResult.receipt?.handoffText || "", /Operational Readiness After Action:[\s\S]*- launchReadinessNextGateRecordIndex: artifacts\/staging\/MAINLINE_REHEARSAL\/stable\/launch-duty-record-index\.json/);
     assert.match(actionResult.receipt?.handoffText || "", /- nextAction: .*operation=record_launch_day_readiness_review/);
     const summaryLaunchOpsContext = actionResult.launchMainline?.mainlineSummary?.initialLaunchOpsMainlineGate?.actionPlan?.find((item) =>
       item?.key === "initial_launch_ops_overview_status"
@@ -11527,21 +11544,23 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(stabilizationGateOpsSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*goLiveCurrentGate=ready_for_closeout_reload/);
     assert.match(
       stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps,
-      /"launchReadinessNextGateStatus","launchReadinessNextGateDecision","launchReadinessNextGateCurrentGate","launchReadinessNextGateFullTestWindowCommand","launchReadinessNextGateProductionSignoffPacket","launchReadinessNextGateLaunchDayWatchEntry"/
+      /"launchReadinessNextGateStatus","launchReadinessNextGateDecision","launchReadinessNextGateCurrentGate","launchReadinessNextGateFullTestWindowCommand","launchReadinessNextGateProductionSignoffPacket","launchReadinessNextGateLaunchDutyRecordIndexPath","launchReadinessNextGateLaunchDayWatchEntry"/
     );
     assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /npm\.cmd test/);
     assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json/);
     assert.match(stabilizationGateOpsSnapshot.csv.launchReceiptFollowUps, /enter_after_production_signoff/);
     assert.match(
       stabilizationGateOpsSnapshot.csv.auditLogs,
-      /"launchReceiptLaunchReadinessNextGateStatus","launchReceiptLaunchReadinessNextGateDecision","launchReceiptLaunchReadinessNextGateCurrentGate","launchReceiptLaunchReadinessNextGateFullTestWindowCommand","launchReceiptLaunchReadinessNextGateProductionSignoffPacket","launchReceiptLaunchReadinessNextGateLaunchDayWatchEntry"/
+      /"launchReceiptLaunchReadinessNextGateStatus","launchReceiptLaunchReadinessNextGateDecision","launchReceiptLaunchReadinessNextGateCurrentGate","launchReceiptLaunchReadinessNextGateFullTestWindowCommand","launchReceiptLaunchReadinessNextGateProductionSignoffPacket","launchReceiptLaunchReadinessNextGateLaunchDutyRecordIndexPath","launchReceiptLaunchReadinessNextGateLaunchDayWatchEntry"/
     );
     assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /awaiting_launch_readiness/);
     assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /ready_for_closeout_reload/);
     assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /npm\.cmd test/);
     assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json/);
     assert.match(stabilizationGateOpsSnapshot.csv.auditLogs, /enter_after_production_signoff/);
     const stabilizationGateFollowUpsCsvDownload = await getText(
       baseUrl,

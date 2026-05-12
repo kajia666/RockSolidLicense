@@ -4929,6 +4929,9 @@ function buildLaunchMainlineActionReceiptHandoffText({
         + ` | currentGate=${launchReadinessNextGateForOperationalReadiness.currentGate || "-"}`
       );
       lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGateForOperationalReadiness.fullTestWindowCommand || "-"}`);
+      if (launchReadinessNextGateForOperationalReadiness.launchDutyRecordIndexPath) {
+        lines.push(`- launchReadinessNextGateRecordIndex: ${launchReadinessNextGateForOperationalReadiness.launchDutyRecordIndexPath}`);
+      }
     }
     if (mainlineOperationalReadiness.nextActionKey || mainlineOperationalReadiness.nextActionOperation) {
       lines.push(`- nextAction: ${mainlineOperationalReadiness.nextActionKey || "-"} | operation=${mainlineOperationalReadiness.nextActionOperation || "-"}`);
@@ -4969,6 +4972,7 @@ function buildLaunchMainlineActionReceiptHandoffText({
         + ` | goLiveCurrentGate=${launchReadinessNextGateForOperatorReceipt.currentGate || "-"}`
         + ` | goLiveFullTestWindow=${launchReadinessNextGateForOperatorReceipt.fullTestWindowCommand || "-"}`
         + ` | productionSignoffPacket=${launchReadinessNextGateForOperatorReceipt.productionSignoffPacket || "-"}`
+        + ` | launchDutyRecordIndex=${launchReadinessNextGateForOperatorReceipt.launchDutyRecordIndexPath || "-"}`
       );
     }
     lines.push(
@@ -5012,6 +5016,9 @@ function buildLaunchMainlineActionReceiptHandoffText({
       `- productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
       + ` | launchDayWatchEntry=${launchReadinessNextGate.launchDayWatchEntry || "-"}`
     );
+    if (launchReadinessNextGate.launchDutyRecordIndexPath) {
+      lines.push(`- launchReadinessNextGateRecordIndex=${launchReadinessNextGate.launchDutyRecordIndexPath}`);
+    }
     lines.push(`- nextAction=${launchReadinessNextGate.nextAction || "-"}`);
   }
 
@@ -6021,6 +6028,7 @@ const mainlineStabilizationHandoffPanel = launchMainline?.mainlineSummary?.stabi
         launchReadinessNextGateCloseoutReloadCommand: initialLaunchOperatorGateCarry.launchReadinessNextGateCloseoutReloadCommand,
         launchReadinessNextGateFullTestWindowCommand: initialLaunchOperatorGateCarry.launchReadinessNextGateFullTestWindowCommand,
         launchReadinessNextGateProductionSignoffPacket: initialLaunchOperatorGateCarry.launchReadinessNextGateProductionSignoffPacket,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: initialLaunchOperatorGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath,
         launchReadinessNextGateLaunchDayWatchEntry: initialLaunchOperatorGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
         launchReadinessNextGatePrimaryDownloadKey: initialLaunchOperatorGateCarry.launchReadinessNextGatePrimaryDownloadKey,
         launchReadinessNextGatePrimaryDownloadFileName: initialLaunchOperatorGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
@@ -7271,6 +7279,7 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           launchReadinessNextGateCanEnterInitialLaunch: operationalReadinessLaunchReadinessNextGate?.canEnterInitialLaunch === true,
           launchReadinessNextGateFullTestWindowCommand: operationalReadinessLaunchReadinessNextGate?.fullTestWindowCommand || null,
           launchReadinessNextGateProductionSignoffPacket: operationalReadinessLaunchReadinessNextGate?.productionSignoffPacket || null,
+          launchReadinessNextGateLaunchDutyRecordIndexPath: operationalReadinessLaunchReadinessNextGate?.launchDutyRecordIndexPath || null,
           launchReadinessNextGateLaunchDayWatchEntry: operationalReadinessLaunchReadinessNextGate?.launchDayWatchEntry || null,
           launchReadinessNextGateCloseoutReloadCommand: operationalReadinessLaunchReadinessNextGate?.closeoutReloadCommand || null,
           launchReadinessNextGatePrimaryDownloadKey: operationalReadinessLaunchReadinessNextGate?.primaryDownloadKey || null,
@@ -7348,6 +7357,7 @@ function buildLaunchReceiptAuditMetadata(receipt = null) {
           closeoutReloadCommand: launchReadinessNextGate.closeoutReloadCommand || null,
           fullTestWindowCommand: launchReadinessNextGate.fullTestWindowCommand || null,
           productionSignoffPacket: launchReadinessNextGate.productionSignoffPacket || null,
+          launchDutyRecordIndexPath: launchReadinessNextGate.launchDutyRecordIndexPath || null,
           launchDayWatchEntry: launchReadinessNextGate.launchDayWatchEntry || null,
           primaryDownloadKey: launchReadinessNextGate.primaryDownload?.key || null,
           primaryDownloadFormat: launchReadinessNextGate.primaryDownload?.format || null,
@@ -14936,6 +14946,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     closeoutReloadCommand: stagingArchiveNextOperations?.closeoutReload || null,
     fullTestWindowCommand: stagingArchiveNextOperations?.fullTestWindow || null,
     productionSignoffPacket: stagingArchiveNextOperations?.productionSignoffPacket || null,
+    launchDutyRecordIndexPath: stagingArchiveNextOperations?.launchDutyRecordIndexPath
+      || stagingArchiveNextOperations?.launchDutyRecordIndexFile
+      || stagingLaunchDutyArchive?.files?.launchDutyRecordIndex
+      || stagingLaunchDutyArchive?.launchDutyRecordIndexPath
+      || null,
     launchDayWatchEntry: stagingArchiveLaunchRunway?.launchDayWatchEntry || "enter_after_production_signoff"
   };
   const launchRunwayNextGate = launchRunwayGateCarry.launchReadinessNextGate?.currentGate
@@ -17283,6 +17298,9 @@ function appendMainlineLaunchRunwayTextLines(lines = [], launchRunway = null) {
       + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
     );
     lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+    if (launchReadinessNextGate.launchDutyRecordIndexPath) {
+      lines.push(`- launchReadinessNextGateRecordIndex: ${launchReadinessNextGate.launchDutyRecordIndexPath}`);
+    }
   }
   lines.push(`- sequence: ${sequence}`);
   if (launchRunway.nextAction) {
@@ -17383,6 +17401,9 @@ function appendOperationalReadinessTextLines(lines = [], operationalReadiness = 
       + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
     );
     lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+    if (launchReadinessNextGate.launchDutyRecordIndexPath) {
+      lines.push(`- launchReadinessNextGateRecordIndex: ${launchReadinessNextGate.launchDutyRecordIndexPath}`);
+    }
   }
   if (operationalReadiness.nextActionKey || operationalReadiness.nextActionOperation) {
     lines.push(`- nextAction: ${operationalReadiness.nextActionKey || "-"} | operation=${operationalReadiness.nextActionOperation || "-"}`);
@@ -17531,6 +17552,9 @@ function appendLaunchDayWatchPanelTextLines(lines = [], launchDayWatchPanel = nu
       + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
     );
     lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+    if (launchReadinessNextGate.launchDutyRecordIndexPath) {
+      lines.push(`- launchReadinessNextGateRecordIndex: ${launchReadinessNextGate.launchDutyRecordIndexPath}`);
+    }
   }
   if (launchDayWatchPanel.productionSignoffPacket) {
     lines.push(`- productionSignoffPacket: ${launchDayWatchPanel.productionSignoffPacket}`);
@@ -17644,6 +17668,9 @@ function appendStabilizationHandoffPanelTextLines(lines = [], stabilizationHando
       + ` | currentGate=${launchReadinessNextGate.currentGate || "-"}`
     );
     lines.push(`- launchReadinessNextGateFullTestWindow: ${launchReadinessNextGate.fullTestWindowCommand || "-"}`);
+    if (launchReadinessNextGate.launchDutyRecordIndexPath) {
+      lines.push(`- launchReadinessNextGateRecordIndex: ${launchReadinessNextGate.launchDutyRecordIndexPath}`);
+    }
   }
   if (stabilizationHandoffPanel.nextActionKey || stabilizationHandoffPanel.nextActionOperation) {
     lines.push(`- nextAction: ${stabilizationHandoffPanel.nextActionKey || "-"} | operation=${stabilizationHandoffPanel.nextActionOperation || "-"}`);
@@ -17818,6 +17845,7 @@ function appendInitialLaunchOperatorNextActionTextLines(lines = [], operatorNext
       + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
       + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
       + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+      + ` | launchDutyRecordIndex=${launchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
     );
   }
   lines.push(`- ${labels.workspace}: ${workspaceAction.label || "-"}@${workspaceAction.autofocus || "-"} | href=${workspaceAction.href || "-"}`);
@@ -17849,6 +17877,7 @@ function appendInitialLaunchOperatorActionManifestTextLines(lines = [], manifest
       + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
       + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
       + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+      + ` | launchDutyRecordIndex=${launchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
     );
   }
   lines.push(
@@ -20100,6 +20129,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           launchReadinessNextGateCloseoutReloadCommand: latestLaunchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
           launchReadinessNextGateFullTestWindowCommand: latestLaunchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
           launchReadinessNextGateProductionSignoffPacket: latestLaunchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+          launchReadinessNextGateLaunchDutyRecordIndexPath: latestLaunchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath,
           launchReadinessNextGateLaunchDayWatchEntry: latestLaunchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
           launchReadinessNextGatePrimaryDownloadKey: latestLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
           launchReadinessNextGatePrimaryDownloadFileName: latestLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
@@ -20132,6 +20162,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
           launchReadinessNextGateCloseoutReloadCommand: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
           launchReadinessNextGateFullTestWindowCommand: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
           launchReadinessNextGateProductionSignoffPacket: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+          launchReadinessNextGateLaunchDutyRecordIndexPath: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath,
           launchReadinessNextGateLaunchDayWatchEntry: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
           launchReadinessNextGatePrimaryDownloadKey: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
           launchReadinessNextGatePrimaryDownloadFileName: nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
@@ -20151,6 +20182,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
             || null,
           operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket
             || nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket
+            || null,
+          operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath
+            || nextFollowUpLaunchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath
             || null
         }
       : null,
@@ -20855,6 +20889,7 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
       "launchReceiptLaunchReadinessNextGateCurrentGate",
       "launchReceiptLaunchReadinessNextGateFullTestWindowCommand",
       "launchReceiptLaunchReadinessNextGateProductionSignoffPacket",
+      "launchReceiptLaunchReadinessNextGateLaunchDutyRecordIndexPath",
       "launchReceiptLaunchReadinessNextGateLaunchDayWatchEntry",
       "launchReceiptLaunchReadinessNextGateCloseoutReloadCommand",
       "launchReceiptLaunchReadinessNextGatePrimaryDownloadKey",
@@ -20911,6 +20946,7 @@ function buildDeveloperOpsAuditLogsCsv(items = []) {
         launchReadinessNextGate?.currentGate,
         launchReadinessNextGate?.fullTestWindowCommand,
         launchReadinessNextGate?.productionSignoffPacket,
+        launchReadinessNextGate?.launchDutyRecordIndexPath,
         launchReadinessNextGate?.launchDayWatchEntry,
         launchReadinessNextGate?.closeoutReloadCommand,
         launchReadinessNextGate?.primaryDownloadKey,
@@ -20959,6 +20995,7 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "operationalReadinessLaunchReadinessNextGateCurrentGate",
       "operationalReadinessLaunchReadinessNextGateFullTestWindowCommand",
       "operationalReadinessLaunchReadinessNextGateProductionSignoffPacket",
+      "operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath",
       "launchOpsOverviewContext",
       "launchOpsOverviewStatus",
       "launchOpsOverviewWatchRecordDraftStatus",
@@ -20976,6 +21013,7 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
       "launchReadinessNextGateCurrentGate",
       "launchReadinessNextGateFullTestWindowCommand",
       "launchReadinessNextGateProductionSignoffPacket",
+      "launchReadinessNextGateLaunchDutyRecordIndexPath",
       "launchReadinessNextGateLaunchDayWatchEntry",
       "launchReadinessNextGateCloseoutReloadCommand",
       "launchReadinessNextGatePrimaryDownloadKey",
@@ -21020,6 +21058,7 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
         item.operationalReadinessLaunchReadinessNextGateCurrentGate,
         item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand,
         item.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket,
+        item.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath,
         launchOpsOverviewContext?.kind,
         launchOpsOverviewContext?.status,
         launchOpsOverviewContext?.watchRecordDraftStatus,
@@ -21037,6 +21076,7 @@ function buildDeveloperOpsLaunchReceiptFollowUpsCsv(items = []) {
         item.launchReadinessNextGateCurrentGate,
         item.launchReadinessNextGateFullTestWindowCommand,
         item.launchReadinessNextGateProductionSignoffPacket,
+        item.launchReadinessNextGateLaunchDutyRecordIndexPath,
         item.launchReadinessNextGateLaunchDayWatchEntry,
         item.launchReadinessNextGateCloseoutReloadCommand,
         item.launchReadinessNextGatePrimaryDownloadKey,
@@ -21175,6 +21215,7 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         operationalReadinessLaunchReadinessNextGateCanEnterInitialLaunch: receipt.operationalReadiness?.launchReadinessNextGateCanEnterInitialLaunch === true,
         operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: receipt.operationalReadiness?.launchReadinessNextGateFullTestWindowCommand || null,
         operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: receipt.operationalReadiness?.launchReadinessNextGateProductionSignoffPacket || null,
+        operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: receipt.operationalReadiness?.launchReadinessNextGateLaunchDutyRecordIndexPath || null,
         operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry: receipt.operationalReadiness?.launchReadinessNextGateLaunchDayWatchEntry || null,
         operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand: receipt.operationalReadiness?.launchReadinessNextGateCloseoutReloadCommand || null,
         operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey: receipt.operationalReadiness?.launchReadinessNextGatePrimaryDownloadKey || null,
@@ -21209,6 +21250,7 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
         launchReadinessNextGateCloseoutReloadCommand: receipt.launchReadinessNextGate?.closeoutReloadCommand || null,
         launchReadinessNextGateFullTestWindowCommand: receipt.launchReadinessNextGate?.fullTestWindowCommand || null,
         launchReadinessNextGateProductionSignoffPacket: receipt.launchReadinessNextGate?.productionSignoffPacket || null,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: receipt.launchReadinessNextGate?.launchDutyRecordIndexPath || null,
         launchReadinessNextGateLaunchDayWatchEntry: receipt.launchReadinessNextGate?.launchDayWatchEntry || null,
         launchReadinessNextGatePrimaryDownloadKey: receipt.launchReadinessNextGate?.primaryDownload?.key
           || receipt.launchReadinessNextGate?.primaryDownloadKey
@@ -22004,6 +22046,7 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       operationalReadinessLaunchReadinessNextGateCurrentGate: receipt.operationalReadinessLaunchReadinessNextGateCurrentGate || launchReadinessNextGate?.currentGate || null,
       operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: receipt.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || launchReadinessNextGate?.fullTestWindowCommand || null,
       operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: receipt.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || launchReadinessNextGate?.productionSignoffPacket || null,
+      operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: receipt.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath || launchReadinessNextGate?.launchDutyRecordIndexPath || null,
       operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry: receipt.operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry || launchReadinessNextGate?.launchDayWatchEntry || null,
       operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand: receipt.operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand || launchReadinessNextGate?.closeoutReloadCommand || null,
       operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey: receipt.operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey || launchReadinessNextGate?.primaryDownloadKey || null,
@@ -22015,6 +22058,7 @@ function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 
       launchReadinessNextGateCurrentGate: launchReadinessNextGate?.currentGate || null,
       launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGate?.fullTestWindowCommand || null,
       launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGate?.productionSignoffPacket || null,
+      launchReadinessNextGateLaunchDutyRecordIndexPath: launchReadinessNextGate?.launchDutyRecordIndexPath || null,
       launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGate?.launchDayWatchEntry || null,
       launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGate?.closeoutReloadCommand || null,
       launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGate?.primaryDownloadKey || null,
@@ -22525,6 +22569,7 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}, launchReadinessNe
     readinessReviewPacket: file("staging-readiness-review-packet.json"),
     productionSignoffPacket: file("staging-production-signoff-packet.json"),
     launchDutyArchiveIndex: file("staging-launch-duty-archive-index.json"),
+    launchDutyRecordIndex: file("launch-duty-record-index.json"),
     filledCloseoutInput: file("filled-closeout-input.json"),
     filledCloseoutDraft: file("filled-closeout-input.draft.json")
   };
@@ -22578,6 +22623,7 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}, launchReadinessNe
     archiveRoot,
     profileFile,
     files,
+    launchDutyRecordIndexPath: files.launchDutyRecordIndex,
     packetFiles,
     packetCompleteness,
     commands: {
@@ -22598,6 +22644,7 @@ function appendDeveloperOpsStagingLaunchDutyArchiveLines(lines = [], archive = n
   lines.push(`- Status: ${archive.status || "-"}`);
   lines.push(`- Archive Root: ${archive.archiveRoot || "-"}`);
   lines.push(`- Launch Duty Archive Index: ${archive.files?.launchDutyArchiveIndex || archive.indexFile || "-"}`);
+  lines.push(`- Launch Duty Record Index: ${archive.files?.launchDutyRecordIndex || archive.launchDutyRecordIndexPath || "-"}`);
   const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(archive);
   if (launchReadinessNextGate) {
     lines.push(
@@ -22605,6 +22652,7 @@ function appendDeveloperOpsStagingLaunchDutyArchiveLines(lines = [], archive = n
       + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
       + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
       + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+      + ` | launchDutyRecordIndex=${launchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
     );
   }
   lines.push("- Packet Files:");
@@ -22671,6 +22719,9 @@ function buildDeveloperOpsLaunchDutyActionOrder({
         closeoutReload: stagingLaunchDutyArchive.commands?.closeoutReload || null,
         fullTestWindow: stagingLaunchDutyArchive.commands?.fullTestWindow || null,
         productionSignoffPacket: stagingLaunchDutyArchive.files?.productionSignoffPacket || null,
+        launchDutyRecordIndexPath: stagingLaunchDutyArchive.files?.launchDutyRecordIndex
+          || stagingLaunchDutyArchive.launchDutyRecordIndexPath
+          || null,
         ...launchReadinessNextGateCarry,
         launchRunway: {
           mode: "staging-archive-launch-runway",
@@ -22682,6 +22733,10 @@ function buildDeveloperOpsLaunchDutyActionOrder({
             || (stagingLaunchDutyArchive.packetCompleteness?.missingCount ? "waiting_for_packet_paths" : "ready_for_closeout_reload"),
           sequence: ["closeout_reload", "full_test_window", "production_signoff", "launch_day_watch"],
           launchDayWatchEntry: normalizedLaunchReadinessNextGate?.launchDayWatchEntry || "enter_after_production_signoff",
+          launchDutyRecordIndexPath: normalizedLaunchReadinessNextGate?.launchDutyRecordIndexPath
+            || stagingLaunchDutyArchive.files?.launchDutyRecordIndex
+            || stagingLaunchDutyArchive.launchDutyRecordIndexPath
+            || null,
           nextAction: normalizedLaunchReadinessNextGate?.nextAction || null
         },
         nextAction: stagingLaunchDutyArchive.packetCompleteness?.missingCount
@@ -22767,6 +22822,7 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
     lines.push(`- Staging Archive Next Operations: ${stagingArchiveNextOperations.status || "-"}`);
     lines.push(`- Staging Archive Closeout Reload: ${stagingArchiveNextOperations.closeoutReload || "-"}`);
     lines.push(`- Staging Archive Production Signoff Packet: ${stagingArchiveNextOperations.productionSignoffPacket || "-"}`);
+    lines.push(`- Staging Archive Launch Duty Record Index: ${stagingArchiveNextOperations.launchDutyRecordIndexPath || stagingArchiveNextOperations.launchDutyRecordIndexFile || "-"}`);
     lines.push(`- Staging Archive Full Test Window: ${stagingArchiveNextOperations.fullTestWindow || "-"}`);
     const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(stagingArchiveNextOperations);
     if (launchReadinessNextGate) {
@@ -22776,6 +22832,7 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         + ` | canEnterInitialLaunch=${launchReadinessNextGate.canEnterInitialLaunch === true}`
         + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
         + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
+        + ` | launchDutyRecordIndex=${launchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
       );
     }
     const launchRunway = stagingArchiveNextOperations.launchRunway || null;
@@ -22786,6 +22843,7 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
       lines.push(`- Staging Archive Launch Runway: ${sequence}`);
       lines.push(`- Staging Archive Runway Current Gate: ${launchRunway.currentGate || "-"}`);
       lines.push(`- Staging Archive Launch-Day Watch Entry: ${launchRunway.launchDayWatchEntry || "-"}`);
+      lines.push(`- Staging Archive Launch Duty Record Index: ${launchRunway.launchDutyRecordIndexPath || launchRunway.launchDutyRecordIndexFile || "-"}`);
     }
     lines.push(`- Staging Archive Next Readiness Step: ${stagingArchiveNextOperations.nextAction || "-"}`);
   }
@@ -22924,6 +22982,7 @@ function buildDeveloperOpsLaunchReadinessNextGateCarry(source = null) {
     launchReadinessNextGateCloseoutReloadCommand: normalized?.closeoutReloadCommand || null,
     launchReadinessNextGateFullTestWindowCommand: normalized?.fullTestWindowCommand || null,
     launchReadinessNextGateProductionSignoffPacket: normalized?.productionSignoffPacket || null,
+    launchReadinessNextGateLaunchDutyRecordIndexPath: normalized?.launchDutyRecordIndexPath || null,
     launchReadinessNextGateLaunchDayWatchEntry: normalized?.launchDayWatchEntry || null,
     launchReadinessNextGatePrimaryDownloadKey: normalized?.primaryDownloadKey || null,
     launchReadinessNextGatePrimaryDownloadFileName: normalized?.primaryDownloadFileName || null,
@@ -24894,6 +24953,7 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
           launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
           launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
           launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+          launchReadinessNextGateLaunchDutyRecordIndexPath: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath,
           launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
           launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
           launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
@@ -24913,6 +24973,9 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
             || null,
           operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: launchReceiptNextFollowUp?.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket
             || launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket
+            || null,
+          operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: launchReceiptNextFollowUp?.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath
+            || launchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath
             || null
         }
       : null,
@@ -24940,6 +25003,7 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
           launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
           launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
           launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+          launchReadinessNextGateLaunchDutyRecordIndexPath: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath,
           launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
           launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
           launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
@@ -24959,6 +25023,9 @@ function buildDeveloperOpsInitialLaunchOpsTraceability({
             || null,
           operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket
             || launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket
+            || null,
+          operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath
+            || launchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath
             || null
         }
       : null,
@@ -25192,6 +25259,7 @@ function buildDeveloperOpsInitialLaunchOperatorNextAction({
     launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
     launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
     launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+    launchReadinessNextGateLaunchDutyRecordIndexPath: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath,
     launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
     launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
     launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
@@ -25236,6 +25304,7 @@ function buildDeveloperOpsInitialLaunchOperatorActionManifest({
     launchReadinessNextGateCloseoutReloadCommand: launchReadinessNextGateCarry.launchReadinessNextGateCloseoutReloadCommand,
     launchReadinessNextGateFullTestWindowCommand: launchReadinessNextGateCarry.launchReadinessNextGateFullTestWindowCommand,
     launchReadinessNextGateProductionSignoffPacket: launchReadinessNextGateCarry.launchReadinessNextGateProductionSignoffPacket,
+    launchReadinessNextGateLaunchDutyRecordIndexPath: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDutyRecordIndexPath,
     launchReadinessNextGateLaunchDayWatchEntry: launchReadinessNextGateCarry.launchReadinessNextGateLaunchDayWatchEntry,
     launchReadinessNextGatePrimaryDownloadKey: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadKey,
     launchReadinessNextGatePrimaryDownloadFileName: launchReadinessNextGateCarry.launchReadinessNextGatePrimaryDownloadFileName,
@@ -26591,6 +26660,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         operationalReadinessLaunchReadinessNextGateCurrentGate: item.operationalReadinessLaunchReadinessNextGateCurrentGate || null,
         operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || null,
         operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: item.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || null,
+        operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: item.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath || null,
         operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry: item.operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry || null,
         operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand: item.operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand || null,
         operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey: item.operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey || null,
@@ -26611,6 +26681,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         launchReadinessNextGateCurrentGate: item.launchReadinessNextGateCurrentGate || null,
         launchReadinessNextGateFullTestWindowCommand: item.launchReadinessNextGateFullTestWindowCommand || null,
         launchReadinessNextGateProductionSignoffPacket: item.launchReadinessNextGateProductionSignoffPacket || null,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: item.launchReadinessNextGateLaunchDutyRecordIndexPath || null,
         launchReadinessNextGateLaunchDayWatchEntry: item.launchReadinessNextGateLaunchDayWatchEntry || null,
         launchReadinessNextGateCloseoutReloadCommand: item.launchReadinessNextGateCloseoutReloadCommand || null,
         launchReadinessNextGatePrimaryDownloadKey: item.launchReadinessNextGatePrimaryDownloadKey || null,
@@ -27717,6 +27788,10 @@ function buildLaunchMainlineReceiptLaunchReadinessNextGate({
     && typeof initialLaunchOpsReadiness.launchDutyActionOrder === "object"
       ? initialLaunchOpsReadiness.launchDutyActionOrder
       : null;
+  const stagingLaunchDutyArchive = initialLaunchOpsReadiness.stagingLaunchDutyArchive
+    && typeof initialLaunchOpsReadiness.stagingLaunchDutyArchive === "object"
+      ? initialLaunchOpsReadiness.stagingLaunchDutyArchive
+      : null;
   const stagingArchiveStep = Array.isArray(launchDutyActionOrder?.steps)
     ? launchDutyActionOrder.steps.find((item) => item?.key === "staging_archive") || null
     : null;
@@ -27746,6 +27821,13 @@ function buildLaunchMainlineReceiptLaunchReadinessNextGate({
     fullTestWindowCommand: stagingArchiveNextOperations?.fullTestWindow || null,
     productionSignoffPacket: stagingArchiveNextOperations?.productionSignoffPacket
       || launchRunway?.productionSignoffPacket
+      || null,
+    launchDutyRecordIndexPath: stagingArchiveNextOperations?.launchDutyRecordIndexPath
+      || stagingArchiveNextOperations?.launchDutyRecordIndexFile
+      || launchRunway?.launchDutyRecordIndexPath
+      || launchRunway?.launchDutyRecordIndexFile
+      || stagingLaunchDutyArchive?.files?.launchDutyRecordIndex
+      || stagingLaunchDutyArchive?.launchDutyRecordIndexPath
       || null,
     launchDayWatchEntry: launchRunway?.launchDayWatchEntry || null,
     primaryDownload: initialLaunchOpsReadiness.primaryDownload || gate.primaryDownload || null
@@ -29056,6 +29138,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) 
       readinessGate: item.operationalReadinessLaunchReadinessNextGateStatus || "",
       readinessGateCurrent: item.operationalReadinessLaunchReadinessNextGateCurrentGate || "",
       readinessGateFullTestWindow: item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || "",
+      readinessGateRecordIndex: item.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath || "",
       watchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || "",
       watchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? "",
       routeTitle: item.title || "Launch receipt follow-up",
@@ -29092,6 +29175,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpAction(item = null) {
     operationalReadinessLaunchReadinessNextGateCurrentGate: item.operationalReadinessLaunchReadinessNextGateCurrentGate || null,
     operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || null,
     operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: item.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || null,
+    operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: item.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath || null,
     workspaceAction: buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item),
     productCode: item.productCode || null,
     channel: item.channel || null,
@@ -30989,6 +31073,13 @@ function normalizeLaunchReadinessNextGateForHandoff(source = null) {
     closeoutReloadCommand: gate?.closeoutReloadCommand || source.launchReadinessNextGateCloseoutReloadCommand || null,
     fullTestWindowCommand: gate?.fullTestWindowCommand || source.launchReadinessNextGateFullTestWindowCommand || null,
     productionSignoffPacket: gate?.productionSignoffPacket || source.launchReadinessNextGateProductionSignoffPacket || null,
+    launchDutyRecordIndexPath: gate?.launchDutyRecordIndexPath
+      || gate?.launchDutyRecordIndexFile
+      || source.launchReadinessNextGateLaunchDutyRecordIndexPath
+      || source.launchReadinessNextGateLaunchDutyRecordIndexFile
+      || source.launchDutyRecordIndexPath
+      || source.launchDutyRecordIndexFile
+      || null,
     launchDayWatchEntry: gate?.launchDayWatchEntry || source.launchReadinessNextGateLaunchDayWatchEntry || null,
     primaryDownloadKey: primaryDownload?.key || gate?.primaryDownloadKey || source.launchReadinessNextGatePrimaryDownloadKey || null,
     primaryDownloadFormat: primaryDownload?.format || gate?.primaryDownloadFormat || source.launchReadinessNextGatePrimaryDownloadFormat || null,
@@ -31004,6 +31095,7 @@ function normalizeLaunchReadinessNextGateForHandoff(source = null) {
     normalized.closeoutReloadCommand,
     normalized.fullTestWindowCommand,
     normalized.productionSignoffPacket,
+    normalized.launchDutyRecordIndexPath,
     normalized.launchDayWatchEntry
   ].some(Boolean);
   return hasGate ? normalized : null;
@@ -31092,6 +31184,7 @@ function buildDeveloperOpsLaunchReadinessNextGateHandoffPayload({
     closeoutReloadCommand: launchReadinessNextGate.closeoutReloadCommand || null,
     fullTestWindowCommand: launchReadinessNextGate.fullTestWindowCommand || null,
     productionSignoffPacket: launchReadinessNextGate.productionSignoffPacket || null,
+    launchDutyRecordIndexPath: launchReadinessNextGate.launchDutyRecordIndexPath || null,
     launchDayWatchEntry: launchReadinessNextGate.launchDayWatchEntry || null,
     sourceReceipt: launchReadinessNextGateSource
       ? {
@@ -31156,6 +31249,9 @@ function appendLaunchReadinessNextGateHandoffText(lines = [], source = null, {
     `- productionSignoffPacket=${gate.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${gate.launchDayWatchEntry || "-"}`
   );
+  if (gate.launchDutyRecordIndexPath) {
+    lines.push(`- launchReadinessNextGateRecordIndex=${gate.launchDutyRecordIndexPath}`);
+  }
   if (gate.primaryDownloadKey || gate.primaryDownloadFormat || gate.primaryDownloadFileName || gate.primaryDownloadHref) {
     lines.push(
       `- primaryDownload=${gate.primaryDownloadKey || "-"}`
@@ -32215,6 +32311,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
             + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
             + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
             + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+            + ` | launchDutyRecordIndex=${launchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
           );
         }
       }
@@ -32260,6 +32357,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | goLiveCurrentGate=${latestOperatorLaunchReadinessNextGate.currentGate || "-"}`
           + ` | goLiveFullTestWindow=${latestOperatorLaunchReadinessNextGate.fullTestWindowCommand || "-"}`
           + ` | productionSignoffPacket=${latestOperatorLaunchReadinessNextGate.productionSignoffPacket || "-"}`
+          + ` | launchDutyRecordIndex=${latestOperatorLaunchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
         );
       }
       lines.push(
@@ -32536,6 +32634,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         `- status=${stagingArchive.status || "-"}`
         + ` | archiveRoot=${stagingArchive.archiveRoot || "-"}`
         + ` | launchDutyArchiveIndex=${stagingArchive.files?.launchDutyArchiveIndex || "-"}`
+        + ` | launchDutyRecordIndex=${stagingArchive.files?.launchDutyRecordIndex || stagingArchive.launchDutyRecordIndexPath || "-"}`
       );
       const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(stagingArchive);
       if (launchReadinessNextGate) {
@@ -32544,6 +32643,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | goLiveCurrentGate=${launchReadinessNextGate.currentGate || "-"}`
           + ` | goLiveFullTestWindow=${launchReadinessNextGate.fullTestWindowCommand || "-"}`
           + ` | productionSignoffPacket=${launchReadinessNextGate.productionSignoffPacket || "-"}`
+          + ` | launchDutyRecordIndex=${launchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
         );
       }
       const packetCompleteness = stagingArchive.packetCompleteness || null;
@@ -32947,6 +33047,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | currentGate=${latestOperatorLaunchReadinessNextGate.currentGate || "-"}`
         + ` | fullTestWindow=${latestOperatorLaunchReadinessNextGate.fullTestWindowCommand || "-"}`
         + ` | productionSignoffPacket=${latestOperatorLaunchReadinessNextGate.productionSignoffPacket || "-"}`
+        + ` | launchDutyRecordIndex=${latestOperatorLaunchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
       );
     }
     lines.push(`- Next Action: ${stabilizationHandoff.nextAction?.operation || "-"} | download=${stabilizationHandoff.nextAction?.downloadFileName || stabilizationHandoff.nextAction?.downloadKey || "-"} | href=${stabilizationHandoff.nextAction?.downloadHref || "-"} | workspace=${stabilizationHandoff.nextAction?.workspaceHref || "-"}`);
@@ -33585,6 +33686,7 @@ function buildDeveloperOpsStabilizationHandoffText(payload = {}) {
       + ` | currentGate=${latestOperatorLaunchReadinessNextGate.currentGate || "-"}`
       + ` | fullTestWindow=${latestOperatorLaunchReadinessNextGate.fullTestWindowCommand || "-"}`
       + ` | productionSignoffPacket=${latestOperatorLaunchReadinessNextGate.productionSignoffPacket || "-"}`
+      + ` | launchDutyRecordIndex=${latestOperatorLaunchReadinessNextGate.launchDutyRecordIndexPath || "-"}`
     );
   }
   lines.push(`Next Action: ${nextAction.operation || "-"} | stage=${nextAction.stage || "-"} | action=${nextAction.actionKey || "-"} | priority=${nextAction.priority || "-"}`);

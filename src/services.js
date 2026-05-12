@@ -17755,6 +17755,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   lines.push(
     `- Next Follow-up: ${formatLaunchReceiptNextFollowUp(nextFollowUp)}`
   );
+  lines.push(`- Next Follow-up Record Index: ${resolveLaunchReadinessGateRecordIndexPath(nextFollowUp) || "-"}`);
   lines.push(
     `- Post-Launch Lifecycle: status=${String(lifecycle.status || "unknown").toUpperCase()}`
     + ` | primaryDownload=${lifecycle.primaryDownloadKey || "-"}`
@@ -20336,6 +20337,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "ops/handoff-index.txt"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"} | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
+  lines.push(`- Next Follow-up Record Index: ${resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp) || "-"}`);
   lines.push(
     `- First-Wave Audit Backfill Status: ${opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"}`
     + ` | file=${opsFirstWaveAuditBackfillStatusDownload.fileName || "-"}`
@@ -32258,6 +32260,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     `Receipt Follow-up Count: ${summary.launchReceiptFollowUps ?? 0}`,
     `Receipt Follow-up Priorities: ${formatLaunchReceiptFollowUpPrioritySummary(launchReceiptFollowUpPriorities)}`,
     `Receipt Next Follow-up: ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`,
+    `Receipt Next Follow-up Record Index: ${resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp) || "-"}`,
     `Receipt Next Follow-up Action: ${launchReceiptNextFollowUpAction?.key || "-"} (${launchReceiptNextFollowUpAction?.operation || "-"})`,
     `Receipt Next Follow-up Workspace: ${launchReceiptNextFollowUpWorkspace?.label || "-"}@${launchReceiptNextFollowUpWorkspace?.autofocus || "-"}`,
     `Receipt Next Follow-up Download: ${launchReceiptNextFollowUpDownload?.fileName || "-"} (${launchReceiptNextFollowUpDownload?.format || "-"}) | href=${launchReceiptNextFollowUpDownload?.href || "-"}`

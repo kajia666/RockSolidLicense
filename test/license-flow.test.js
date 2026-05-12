@@ -17734,6 +17734,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       )
     );
     assert.match(launchReceiptSnapshot.summaryText, /Receipt Next Follow-up: \[REVIEW\]\[production_evidence\]/);
+    assert.match(
+      launchReceiptSnapshot.summaryText,
+      /Receipt Next Follow-up Record Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(launchReceiptSnapshot.summaryText, /context=launch_ops_overview_status/);
     assert.match(launchReceiptSnapshot.summaryText, /downloadKey=ops_launch_operations_overview_status/);
     assert.match(launchReceiptSnapshot.summaryText, /downloadFileName=developer-ops-launch-operations-overview-status\.txt/);
@@ -17808,6 +17812,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSummaryDownload.body, /Launch Receipt Audit Backfill Status: USED/);
     assert.match(launchReceiptSummaryDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
     assert.match(launchReceiptSummaryDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
+    assert.match(
+      launchReceiptSummaryDownload.body,
+      /Receipt Next Follow-up Record Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchReceiptFollowUpsCsvDownload = await getText(
       baseUrl,
@@ -18479,6 +18487,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
+      /Next Follow-up Record Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
       new RegExp(
         `Post-Launch Lifecycle: .*primaryDownload=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadKey}`
         + `.*format=${latestLaunchReceipt.postLaunchLifecyclePrimaryDownloadFormat}`
@@ -18965,6 +18977,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       /Next Follow-up: .*file=developer-ops-launch-receipt-next-follow-up\.txt.*format=launch-receipt-next-follow-up.*href=.*format=launch-receipt-next-follow-up/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Next Follow-up Record Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,

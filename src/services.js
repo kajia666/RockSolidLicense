@@ -17859,14 +17859,28 @@ function appendInitialLaunchContractTraceabilityTextLines(lines = [], contract =
   return true;
 }
 
+function resolveInitialLaunchOperatorHeadlineRecordIndex(operatorHeadline = null) {
+  return operatorHeadline?.launchDutyRecordIndexPath
+    || operatorHeadline?.readinessGateRecordIndex
+    || resolveLaunchReadinessGateRecordIndexPath(operatorHeadline)
+    || "";
+}
+
 function appendInitialLaunchOperatorHeadlineTextLines(lines = [], operatorHeadline = null) {
   if (!Array.isArray(lines) || !operatorHeadline || typeof operatorHeadline !== "object") {
     return false;
   }
+  const launchDutyRecordIndexPath = resolveInitialLaunchOperatorHeadlineRecordIndex(operatorHeadline);
   lines.push("");
   lines.push("Initial Launch Operator Headline:");
   lines.push(`- Headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
-  lines.push(`- Next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | href=${operatorHeadline.nextDownloadHref || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+  lines.push(
+    `- Next: operation=${operatorHeadline.nextOperation || "-"}`
+    + ` | download=${operatorHeadline.nextDownloadFileName || "-"}`
+    + ` | href=${operatorHeadline.nextDownloadHref || "-"}`
+    + ` | workspace=${operatorHeadline.workspaceHref || "-"}`
+    + `${launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${launchDutyRecordIndexPath}` : ""}`
+  );
   lines.push(`- Handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
   return true;
 }
@@ -25282,6 +25296,7 @@ function buildDeveloperOpsInitialLaunchOperatorHeadline({
   const decisionLabel = contract.label || goNoGo.label || String(contract.decision || goNoGo.decision || "unknown").toUpperCase();
   const status = contract.status || goNoGo.status || "unknown";
   const primaryBlockerStage = goNoGo.primaryBlockerStage || (Array.isArray(contract.blockingStages) && contract.blockingStages.length ? contract.blockingStages[0] : null);
+  const launchDutyRecordIndexPath = resolveInitialLaunchContractNextActionRecordIndex(contract) || null;
   return {
     decisionLabel,
     status,
@@ -25293,6 +25308,8 @@ function buildDeveloperOpsInitialLaunchOperatorHeadline({
     nextDownloadHref: nextRequiredAction.downloadHref || goNoGo.nextDownloadHref || null,
     workspaceHref: nextRequiredAction.workspaceHref || primaryWorkspaceAction?.href || null,
     handoffFileName: nextRequiredAction.handoffFileName || latestReceipt?.handoffFileName || null,
+    launchDutyRecordIndexPath,
+    readinessGateRecordIndex: launchDutyRecordIndexPath,
     files: {
       readiness: files.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt",
       handoffIndex: files.handoffIndex || "handoff-index.txt",
@@ -32433,10 +32450,17 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     }
     const operatorHeadline = initialLaunchOpsReadiness.operatorHeadline || null;
     if (operatorHeadline) {
+      const operatorHeadlineRecordIndex = resolveInitialLaunchOperatorHeadlineRecordIndex(operatorHeadline);
       lines.push("");
       lines.push("Initial Launch Operator Headline:");
       lines.push(`- headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
-      lines.push(`- next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | href=${operatorHeadline.nextDownloadHref || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+      lines.push(
+        `- next: operation=${operatorHeadline.nextOperation || "-"}`
+        + ` | download=${operatorHeadline.nextDownloadFileName || "-"}`
+        + ` | href=${operatorHeadline.nextDownloadHref || "-"}`
+        + ` | workspace=${operatorHeadline.workspaceHref || "-"}`
+        + `${operatorHeadlineRecordIndex ? ` | launchDutyRecordIndex=${operatorHeadlineRecordIndex}` : ""}`
+      );
       lines.push(`- handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
     }
     appendInitialLaunchOperatorNextActionTextLines(lines, initialLaunchOpsReadiness.operatorNextAction || null, {
@@ -33183,9 +33207,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   }
   const operatorHeadline = readiness.operatorHeadline || null;
   if (operatorHeadline) {
+    const operatorHeadlineRecordIndex = resolveInitialLaunchOperatorHeadlineRecordIndex(operatorHeadline);
     lines.push("Operator Headline:");
     lines.push(`- Headline: ${operatorHeadline.headline || `${operatorHeadline.decisionLabel || "-"} | status=${operatorHeadline.status || "-"} | blocker=${operatorHeadline.primaryBlockerStage || "-"}`}`);
-    lines.push(`- Next: operation=${operatorHeadline.nextOperation || "-"} | download=${operatorHeadline.nextDownloadFileName || "-"} | href=${operatorHeadline.nextDownloadHref || "-"} | workspace=${operatorHeadline.workspaceHref || "-"}`);
+    lines.push(
+      `- Next: operation=${operatorHeadline.nextOperation || "-"}`
+      + ` | download=${operatorHeadline.nextDownloadFileName || "-"}`
+      + ` | href=${operatorHeadline.nextDownloadHref || "-"}`
+      + ` | workspace=${operatorHeadline.workspaceHref || "-"}`
+      + `${operatorHeadlineRecordIndex ? ` | launchDutyRecordIndex=${operatorHeadlineRecordIndex}` : ""}`
+    );
     lines.push(`- Handoff: ${operatorHeadline.handoffFileName || "-"} | readiness=${operatorHeadline.files?.readiness || "-"} | handoffIndex=${operatorHeadline.files?.handoffIndex || "-"}`);
     lines.push("");
   }

@@ -527,6 +527,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       postLaunchHandoffIndex.body,
       /Contract Next Required Action: .*download=developer-ops-launch-receipt-next-follow-up\.txt.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      postLaunchHandoffIndex.body,
+      /Initial Launch Operator Headline:[\s\S]*Next: operation=.*download=developer-ops-launch-receipt-next-follow-up\.txt.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
 
     const handoffDownloadRoutes = await getText(
       baseUrl,

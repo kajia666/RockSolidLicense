@@ -17300,6 +17300,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href, /readinessGateCurrent=ready_for_closeout_reload/);
     assert.match(
       launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href,
+      /readinessGateRecordIndex=artifacts%2Fstaging%2FEXPORT_ALPHA%2Fstable%2Flaunch-duty-record-index\.json/
+    );
+    assert.match(
+      launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.href,
       new RegExp(`operation=${latestLaunchReceipt.productionEvidenceNextOperation}`)
     );
     assert.ok(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload);
@@ -17311,6 +17315,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /watchRecordDraftStatus=blocked_until_runway_evidence/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /readinessGate=awaiting_launch_readiness/);
     assert.match(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href, /readinessGateCurrent=ready_for_closeout_reload/);
+    assert.match(
+      launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedDownload.href,
+      /readinessGateRecordIndex=artifacts%2Fstaging%2FEXPORT_ALPHA%2Fstable%2Flaunch-duty-record-index\.json/
+    );
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.status, "review");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.followUpCount, launchReceiptSnapshot.overview.launchReceiptFollowUps.length);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.nextFollowUp.stage, "production_evidence");

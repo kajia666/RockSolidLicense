@@ -22301,6 +22301,30 @@ function formatLaunchReceiptNextFollowUp(item = null) {
   ].filter(Boolean).join(" | ");
 }
 
+function deriveLaunchDutyRecordIndexPathFromSignoffPacketPath(signoffPacketPath = "") {
+  const normalizedPath = String(signoffPacketPath || "").trim();
+  if (!normalizedPath) {
+    return "";
+  }
+  if (/[\\/]/.test(normalizedPath)) {
+    return normalizedPath.replace(/[^\\/]+$/, "launch-duty-record-index.json");
+  }
+  return "launch-duty-record-index.json";
+}
+
+function resolveLaunchReadinessGateRecordIndexPath(item = null) {
+  return String(
+    item?.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath
+    || item?.launchReadinessNextGateLaunchDutyRecordIndexPath
+    || deriveLaunchDutyRecordIndexPathFromSignoffPacketPath(
+      item?.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket
+      || item?.launchReadinessNextGateProductionSignoffPacket
+      || ""
+    )
+    || ""
+  ).trim();
+}
+
 function buildDeveloperOpsLaunchReceiptDownloadParams(scope = {}, item = null) {
   return compactRouteParams({
     ...buildDeveloperOpsRouteReviewBaseDownloadParams(scope),
@@ -22316,6 +22340,7 @@ function buildDeveloperOpsLaunchReceiptDownloadParams(scope = {}, item = null) {
     readinessGate: item?.operationalReadinessLaunchReadinessNextGateStatus || "",
     readinessGateCurrent: item?.operationalReadinessLaunchReadinessNextGateCurrentGate || "",
     readinessGateFullTestWindow: item?.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || "",
+    readinessGateRecordIndex: resolveLaunchReadinessGateRecordIndexPath(item),
     watchRecordDraftStatus: item?.operationalReadinessWatchRecordDraftStatus || "",
     watchRecordDraftRecordCount: item?.operationalReadinessWatchRecordDraftRecordCount ?? "",
     routeTitle: item?.title || "",
@@ -29138,7 +29163,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpWorkspaceAction(item = null) 
       readinessGate: item.operationalReadinessLaunchReadinessNextGateStatus || "",
       readinessGateCurrent: item.operationalReadinessLaunchReadinessNextGateCurrentGate || "",
       readinessGateFullTestWindow: item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || "",
-      readinessGateRecordIndex: item.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath || "",
+      readinessGateRecordIndex: resolveLaunchReadinessGateRecordIndexPath(item),
       watchRecordDraftStatus: item.operationalReadinessWatchRecordDraftStatus || "",
       watchRecordDraftRecordCount: item.operationalReadinessWatchRecordDraftRecordCount ?? "",
       routeTitle: item.title || "Launch receipt follow-up",

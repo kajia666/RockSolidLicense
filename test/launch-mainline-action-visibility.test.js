@@ -463,6 +463,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(handoffDownloadRoutes.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
     assert.match(
       handoffDownloadRoutes.body,
+      /launch-receipt-next-follow-up.*\/api\/developer\/ops\/export\/download\?.*format=launch-receipt-next-follow-up.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      handoffDownloadRoutes.body,
       /launch-review-receipt-visibility-summary.*\/api\/developer\/launch-review\/download\?.*source=launch-smoke.*handoff=first-wave.*format=summary.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/
     );
     assert.match(

@@ -18779,7 +18779,10 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       fileName: nextFollowUp.downloadFileName || nextFollowUpDownload.fileName || null,
       format: nextFollowUp.downloadFormat || nextFollowUpDownload.format || null,
       source: nextFollowUp.downloadSource || nextFollowUpDownload.source || null,
-      href: nextFollowUp.downloadHref || nextFollowUpDownload.href || null
+      href: nextFollowUp.downloadHref || nextFollowUpDownload.href || null,
+      launchDutyRecordIndexPath: resolveLaunchReadinessGateRecordIndexPath(nextFollowUp)
+        || receiptVisibilitySummaryRecordIndexPath
+        || null
     }
   );
   pushRoute(

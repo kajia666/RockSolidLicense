@@ -17271,6 +17271,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessWatchRecordDraftRecordCount, 5);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateStatus, "awaiting_launch_readiness");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateCurrentGate, "ready_for_closeout_reload");
+    assert.equal(
+      launchReceiptSnapshot.summary.launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/launch-duty-record-index.json"
+    );
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.launchOpsOverviewContext?.watchRecordDraftStatus, "blocked_until_runway_evidence");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
@@ -17282,6 +17286,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessWatchRecordDraftRecordCount, 5);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessLaunchReadinessNextGateStatus, "awaiting_launch_readiness");
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessLaunchReadinessNextGateCurrentGate, "ready_for_closeout_reload");
+    assert.equal(
+      launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/launch-duty-record-index.json"
+    );
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.source, "developer-ops-launch-receipt");
     assert.ok(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction);
     assert.equal(launchReceiptSnapshot.summary.launchReceiptNextFollowUp.recommendedAction.workspaceAction.key, "launch-mainline");

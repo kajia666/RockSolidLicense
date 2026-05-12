@@ -26,7 +26,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - First-launch operations: launch bootstrap, first batch setup, inventory refill, first-launch handoff, launch receipt follow-ups, initial launch ops readiness.
 - Production readiness: production gate, cutover handoff, recovery drill handoff, operations handoff, post-launch sweep handoff, closeout handoff, stabilization handoff.
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
-- Latest launch-receipt follow-up record-index continuity slice: Developer Ops `launch-receipt-next-follow-up` now resolves `readinessGateRecordIndex` through a shared rule used by both workspace and download links. If explicit launch-duty record-index fields are missing but a production signoff packet path exists, the link now derives the sibling `launch-duty-record-index.json` path automatically. This removes one remaining manual lookup breakpoint between Launch Smoke / Launch Review / Developer Ops follow-up files and Launch Mainline continuation.
+- Latest launch-receipt follow-up record-index continuity slice: Developer Ops `launch-receipt-next-follow-up` now resolves `readinessGateRecordIndex` through a shared rule used by the next-follow-up object, recommended action object, workspace link, and download link. If explicit launch-duty record-index fields are missing but a production signoff packet path exists, the handoff now derives the sibling `launch-duty-record-index.json` path automatically. This removes one remaining manual lookup breakpoint between Launch Smoke / Launch Review / Developer Ops follow-up files and Launch Mainline continuation.
 - Latest staging profile init launch-lane files slice: `staging:profile:init` now emits a `launchLaneFiles` packet and prints the launch lane archive root, generated profile, closeout draft, filled closeout input, readiness action queue, backup/restore artifact, handoff file, launch-duty archive index, and launch-duty record index. This puts the first real staging lane paths on the first terminal screen before rehearsal, closeout init, readiness refresh, backup/restore evidence backfill, or launch-duty watch record handoff.
 - Latest readiness full-test/signoff operator-command slice: `staging:readiness:status` now emits `operatorNextCommands` not only after final launch-day readiness, but also during the full-test window and production sign-off gates. When closeout is ready, the plain output and optional Markdown action queue show the current `npm.cmd test`, the blocked `full_test_window_passed` sign-off backfill command, and the follow-up status refresh; during production sign-off, each sign-off condition and receipt-visibility lane is also exposed as an operator command with artifact hints and status refreshes.
 - Latest profile-to-recovery operator-command slice: `staging:profile:init` now emits a copyable `recoveryPreflightCommand` after closeout init/readiness status, already carrying product, channel, closeout input, and readiness action queue paths. `staging:rehearsal` now passes the same paths into its internal recovery preflight, surfaces the resulting `backup_restore_drill_result` backfill command in environment readiness, the operator checklist, the staging execution runbook, the backup/restore packet JSON, and the Markdown handoff, so launch duty no longer has to rebuild the backup/restore backfill command after generating the staging profile.
@@ -384,7 +384,12 @@ Remaining work:
 
 ## Development Progress
 
-Current high-level progress:
+Current high-level progress uses two separate yardsticks so the percentage does not drift:
+
+- Feature/mainline completion means how much of the backend/API, SDK handoff, launch workflow, and operator control plane is already built and covered by targeted checks.
+- Strict initial pilot-launch readiness means how much is ready after counting real environment proof, staging evidence, full-test/sign-off, live-write smoke, HTTPS/secrets, and first-wave support handoff.
+
+Feature/mainline completion:
 
 - Core backend/API authorization: 90%-95%.
 - Developer delivery and handoff chain: 92%-94%.
@@ -393,9 +398,11 @@ Current high-level progress:
 - Production deployment readiness: 90%-94%.
 - Commercial operations readiness: 65%-75%.
 
-Overall operational initial pilot-launch readiness: 97%-98%.
+Strict initial pilot-launch readiness: 88%-90%.
 
-This is high enough to keep moving toward a controlled launch. The remaining 2%-3% is not mostly new product code; it is the real-environment and sign-off work that cannot be honestly replaced by local scripting: staging setup, backup/restore drill, live-write smoke, full repository test window, production sign-off, and first-wave support readiness.
+This is high enough to keep moving toward a controlled launch, but the remaining 10%-12% should not be described as ordinary feature work. It is mostly the real-environment and sign-off work that cannot be honestly replaced by local scripting: staging setup, backup/restore drill, live-write smoke, full repository test window, production sign-off, and first-wave support readiness.
+
+The earlier "90%+" estimates refer to feature/mainline completion. The stricter 88%-90% launch-readiness estimate is the number to use when answering "how close are we to going online and operating the first wave?"
 
 ## Work Remaining Before Initial Launch
 

@@ -374,6 +374,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     );
     assert.equal(launchReviewSummaryDownload.contentType, "text/plain; charset=utf-8");
     assert.match(launchReviewSummaryDownload.body, /Launch Review Receipt Visibility:/);
+    assert.match(
+      launchReviewSummaryDownload.body,
+      /^- Launch Duty Record Index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json$/m
+    );
     assert.match(launchReviewSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchReviewSummaryDownload.body, /post-launch-sweep-handoff/);
     assert.match(launchReviewSummaryDownload.body, /post-launch-handoff-index/);
@@ -385,6 +389,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     );
     assert.equal(launchSmokeSummaryDownload.contentType, "text/plain; charset=utf-8");
     assert.match(launchSmokeSummaryDownload.body, /Launch Smoke Receipt Visibility:/);
+    assert.match(
+      launchSmokeSummaryDownload.body,
+      /^- Launch Duty Record Index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json$/m
+    );
     assert.match(launchSmokeSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchSmokeSummaryDownload.body, /post-launch-sweep-handoff/);
     assert.match(launchSmokeSummaryDownload.body, /post-launch-handoff-index/);

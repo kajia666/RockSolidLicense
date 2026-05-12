@@ -31053,6 +31053,10 @@ function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
     + ` | operation=${visibility.recordedReceipt?.operation || receipt?.operation || "-"}`
     + ` | handoff=${visibility.recordedReceipt?.handoffFileName || receipt?.handoffFileName || "-"}`
   );
+  const launchDutyRecordIndexPath = resolveLaunchReadinessGateRecordIndexPath(receipt);
+  if (launchDutyRecordIndexPath) {
+    lines.push(`- Launch Duty Record Index: ${launchDutyRecordIndexPath}`);
+  }
   for (const item of workspaces) {
     lines.push(`- workspace=${item.label || item.key || "-"}@${item.autofocus || "-"} | href=${item.href || "-"}`);
   }

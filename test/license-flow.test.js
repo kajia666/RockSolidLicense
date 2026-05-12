@@ -19481,6 +19481,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchOpsOverviewDownloadFileName=developer-ops-launch-operations-overview-status\.txt/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status/i);
+    assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchReadinessNextGateStatus=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchReadinessNextGateCurrentGate=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, steadyStateLaunchDutyRecordIndexPattern);

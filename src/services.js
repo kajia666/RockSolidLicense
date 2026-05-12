@@ -32079,7 +32079,12 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
         + (prefill.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${prefill.launchOpsOverviewDownloadFileName}` : "")
         + (prefill.launchOpsOverviewDownloadFormat ? ` | launchOpsOverviewDownloadFormat=${prefill.launchOpsOverviewDownloadFormat}` : "")
         + (prefill.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${prefill.launchOpsOverviewDownloadHref}` : "")
-        + (prefill.launchReadinessNextGateLaunchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${prefill.launchReadinessNextGateLaunchDutyRecordIndexPath}` : "")
+        + (prefill.launchOpsOverviewContextLaunchDutyRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${prefill.launchOpsOverviewContextLaunchDutyRecordIndexPath}` : "")
+        + (
+          prefill.launchOpsOverviewContextLaunchDutyRecordIndexPath || prefill.launchReadinessNextGateLaunchDutyRecordIndexPath
+            ? ` | launchDutyRecordIndex=${prefill.launchOpsOverviewContextLaunchDutyRecordIndexPath || prefill.launchReadinessNextGateLaunchDutyRecordIndexPath}`
+            : ""
+        )
       );
     }
   };

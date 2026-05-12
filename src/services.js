@@ -17816,12 +17816,22 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   return true;
 }
 
+function resolveInitialLaunchContractNextActionRecordIndex(contract = null) {
+  const nextRequiredAction = contract?.nextRequiredAction || {};
+  return nextRequiredAction.launchDutyRecordIndexPath
+    || nextRequiredAction.readinessGateRecordIndex
+    || resolveLaunchReadinessGateRecordIndexPath(nextRequiredAction)
+    || resolveLaunchReadinessGateRecordIndexPath(contract)
+    || "";
+}
+
 function appendInitialLaunchContractTraceabilityTextLines(lines = [], contract = null, opsFiles = {}) {
   if (!Array.isArray(lines) || !contract || typeof contract !== "object") {
     return false;
   }
   const files = contract.files || {};
   const nextRequiredAction = contract.nextRequiredAction || {};
+  const nextRequiredActionRecordIndex = resolveInitialLaunchContractNextActionRecordIndex(contract);
   const toOpsFile = (value, fallback) => {
     const fileName = value || fallback || "";
     if (!fileName) {
@@ -17834,7 +17844,13 @@ function appendInitialLaunchContractTraceabilityTextLines(lines = [], contract =
   lines.push(`- Contract Version: ${contract.version || "-"}`);
   lines.push(`- Contract Decision: ${contract.label || String(contract.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${contract.canEnterInitialLaunch === true})`);
   lines.push(`- Contract Scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
-  lines.push(`- Contract Next Required Action: ${nextRequiredAction.stage || "-"} | operation=${nextRequiredAction.operation || "-"} | download=${nextRequiredAction.downloadFileName || "-"} | href=${nextRequiredAction.downloadHref || "-"}`);
+  lines.push(
+    `- Contract Next Required Action: ${nextRequiredAction.stage || "-"}`
+    + ` | operation=${nextRequiredAction.operation || "-"}`
+    + ` | download=${nextRequiredAction.downloadFileName || "-"}`
+    + ` | href=${nextRequiredAction.downloadHref || "-"}`
+    + `${nextRequiredActionRecordIndex ? ` | launchDutyRecordIndex=${nextRequiredActionRecordIndex}` : ""}`
+  );
   lines.push(
     `- Contract Files: readiness=${toOpsFile(opsFiles.initialLaunchOpsReadiness, files.initialLaunchOpsReadiness || "initial-launch-ops-readiness.txt")}`
     + ` | handoffIndex=${toOpsFile(opsFiles.handoffIndex, files.handoffIndex || "handoff-index.txt")}`
@@ -25189,6 +25205,10 @@ function buildDeveloperOpsInitialLaunchContract({
 } = {}) {
   const blockers = Array.isArray(gate.blockers) ? gate.blockers : [];
   const blockingStages = Array.from(new Set(blockers.map((item) => item.stage).filter(Boolean)));
+  const launchDutyRecordIndexPath = resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp)
+    || launchReceiptNextFollowUp?.recommendedDownload?.launchDutyRecordIndexPath
+    || primaryDownload?.launchDutyRecordIndexPath
+    || null;
   const nextRequiredAction = {
     stage: launchReceiptNextFollowUp?.stage || goNoGo.primaryBlockerStage || null,
     priority: launchReceiptNextFollowUp?.priority || null,
@@ -25201,7 +25221,9 @@ function buildDeveloperOpsInitialLaunchContract({
     workspaceKey: primaryWorkspaceAction?.key || null,
     workspaceLabel: primaryWorkspaceAction?.label || null,
     workspaceHref: primaryWorkspaceAction?.href || null,
-    handoffFileName: launchReceiptNextFollowUp?.handoffFileName || latestReceipt?.handoffFileName || null
+    handoffFileName: launchReceiptNextFollowUp?.handoffFileName || latestReceipt?.handoffFileName || null,
+    launchDutyRecordIndexPath,
+    readinessGateRecordIndex: launchDutyRecordIndexPath
   };
   const opsFiles = traceability.opsFiles || {};
   const launchMainlineFiles = traceability.launchMainlineFiles || {};
@@ -32395,11 +32417,18 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     }
     const contract = initialLaunchOpsReadiness.contract || null;
     if (contract) {
+      const contractNextActionRecordIndex = resolveInitialLaunchContractNextActionRecordIndex(contract);
       lines.push("");
       lines.push("Initial Launch Contract:");
       lines.push(`- version: ${contract.version || "-"} | decision=${contract.label || String(contract.decision || "unknown").toUpperCase()} | status=${contract.status || "-"}`);
       lines.push(`- scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
-      lines.push(`- nextRequiredAction: stage=${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"} | href=${contract.nextRequiredAction?.downloadHref || "-"}`);
+      lines.push(
+        `- nextRequiredAction: stage=${contract.nextRequiredAction?.stage || "-"}`
+        + ` | operation=${contract.nextRequiredAction?.operation || "-"}`
+        + ` | download=${contract.nextRequiredAction?.downloadFileName || "-"}`
+        + ` | href=${contract.nextRequiredAction?.downloadHref || "-"}`
+        + `${contractNextActionRecordIndex ? ` | launchDutyRecordIndex=${contractNextActionRecordIndex}` : ""}`
+      );
       lines.push(`- files: readiness=${contract.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${contract.files?.handoffIndex || "-"} | nextFollowUp=${contract.files?.launchReceiptNextFollowUp || "-"}`);
     }
     const operatorHeadline = initialLaunchOpsReadiness.operatorHeadline || null;
@@ -33137,11 +33166,18 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   }
   const contract = readiness.contract || null;
   if (contract) {
+    const contractNextActionRecordIndex = resolveInitialLaunchContractNextActionRecordIndex(contract);
     lines.push("Contract:");
     lines.push(`- Version: ${contract.version || "-"}`);
     lines.push(`- Decision: ${contract.label || String(contract.decision || "unknown").toUpperCase()} (canEnterInitialLaunch=${contract.canEnterInitialLaunch === true})`);
     lines.push(`- Scope: project=${contract.projectCode || "-"} | channel=${contract.channel || "-"}`);
-    lines.push(`- Next Required Action: ${contract.nextRequiredAction?.stage || "-"} | operation=${contract.nextRequiredAction?.operation || "-"} | download=${contract.nextRequiredAction?.downloadFileName || "-"} | href=${contract.nextRequiredAction?.downloadHref || "-"}`);
+    lines.push(
+      `- Next Required Action: ${contract.nextRequiredAction?.stage || "-"}`
+      + ` | operation=${contract.nextRequiredAction?.operation || "-"}`
+      + ` | download=${contract.nextRequiredAction?.downloadFileName || "-"}`
+      + ` | href=${contract.nextRequiredAction?.downloadHref || "-"}`
+      + `${contractNextActionRecordIndex ? ` | launchDutyRecordIndex=${contractNextActionRecordIndex}` : ""}`
+    );
     lines.push(`- Files: readiness=${contract.files?.initialLaunchOpsReadiness || "-"} | handoffIndex=${contract.files?.handoffIndex || "-"} | nextFollowUp=${contract.files?.launchReceiptNextFollowUp || "-"}`);
     lines.push("");
   }

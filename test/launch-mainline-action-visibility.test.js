@@ -502,6 +502,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(launchReviewSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchReviewSummaryDownload.body, /post-launch-sweep-handoff/);
     assert.match(launchReviewSummaryDownload.body, /post-launch-handoff-index/);
+    assert.match(
+      launchReviewSummaryDownload.body,
+      /Launch Readiness Next Gate:[\s\S]*- primaryDownload=.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(launchReviewSummaryDownload.body, stagingBackfillReceiptDownloadRecordIndexPattern);
 
     const launchSmokeSummaryDownload = await getText(
@@ -518,6 +522,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(launchSmokeSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchSmokeSummaryDownload.body, /post-launch-sweep-handoff/);
     assert.match(launchSmokeSummaryDownload.body, /post-launch-handoff-index/);
+    assert.match(
+      launchSmokeSummaryDownload.body,
+      /Launch Readiness Next Gate:[\s\S]*- primaryDownload=.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(launchSmokeSummaryDownload.body, stagingBackfillReceiptDownloadRecordIndexPattern);
 
     const postLaunchHandoffIndex = await getText(

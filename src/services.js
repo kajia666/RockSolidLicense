@@ -31227,8 +31227,8 @@ function normalizeLaunchReadinessNextGateForHandoff(source = null) {
     : null;
   const normalized = {
     key: gate?.key || source.launchReadinessNextGateKey || null,
-    status: gate?.status || source.launchReadinessNextGateStatus || null,
-    decision: gate?.decision || source.launchReadinessNextGateDecision || null,
+    status: gate?.status || source.launchReadinessNextGateStatus || source.operationalReadinessLaunchReadinessNextGateStatus || null,
+    decision: gate?.decision || source.launchReadinessNextGateDecision || source.operationalReadinessLaunchReadinessNextGateDecision || null,
     label: gate?.label || source.launchReadinessNextGateLabel || null,
     canEnterInitialLaunch: gate
       ? gate.canEnterInitialLaunch === true
@@ -31239,23 +31239,25 @@ function normalizeLaunchReadinessNextGateForHandoff(source = null) {
     firstLaunchOperatingChainStatus: gate?.firstLaunchOperatingChainStatus
       || source.launchReadinessNextGateFirstLaunchOperatingChainStatus
       || null,
-    currentGate: gate?.currentGate || source.launchReadinessNextGateCurrentGate || null,
+    currentGate: gate?.currentGate || source.launchReadinessNextGateCurrentGate || source.operationalReadinessLaunchReadinessNextGateCurrentGate || null,
     nextAction: gate?.nextAction || source.launchReadinessNextGateNextAction || null,
-    closeoutReloadCommand: gate?.closeoutReloadCommand || source.launchReadinessNextGateCloseoutReloadCommand || null,
-    fullTestWindowCommand: gate?.fullTestWindowCommand || source.launchReadinessNextGateFullTestWindowCommand || null,
-    productionSignoffPacket: gate?.productionSignoffPacket || source.launchReadinessNextGateProductionSignoffPacket || null,
+    closeoutReloadCommand: gate?.closeoutReloadCommand || source.launchReadinessNextGateCloseoutReloadCommand || source.operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand || null,
+    fullTestWindowCommand: gate?.fullTestWindowCommand || source.launchReadinessNextGateFullTestWindowCommand || source.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || null,
+    productionSignoffPacket: gate?.productionSignoffPacket || source.launchReadinessNextGateProductionSignoffPacket || source.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || null,
     launchDutyRecordIndexPath: gate?.launchDutyRecordIndexPath
       || gate?.launchDutyRecordIndexFile
       || source.launchReadinessNextGateLaunchDutyRecordIndexPath
       || source.launchReadinessNextGateLaunchDutyRecordIndexFile
+      || source.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath
+      || source.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexFile
       || source.launchDutyRecordIndexPath
       || source.launchDutyRecordIndexFile
       || null,
-    launchDayWatchEntry: gate?.launchDayWatchEntry || source.launchReadinessNextGateLaunchDayWatchEntry || null,
-    primaryDownloadKey: primaryDownload?.key || gate?.primaryDownloadKey || source.launchReadinessNextGatePrimaryDownloadKey || null,
-    primaryDownloadFormat: primaryDownload?.format || gate?.primaryDownloadFormat || source.launchReadinessNextGatePrimaryDownloadFormat || null,
-    primaryDownloadFileName: primaryDownload?.fileName || gate?.primaryDownloadFileName || source.launchReadinessNextGatePrimaryDownloadFileName || null,
-    primaryDownloadHref: primaryDownload?.href || gate?.primaryDownloadHref || source.launchReadinessNextGatePrimaryDownloadHref || null
+    launchDayWatchEntry: gate?.launchDayWatchEntry || source.launchReadinessNextGateLaunchDayWatchEntry || source.operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry || null,
+    primaryDownloadKey: primaryDownload?.key || gate?.primaryDownloadKey || source.launchReadinessNextGatePrimaryDownloadKey || source.operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey || null,
+    primaryDownloadFormat: primaryDownload?.format || gate?.primaryDownloadFormat || source.launchReadinessNextGatePrimaryDownloadFormat || source.operationalReadinessLaunchReadinessNextGatePrimaryDownloadFormat || null,
+    primaryDownloadFileName: primaryDownload?.fileName || gate?.primaryDownloadFileName || source.launchReadinessNextGatePrimaryDownloadFileName || source.operationalReadinessLaunchReadinessNextGatePrimaryDownloadFileName || null,
+    primaryDownloadHref: primaryDownload?.href || gate?.primaryDownloadHref || source.launchReadinessNextGatePrimaryDownloadHref || source.operationalReadinessLaunchReadinessNextGatePrimaryDownloadHref || null
   };
   const hasGate = [
     normalized.key,
@@ -31423,12 +31425,18 @@ function appendLaunchReadinessNextGateHandoffText(lines = [], source = null, {
   if (gate.launchDutyRecordIndexPath) {
     lines.push(`- launchReadinessNextGateRecordIndex=${gate.launchDutyRecordIndexPath}`);
   }
-  if (gate.primaryDownloadKey || gate.primaryDownloadFormat || gate.primaryDownloadFileName || gate.primaryDownloadHref) {
+  const sourceObject = source && typeof source === "object" ? source : null;
+  const primaryDownloadKey = gate.primaryDownloadKey || sourceObject?.operationalReadinessPrimaryDownloadKey || null;
+  const primaryDownloadFileName = gate.primaryDownloadFileName || sourceObject?.operationalReadinessPrimaryDownloadFileName || null;
+  const primaryDownloadFormat = gate.primaryDownloadFormat || sourceObject?.operationalReadinessPrimaryDownloadFormat || null;
+  const primaryDownloadHref = gate.primaryDownloadHref || sourceObject?.operationalReadinessPrimaryDownloadHref || null;
+  if (primaryDownloadKey || primaryDownloadFormat || primaryDownloadFileName || primaryDownloadHref) {
     lines.push(
-      `- primaryDownload=${gate.primaryDownloadKey || "-"}`
-      + ` | file=${gate.primaryDownloadFileName || "-"}`
-      + ` | format=${gate.primaryDownloadFormat || "-"}`
-      + ` | href=${gate.primaryDownloadHref || "-"}`
+      `- primaryDownload=${primaryDownloadKey || "-"}`
+      + ` | file=${primaryDownloadFileName || "-"}`
+      + ` | format=${primaryDownloadFormat || "-"}`
+      + ` | href=${primaryDownloadHref || "-"}`
+      + `${gate.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${gate.launchDutyRecordIndexPath}` : ""}`
     );
   }
   lines.push(`- nextAction=${gate.nextAction || "-"}`);

@@ -17938,6 +17938,10 @@ function appendInitialLaunchOperatorActionManifestTextLines(lines = [], manifest
   const primaryDownload = primaryAction.download || primaryAction.recommendedDownload || {};
   const files = manifest.files || {};
   const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(manifest);
+  const launchDutyRecordIndexPath = primaryDownload.launchDutyRecordIndexPath
+    || primaryDownload.readinessGateRecordIndex
+    || launchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
   lines.push("");
   lines.push(title);
   lines.push(`- ${labels.manifest}: ${manifest.version || "-"} | primary=${manifest.primaryActionKey || "-"} | actions=${manifest.actionCount ?? (Array.isArray(manifest.actions) ? manifest.actions.length : 0)}`);
@@ -17959,6 +17963,7 @@ function appendInitialLaunchOperatorActionManifestTextLines(lines = [], manifest
     + ` | download=${primaryDownload.fileName || primaryDownload.key || "-"}`
     + ` | downloadFormat=${primaryDownload.format || "-"}`
     + ` | downloadHref=${primaryDownload.href || manifest.entrypoints?.downloadHref || "-"}`
+    + `${launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${launchDutyRecordIndexPath}` : ""}`
   );
   lines.push(`- ${labels.files}: readiness=${files.initialLaunchOpsReadiness || "-"} | handoffIndex=${files.handoffIndex || "-"} | nextFollowUp=${files.launchReceiptNextFollowUp || "-"}`);
   return true;

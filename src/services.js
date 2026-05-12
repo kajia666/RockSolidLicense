@@ -1993,6 +1993,7 @@ function formatLaunchHandoffDownloadText(download = null, {
     base,
     download.href ? `href=${download.href}` : "",
     includeFormat && download.format ? `format=${download.format}` : "",
+    download.launchDutyRecordIndexPath ? `launchDutyRecordIndex=${download.launchDutyRecordIndexPath}` : "",
     includeSource && download.source ? `source=${download.source}` : ""
   ].filter(Boolean).join(" | ");
 }
@@ -31133,6 +31134,7 @@ function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
         `- receiptVisibilityDownload=${item.fileName || item.key || "-"}`
         + ` | format=${item.format || "-"}`
         + ` | href=${item.href || "-"}`
+        + `${item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : ""}`
       );
     }
     lines.push(`- operatorNote=${stagingBackfill.operatorNote || "-"}`);

@@ -22282,6 +22282,7 @@ function formatLaunchReceiptNextFollowUp(item = null) {
   const downloadFileName = item.downloadFileName || recommendedDownload?.fileName || "";
   const downloadFormat = item.downloadFormat || recommendedDownload?.format || "";
   const downloadHref = item.downloadHref || recommendedDownload?.href || "";
+  const readinessGateRecordIndex = resolveLaunchReadinessGateRecordIndexPath(item);
   return [
     `[${String(item.priority || "secondary").toUpperCase()}][${item.stage || "-"}] ${item.title || "-"}`,
     `project=${item.productCode || "-"}`,
@@ -22297,6 +22298,7 @@ function formatLaunchReceiptNextFollowUp(item = null) {
     item.operationalReadinessNextOperation ? `readinessNext=${item.operationalReadinessNextOperation}` : "",
     item.operationalReadinessLaunchReadinessNextGateStatus ? `readinessGate=${item.operationalReadinessLaunchReadinessNextGateStatus}` : "",
     item.operationalReadinessLaunchReadinessNextGateCurrentGate ? `readinessGateCurrent=${item.operationalReadinessLaunchReadinessNextGateCurrentGate}` : "",
+    readinessGateRecordIndex ? `readinessGateRecordIndex=${readinessGateRecordIndex}` : "",
     formatLaunchWorkflowActionContextText(item.launchOpsOverviewContext),
     `handoff=${item.handoffFileName || "-"}`
   ].filter(Boolean).join(" | ");
@@ -26686,7 +26688,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         operationalReadinessLaunchReadinessNextGateCurrentGate: item.operationalReadinessLaunchReadinessNextGateCurrentGate || null,
         operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || null,
         operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: item.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket || null,
-        operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: item.operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath || null,
+        operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: resolveLaunchReadinessGateRecordIndexPath(item) || null,
         operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry: item.operationalReadinessLaunchReadinessNextGateLaunchDayWatchEntry || null,
         operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand: item.operationalReadinessLaunchReadinessNextGateCloseoutReloadCommand || null,
         operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey: item.operationalReadinessLaunchReadinessNextGatePrimaryDownloadKey || null,
@@ -27240,9 +27242,34 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
           priority: launchReceiptNextFollowUp.priority || null,
           title: launchReceiptNextFollowUp.title || null,
           summary: launchReceiptNextFollowUp.summary || null,
+          productCode: launchReceiptNextFollowUp.productCode || latestReceipt?.productCode || scope.productCode || null,
+          channel: launchReceiptNextFollowUp.channel || latestReceipt?.channel || scope.channel || "stable",
           actionKey: launchReceiptNextFollowUp.actionKey || null,
           operationToRecord: launchReceiptNextFollowUp.operationToRecord || null,
           downloadKey: launchReceiptNextFollowUp.downloadKey || null,
+          operationalReadinessStatus: launchReceiptNextFollowUp.operationalReadinessStatus || null,
+          operationalReadinessNextActionKey: launchReceiptNextFollowUp.operationalReadinessNextActionKey || null,
+          operationalReadinessNextOperation: launchReceiptNextFollowUp.operationalReadinessNextOperation || null,
+          operationalReadinessWatchRecordDraftStatus: launchReceiptNextFollowUp.operationalReadinessWatchRecordDraftStatus || null,
+          operationalReadinessWatchRecordDraftRecordCount: launchReceiptNextFollowUp.operationalReadinessWatchRecordDraftRecordCount ?? null,
+          operationalReadinessLaunchReadinessNextGateStatus: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateStatus
+            || launchReadinessNextGate?.status
+            || null,
+          operationalReadinessLaunchReadinessNextGateDecision: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateDecision
+            || launchReadinessNextGate?.decision
+            || null,
+          operationalReadinessLaunchReadinessNextGateCurrentGate: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateCurrentGate
+            || launchReadinessNextGate?.currentGate
+            || null,
+          operationalReadinessLaunchReadinessNextGateFullTestWindowCommand: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand
+            || launchReadinessNextGate?.fullTestWindowCommand
+            || null,
+          operationalReadinessLaunchReadinessNextGateProductionSignoffPacket: launchReceiptNextFollowUp.operationalReadinessLaunchReadinessNextGateProductionSignoffPacket
+            || launchReadinessNextGate?.productionSignoffPacket
+            || null,
+          operationalReadinessLaunchReadinessNextGateLaunchDutyRecordIndexPath: resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp)
+            || launchReadinessNextGate?.launchDutyRecordIndexPath
+            || null,
           recommendedDownload: launchReceiptNextFollowUp.recommendedDownload || null,
           downloadFileName: launchReceiptNextFollowUp.recommendedDownload?.fileName || null,
           downloadHref: launchReceiptNextFollowUp.recommendedDownload?.href || null,
@@ -32899,6 +32926,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Operational Readiness Launch Gate: ${item.operationalReadinessLaunchReadinessNextGateStatus || "-"}`);
   lines.push(`Operational Readiness Launch Gate Current: ${item.operationalReadinessLaunchReadinessNextGateCurrentGate || "-"}`);
   lines.push(`Operational Readiness Full Test Window: ${item.operationalReadinessLaunchReadinessNextGateFullTestWindowCommand || "-"}`);
+  lines.push(`Operational Readiness Launch Gate Record Index: ${resolveLaunchReadinessGateRecordIndexPath(item) || "-"}`);
   lines.push(`Created At: ${item.createdAt || "-"}`);
   lines.push(`Recommended Action: ${recommendedAction?.key || "-"}`);
   lines.push(`Action Operation: ${recommendedAction?.operation || "-"}`);

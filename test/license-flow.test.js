@@ -17852,6 +17852,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*Launch Mainline action receipts/i);
     assert.match(launchReceiptNextFollowUpDownload.body, /watchRecordDraft=blocked_until_runway_evidence/);
+    assert.match(
+      launchReceiptNextFollowUpDownload.body,
+      /Operational Readiness Launch Gate Record Index: artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(launchReceiptNextFollowUpDownload.body, /Priority: REVIEW/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Stage: production_evidence/);
     assert.match(launchReceiptNextFollowUpDownload.body, new RegExp(`Action Key: ${latestLaunchReceipt.productionEvidenceNextActionKey}`));
@@ -17869,6 +17873,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchReceiptNextFollowUpDownload.body, /Download Format: launch-receipt-next-follow-up/);
     assert.match(launchReceiptNextFollowUpDownload.body, /Download Href: .*format=launch-receipt-next-follow-up/);
+    assert.match(
+      launchReceiptNextFollowUpDownload.body,
+      /- Next: .*readinessGateRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(launchReceiptNextFollowUpDownload.body, /Launch Ops Overview Context:/);
     assert.match(launchReceiptNextFollowUpDownload.body, /downloadKey=ops_launch_operations_overview_status/);
     assert.match(launchReceiptNextFollowUpDownload.body, /downloadFileName=developer-ops-launch-operations-overview-status\.txt/);
@@ -17903,6 +17911,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`Required Actions:\\n- [^\\n]*stage=production_evidence[^\\n]*operation=${latestLaunchReceipt.productionEvidenceNextOperation}[^\\n]*download=[^\\n]*href=.*\\/api\\/developer\\/(?:ops\\/export|launch-mainline)\\/download\\?`)
     );
     assert.match(initialLaunchOpsReadinessDownload.body, /Next Follow-up: \[REVIEW\]\[production_evidence\]/);
+    assert.match(
+      initialLaunchOpsReadinessDownload.body,
+      /Next Follow-up: .*readinessGateRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(initialLaunchOpsReadinessDownload.body, /Primary Workspace: Open Launch Mainline/);
     assert.match(initialLaunchOpsReadinessDownload.body, /Primary Download: developer-ops-launch-receipt-next-follow-up\.txt.*href=.*format=launch-receipt-next-follow-up/);
     assert.match(initialLaunchOpsReadinessDownload.body, /First Launch Handoff: launch-mainline-first-launch-handoff\.txt/);

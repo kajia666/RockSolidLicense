@@ -20356,6 +20356,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || null;
   const launchOperationsOverviewRecordIndexPath = resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp)
     || launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.receiptVisibilitySummary?.failureRecovery?.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.launchOpsOverviewContext?.launchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.overviewDownload?.launchDutyRecordIndexPath
     || launchOperationsOverviewStatus?.launchReadinessNextGate?.launchDutyRecordIndexPath
     || receiptVisibilitySummaryRecordIndexPath;
   const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
@@ -21878,6 +21882,13 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       ?? metadata.readinessGateRecordIndex
       ?? ""
   ).trim();
+  const launchOpsOverviewContextLaunchDutyRecordIndexPath = String(
+    item.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      ?? item.launchOpsOverviewContextRecordIndexPath
+      ?? metadata.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      ?? metadata.launchOpsOverviewContextRecordIndexPath
+      ?? ""
+  ).trim() || launchReadinessNextGateLaunchDutyRecordIndexPath;
   const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
   const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
   const note = String(item.note ?? metadata.note ?? "").trim();
@@ -21908,6 +21919,7 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     launchReadinessNextGateCurrentGate,
     launchReadinessNextGateCanEnterInitialLaunch,
     launchReadinessNextGateLaunchDutyRecordIndexPath,
+    launchOpsOverviewContextLaunchDutyRecordIndexPath,
     focusKind,
     focusReason,
     note,
@@ -21940,6 +21952,7 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       launchReadinessNextGateCurrentGate,
       launchReadinessNextGateCanEnterInitialLaunch,
       launchReadinessNextGateLaunchDutyRecordIndexPath,
+      launchOpsOverviewContextLaunchDutyRecordIndexPath,
       focusKind,
       focusReason,
       note,
@@ -21971,6 +21984,7 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
     launchOpsOverviewDownloadFileName: String(receipt.launchOpsOverviewDownloadFileName || "").trim(),
     launchOpsOverviewDownloadFormat: normalizeDeveloperOpsConfirmationToken(receipt.launchOpsOverviewDownloadFormat, ""),
     launchOpsOverviewDownloadHref: String(receipt.launchOpsOverviewDownloadHref || "").trim(),
+    launchOpsOverviewContextLaunchDutyRecordIndexPath: String(receipt.launchOpsOverviewContextLaunchDutyRecordIndexPath || "").trim(),
     launchReadinessNextGateStatus: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateStatus, ""),
     launchReadinessNextGateDecision: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateDecision, ""),
     launchReadinessNextGateCurrentGate: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateCurrentGate, ""),
@@ -21993,7 +22007,10 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
       limit: "80"
     },
     exportDownloadRoute: "/api/developer/ops/export/download",
-    launchDutyRecordIndexPath: payload.launchReadinessNextGateLaunchDutyRecordIndexPath || null,
+    launchOpsOverviewContextLaunchDutyRecordIndexPath: payload.launchOpsOverviewContextLaunchDutyRecordIndexPath || null,
+    launchDutyRecordIndexPath: payload.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || payload.launchReadinessNextGateLaunchDutyRecordIndexPath
+      || null,
     visibleIn: [
       "receipt_response",
       "developer_ops_snapshot",
@@ -22055,8 +22072,13 @@ function buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanRece
     failureRecovery,
     handoffEvidence,
     launchDutyRecordIndexPath: visibility.launchDutyRecordIndexPath
+      || failureRecovery?.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath
       || failureRecovery?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath
       || receipt.launchReadinessNextGateLaunchDutyRecordIndexPath
+      || null,
+    launchOpsOverviewContextLaunchDutyRecordIndexPath: visibility.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || failureRecovery?.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || receipt.launchOpsOverviewContextLaunchDutyRecordIndexPath
       || null,
     operatorHint: failureRecovery?.operatorHint || "Confirm the latest receipt is visible before handing launch operations to the next owner."
   };
@@ -32111,7 +32133,12 @@ function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, 
   const recoveryPayload = summary.failureRecovery?.payload && typeof summary.failureRecovery.payload === "object"
     ? summary.failureRecovery.payload
     : {};
+  const launchOpsOverviewContextRecordIndexPath = summary.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || recoveryPayload.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || recoveryPayload.launchOpsOverviewContextRecordIndexPath
+    || "";
   const launchDutyRecordIndexPath = summary.launchDutyRecordIndexPath
+    || launchOpsOverviewContextRecordIndexPath
     || recoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath
     || recoveryPayload.launchDutyRecordIndexPath
     || recoveryPayload.readinessGateRecordIndex
@@ -32132,6 +32159,7 @@ function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, 
     + (recoveryPayload.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${recoveryPayload.launchOpsOverviewDownloadHref}` : "")
     + (recoveryPayload.launchReadinessNextGateStatus ? ` | launchReadinessNextGateStatus=${recoveryPayload.launchReadinessNextGateStatus}` : "")
     + (recoveryPayload.launchReadinessNextGateCurrentGate ? ` | launchReadinessNextGateCurrentGate=${recoveryPayload.launchReadinessNextGateCurrentGate}` : "")
+    + (launchOpsOverviewContextRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${launchOpsOverviewContextRecordIndexPath}` : "")
     + (launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${launchDutyRecordIndexPath}` : "")
   );
 }
@@ -34562,6 +34590,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | format=${plan.format || "-"}`
         + ` | file=${plan.fileName || "-"}`
         + ` | href=${plan.href || "-"}`
+        + ` | prefillLaunchOpsOverviewContextRecordIndex=${plan.prefill?.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
       );
       lines.push(`  - confirmation=${plan.confirmationLabel || "-"} | hint=${plan.operatorHint || "-"}`);
     }
@@ -34585,11 +34614,12 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | launchOpsOverviewDownloadKey=${payload.launchOpsOverviewDownloadKey || "-"}`
         + ` | launchOpsOverviewDownloadFileName=${payload.launchOpsOverviewDownloadFileName || "-"}`
         + ` | launchOpsOverviewDownloadHref=${payload.launchOpsOverviewDownloadHref || "-"}`
+        + ` | launchOpsOverviewContextRecordIndex=${payload.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
         + ` | productionSignoffPacket=${payload.productionSignoffPacket || "-"}`
         + ` | launchDayWatchEntry=${payload.launchDayWatchEntry || "-"}`
         + ` | launchReadinessNextGateStatus=${payload.launchReadinessNextGateStatus || "-"}`
         + ` | launchReadinessNextGateCurrentGate=${payload.launchReadinessNextGateCurrentGate || "-"}`
-        + ` | launchDutyRecordIndex=${payload.launchReadinessNextGateLaunchDutyRecordIndexPath || "-"}`
+        + ` | launchDutyRecordIndex=${payload.launchOpsOverviewContextLaunchDutyRecordIndexPath || payload.launchReadinessNextGateLaunchDutyRecordIndexPath || "-"}`
         + ` | firstWaveLifecycleStatus=${payload.firstWaveLifecycleStatus || "-"}`
         + ` | firstWaveLifecycleNextOperation=${payload.firstWaveLifecycleNextOperation || "-"}`
         + ` | firstWaveLifecyclePrimaryDownloadKey=${payload.firstWaveLifecyclePrimaryDownloadKey || "-"}`
@@ -34684,6 +34714,16 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     && typeof overview.receiptVisibilitySummary.failureRecovery.payload === "object"
     ? overview.receiptVisibilitySummary.failureRecovery.payload
     : {};
+  const receiptRecoveryContextRecordIndexPath = receiptRecoveryPayload.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || overview?.receiptVisibilitySummary?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || launchOpsOverviewContext?.launchDutyRecordIndexPath
+    || overview?.overviewDownload?.launchDutyRecordIndexPath
+    || "";
+  const receiptRecoveryRecordIndexPath = receiptRecoveryContextRecordIndexPath
+    || receiptRecoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath
+    || overview?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || overview?.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
   lines.push("");
   lines.push("Receipt Recovery:");
   lines.push(
@@ -34696,7 +34736,8 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     + (receiptRecoveryPayload.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${receiptRecoveryPayload.launchOpsOverviewDownloadHref}` : "")
     + (receiptRecoveryPayload.launchReadinessNextGateStatus ? ` | launchReadinessNextGateStatus=${receiptRecoveryPayload.launchReadinessNextGateStatus}` : "")
     + (receiptRecoveryPayload.launchReadinessNextGateCurrentGate ? ` | launchReadinessNextGateCurrentGate=${receiptRecoveryPayload.launchReadinessNextGateCurrentGate}` : "")
-    + (receiptRecoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${receiptRecoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath}` : "")
+    + (receiptRecoveryContextRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${receiptRecoveryContextRecordIndexPath}` : "")
+    + (receiptRecoveryRecordIndexPath ? ` | launchDutyRecordIndex=${receiptRecoveryRecordIndexPath}` : "")
   );
   lines.push("");
   lines.push("Overview Download:");
@@ -34704,6 +34745,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     `- file=${overview?.overviewDownload?.fileName || "-"}`
     + ` | format=${overview?.overviewDownload?.format || "-"}`
     + ` | href=${overview?.overviewDownload?.href || "-"}`
+    + (receiptRecoveryRecordIndexPath ? ` | launchDutyRecordIndex=${receiptRecoveryRecordIndexPath}` : "")
   );
   lines.push("");
   lines.push("Panels:");
@@ -34750,8 +34792,17 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     ? launchOperationsOverviewStatus.receiptVisibilitySummary.failureRecovery.payload
     : {};
   const launchOperationsOverviewRecordIndexPath = launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || launchOperationsOverviewRecoveryPayload.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.launchOpsOverviewContext?.launchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.overviewDownload?.launchDutyRecordIndexPath
     || launchOperationsOverviewRecoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath
     || launchOperationsOverviewStatus?.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
+  const launchOperationsOverviewContextRecordIndexPath = launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || launchOperationsOverviewRecoveryPayload.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.launchOpsOverviewContext?.launchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.overviewDownload?.launchDutyRecordIndexPath
     || "";
   const latestLaunchReceipts = Array.isArray(payload.overview?.latestLaunchReceipts)
     ? payload.overview.latestLaunchReceipts
@@ -34822,6 +34873,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | href=${launchOperationsOverviewStatus?.overviewDownload?.href || "-"}`
       + ` | recoveryDownloadKey=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadKey || "-"}`
       + ` | recoveryDownloadHref=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadHref || "-"}`
+      + `${launchOperationsOverviewContextRecordIndexPath ? ` | recoveryContextRecordIndex=${launchOperationsOverviewContextRecordIndexPath}` : ""}`
       + `${launchOperationsOverviewRecordIndexPath ? ` | launchDutyRecordIndex=${launchOperationsOverviewRecordIndexPath}` : ""}`
       + ` | recoveryLaunchReadinessNextGateStatus=${launchOperationsOverviewRecoveryPayload.launchReadinessNextGateStatus || "-"}`
       + ` | recoveryLaunchReadinessNextGateCurrentGate=${launchOperationsOverviewRecoveryPayload.launchReadinessNextGateCurrentGate || "-"}`,
@@ -48879,6 +48931,12 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           ?? body.readinessGateRecordIndex
           ?? ""
       ).trim().slice(0, 1000);
+      const launchOpsOverviewContextLaunchDutyRecordIndexPath = String(
+        body.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          ?? body.launchOpsOverviewContextRecordIndexPath
+          ?? body.dutyPlanLaunchOpsOverviewContextLaunchDutyRecordIndexPath
+          ?? ""
+      ).trim().slice(0, 1000);
       const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
       const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
@@ -48926,6 +48984,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessNextGateCurrentGate,
           launchReadinessNextGateCanEnterInitialLaunch,
           launchReadinessNextGateLaunchDutyRecordIndexPath,
+          launchOpsOverviewContextLaunchDutyRecordIndexPath,
           focusKind,
           focusReason,
           note,
@@ -48962,6 +49021,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessNextGateCurrentGate,
           launchReadinessNextGateCanEnterInitialLaunch,
           launchReadinessNextGateLaunchDutyRecordIndexPath,
+          launchOpsOverviewContextLaunchDutyRecordIndexPath,
           focusKind,
           focusReason,
           note,

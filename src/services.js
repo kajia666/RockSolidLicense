@@ -4311,6 +4311,9 @@ function buildLaunchOpsOverviewContextDownload(context = null) {
   if (!context || typeof context !== "object") {
     return null;
   }
+  const launchDutyRecordIndexPath = context.overviewDownload?.launchDutyRecordIndexPath
+    || context.launchDutyRecordIndexPath
+    || deriveLaunchDutyRecordIndexPathFromSignoffPacketPath(context.productionSignoffPacket);
   if (context.overviewDownload && typeof context.overviewDownload === "object") {
     return {
       ...context.overviewDownload,
@@ -4318,7 +4321,8 @@ function buildLaunchOpsOverviewContextDownload(context = null) {
       fileName: context.overviewDownload.fileName || context.downloadFileName || null,
       format: context.overviewDownload.format || context.downloadFormat || null,
       href: context.overviewDownload.href || context.downloadHref || null,
-      source: context.overviewDownload.source || "developer-ops"
+      source: context.overviewDownload.source || "developer-ops",
+      launchDutyRecordIndexPath: launchDutyRecordIndexPath || null
     };
   }
   if (!context.downloadKey && !context.downloadFileName && !context.downloadFormat && !context.downloadHref) {
@@ -4330,7 +4334,8 @@ function buildLaunchOpsOverviewContextDownload(context = null) {
     fileName: context.downloadFileName || null,
     format: context.downloadFormat || null,
     href: context.downloadHref || null,
-    source: "developer-ops"
+    source: "developer-ops",
+    launchDutyRecordIndexPath: launchDutyRecordIndexPath || null
   };
 }
 

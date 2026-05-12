@@ -18415,6 +18415,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       opsLaunchMainlineRouteMapDownload.body,
       /launch-ops-overview-status: .*developer-ops-launch-operations-overview-status\.txt.*href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-overview-status.*format=launch-operations-overview-status/
     );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-ops-overview-status: [^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchMainlineHandoffRoutesDownload = await getText(
       baseUrl,
@@ -18442,6 +18446,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineHandoffRoutesDownload.body,
       /launch-ops-overview-status: .*developer-ops-launch-operations-overview-status\.txt.*format=launch-operations-overview-status.*href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-overview-status/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /launch-ops-overview-status: [^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
     );
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Ops Overview Evidence:/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Ops Overview Evidence:[\s\S]*receipt=pending/);

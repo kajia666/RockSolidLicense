@@ -4365,8 +4365,12 @@ function normalizeLaunchOpsOverviewContext(context = null) {
     return null;
   }
   const overviewDownload = buildLaunchOpsOverviewContextDownload(normalized);
+  const launchDutyRecordIndexPath = normalized.launchDutyRecordIndexPath
+    || overviewDownload?.launchDutyRecordIndexPath
+    || deriveLaunchDutyRecordIndexPathFromSignoffPacketPath(normalized.productionSignoffPacket);
   return {
     ...normalized,
+    launchDutyRecordIndexPath: launchDutyRecordIndexPath || null,
     downloadKey: normalized.downloadKey || overviewDownload?.key || null,
     downloadFileName: normalized.downloadFileName || overviewDownload?.fileName || null,
     downloadFormat: normalized.downloadFormat || overviewDownload?.format || null,

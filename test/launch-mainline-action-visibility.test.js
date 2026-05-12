@@ -227,6 +227,12 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     const nextFollowUpVisibilityCard = Array.isArray(visibilitySection?.cards)
       ? visibilitySection.cards.find((item) => item?.key === "receipt_visibility_launch_receipt_next_follow_up")
       : null;
+    const receiptVisibilitySummaryCard = Array.isArray(visibilitySection?.cards)
+      ? visibilitySection.cards.find((item) => item?.key === "receipt_visibility_summary")
+      : null;
+    const stagingBackfillVisibilityCard = Array.isArray(visibilitySection?.cards)
+      ? visibilitySection.cards.find((item) => item?.key === "receipt_visibility_staging_result_backfill")
+      : null;
     assert.deepEqual(
       Array.isArray(visibilitySection?.cards) ? visibilitySection.cards.map((item) => item?.key) : [],
       [
@@ -245,6 +251,30 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       Array.isArray(nextFollowUpVisibilityCard?.details)
         ? nextFollowUpVisibilityCard.details.some((item) =>
             /Launch duty record index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/.test(item)
+          )
+        : false,
+      true
+    );
+    assert.equal(
+      Array.isArray(receiptVisibilitySummaryCard?.details)
+        ? receiptVisibilitySummaryCard.details.some((item) =>
+            /Next follow-up record index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/.test(item)
+          )
+        : false,
+      true
+    );
+    assert.equal(
+      Array.isArray(stagingBackfillVisibilityCard?.details)
+        ? stagingBackfillVisibilityCard.details.some((item) =>
+            /Launch Review record index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/.test(item)
+          )
+        : false,
+      true
+    );
+    assert.equal(
+      Array.isArray(stagingBackfillVisibilityCard?.details)
+        ? stagingBackfillVisibilityCard.details.some((item) =>
+            /Launch Smoke record index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/.test(item)
           )
         : false,
       true

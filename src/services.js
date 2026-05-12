@@ -4793,6 +4793,8 @@ function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
   const stagingBackfillDownloads = stagingBackfill?.receiptVisibilityDownloads && typeof stagingBackfill.receiptVisibilityDownloads === "object"
     ? Object.values(stagingBackfill.receiptVisibilityDownloads).filter((item) => item?.key || item?.href)
     : [];
+  const stagingBackfillLaunchReviewDownload = stagingBackfillDownloads.find((item) => item?.key === "launch_review_summary") || null;
+  const stagingBackfillLaunchSmokeDownload = stagingBackfillDownloads.find((item) => item?.key === "launch_smoke_kit_summary") || null;
   const stagingBackfillCard = stagingBackfill
     ? {
         key: "receipt_visibility_staging_result_backfill",
@@ -4812,6 +4814,8 @@ function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
           stagingBackfill.destinations?.developerOps?.href ? `Developer Ops: ${stagingBackfill.destinations.developerOps.href}` : "",
           stagingBackfill.destinations?.launchMainline?.href ? `Launch Mainline: ${stagingBackfill.destinations.launchMainline.href}` : "",
           stagingBackfill.evidenceEndpoint ? `Evidence endpoint: ${stagingBackfill.evidenceEndpoint}` : "",
+          stagingBackfillLaunchReviewDownload?.launchDutyRecordIndexPath ? `Launch Review record index: ${stagingBackfillLaunchReviewDownload.launchDutyRecordIndexPath}` : "",
+          stagingBackfillLaunchSmokeDownload?.launchDutyRecordIndexPath ? `Launch Smoke record index: ${stagingBackfillLaunchSmokeDownload.launchDutyRecordIndexPath}` : "",
           stagingBackfill.operatorNote ? `Operator note: ${stagingBackfill.operatorNote}` : ""
         ].filter(Boolean),
         controls: stagingBackfillDownloads.map((download) => ({
@@ -4863,7 +4867,8 @@ function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
         ].filter(Boolean),
         details: [
           visibility.recordedReceipt?.handoffFileName ? `Receipt handoff: ${visibility.recordedReceipt.handoffFileName}` : "",
-          downloads.launchReceiptNextFollowUp?.fileName ? `Next follow-up: ${downloads.launchReceiptNextFollowUp.fileName}` : ""
+          downloads.launchReceiptNextFollowUp?.fileName ? `Next follow-up: ${downloads.launchReceiptNextFollowUp.fileName}` : "",
+          downloads.launchReceiptNextFollowUp?.launchDutyRecordIndexPath ? `Next follow-up record index: ${downloads.launchReceiptNextFollowUp.launchDutyRecordIndexPath}` : ""
         ].filter(Boolean),
         controls: workspaces.map((item) => ({
           kind: "workspace",

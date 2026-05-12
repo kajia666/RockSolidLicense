@@ -4477,8 +4477,14 @@ function formatLaunchWorkflowActionContextText(context = null) {
       `downloadFormat=${context.downloadFormat || context.overviewDownload?.format || "-"}`
     ];
     const downloadHref = context.downloadHref || context.overviewDownload?.href || "";
+    const launchDutyRecordIndexPath = context.launchDutyRecordIndexPath
+      || context.overviewDownload?.launchDutyRecordIndexPath
+      || deriveLaunchDutyRecordIndexPathFromSignoffPacketPath(context.productionSignoffPacket);
     if (downloadHref) {
       segments.push(`downloadHref=${downloadHref}`);
+    }
+    if (launchDutyRecordIndexPath) {
+      segments.push(`launchDutyRecordIndex=${launchDutyRecordIndexPath}`);
     }
     if (context.productionSignoffPacket || context.launchDayWatchEntry) {
       segments.push(`productionSignoffPacket=${context.productionSignoffPacket || "-"}`);

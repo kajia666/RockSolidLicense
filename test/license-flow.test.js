@@ -19697,6 +19697,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Steady-State Duty Plan Receipts:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`audit=${steadyStateDutyPlanReceipt.auditLogId}`));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Steady-State Duty Plan Receipts:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Steady-State Duty Plan Receipts:[\s\S]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:[\s\S]*steady_state_duty_plan_receipt=recorded[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Evidence Chain:[\s\S]*steady_state_duty_plan_receipt=recorded[\s\S]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /receiptVisibility=visible/);
@@ -19766,6 +19767,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchOperationsHandoffSummary.handoffChecklist.some((item) => (
       item.key === "steady_state_duty_plan_receipt"
       && item.auditLogId === steadyStateDutyPlanReceipt.auditLogId
+      && item.launchOpsOverviewContextLaunchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
     )));
     assert.match(launchOperationsHandoffSummary.handoffDownload.href, /format=launch-operations-handoff-summary/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Handoff Summary:/);
@@ -19807,6 +19809,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, /Launch Readiness Next Gate:/);
     assert.match(launchOperationsHandoffDownload.body, /recommendedDownload=developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchOperationsHandoffDownload.body, /Next Review:/);
+    assert.match(launchOperationsHandoffDownload.body, /Handoff Checklist:[\s\S]*- steady_state_duty_plan_receipt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
     assert.match(launchOperationsHandoffDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
 
@@ -19848,7 +19851,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsDailyBrief.supportingDownloads.some((item) => item.format === "launch-operations-overview-status")
     );
     assert.ok(Array.isArray(launchOperationsDailyBrief.dailyChecklist));
-    assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => item.key === "launch_operations_handoff_summary"));
+    assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => (
+      item.key === "launch_operations_handoff_summary"
+      && item.launchOpsOverviewContextLaunchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
     assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => (
       item.key === "production_signoff_packet"
       && item.fileName === expectedProductionSignoffPacket
@@ -19892,6 +19898,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsDailyBriefDownload.body, /recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsDailyBriefDownload.body, /Next Review:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Daily Checklist:/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Daily Checklist:[\s\S]*- launch_operations_handoff_summary[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
     assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);

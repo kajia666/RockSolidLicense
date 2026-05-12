@@ -25739,7 +25739,11 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     auditLogId: item.auditLogId || null,
     action: item.action || item.operation || null,
     fileName: item.fileName || item.format || null,
-    recordedAt: item.recordedAt || null
+    recordedAt: item.recordedAt || null,
+    launchOpsOverviewContextLaunchDutyRecordIndexPath: item.launchOpsOverviewContextLaunchDutyRecordIndexPath || null,
+    launchDutyRecordIndexPath: item.launchDutyRecordIndexPath
+      || item.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || null
   }));
   const latestSteadyStateDutyPlanReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
   const receiptVisibilitySummary = buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanReceiptPayload);
@@ -25901,6 +25905,20 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     || steadyStateDutyBoard?.launchOpsOverviewContext
     || steadyStateOperationalReview?.launchOpsOverviewContext
   );
+  const launchOpsOverviewContextRecordIndexPath = launchOpsOverviewContext?.launchDutyRecordIndexPath
+    || receiptVisibilitySummary?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || "";
+  const withLaunchOpsOverviewContextRecordIndex = (item = {}) => ({
+    ...item,
+    launchOpsOverviewContextLaunchDutyRecordIndexPath: item.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || launchOpsOverviewContextRecordIndexPath
+      || null,
+    launchDutyRecordIndexPath: item.launchDutyRecordIndexPath
+      || item.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || launchOpsOverviewContextRecordIndexPath
+      || null
+  });
   const firstWaveLifecycle = handoffSummary.firstWaveLifecycle
     || steadyStateDutyActionLinks?.firstWaveLifecycle
     || steadyStateDutyBoard?.firstWaveLifecycle
@@ -25914,15 +25932,15 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     || null;
   const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(briefScope, launchOpsOverviewContext);
   const dailyChecklist = [
-    {
+    withLaunchOpsOverviewContextRecordIndex({
       key: "launch_operations_evidence_chain",
       label: "Review launch operations evidence chain",
       status: chain?.status || handoffSummary.evidenceChainStatus || "unknown",
       ready: chain?.complete === true,
       summary: `${handoffSummary.evidenceCompletedStageCount ?? chain?.completedStageCount ?? 0}/${handoffSummary.evidenceRequiredStageCount ?? chain?.requiredStageCount ?? 0} launch operation evidence stages are recorded.`,
       fileName: "initial-launch-ops-readiness.txt"
-    },
-    {
+    }),
+    withLaunchOpsOverviewContextRecordIndex({
       key: "launch_operations_handoff_summary",
       label: "Attach launch operations handoff summary",
       status: handoffSummary.status || "unknown",
@@ -25930,7 +25948,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       summary: handoffSummary.operatorSummary || "Launch operations handoff summary is available.",
       fileName: handoffSummary.handoffDownload?.fileName || null,
       href: handoffSummary.handoffDownload?.href || null
-    },
+    }),
     {
       key: "steady_state_exception_digest",
       label: "Review steady-state exception digest",
@@ -25940,7 +25958,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       fileName: steadyStateExceptionDigest?.digestDownload?.fileName || null,
       href: steadyStateExceptionDigest?.digestDownload?.href || null
     },
-    {
+    withLaunchOpsOverviewContextRecordIndex({
       key: "steady_state_duty_board",
       label: "Open steady-state duty board",
       status: steadyStateDutyBoard?.status || "unknown",
@@ -25948,8 +25966,8 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       summary: steadyStateDutyBoard?.summary || "Steady-state duty board should stay open during launch monitoring.",
       fileName: steadyStateDutyBoard?.boardDownload?.fileName || null,
       href: steadyStateDutyBoard?.boardDownload?.href || null
-    },
-    {
+    }),
+    withLaunchOpsOverviewContextRecordIndex({
       key: "steady_state_duty_action_links",
       label: "Confirm duty action links",
       status: steadyStateDutyActionLinks?.status || "unknown",
@@ -25957,7 +25975,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       summary: `${steadyStateDutyActionLinks?.actionCount ?? 0} duty action link${Number(steadyStateDutyActionLinks?.actionCount ?? 0) === 1 ? "" : "s"} are mapped for the operator.`,
       fileName: steadyStateDutyActionLinks?.actionLinksDownload?.fileName || null,
       href: steadyStateDutyActionLinks?.actionLinksDownload?.href || null
-    },
+    }),
     {
       key: "first_wave_lifecycle",
       label: "Review first-wave lifecycle handoff",
@@ -25980,7 +25998,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       fileName: productionSignoffPacket || null,
       href: null
     },
-    {
+    withLaunchOpsOverviewContextRecordIndex({
       key: "launch_operations_daily_brief_download",
       label: "Download launch operations daily brief",
       status: briefDownload ? "ready" : "pending",
@@ -25988,7 +26006,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       summary: "Use this single brief for shift start, launch-day watch, and first stable handoff.",
       fileName: briefDownload?.fileName || null,
       href: briefDownload?.href || null
-    }
+    })
   ];
   const supportingDownloads = [];
   const seenDownloads = new Set();
@@ -32252,6 +32270,8 @@ function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = 
         + ` | audit=${item.auditLogId || "-"}`
         + ` | action=${item.action || "-"}`
         + ` | file=${item.fileName || "-"}`
+        + (item.launchOpsOverviewContextLaunchDutyRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${item.launchOpsOverviewContextLaunchDutyRecordIndexPath}` : "")
+        + (item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : "")
       );
     }
   }
@@ -32309,6 +32329,8 @@ function appendDeveloperOpsLaunchOperationsDailyBriefLines(lines, brief = null, 
         + ` | ready=${item.ready === true}`
         + ` | file=${item.fileName || "-"}`
         + ` | summary=${item.summary || "-"}`
+        + (item.launchOpsOverviewContextLaunchDutyRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${item.launchOpsOverviewContextLaunchDutyRecordIndexPath}` : "")
+        + (item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : "")
       );
     }
   }
@@ -33540,6 +33562,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       + ` | launchOpsOverviewDownloadHref=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewDownloadHref || "-"}`
       + ` | launchReadinessNextGateStatus=${latestSteadyStateDutyPlanReceipt.launchReadinessNextGateStatus || "-"}`
       + ` | launchReadinessNextGateCurrentGate=${latestSteadyStateDutyPlanReceipt.launchReadinessNextGateCurrentGate || "-"}`
+      + (latestSteadyStateDutyPlanReceipt.launchOpsOverviewContextLaunchDutyRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${latestSteadyStateDutyPlanReceipt.launchOpsOverviewContextLaunchDutyRecordIndexPath}` : "")
+      + (latestSteadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${latestSteadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath}` : "")
     );
     if (latestSteadyStateDutyPlanReceipt.receiptVisibility) {
       lines.push(
@@ -34303,6 +34327,8 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
         + ` | audit=${item.auditLogId || "-"}`
         + ` | action=${item.action || "-"}`
         + ` | file=${item.fileName || "-"}`
+        + (item.launchOpsOverviewContextLaunchDutyRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${item.launchOpsOverviewContextLaunchDutyRecordIndexPath}` : "")
+        + (item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : "")
       );
     }
   } else {
@@ -34441,6 +34467,8 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
         + ` | file=${item.fileName || "-"}`
         + ` | href=${item.href || "-"}`
         + ` | summary=${item.summary || "-"}`
+        + (item.launchOpsOverviewContextLaunchDutyRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${item.launchOpsOverviewContextLaunchDutyRecordIndexPath}` : "")
+        + (item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : "")
       );
     }
   } else {

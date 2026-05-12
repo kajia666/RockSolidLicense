@@ -19914,6 +19914,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.prefill.productionSignoffPacket, expectedProductionSignoffPacket);
     assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.prefill.launchDayWatchEntry, expectedLaunchDayWatchEntry);
     assert.equal(
+      launchOperationsShiftActionPlan.primaryAction.executionPlan.prefill.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(
       launchOperationsShiftActionPlan.primaryAction.executionPlan.prefill.launchReadinessNextGateStatus,
       expectedLaunchOperationsGoLiveGate.status
     );
@@ -19923,6 +19927,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.productionSignoffPacket, expectedProductionSignoffPacket);
     assert.equal(launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.launchDayWatchEntry, expectedLaunchDayWatchEntry);
+    assert.equal(
+      launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.equal(
       launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.launchReadinessNextGateStatus,
       expectedLaunchOperationsGoLiveGate.status
@@ -19949,9 +19957,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewDownloadFileName, "developer-ops-launch-operations-overview-status.txt");
     assert.equal(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewDownloadFormat, "launch-operations-overview-status");
     assert.match(launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewDownloadHref, /format=launch-operations-overview-status/);
+    assert.equal(
+      launchOperationsOverviewStatusAction.executionPlan.receiptPlan.payload.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.equal(launchOperationsOverviewStatusAction.executionPlan.prefill.launchOpsOverviewDownloadKey, "ops_launch_operations_overview_status");
     assert.equal(launchOperationsOverviewStatusAction.executionPlan.prefill.launchOpsOverviewDownloadFileName, "developer-ops-launch-operations-overview-status.txt");
     assert.match(launchOperationsOverviewStatusAction.executionPlan.prefill.launchOpsOverviewDownloadHref, /format=launch-operations-overview-status/);
+    assert.equal(
+      launchOperationsOverviewStatusAction.executionPlan.prefill.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.ok(launchOperationsShiftActionPlan.operatorActions.every((item) => item.executionPlan?.operatorHint));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Shift Action Plan:[\s\S]*context=launch_ops_overview_status/);

@@ -33021,6 +33021,10 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   const recommendedWorkspace = recommendedAction?.workspaceAction || null;
   const recommendedDownload = item?.recommendedDownload
     || buildDeveloperOpsLaunchReceiptNextFollowUpDownload(scope, item);
+  const recommendedDownloadRecordIndex = resolveLaunchReadinessGateRecordIndexPath(item)
+    || recommendedDownload?.launchDutyRecordIndexPath
+    || recommendedDownload?.readinessGateRecordIndex
+    || "";
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(item?.launchOpsOverviewContext);
   const launchOpsOverviewDownload = buildLaunchOpsOverviewContextDownload(launchOpsOverviewContext);
   const launchReceiptAuditBackfill = Number(
@@ -33091,7 +33095,7 @@ function buildDeveloperOpsLaunchReceiptNextFollowUpText(payload = {}) {
   lines.push(`Workspace Href: ${recommendedWorkspace?.href || "-"}`);
   lines.push(`Download File: ${recommendedDownload?.fileName || "-"}`);
   lines.push(`Download Format: ${recommendedDownload?.format || "-"}`);
-  lines.push(`Download Href: ${recommendedDownload?.href || "-"}`);
+  lines.push(`Download Href: ${recommendedDownload?.href || "-"}${recommendedDownloadRecordIndex ? ` | launchDutyRecordIndex=${recommendedDownloadRecordIndex}` : ""}`);
   if (launchOpsOverviewContext) {
     lines.push("");
     lines.push("Launch Ops Overview Context:");

@@ -465,6 +465,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.equal(opsLaunchReceiptNextFollowUp.contentType, "text/plain; charset=utf-8");
     assert.match(opsLaunchReceiptNextFollowUp.body, /Receipt Visibility:/);
     assert.match(opsLaunchReceiptNextFollowUp.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
+    assert.match(
+      opsLaunchReceiptNextFollowUp.body,
+      /Download Href: .*format=launch-receipt-next-follow-up.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(opsLaunchReceiptNextFollowUp.body, nextFollowUpDownloadRecordIndexPattern);
     assert.match(opsLaunchReceiptNextFollowUp.body, nextFollowUpCheckpointRecordIndexPattern);
     assert.match(opsLaunchReceiptNextFollowUp.body, /post-launch-sweep-handoff/);

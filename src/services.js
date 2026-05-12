@@ -32108,6 +32108,26 @@ function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, 
   );
 }
 
+function formatDeveloperOpsLaunchOperationsSupportingDownloadText(item = null, {
+  launchDutyRecordIndexPath = ""
+} = {}) {
+  if (!item || typeof item !== "object") {
+    return "-";
+  }
+  const recordIndexPath = item.launchDutyRecordIndexPath
+    || item.readinessGateRecordIndex
+    || (
+      (item.key === "ops_launch_operations_overview_status" || item.format === "launch-operations-overview-status")
+        ? launchDutyRecordIndexPath
+        : ""
+    );
+  return `- ${item.label || item.key || "-"}`
+    + ` | file=${item.fileName || "-"}`
+    + ` | format=${item.format || "-"}`
+    + ` | href=${item.href || "-"}`
+    + (recordIndexPath ? ` | launchDutyRecordIndex=${recordIndexPath}` : "");
+}
+
 function appendDeveloperOpsLaunchOperationsHandoffSummaryLines(lines, summary = null, {
   title = "Launch Operations Handoff Summary:"
 } = {}) {
@@ -34129,6 +34149,9 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   const supportingDownloads = Array.isArray(handoffSummary?.supportingDownloads)
     ? handoffSummary.supportingDownloads
     : [];
+  const supportingDownloadRecordIndexPath = handoffSummary?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || handoffSummary?.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(handoffSummary?.launchOpsOverviewContext);
   const lines = [
     "RockSolid Developer Ops Launch Operations Handoff Summary",
@@ -34220,12 +34243,9 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   lines.push("Supporting Downloads:");
   if (supportingDownloads.length) {
     for (const item of supportingDownloads) {
-      lines.push(
-        `- ${item.label || item.key || "-"}`
-        + ` | file=${item.fileName || "-"}`
-        + ` | format=${item.format || "-"}`
-        + ` | href=${item.href || "-"}`
-      );
+      lines.push(formatDeveloperOpsLaunchOperationsSupportingDownloadText(item, {
+        launchDutyRecordIndexPath: supportingDownloadRecordIndexPath
+      }));
     }
   } else {
     lines.push("- none");
@@ -34271,6 +34291,9 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   const supportingDownloads = Array.isArray(dailyBrief?.supportingDownloads)
     ? dailyBrief.supportingDownloads
     : [];
+  const supportingDownloadRecordIndexPath = dailyBrief?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || dailyBrief?.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(dailyBrief?.launchOpsOverviewContext);
   const lines = [
     "RockSolid Developer Ops Launch Operations Daily Brief",
@@ -34358,12 +34381,9 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   lines.push("Supporting Downloads:");
   if (supportingDownloads.length) {
     for (const item of supportingDownloads) {
-      lines.push(
-        `- ${item.label || item.key || "-"}`
-        + ` | file=${item.fileName || "-"}`
-        + ` | format=${item.format || "-"}`
-        + ` | href=${item.href || "-"}`
-      );
+      lines.push(formatDeveloperOpsLaunchOperationsSupportingDownloadText(item, {
+        launchDutyRecordIndexPath: supportingDownloadRecordIndexPath
+      }));
     }
   } else {
     lines.push("- none");
@@ -34416,6 +34436,9 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   });
   const actions = Array.isArray(actionPlan?.operatorActions) ? actionPlan.operatorActions : [];
   const supportingDownloads = Array.isArray(actionPlan?.supportingDownloads) ? actionPlan.supportingDownloads : [];
+  const supportingDownloadRecordIndexPath = actionPlan?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || actionPlan?.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(actionPlan?.launchOpsOverviewContext);
   const lines = [
     "RockSolid Developer Ops Launch Operations Shift Action Plan",
@@ -34552,12 +34575,9 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   lines.push("Supporting Downloads:");
   if (supportingDownloads.length) {
     for (const item of supportingDownloads) {
-      lines.push(
-        `- ${item.label || item.key || "-"}`
-        + ` | file=${item.fileName || "-"}`
-        + ` | format=${item.format || "-"}`
-        + ` | href=${item.href || "-"}`
-      );
+      lines.push(formatDeveloperOpsLaunchOperationsSupportingDownloadText(item, {
+        launchDutyRecordIndexPath: supportingDownloadRecordIndexPath
+      }));
     }
   } else {
     lines.push("- none");
@@ -34701,6 +34721,10 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     && typeof launchOperationsOverviewStatus.receiptVisibilitySummary.failureRecovery.payload === "object"
     ? launchOperationsOverviewStatus.receiptVisibilitySummary.failureRecovery.payload
     : {};
+  const launchOperationsOverviewRecordIndexPath = launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || launchOperationsOverviewRecoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
   const latestLaunchReceipts = Array.isArray(payload.overview?.latestLaunchReceipts)
     ? payload.overview.latestLaunchReceipts
     : [];
@@ -34770,6 +34794,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | href=${launchOperationsOverviewStatus?.overviewDownload?.href || "-"}`
       + ` | recoveryDownloadKey=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadKey || "-"}`
       + ` | recoveryDownloadHref=${launchOperationsOverviewRecoveryPayload.launchOpsOverviewDownloadHref || "-"}`
+      + `${launchOperationsOverviewRecordIndexPath ? ` | launchDutyRecordIndex=${launchOperationsOverviewRecordIndexPath}` : ""}`
       + ` | recoveryLaunchReadinessNextGateStatus=${launchOperationsOverviewRecoveryPayload.launchReadinessNextGateStatus || "-"}`
       + ` | recoveryLaunchReadinessNextGateCurrentGate=${launchOperationsOverviewRecoveryPayload.launchReadinessNextGateCurrentGate || "-"}`,
     `Launch Operations Overview Signoff: productionSignoffPacket=${launchOperationsOverviewStatus?.productionSignoffPacket || "-"} | launchDayWatchEntry=${launchOperationsOverviewStatus?.launchDayWatchEntry || "-"}`,

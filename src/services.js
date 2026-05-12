@@ -4834,7 +4834,8 @@ function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
         ].filter(Boolean),
         details: [
           item?.workspaceAction?.href ? `Workspace: ${item.workspaceAction.href}` : "",
-          download?.href ? `Download: ${download.href}` : ""
+          download?.href ? `Download: ${download.href}` : "",
+          download?.launchDutyRecordIndexPath ? `Launch duty record index: ${download.launchDutyRecordIndexPath}` : ""
         ].filter(Boolean),
         controls: [
           download ? {
@@ -7107,7 +7108,8 @@ function buildLaunchReceiptAuditVisibility(visibility = null) {
         downloadKey: download?.key || null,
         downloadFormat: download?.format || null,
         downloadFileName: download?.fileName || null,
-        downloadHref: download?.href || null
+        downloadHref: download?.href || null,
+        launchDutyRecordIndexPath: download?.launchDutyRecordIndexPath || null
       };
     })
     .filter((item) => item.key);
@@ -31119,6 +31121,7 @@ function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
       + ` | download=${item.downloadFileName || item.downloadKey || "-"}`
       + ` | format=${item.downloadFormat || "-"}`
       + ` | href=${item.downloadHref || "-"}`
+      + `${item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : ""}`
     );
   }
   const stagingBackfill = visibility.stagingResultBackfill && typeof visibility.stagingResultBackfill === "object"

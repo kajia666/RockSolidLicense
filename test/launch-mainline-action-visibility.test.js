@@ -224,6 +224,9 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       ? actionResult.receipt.mainlineLastActionScreen.sections.find((item) => item?.key === "receipt_visibility")
       : null;
     assert.equal(visibilitySection?.title, "Receipt Visibility");
+    const nextFollowUpVisibilityCard = Array.isArray(visibilitySection?.cards)
+      ? visibilitySection.cards.find((item) => item?.key === "receipt_visibility_launch_receipt_next_follow_up")
+      : null;
     assert.deepEqual(
       Array.isArray(visibilitySection?.cards) ? visibilitySection.cards.map((item) => item?.key) : [],
       [
@@ -237,6 +240,14 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         "receipt_visibility_post_launch_handoff_index",
         "receipt_visibility_handoff_download_routes"
       ]
+    );
+    assert.equal(
+      Array.isArray(nextFollowUpVisibilityCard?.details)
+        ? nextFollowUpVisibilityCard.details.some((item) =>
+            /Launch duty record index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/.test(item)
+          )
+        : false,
+      true
     );
     assert.deepEqual(
       Array.isArray(visibilitySection?.cards)
@@ -277,10 +288,13 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       /receiptVisibilityDownload[:=].*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/;
     const nextFollowUpDownloadRecordIndexPattern =
       /download[:=].*developer-ops-launch-receipt-next-follow-up\.txt.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/;
+    const nextFollowUpCheckpointRecordIndexPattern =
+      /checkpoint[:=].*Open launch receipt next follow-up.*developer-ops-launch-receipt-next-follow-up\.txt.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/;
 
     assert.match(actionResult.receipt?.handoffText || "", /Receipt Visibility:/);
     assert.match(actionResult.receipt?.handoffText || "", /developer-ops-launch-receipt-next-follow-up\.txt/i);
     assert.match(actionResult.receipt?.handoffText || "", nextFollowUpDownloadRecordIndexPattern);
+    assert.match(actionResult.receipt?.handoffText || "", nextFollowUpCheckpointRecordIndexPattern);
     assert.match(actionResult.receipt?.handoffText || "", /post-launch-handoff-index/i);
     assert.match(actionResult.receipt?.handoffText || "", /handoff-download-routes/i);
     assert.match(actionResult.receipt?.handoffText || "", /Staging Result Backfill:/);
@@ -362,22 +376,24 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         ? latestReceipt.receiptVisibility.checkpoints.map((item) => ({
             key: item?.key || null,
             workspaceKey: item?.workspaceKey || null,
-            downloadKey: item?.downloadKey || null
+            downloadKey: item?.downloadKey || null,
+            launchDutyRecordIndexPath: item?.launchDutyRecordIndexPath || null
           }))
         : [],
       [
-        { key: "developer_ops_summary", workspaceKey: "ops", downloadKey: "ops_summary" },
-        { key: "launch_receipt_next_follow_up", workspaceKey: "ops", downloadKey: "ops_launch_receipt_next_follow_up" },
-        { key: "post_launch_sweep_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_sweep_handoff" },
-        { key: "closeout_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_closeout_handoff" },
-        { key: "stabilization_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_stabilization_handoff" },
-        { key: "post_launch_handoff_index", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_handoff_index" },
-        { key: "handoff_download_routes", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_handoff_download_routes" }
+        { key: "developer_ops_summary", workspaceKey: "ops", downloadKey: "ops_summary", launchDutyRecordIndexPath: null },
+        { key: "launch_receipt_next_follow_up", workspaceKey: "ops", downloadKey: "ops_launch_receipt_next_follow_up", launchDutyRecordIndexPath: "artifacts/staging/VISIBILITY_ALPHA/stable/launch-duty-record-index.json" },
+        { key: "post_launch_sweep_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_sweep_handoff", launchDutyRecordIndexPath: null },
+        { key: "closeout_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_closeout_handoff", launchDutyRecordIndexPath: null },
+        { key: "stabilization_handoff", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_stabilization_handoff", launchDutyRecordIndexPath: null },
+        { key: "post_launch_handoff_index", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_post_launch_handoff_index", launchDutyRecordIndexPath: null },
+        { key: "handoff_download_routes", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_handoff_download_routes", launchDutyRecordIndexPath: null }
       ]
     );
     assert.match(opsExport.summaryText || "", /Receipt Visibility:/);
     assert.match(opsExport.summaryText || "", /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(opsExport.summaryText || "", nextFollowUpDownloadRecordIndexPattern);
+    assert.match(opsExport.summaryText || "", nextFollowUpCheckpointRecordIndexPattern);
     assert.match(opsExport.summaryText || "", /post-launch-sweep-handoff/);
     assert.match(opsExport.summaryText || "", /closeout-handoff/);
     assert.match(opsExport.summaryText || "", /stabilization-handoff/);
@@ -396,6 +412,7 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(opsSummaryDownload.body, /Receipt Visibility:/);
     assert.match(opsSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(opsSummaryDownload.body, nextFollowUpDownloadRecordIndexPattern);
+    assert.match(opsSummaryDownload.body, nextFollowUpCheckpointRecordIndexPattern);
     assert.match(opsSummaryDownload.body, /post-launch-sweep-handoff/);
     assert.match(opsSummaryDownload.body, /post-launch-handoff-index/);
     assert.match(opsSummaryDownload.body, /Staging Result Backfill:/);
@@ -411,6 +428,7 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(opsLaunchReceiptNextFollowUp.body, /Receipt Visibility:/);
     assert.match(opsLaunchReceiptNextFollowUp.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(opsLaunchReceiptNextFollowUp.body, nextFollowUpDownloadRecordIndexPattern);
+    assert.match(opsLaunchReceiptNextFollowUp.body, nextFollowUpCheckpointRecordIndexPattern);
     assert.match(opsLaunchReceiptNextFollowUp.body, /post-launch-sweep-handoff/);
     assert.match(opsLaunchReceiptNextFollowUp.body, /post-launch-handoff-index/);
     assert.match(opsLaunchReceiptNextFollowUp.body, /Staging Result Backfill:/);

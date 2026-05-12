@@ -17774,6 +17774,8 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   const initialLaunchOperatorNextAction = traceability.initialLaunchOperatorNextAction || null;
   const initialLaunchOperatorActionManifest = traceability.initialLaunchOperatorActionManifest || null;
   const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
+  const launchOperationsOverviewRecordIndexPath = resolveLaunchReadinessGateRecordIndexPath(nextFollowUp)
+    || resolveLaunchReadinessGateRecordIndexPath(latestReceipt);
   lines.push("");
   lines.push("Post-Launch Handoff Traceability:");
   lines.push(
@@ -17796,7 +17798,10 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   );
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "-"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "-"}`);
-  lines.push(`- Launch Operations Overview Status: ${opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"}`);
+  lines.push(
+    `- Launch Operations Overview Status: ${opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"}`
+    + (launchOperationsOverviewRecordIndexPath ? ` | launchDutyRecordIndex=${launchOperationsOverviewRecordIndexPath}` : "")
+  );
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "-"}`);
   if (stabilizationConfirmation) {
@@ -20334,6 +20339,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchOpsOverviewWatchEntry = launchOperationsOverviewStatus?.launchDayWatchEntry
     || stagingArchiveNextOperations?.launchRunway?.launchDayWatchEntry
     || null;
+  const launchOperationsOverviewRecordIndexPath = resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp)
+    || launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || launchOperationsOverviewStatus?.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || receiptVisibilitySummaryRecordIndexPath;
   const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
     productCode: project.code || filters.productCode || "",
     channel: manifest.channel || filters.channel || "stable",
@@ -20435,6 +20444,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | recovery=${launchOperationsOverviewStatus?.recoveryRoute || "-"}`
     + ` | productionSignoffPacket=${launchOpsOverviewProductionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${launchOpsOverviewWatchEntry || "-"}`
+    + (launchOperationsOverviewRecordIndexPath ? ` | launchDutyRecordIndex=${launchOperationsOverviewRecordIndexPath}` : "")
   );
   if (appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource)) {
     lines.push("");

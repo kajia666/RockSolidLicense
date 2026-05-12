@@ -18477,6 +18477,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt/);
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status:[\s\S]*receipt=pending/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
@@ -18973,6 +18977,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt/);
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Receipt Next Follow-up: ops\/launch-receipt-next-follow-up\.txt/);
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,

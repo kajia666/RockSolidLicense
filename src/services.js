@@ -4657,7 +4657,11 @@ function buildLaunchMainlineActionReceiptVisibility({
     {
       source: "developer-ops",
       format: "launch-receipt-next-follow-up",
-      params: developerOpsParams
+      params: {
+        ...developerOpsParams,
+        readinessGateRecordIndex: launchDutyRecordIndexPath || ""
+      },
+      ...(launchDutyRecordIndexPath ? { launchDutyRecordIndexPath } : {})
     }
   );
   const postLaunchSweepHandoff = createLaunchMainlineDownloadShortcut(
@@ -31105,6 +31109,7 @@ function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
       `- download=${item.fileName || item.key || "-"}`
       + ` | format=${item.format || "-"}`
       + ` | href=${item.href || "-"}`
+      + `${item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : ""}`
     );
   }
   for (const item of checkpoints) {

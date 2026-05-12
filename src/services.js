@@ -17898,6 +17898,10 @@ function appendInitialLaunchOperatorNextActionTextLines(lines = [], operatorNext
   const workspaceAction = operatorNextAction.workspaceAction || {};
   const download = operatorNextAction.download || {};
   const launchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(operatorNextAction);
+  const launchDutyRecordIndexPath = download.launchDutyRecordIndexPath
+    || download.readinessGateRecordIndex
+    || launchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
   lines.push("");
   lines.push(title);
   lines.push(`- ${labels.action}: ${operatorNextAction.kind || "-"} | stage=${operatorNextAction.stage || "-"} | operation=${operatorNextAction.operation || "-"} | action=${operatorNextAction.actionKey || "-"}`);
@@ -17911,7 +17915,11 @@ function appendInitialLaunchOperatorNextActionTextLines(lines = [], operatorNext
     );
   }
   lines.push(`- ${labels.workspace}: ${workspaceAction.label || "-"}@${workspaceAction.autofocus || "-"} | href=${workspaceAction.href || "-"}`);
-  lines.push(`- ${labels.download}: ${download.fileName || "-"} (${download.format || "-"}) | href=${download.href || "-"}`);
+  lines.push(
+    `- ${labels.download}: ${download.fileName || "-"} (${download.format || "-"})`
+    + ` | href=${download.href || "-"}`
+    + `${launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${launchDutyRecordIndexPath}` : ""}`
+  );
   return true;
 }
 
@@ -25341,6 +25349,10 @@ function buildDeveloperOpsInitialLaunchOperatorNextAction({
           : {}
       }
     : null;
+  const launchDutyRecordIndexPath = resolveInitialLaunchContractNextActionRecordIndex(contract)
+    || resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp)
+    || primaryDownload?.launchDutyRecordIndexPath
+    || null;
   const download = primaryDownload
     ? {
         key: primaryDownload.key || null,
@@ -25348,7 +25360,9 @@ function buildDeveloperOpsInitialLaunchOperatorNextAction({
         fileName: primaryDownload.fileName || null,
         format: primaryDownload.format || null,
         href: primaryDownload.href || null,
-        source: primaryDownload.source || null
+        source: primaryDownload.source || null,
+        launchDutyRecordIndexPath,
+        readinessGateRecordIndex: launchDutyRecordIndexPath
       }
     : null;
   const launchReadinessNextGateCarry = buildDeveloperOpsLaunchReadinessNextGateCarry(

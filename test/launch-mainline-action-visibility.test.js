@@ -193,6 +193,22 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(visibility?.stagingResultBackfill?.evidenceEndpoint || "", /\/api\/developer\/launch-mainline\/action$/);
     assert.equal(visibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchReviewSummary?.key, "launch_review_summary");
     assert.equal(visibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchSmokeSummary?.key, "launch_smoke_kit_summary");
+    assert.equal(
+      visibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchReviewSummary?.launchDutyRecordIndexPath,
+      "artifacts/staging/VISIBILITY_ALPHA/stable/launch-duty-record-index.json"
+    );
+    assert.match(
+      visibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchReviewSummary?.href || "",
+      /readinessGateRecordIndex=artifacts%2Fstaging%2FVISIBILITY_ALPHA%2Fstable%2Flaunch-duty-record-index\.json/
+    );
+    assert.equal(
+      visibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchSmokeSummary?.launchDutyRecordIndexPath,
+      "artifacts/staging/VISIBILITY_ALPHA/stable/launch-duty-record-index.json"
+    );
+    assert.match(
+      visibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchSmokeSummary?.href || "",
+      /readinessGateRecordIndex=artifacts%2Fstaging%2FVISIBILITY_ALPHA%2Fstable%2Flaunch-duty-record-index\.json/
+    );
     assert.match(visibility?.stagingResultBackfill?.operatorNote || "", /Do not paste passwords or bearer tokens/i);
     assert.doesNotMatch(JSON.stringify(visibility?.stagingResultBackfill), /Pass123!abc|LaunchVisibilityOwner123!/);
 
@@ -301,7 +317,23 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.equal(latestReceipt?.receiptVisibility?.stagingResultBackfill?.destinationKeys?.includes("ops"), true);
     assert.equal(latestReceipt?.receiptVisibility?.stagingResultBackfill?.destinationKeys?.includes("launch-mainline"), true);
     assert.match(latestReceipt?.receiptVisibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchReviewSummary?.href || "", /format=summary/);
+    assert.equal(
+      latestReceipt?.receiptVisibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchReviewSummary?.launchDutyRecordIndexPath,
+      "artifacts/staging/VISIBILITY_ALPHA/stable/launch-duty-record-index.json"
+    );
+    assert.match(
+      latestReceipt?.receiptVisibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchReviewSummary?.href || "",
+      /readinessGateRecordIndex=artifacts%2Fstaging%2FVISIBILITY_ALPHA%2Fstable%2Flaunch-duty-record-index\.json/
+    );
     assert.match(latestReceipt?.receiptVisibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchSmokeSummary?.href || "", /format=summary/);
+    assert.equal(
+      latestReceipt?.receiptVisibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchSmokeSummary?.launchDutyRecordIndexPath,
+      "artifacts/staging/VISIBILITY_ALPHA/stable/launch-duty-record-index.json"
+    );
+    assert.match(
+      latestReceipt?.receiptVisibility?.stagingResultBackfill?.receiptVisibilityDownloads?.launchSmokeSummary?.href || "",
+      /readinessGateRecordIndex=artifacts%2Fstaging%2FVISIBILITY_ALPHA%2Fstable%2Flaunch-duty-record-index\.json/
+    );
     assert.deepEqual(
       Array.isArray(latestReceipt?.receiptVisibility?.checkpoints)
         ? latestReceipt.receiptVisibility.checkpoints.map((item) => ({

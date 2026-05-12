@@ -4540,7 +4540,8 @@ function buildLaunchMainlineStagingResultBackfill({
   productCode = "",
   channel = "stable",
   developerOpsWorkspace = null,
-  launchMainlineWorkspace = null
+  launchMainlineWorkspace = null,
+  launchDutyRecordIndexPath = ""
 } = {}) {
   return {
     status: "awaiting_staging_result_backfill",
@@ -4560,7 +4561,8 @@ function buildLaunchMainlineStagingResultBackfill({
     evidenceEndpoint: "/api/developer/launch-mainline/action",
     receiptVisibilityDownloads: buildLaunchDutyReceiptVisibilitySummaryDownloads({
       productCode,
-      channel
+      channel,
+      launchDutyRecordIndexPath
     }),
     operatorNote: "Do not paste passwords or bearer tokens into the staging result backfill; record pass/fail status, receipt IDs, artifact paths, and redacted handoff file names only."
   };
@@ -4584,6 +4586,21 @@ function buildLaunchMainlineActionReceiptVisibility({
     : {};
   const productCode = project.code || filters.productCode || null;
   const channel = manifest.channel || filters.channel || "stable";
+  const launchDutyRecordIndexSourceFollowUp = opsSnapshot.summary?.launchReceiptNextFollowUp
+    || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
+    || null;
+  const launchReadinessNextGateSource = findLaunchReadinessNextGateReceipt(
+    opsSnapshot.overview?.latestLaunchReceipts || [],
+    launchDutyRecordIndexSourceFollowUp
+  );
+  const stagingArchiveNextOperations = opsSnapshot.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder?.stagingArchiveNextOperations || null;
+  const launchDutyRecordIndexPath = resolveLaunchReadinessGateRecordIndexPath(launchReadinessNextGateSource)
+    || resolveLaunchReadinessGateRecordIndexPath(launchDutyRecordIndexSourceFollowUp)
+    || stagingArchiveNextOperations?.launchDutyRecordIndexPath
+    || stagingArchiveNextOperations?.launchDutyRecordIndexFile
+    || stagingArchiveNextOperations?.launchRunway?.launchDutyRecordIndexPath
+    || stagingArchiveNextOperations?.launchRunway?.launchDutyRecordIndexFile
+    || "";
   const developerOpsParams = buildDeveloperOpsRouteReviewBaseDownloadParams({
     ...opsScope,
     productCode: opsScope.productCode || productCode || "",
@@ -4676,7 +4693,8 @@ function buildLaunchMainlineActionReceiptVisibility({
     productCode: productCode || "",
     channel,
     developerOpsWorkspace,
-    launchMainlineWorkspace
+    launchMainlineWorkspace,
+    launchDutyRecordIndexPath
   });
   return {
     status: "ready",
@@ -7024,7 +7042,8 @@ function summarizeLaunchReceiptVisibilityDownload(item = null) {
     fileName: item.fileName || null,
     source: item.source || null,
     format: item.format || null,
-    href: item.href || null
+    href: item.href || null,
+    launchDutyRecordIndexPath: item.launchDutyRecordIndexPath || null
   };
 }
 

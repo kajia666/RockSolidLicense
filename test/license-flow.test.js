@@ -19217,6 +19217,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     const expectedSteadyStateGoLiveGateHandoff = steadyStateSnapshot.summary.launchReadinessNextGateHandoff;
     assert.ok(expectedSteadyStateGoLiveGate);
     assert.ok(expectedSteadyStateGoLiveGateHandoff);
+    const expectedSteadyStateLaunchDutyRecordIndexPath = expectedSteadyStateGoLiveGate.launchDutyRecordIndexPath;
+    assert.equal(
+      expectedSteadyStateLaunchDutyRecordIndexPath,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+    );
+    const steadyStateLaunchDutyRecordIndexPattern =
+      /launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/;
     const steadyStateWatchRecordDraftStatus = steadyStateOperationalReview.watchRecordDraftStatus;
     const steadyStateWatchRecordDraftRecordCount = steadyStateOperationalReview.watchRecordDraftRecordCount;
     const steadyStateWatchRecordDraftPattern = new RegExp(
@@ -19390,6 +19397,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
       item.executionPlan?.prefill?.launchReadinessNextGateStatus === expectedSteadyStateGoLiveGate.status
       && item.executionPlan?.prefill?.launchReadinessNextGateCurrentGate === expectedSteadyStateGoLiveGate.currentGate
+      && item.executionPlan?.prefill?.launchReadinessNextGateLaunchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
     )));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
       item.intent === "open_workspace"
@@ -19434,6 +19442,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchReadinessNextGateStatus=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchReadinessNextGateCurrentGate=/i);
+    assert.match(steadyStateDutyActionLinksDownload.body, steadyStateLaunchDutyRecordIndexPattern);
 
     const steadyStateDutyDownloadIntent = steadyStateDutyActionLinks.controlIntents.find((item) => (
       item.intent === "download_asset"
@@ -19447,6 +19456,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateCurrentGate,
       expectedSteadyStateGoLiveGate.currentGate
+    );
+    assert.equal(
+      steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
     );
     const steadyStateDutyPlanReceipt = await postJson(
       baseUrl,
@@ -19471,6 +19484,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         launchReadinessNextGateDecision: steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateDecision,
         launchReadinessNextGateCurrentGate: steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateCurrentGate,
         launchReadinessNextGateCanEnterInitialLaunch: steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateCanEnterInitialLaunch,
+        launchReadinessNextGateLaunchDutyRecordIndexPath:
+          steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateLaunchDutyRecordIndexPath,
         note: "steady-state duty board downloaded during launch duty"
       },
       ownerSession.token
@@ -19495,6 +19510,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       steadyStateDutyPlanReceipt.launchReadinessNextGateCanEnterInitialLaunch,
       expectedSteadyStateGoLiveGate.canEnterInitialLaunch
+    );
+    assert.equal(
+      steadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
     );
     assert.ok(steadyStateDutyPlanReceipt.auditLogId);
     assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.status, "visible");
@@ -19525,6 +19544,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.payload.launchReadinessNextGateCurrentGate,
       expectedSteadyStateGoLiveGate.currentGate
     );
+    assert.equal(
+      steadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.payload.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.equal(steadyStateDutyPlanReceipt.receiptVisibility.handoffEvidence.stageKey, "steady_state_duty_plan_receipt");
 
     const steadyStateDutyReceiptSnapshot = await getJson(
@@ -19547,6 +19570,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(latestSteadyStateDutyPlanReceipt.launchReadinessNextGateStatus, expectedSteadyStateGoLiveGate.status);
     assert.equal(latestSteadyStateDutyPlanReceipt.launchReadinessNextGateDecision, expectedSteadyStateGoLiveGate.decision);
     assert.equal(latestSteadyStateDutyPlanReceipt.launchReadinessNextGateCurrentGate, expectedSteadyStateGoLiveGate.currentGate);
+    assert.equal(
+      latestSteadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.equal(latestSteadyStateDutyPlanReceipt.receiptVisibility.status, "visible");
     assert.equal(latestSteadyStateDutyPlanReceipt.receiptVisibility.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
     assert.equal(latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.payload.action, "download");
@@ -19569,6 +19596,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.payload.launchReadinessNextGateCurrentGate,
       expectedSteadyStateGoLiveGate.currentGate
+    );
+    assert.equal(
+      latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery.payload.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
     );
     assert.equal(
       steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.latestSteadyStateDutyPlanReceipt.auditLogId,
@@ -19638,6 +19669,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsHandoffSummary.receiptVisibilitySummary.stageKey, "steady_state_duty_plan_receipt");
     assert.equal(launchOperationsHandoffSummary.receiptVisibilitySummary.failureRecovery.route, "/api/developer/ops/steady-state-duty-plan/receipt");
     assert.equal(
+      launchOperationsHandoffSummary.receiptVisibilitySummary.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(
       launchOperationsHandoffSummary.receiptVisibilitySummary.failureRecovery.payload.launchOpsOverviewDownloadKey,
       "ops_launch_operations_overview_status"
     );
@@ -19684,6 +19719,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadFileName=developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status/);
+    assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchReadinessNextGateStatus=/);
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsHandoffDownload.body, steadyStateWatchRecordDraftPattern);
@@ -19712,6 +19748,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsDailyBrief.nextReviewAction.key, launchOperationsHandoffSummary.nextReviewAction.key);
     assert.equal(launchOperationsDailyBrief.receiptVisibilitySummary.status, "visible");
     assert.equal(launchOperationsDailyBrief.receiptVisibilitySummary.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(
+      launchOperationsDailyBrief.receiptVisibilitySummary.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.equal(launchOperationsDailyBrief.receiptVisibilitySummary.failureRecovery.method, "POST");
     assert.equal(
       launchOperationsDailyBrief.receiptVisibilitySummary.failureRecovery.payload.launchOpsOverviewDownloadKey,
@@ -19760,6 +19800,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:/);
     assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
     assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status/);
+    assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:[\s\S]*launchReadinessNextGateStatus=/);
     assert.match(launchOperationsDailyBriefDownload.body, /Receipt Visibility Summary:[\s\S]*launchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsDailyBriefDownload.body, steadyStateWatchRecordDraftPattern);
@@ -19785,6 +19826,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsShiftActionPlan.receiptVisibilitySummary.status, "visible");
     assert.equal(launchOperationsShiftActionPlan.receiptVisibilitySummary.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
     assert.equal(launchOperationsShiftActionPlan.receiptVisibilitySummary.handoffEvidence.stageKey, "steady_state_duty_plan_receipt");
+    assert.equal(
+      launchOperationsShiftActionPlan.receiptVisibilitySummary.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.equal(
       launchOperationsShiftActionPlan.receiptVisibilitySummary.failureRecovery.payload.launchOpsOverviewDownloadKey,
       "ops_launch_operations_overview_status"
@@ -19838,6 +19883,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.launchReadinessNextGateCurrentGate,
       expectedLaunchOperationsGoLiveGate.currentGate
     );
+    assert.equal(
+      launchOperationsShiftActionPlan.primaryAction.executionPlan.receiptPlan.payload.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.ok(launchOperationsShiftActionPlan.operatorActions.every((item) => item.executionPlan?.receiptPlan?.payload?.note));
     assert.match(launchOperationsShiftActionPlan.actionPlanDownload.href, /format=launch-operations-shift-action-plan/);
     assert.ok(launchOperationsShiftActionPlan.operatorActions.some((item) => item.key === "open_steady_state_duty_board"));
@@ -19884,6 +19933,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:[\s\S]*launchReadinessNextGateStatus=/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Visibility Summary:[\s\S]*launchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsShiftActionPlanDownload.body, steadyStateWatchRecordDraftPattern);
@@ -19898,6 +19948,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewDownloadFileName=developer-ops-launch-operations-overview-status\.txt/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status/);
+    assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchReadinessNextGateStatus=/);
@@ -19951,6 +20002,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:[\s\S]*launchOpsOverviewDownloadKey=ops_launch_operations_overview_status/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status/);
+    assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:[\s\S]*launchOpsOverviewDownloadHref=.*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:[\s\S]*launchReadinessNextGateStatus=/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:[\s\S]*launchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:/);

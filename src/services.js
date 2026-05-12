@@ -21844,6 +21844,15 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     || String(item.launchReadinessNextGateCanEnterInitialLaunch ?? metadata.launchReadinessNextGateCanEnterInitialLaunch ?? "")
       .trim()
       .toLowerCase() === "true";
+  const launchReadinessNextGateLaunchDutyRecordIndexPath = String(
+    item.launchReadinessNextGateLaunchDutyRecordIndexPath
+      ?? item.launchDutyRecordIndexPath
+      ?? item.readinessGateRecordIndex
+      ?? metadata.launchReadinessNextGateLaunchDutyRecordIndexPath
+      ?? metadata.launchDutyRecordIndexPath
+      ?? metadata.readinessGateRecordIndex
+      ?? ""
+  ).trim();
   const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
   const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
   const note = String(item.note ?? metadata.note ?? "").trim();
@@ -21873,6 +21882,7 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     launchReadinessNextGateDecision,
     launchReadinessNextGateCurrentGate,
     launchReadinessNextGateCanEnterInitialLaunch,
+    launchReadinessNextGateLaunchDutyRecordIndexPath,
     focusKind,
     focusReason,
     note,
@@ -21904,6 +21914,7 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       launchReadinessNextGateDecision,
       launchReadinessNextGateCurrentGate,
       launchReadinessNextGateCanEnterInitialLaunch,
+      launchReadinessNextGateLaunchDutyRecordIndexPath,
       focusKind,
       focusReason,
       note,
@@ -21939,6 +21950,7 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
     launchReadinessNextGateDecision: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateDecision, ""),
     launchReadinessNextGateCurrentGate: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateCurrentGate, ""),
     launchReadinessNextGateCanEnterInitialLaunch: receipt.launchReadinessNextGateCanEnterInitialLaunch === true,
+    launchReadinessNextGateLaunchDutyRecordIndexPath: String(receipt.launchReadinessNextGateLaunchDutyRecordIndexPath || "").trim(),
     focusKind: normalizeDeveloperOpsConfirmationToken(receipt.focusKind, ""),
     focusReason: String(receipt.focusReason || "").trim(),
     note: String(receipt.note || "").trim()
@@ -21956,6 +21968,7 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
       limit: "80"
     },
     exportDownloadRoute: "/api/developer/ops/export/download",
+    launchDutyRecordIndexPath: payload.launchReadinessNextGateLaunchDutyRecordIndexPath || null,
     visibleIn: [
       "receipt_response",
       "developer_ops_snapshot",
@@ -22016,6 +22029,10 @@ function buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanRece
     exportDownloadRoute: visibility.exportDownloadRoute || "/api/developer/ops/export/download",
     failureRecovery,
     handoffEvidence,
+    launchDutyRecordIndexPath: visibility.launchDutyRecordIndexPath
+      || failureRecovery?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath
+      || receipt.launchReadinessNextGateLaunchDutyRecordIndexPath
+      || null,
     operatorHint: failureRecovery?.operatorHint || "Confirm the latest receipt is visible before handing launch operations to the next owner."
   };
 }
@@ -24875,6 +24892,7 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
       launchReadinessNextGateDecision: currentLaunchReadinessNextGate?.decision || "",
       launchReadinessNextGateCurrentGate: currentLaunchReadinessNextGate?.currentGate || "",
       launchReadinessNextGateCanEnterInitialLaunch: currentLaunchReadinessNextGate?.canEnterInitialLaunch === true,
+      launchReadinessNextGateLaunchDutyRecordIndexPath: currentLaunchReadinessNextGate?.launchDutyRecordIndexPath || "",
       watchRecordDraftStatus: watchRecordDraftStatus || "",
       watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
       firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
@@ -26135,6 +26153,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       launchReadinessNextGateDecision: currentLaunchReadinessNextGate?.decision || "",
       launchReadinessNextGateCurrentGate: currentLaunchReadinessNextGate?.currentGate || "",
       launchReadinessNextGateCanEnterInitialLaunch: currentLaunchReadinessNextGate?.canEnterInitialLaunch === true,
+      launchReadinessNextGateLaunchDutyRecordIndexPath: currentLaunchReadinessNextGate?.launchDutyRecordIndexPath || "",
       firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
       firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || "",
       firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
@@ -26170,6 +26189,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         launchReadinessNextGateDecision: currentLaunchReadinessNextGate?.decision || "",
         launchReadinessNextGateCurrentGate: currentLaunchReadinessNextGate?.currentGate || "",
         launchReadinessNextGateCanEnterInitialLaunch: currentLaunchReadinessNextGate?.canEnterInitialLaunch === true,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: currentLaunchReadinessNextGate?.launchDutyRecordIndexPath || "",
         firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
         firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || "",
         firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
@@ -32009,6 +32029,7 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
         + (prefill.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${prefill.launchOpsOverviewDownloadFileName}` : "")
         + (prefill.launchOpsOverviewDownloadFormat ? ` | launchOpsOverviewDownloadFormat=${prefill.launchOpsOverviewDownloadFormat}` : "")
         + (prefill.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${prefill.launchOpsOverviewDownloadHref}` : "")
+        + (prefill.launchReadinessNextGateLaunchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${prefill.launchReadinessNextGateLaunchDutyRecordIndexPath}` : "")
       );
     }
   };
@@ -32062,6 +32083,11 @@ function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, 
   const recoveryPayload = summary.failureRecovery?.payload && typeof summary.failureRecovery.payload === "object"
     ? summary.failureRecovery.payload
     : {};
+  const launchDutyRecordIndexPath = summary.launchDutyRecordIndexPath
+    || recoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath
+    || recoveryPayload.launchDutyRecordIndexPath
+    || recoveryPayload.readinessGateRecordIndex
+    || "";
   lines.push(title);
   lines.push(
     `- receiptVisibilitySummary=${summary.status || "-"}`
@@ -32078,6 +32104,7 @@ function appendDeveloperOpsReceiptVisibilitySummaryLines(lines, summary = null, 
     + (recoveryPayload.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${recoveryPayload.launchOpsOverviewDownloadHref}` : "")
     + (recoveryPayload.launchReadinessNextGateStatus ? ` | launchReadinessNextGateStatus=${recoveryPayload.launchReadinessNextGateStatus}` : "")
     + (recoveryPayload.launchReadinessNextGateCurrentGate ? ` | launchReadinessNextGateCurrentGate=${recoveryPayload.launchReadinessNextGateCurrentGate}` : "")
+    + (launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${launchDutyRecordIndexPath}` : "")
   );
 }
 
@@ -34511,6 +34538,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | launchDayWatchEntry=${payload.launchDayWatchEntry || "-"}`
         + ` | launchReadinessNextGateStatus=${payload.launchReadinessNextGateStatus || "-"}`
         + ` | launchReadinessNextGateCurrentGate=${payload.launchReadinessNextGateCurrentGate || "-"}`
+        + ` | launchDutyRecordIndex=${payload.launchReadinessNextGateLaunchDutyRecordIndexPath || "-"}`
         + ` | firstWaveLifecycleStatus=${payload.firstWaveLifecycleStatus || "-"}`
         + ` | firstWaveLifecycleNextOperation=${payload.firstWaveLifecycleNextOperation || "-"}`
         + ` | firstWaveLifecyclePrimaryDownloadKey=${payload.firstWaveLifecyclePrimaryDownloadKey || "-"}`
@@ -34620,6 +34648,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     + (receiptRecoveryPayload.launchOpsOverviewDownloadHref ? ` | launchOpsOverviewDownloadHref=${receiptRecoveryPayload.launchOpsOverviewDownloadHref}` : "")
     + (receiptRecoveryPayload.launchReadinessNextGateStatus ? ` | launchReadinessNextGateStatus=${receiptRecoveryPayload.launchReadinessNextGateStatus}` : "")
     + (receiptRecoveryPayload.launchReadinessNextGateCurrentGate ? ` | launchReadinessNextGateCurrentGate=${receiptRecoveryPayload.launchReadinessNextGateCurrentGate}` : "")
+    + (receiptRecoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${receiptRecoveryPayload.launchReadinessNextGateLaunchDutyRecordIndexPath}` : "")
   );
   lines.push("");
   lines.push("Overview Download:");
@@ -48790,6 +48819,13 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         || String(body.launchReadinessNextGateCanEnterInitialLaunch ?? body.dutyPlanLaunchReadinessNextGateCanEnterInitialLaunch ?? "")
           .trim()
           .toLowerCase() === "true";
+      const launchReadinessNextGateLaunchDutyRecordIndexPath = String(
+        body.launchReadinessNextGateLaunchDutyRecordIndexPath
+          ?? body.dutyPlanLaunchReadinessNextGateLaunchDutyRecordIndexPath
+          ?? body.launchDutyRecordIndexPath
+          ?? body.readinessGateRecordIndex
+          ?? ""
+      ).trim().slice(0, 1000);
       const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
       const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
@@ -48836,6 +48872,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessNextGateDecision,
           launchReadinessNextGateCurrentGate,
           launchReadinessNextGateCanEnterInitialLaunch,
+          launchReadinessNextGateLaunchDutyRecordIndexPath,
           focusKind,
           focusReason,
           note,
@@ -48871,6 +48908,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessNextGateDecision,
           launchReadinessNextGateCurrentGate,
           launchReadinessNextGateCanEnterInitialLaunch,
+          launchReadinessNextGateLaunchDutyRecordIndexPath,
           focusKind,
           focusReason,
           note,

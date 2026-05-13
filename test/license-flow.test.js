@@ -20240,6 +20240,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsOperatorEntry.currentAction.executionPlan?.receiptPlan?.payload?.note || "",
       /launch_operations_shift_action:/
     );
+    assert.ok(launchOperationsOperatorEntry.receiptConfirmation);
+    assert.equal(launchOperationsOperatorEntry.receiptConfirmation.status, "recorded");
+    assert.equal(launchOperationsOperatorEntry.receiptConfirmation.recorded, true);
+    assert.equal(launchOperationsOperatorEntry.receiptConfirmation.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(launchOperationsOperatorEntry.receiptConfirmation.action, "download");
+    assert.equal(launchOperationsOperatorEntry.receiptConfirmation.intent, "download_asset");
+    assert.equal(launchOperationsOperatorEntry.receiptConfirmation.receiptVisibilityStatus, "visible");
+    assert.equal(launchOperationsOperatorEntry.receiptConfirmation.recoveryMethod, "POST");
+    assert.equal(
+      launchOperationsOperatorEntry.receiptConfirmation.recoveryRoute,
+      "/api/developer/ops/steady-state-duty-plan/receipt"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.receiptConfirmation.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.receiptConfirmation.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20278,6 +20298,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*primaryDownload=developer-ops-launch-operations-operator-entry\.txt/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*currentAction=/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptPlan=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptConfirmation=recorded/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`Launch Operations Operator Entry:[\\s\\S]*receiptAudit=${steadyStateDutyPlanReceipt.auditLogId}`));
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20374,6 +20396,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Primary Download: developer-ops-launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Current Action:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Plan: POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Confirmation:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, new RegExp(`Receipt Confirmation:[\\s\\S]*audit=${steadyStateDutyPlanReceipt.auditLogId}`));
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Confirmation:[\s\S]*recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

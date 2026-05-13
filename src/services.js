@@ -27018,6 +27018,59 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklist({
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorReceiptConfirmation(
+  latestSteadyStateDutyPlanReceipt = null,
+  {
+    launchDutyRecordIndexPath = null
+  } = {}
+) {
+  const receipt = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
+  const visibility = receipt?.receiptVisibility && typeof receipt.receiptVisibility === "object"
+    ? receipt.receiptVisibility
+    : null;
+  const failureRecovery = visibility?.failureRecovery && typeof visibility.failureRecovery === "object"
+    ? visibility.failureRecovery
+    : null;
+  const recoveryPayload = failureRecovery?.payload && typeof failureRecovery.payload === "object"
+    ? failureRecovery.payload
+    : null;
+  const launchOpsOverviewContextLaunchDutyRecordIndexPath = visibility?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || recoveryPayload?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || receipt?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || launchDutyRecordIndexPath
+    || null;
+  const launchReadinessNextGateLaunchDutyRecordIndexPath = receipt?.launchReadinessNextGateLaunchDutyRecordIndexPath
+    || recoveryPayload?.launchReadinessNextGateLaunchDutyRecordIndexPath
+    || launchDutyRecordIndexPath
+    || null;
+  return {
+    version: "developer-ops-launch-operations-operator-receipt-confirmation/v1",
+    status: receipt?.status || "missing",
+    recorded: Boolean(receipt?.auditLogId),
+    auditLogId: receipt?.auditLogId || null,
+    recordedAt: receipt?.recordedAt || null,
+    action: receipt?.action || null,
+    intent: receipt?.intent || null,
+    planKind: receipt?.planKind || null,
+    planMode: receipt?.planMode || null,
+    fileName: receipt?.fileName || null,
+    format: receipt?.format || null,
+    href: receipt?.href || null,
+    receiptVisibilityStatus: visibility?.status || "pending",
+    visibleInCount: Array.isArray(visibility?.visibleIn) ? visibility.visibleIn.length : 0,
+    recoveryMethod: failureRecovery?.method || "POST",
+    recoveryRoute: failureRecovery?.route || "/api/developer/ops/steady-state-duty-plan/receipt",
+    recoveryPayload,
+    operatorHint: failureRecovery?.operatorHint || "After recording the first launch-duty action, refresh Developer Ops and confirm this receipt remains visible.",
+    launchOpsOverviewContextLaunchDutyRecordIndexPath,
+    launchReadinessNextGateLaunchDutyRecordIndexPath,
+    launchDutyRecordIndexPath: visibility?.launchDutyRecordIndexPath
+      || launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || launchReadinessNextGateLaunchDutyRecordIndexPath
+      || null
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -27025,6 +27078,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   launchOperationsOperatorChecklistDownload = null,
   launchOperationsOperatorEntryDownload = null,
   launchOperationsShiftActionPlan = null,
+  latestSteadyStateDutyPlanReceipt = null,
   launchOperationsFileIndex = [],
   launchMainlineHandoffRoutesDownload = null
 } = {}) {
@@ -27107,6 +27161,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
           : null
       }
     : null;
+  const receiptConfirmation = buildDeveloperOpsLaunchOperationsOperatorReceiptConfirmation(
+    latestSteadyStateDutyPlanReceipt,
+    { launchDutyRecordIndexPath }
+  );
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27153,8 +27211,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchSmokeSummaryDownload,
     launchMainlineHandoffRoutesDownload: launchMainlineHandoffRoutesDownload || null,
     currentAction,
+    receiptConfirmation,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -27691,6 +27750,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsOperatorChecklistDownload,
     launchOperationsOperatorEntryDownload,
     launchOperationsShiftActionPlan,
+    latestSteadyStateDutyPlanReceipt,
     launchOperationsFileIndex,
     launchMainlineHandoffRoutesDownload
   });
@@ -33509,6 +33569,18 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyRecordIndex=${receiptPlan?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || currentAction.launchDutyRecordIndexPath || "-"}`
         );
       }
+      const receiptConfirmation = launchOperationsOperatorEntry.receiptConfirmation || null;
+      if (receiptConfirmation) {
+        lines.push(
+          `- receiptConfirmation=${receiptConfirmation.status || "-"}`
+          + ` | recorded=${receiptConfirmation.recorded === true ? "yes" : "no"}`
+          + ` | receiptAudit=${receiptConfirmation.auditLogId || "-"}`
+          + ` | visibility=${receiptConfirmation.receiptVisibilityStatus || "-"}`
+          + ` | recovery=${receiptConfirmation.recoveryMethod || "-"} ${receiptConfirmation.recoveryRoute || "-"}`
+          + ` | launchOpsOverviewContextRecordIndex=${receiptConfirmation.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+          + ` | launchDutyRecordIndex=${receiptConfirmation.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptConfirmation.launchDutyRecordIndexPath || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -34211,6 +34283,18 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | launchOpsOverviewContextRecordIndex=${receiptPlan?.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
         + ` | launchDutyRecordIndex=${receiptPlan?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || currentAction.launchDutyRecordIndexPath || "-"}`
         + ` | note=${receiptPlan?.payload?.note || "-"}`
+      );
+    }
+    const receiptConfirmation = launchOperationsOperatorEntry.receiptConfirmation || null;
+    if (receiptConfirmation) {
+      lines.push(
+        `- Receipt Confirmation: ${receiptConfirmation.status || "-"}`
+        + ` | recorded=${receiptConfirmation.recorded === true ? "yes" : "no"}`
+        + ` | audit=${receiptConfirmation.auditLogId || "-"}`
+        + ` | visibility=${receiptConfirmation.receiptVisibilityStatus || "-"}`
+        + ` | recovery=${receiptConfirmation.recoveryMethod || "-"} ${receiptConfirmation.recoveryRoute || "-"}`
+        + ` | launchOpsOverviewContextRecordIndex=${receiptConfirmation.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+        + ` | launchDutyRecordIndex=${receiptConfirmation.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptConfirmation.launchDutyRecordIndexPath || "-"}`
       );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
@@ -35609,6 +35693,8 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     `Launch Operations Overview Signoff: productionSignoffPacket=${launchOperationsOverviewStatus?.productionSignoffPacket || "-"} | launchDayWatchEntry=${launchOperationsOverviewStatus?.launchDayWatchEntry || "-"}`,
     `Launch Operations Operator Entry: status=${readiness.launchOperationsOperatorEntry?.status || "-"}`
       + ` | receipt=${readiness.launchOperationsOperatorEntry?.receiptVisibilityStatus || "-"}`
+      + ` | receiptConfirmation=${readiness.launchOperationsOperatorEntry?.receiptConfirmation?.status || "-"}`
+      + ` | receiptAudit=${readiness.launchOperationsOperatorEntry?.receiptConfirmation?.auditLogId || "-"}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -36153,6 +36239,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     launchOperationsOperatorChecklistDownload: readiness.launchOperationsOperatorChecklistDownload || buildDeveloperOpsLaunchOperationsOperatorChecklistDownload(scope),
     launchOperationsOperatorEntryDownload: readiness.launchOperationsOperatorEntryDownload || buildDeveloperOpsLaunchOperationsOperatorEntryDownload(scope),
     launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
+    latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null,
     launchOperationsFileIndex: fileIndex,
     launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope)
   });
@@ -36192,6 +36279,24 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | launchDutyRecordIndex=${receiptPlan?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || currentAction.launchDutyRecordIndexPath || "-"}`
     );
     lines.push(`Receipt Note: ${receiptPlan?.payload?.note || "-"}`);
+    lines.push("");
+  }
+  const receiptConfirmation = entry.receiptConfirmation || null;
+  if (receiptConfirmation) {
+    lines.push("Receipt Confirmation:");
+    lines.push(
+      `- status=${receiptConfirmation.status || "-"}`
+      + ` | recorded=${receiptConfirmation.recorded === true ? "yes" : "no"}`
+      + ` | audit=${receiptConfirmation.auditLogId || "-"}`
+      + ` | action=${receiptConfirmation.action || "-"}`
+      + ` | intent=${receiptConfirmation.intent || "-"}`
+      + ` | visibility=${receiptConfirmation.receiptVisibilityStatus || "-"}`
+      + ` | visibleIn=${receiptConfirmation.visibleInCount ?? 0}`
+      + ` | recovery=${receiptConfirmation.recoveryMethod || "-"} ${receiptConfirmation.recoveryRoute || "-"}`
+      + ` | launchOpsOverviewContextRecordIndex=${receiptConfirmation.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+      + ` | launchDutyRecordIndex=${receiptConfirmation.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptConfirmation.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`Receipt Confirmation Hint: ${receiptConfirmation.operatorHint || "-"}`);
     lines.push("");
   }
   lines.push("Checklist Steps:");

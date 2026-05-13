@@ -21326,6 +21326,129 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationBlockedBy=stabilization_owner_handoff/
     );
 
+    const launchDutyCloseoutReadyReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        action: "record_index_readback",
+        intent: "launch_duty_closeout_ready",
+        planKind: "record_index",
+        planMode: "readback",
+        targetType: "launch-duty-record-index",
+        href: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        fileName: "launch-duty-record-index.json",
+        format: "launch-duty-record-index",
+        launchOpsOverviewContextKind: "launch_ops_overview_status",
+        launchOpsOverviewDownloadKey: "ops_launch_operations_overview_status",
+        launchOpsOverviewDownloadFileName: "developer-ops-launch-operations-overview-status.txt",
+        launchOpsOverviewDownloadFormat: "launch-operations-overview-status",
+        launchOpsOverviewDownloadHref: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        launchReadinessNextGateStatus: expectedSteadyStateGoLiveGate.status,
+        launchReadinessNextGateDecision: expectedSteadyStateGoLiveGate.decision,
+        launchReadinessNextGateCurrentGate: expectedSteadyStateGoLiveGate.currentGate,
+        launchReadinessNextGateCanEnterInitialLaunch: expectedSteadyStateGoLiveGate.canEnterInitialLaunch,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchDutyRecordIndexState: {
+          mode: "staging-launch-duty-record-index",
+          status: "in_progress",
+          recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+          recordedKeys: [
+            "launch_day_watch_summary",
+            "receipt_visibility_snapshot",
+            "first_wave_incident_log",
+            "rollback_signal_review",
+            "stabilization_owner_handoff"
+          ],
+          pendingKeys: ["first_wave_closeout"],
+          nextRecordKey: "first_wave_closeout",
+          records: {
+            first_wave_incident_log: {
+              status: "recorded",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-incident-log.md",
+              recordedAt: "2026-05-14T09:30:00.000Z"
+            },
+            rollback_signal_review: {
+              status: "recorded",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/rollback-signal-review.md",
+              recordedAt: "2026-05-14T09:40:00.000Z"
+            },
+            stabilization_owner_handoff: {
+              status: "recorded",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/stabilization-owner-handoff.md",
+              recordedAt: "2026-05-14T09:50:00.000Z"
+            }
+          }
+        },
+        note: "launch-duty record index read back after closeout source records"
+      },
+      ownerSession.token
+    );
+    assert.equal(launchDutyCloseoutReadyReceipt.launchDutyRecordIndexState.recordedCount, 5);
+    assert.equal(launchDutyCloseoutReadyReceipt.launchDutyRecordIndexState.pendingCount, 1);
+    assert.equal(launchDutyCloseoutReadyReceipt.launchDutyRecordIndexState.nextRecordKey, "first_wave_closeout");
+    const launchDutyCloseoutReadySnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const launchDutyCloseoutReadyQueue = launchDutyCloseoutReadySnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyHandoffAction?.stabilizationReceiptWriteQueue;
+    assert.ok(launchDutyCloseoutReadyQueue);
+    assert.equal(launchDutyCloseoutReadyQueue.currentRecordKey, "first_wave_closeout");
+    assert.equal(launchDutyCloseoutReadyQueue.completionState.recordedRecordCount, 3);
+    assert.equal(launchDutyCloseoutReadyQueue.completionState.pendingRecordCount, 1);
+    assert.equal(launchDutyCloseoutReadyQueue.completionState.nextRecordKey, "first_wave_closeout");
+    assert.equal(launchDutyCloseoutReadyQueue.completionState.closeoutReady, true);
+    assert.deepEqual(launchDutyCloseoutReadyQueue.completionState.closeoutBlockedByRecordKeys, []);
+    assert.equal(launchDutyCloseoutReadyQueue.closeoutExecutionState.status, "ready_for_first_wave_closeout");
+    assert.equal(launchDutyCloseoutReadyQueue.closeoutExecutionState.readyForCloseoutWrite, true);
+    assert.equal(launchDutyCloseoutReadyQueue.closeoutExecutionState.recordKey, "first_wave_closeout");
+    assert.equal(launchDutyCloseoutReadyQueue.closeoutExecutionState.actionKey, "close_first_wave");
+    assert.match(
+      launchDutyCloseoutReadyQueue.closeoutExecutionState.command,
+      /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key first_wave_closeout/
+    );
+    assert.deepEqual(
+      launchDutyCloseoutReadyQueue.closeoutExecutionState.receiptPlaceholders,
+      ["<record_launch_closeout_review-receipt-id>"]
+    );
+    assert.match(
+      launchDutyCloseoutReadySnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationProgress=3\/4/
+    );
+    assert.match(
+      launchDutyCloseoutReadySnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationNext=first_wave_closeout/
+    );
+    assert.match(
+      launchDutyCloseoutReadySnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationCloseoutReady=true/
+    );
+    assert.match(
+      launchDutyCloseoutReadySnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationCloseoutStatus=ready_for_first_wave_closeout/
+    );
+    const launchDutyCloseoutReadyOperatorEntryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
+      ownerSession.token
+    );
+    assert.match(
+      launchDutyCloseoutReadyOperatorEntryDownload.body,
+      /Stabilization Receipt Progress:[\s\S]*status=blocked_until_receipt_visibility_snapshot \| progress=3\/4 \| next=first_wave_closeout \| closeoutReady=yes \| blockedBy=-/
+    );
+    assert.match(
+      launchDutyCloseoutReadyOperatorEntryDownload.body,
+      /Stabilization Closeout Execution:[\s\S]*status=ready_for_first_wave_closeout \| ready=yes \| record=first_wave_closeout \| action=close_first_wave/
+    );
+    assert.match(
+      launchDutyCloseoutReadyOperatorEntryDownload.body,
+      /Stabilization Closeout Execution:[\s\S]*command=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key first_wave_closeout/
+    );
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

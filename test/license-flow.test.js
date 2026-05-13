@@ -20476,6 +20476,43 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ["review_production_signoff_packet", "blocked_until_full_test", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"]
       ]
     );
+    const expectedFirstLaunchOperatingChain = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain;
+    assert.ok(expectedFirstLaunchOperatingChain);
+    const firstLaunchConfirmationDoorway = launchOperationsOperatorEntry.firstLaunchConfirmationDoorway;
+    assert.ok(firstLaunchConfirmationDoorway);
+    assert.equal(
+      firstLaunchConfirmationDoorway.version,
+      "developer-ops-launch-operations-operator-first-launch-confirmation-doorway/v1"
+    );
+    assert.equal(firstLaunchConfirmationDoorway.status, expectedFirstLaunchOperatingChain.status);
+    assert.equal(firstLaunchConfirmationDoorway.currentPhaseKey, expectedFirstLaunchOperatingChain.currentPhaseKey);
+    assert.equal(firstLaunchConfirmationDoorway.phaseCount, expectedFirstLaunchOperatingChain.phaseCount);
+    assert.equal(firstLaunchConfirmationDoorway.readyPhaseCount, expectedFirstLaunchOperatingChain.readyPhaseCount);
+    assert.equal(
+      firstLaunchConfirmationDoorway.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(firstLaunchConfirmationDoorway.confirmationMethod, "POST");
+    assert.equal(firstLaunchConfirmationDoorway.confirmationEndpoint, "/api/developer/ops/first-wave/recommendations/confirm");
+    assert.deepEqual(
+      firstLaunchConfirmationDoorway.segments.map((item) => item.key),
+      [
+        "first_batch_inventory",
+        "first_card_delivery_export",
+        "first_wave_handoff_confirmation",
+        "first_user_runtime_validation"
+      ]
+    );
+    assert.equal(firstLaunchConfirmationDoorway.nextActionKey, expectedFirstLaunchOperatingChain.nextAction?.key || null);
+    assert.equal(firstLaunchConfirmationDoorway.nextActionStage, expectedFirstLaunchOperatingChain.nextAction?.stage || null);
+    assert.equal(firstLaunchConfirmationDoorway.nextActionOperation, expectedFirstLaunchOperatingChain.nextAction?.operation || null);
+    assert.equal(
+      firstLaunchConfirmationDoorway.primaryDownload?.key || null,
+      expectedFirstLaunchOperatingChain.primaryDownload?.key || null
+    );
+    assert.equal(firstLaunchConfirmationDoorway.confirmationDraft?.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(firstLaunchConfirmationDoorway.confirmationDraft?.channel, "stable");
+    assert.equal(firstLaunchConfirmationDoorway.confirmationDraft?.decision, "confirmed");
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20532,6 +20569,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*switchDecision=hold_until_full_test_and_signoff/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchSwitchRunbook=blocked_until_full_test_and_signoff/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*switchCurrentCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*firstLaunchDoorway=/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*firstLaunchDoorwayConfirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20598,6 +20637,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*postSignoffPhase=archive_signoff_packet/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchSwitchReadiness=blocked_until_full_test_and_signoff/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchSwitchRunbook=refresh_staging_readiness_status/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*firstLaunchDoorway=/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*firstLaunchDoorwayConfirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20676,6 +20717,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*status=blocked_until_full_test_and_signoff \| currentStep=refresh_staging_readiness_status \| currentCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*nextCommand=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json \| fullTest=npm\.cmd test/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*4\. review_production_signoff_packet \| status=blocked_until_full_test \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /First-Launch Confirmation Doorway:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /First-Launch Confirmation Doorway:[\s\S]*confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Doorway Segments:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /1\. first_batch_inventory \| status=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /2\. first_card_delivery_export \| status=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /3\. first_wave_handoff_confirmation \| status=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /4\. first_user_runtime_validation \| status=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

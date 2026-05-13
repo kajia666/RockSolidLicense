@@ -20539,6 +20539,48 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(receiptVisibilityParityCheck.launchSmokeSummary.recordIndexAligned, true);
     assert.equal(receiptVisibilityParityCheck.launchReviewSummary.routeIndexAligned, true);
     assert.equal(receiptVisibilityParityCheck.launchSmokeSummary.routeIndexAligned, true);
+    const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry.receiptVisibilityConfirmationQueue;
+    assert.ok(receiptVisibilityConfirmationQueue);
+    assert.equal(
+      receiptVisibilityConfirmationQueue.version,
+      "developer-ops-launch-operations-operator-receipt-visibility-confirmation-queue/v1"
+    );
+    assert.equal(receiptVisibilityConfirmationQueue.parityStatus, receiptVisibilityParityCheck.status);
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.confirmationEndpoint,
+      firstLaunchConfirmationDoorway.confirmationEndpoint
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.confirmationMethod,
+      firstLaunchConfirmationDoorway.confirmationMethod
+    );
+    assert.ok(Array.isArray(receiptVisibilityConfirmationQueue.steps));
+    assert.deepEqual(
+      receiptVisibilityConfirmationQueue.steps.map((item) => item.key),
+      [
+        "review_launch_review_summary",
+        "review_launch_smoke_summary",
+        "confirm_first_wave_handoff",
+        "refresh_developer_ops_overview"
+      ]
+    );
+    assert.equal(receiptVisibilityConfirmationQueue.steps[0].status, "current");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[0].fileName, "launch-review.txt");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[1].status, "next");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[1].fileName, "launch-smoke-kit.txt");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[2].method, "POST");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[2].route, "/api/developer/ops/first-wave/recommendations/confirm");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[2].payload?.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[2].payload?.channel, "stable");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[2].payload?.decision, "confirmed");
+    assert.equal(receiptVisibilityConfirmationQueue.steps[3].method, "GET");
+    assert.match(receiptVisibilityConfirmationQueue.steps[3].href || "", /\/api\/developer\/ops\/export\?/);
+    assert.match(receiptVisibilityConfirmationQueue.steps[3].href || "", /productCode=EXPORT_CLOSEOUT_READY/);
+    assert.match(receiptVisibilityConfirmationQueue.steps[3].href || "", /channel=stable/);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20599,6 +20641,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*firstLaunchDoorwayConfirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptParity=aligned/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptParityReady=2\/2/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptConfirmationQueue=/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueCurrent=review_launch_review_summary/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20669,6 +20713,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*firstLaunchDoorwayConfirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptParity=aligned/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptParityReady=2\/2/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptConfirmationQueue=/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueCurrent=review_launch_review_summary/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20758,6 +20804,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Parity Check:[\s\S]*status=aligned \| aligned=2\/2 \| mismatches=0/);
     assert.match(launchOperationsOperatorEntryDownload.body, /1\. launch_review_summary \| status=aligned \| file=launch-review\.txt \| format=summary \| recordIndexAligned=yes \| routeIndexAligned=yes/);
     assert.match(launchOperationsOperatorEntryDownload.body, /2\. launch_smoke_summary \| status=aligned \| file=launch-smoke-kit\.txt \| format=summary \| recordIndexAligned=yes \| routeIndexAligned=yes/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*parity=aligned \| current=review_launch_review_summary \| steps=4/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /1\. review_launch_review_summary \| status=current \| file=launch-review\.txt \| format=summary/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /2\. review_launch_smoke_summary \| status=next \| file=launch-smoke-kit\.txt \| format=summary/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /3\. confirm_first_wave_handoff \| status=ready_after_summary_review \| POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /4\. refresh_developer_ops_overview \| status=pending_confirmation_receipt \| GET \/api\/developer\/ops\/export\?productCode=EXPORT_CLOSEOUT_READY&channel=stable/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

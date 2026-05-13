@@ -21821,6 +21821,107 @@ function buildSnapshotLatestFirstWaveReadinessBridges(auditLogs = [], limit = 5,
     .slice(0, Math.max(1, Number(limit || 5)));
 }
 
+const LAUNCH_DUTY_RECORD_INDEX_SEQUENCE = [
+  "launch_day_watch_summary",
+  "receipt_visibility_snapshot",
+  "first_wave_incident_log",
+  "rollback_signal_review",
+  "stabilization_owner_handoff",
+  "first_wave_closeout"
+];
+
+function normalizeLaunchDutyRecordIndexKey(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizeLaunchDutyRecordIndexKeyList(value = null) {
+  const items = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(",")
+      : [];
+  const seen = new Set();
+  const keys = [];
+  for (const item of items) {
+    const key = normalizeLaunchDutyRecordIndexKey(item);
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    keys.push(key);
+  }
+  return keys;
+}
+
+function normalizeLaunchDutyRecordIndexRecords(value = null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const records = {};
+  for (const [rawKey, rawRecord] of Object.entries(value)) {
+    const key = normalizeLaunchDutyRecordIndexKey(rawKey);
+    if (!key || !rawRecord || typeof rawRecord !== "object" || Array.isArray(rawRecord)) {
+      continue;
+    }
+    records[key] = {
+      key,
+      status: normalizeDeveloperOpsConfirmationToken(rawRecord.status, ""),
+      actionKey: normalizeDeveloperOpsConfirmationToken(rawRecord.actionKey, ""),
+      category: normalizeDeveloperOpsConfirmationToken(rawRecord.category, ""),
+      artifactPath: String(rawRecord.artifactPath || rawRecord.artifact || "").trim().slice(0, 1000),
+      receiptOperations: normalizeLaunchDutyRecordIndexKeyList(rawRecord.receiptOperations),
+      receiptIds: normalizeLaunchDutyRecordIndexKeyList(rawRecord.receiptIds),
+      sourceRecordKeys: normalizeLaunchDutyRecordIndexKeyList(rawRecord.sourceRecordKeys),
+      recordedAt: String(rawRecord.recordedAt || "").trim().slice(0, 100)
+    };
+  }
+  return records;
+}
+
+function normalizeLaunchDutyRecordIndexState(value = null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const records = normalizeLaunchDutyRecordIndexRecords(value.records);
+  const recordedFromRecords = Object.entries(records)
+    .filter(([, record]) => record.status === "recorded")
+    .map(([key]) => key);
+  const recordedKeys = normalizeLaunchDutyRecordIndexKeyList(value.recordedKeys || value.recordedRecordKeys);
+  const resolvedRecordedKeys = recordedKeys.length ? recordedKeys : recordedFromRecords;
+  const pendingKeys = normalizeLaunchDutyRecordIndexKeyList(value.pendingKeys || value.pendingRecordKeys);
+  const knownKeys = LAUNCH_DUTY_RECORD_INDEX_SEQUENCE.filter((key) => (
+    resolvedRecordedKeys.includes(key)
+    || pendingKeys.includes(key)
+    || Object.prototype.hasOwnProperty.call(records, key)
+  ));
+  const resolvedPendingKeys = pendingKeys.length
+    ? pendingKeys
+    : knownKeys.filter((key) => !resolvedRecordedKeys.includes(key));
+  const nextRecordKey = normalizeLaunchDutyRecordIndexKey(value.nextRecordKey || value.currentRecordKey)
+    || resolvedPendingKeys[0]
+    || null;
+  return {
+    version: "developer-ops-launch-duty-record-index-state/v1",
+    mode: normalizeDeveloperOpsConfirmationToken(value.mode, "staging-launch-duty-record-index"),
+    status: normalizeDeveloperOpsConfirmationToken(
+      value.status,
+      resolvedPendingKeys.length ? "in_progress" : "complete"
+    ),
+    recordIndexFile: String(value.recordIndexFile || value.launchDutyRecordIndexPath || value.path || "").trim().slice(0, 1000),
+    recordedKeys: resolvedRecordedKeys,
+    pendingKeys: resolvedPendingKeys,
+    recordedCount: resolvedRecordedKeys.length,
+    pendingCount: resolvedPendingKeys.length,
+    nextRecordKey,
+    records
+  };
+}
+
 function buildSteadyStateDutyPlanReceiptPayload(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -21901,6 +22002,13 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       ?? metadata.launchOpsOverviewContextRecordIndexPath
       ?? ""
   ).trim() || launchReadinessNextGateLaunchDutyRecordIndexPath;
+  const launchDutyRecordIndexState = normalizeLaunchDutyRecordIndexState(
+    item.launchDutyRecordIndexState
+      || item.launchDutyRecordIndexSnapshot
+      || metadata.launchDutyRecordIndexState
+      || metadata.launchDutyRecordIndexSnapshot
+      || null
+  );
   const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
   const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
   const note = String(item.note ?? metadata.note ?? "").trim();
@@ -21932,6 +22040,7 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     launchReadinessNextGateCanEnterInitialLaunch,
     launchReadinessNextGateLaunchDutyRecordIndexPath,
     launchOpsOverviewContextLaunchDutyRecordIndexPath,
+    launchDutyRecordIndexState,
     focusKind,
     focusReason,
     note,
@@ -21965,6 +22074,7 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       launchReadinessNextGateCanEnterInitialLaunch,
       launchReadinessNextGateLaunchDutyRecordIndexPath,
       launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      launchDutyRecordIndexState,
       focusKind,
       focusReason,
       note,
@@ -22002,6 +22112,7 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
     launchReadinessNextGateCurrentGate: normalizeDeveloperOpsConfirmationToken(receipt.launchReadinessNextGateCurrentGate, ""),
     launchReadinessNextGateCanEnterInitialLaunch: receipt.launchReadinessNextGateCanEnterInitialLaunch === true,
     launchReadinessNextGateLaunchDutyRecordIndexPath: String(receipt.launchReadinessNextGateLaunchDutyRecordIndexPath || "").trim(),
+    launchDutyRecordIndexState: normalizeLaunchDutyRecordIndexState(receipt.launchDutyRecordIndexState),
     focusKind: normalizeDeveloperOpsConfirmationToken(receipt.focusKind, ""),
     focusReason: String(receipt.focusReason || "").trim(),
     note: String(receipt.note || "").trim()
@@ -28005,7 +28116,8 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   receiptVisibilityConfirmationQueue = null,
   postSignoffExecutionChecklist = null,
   postSignoffWatchReceiptPlan = null,
-  launchDutyRecordIndexPath = null
+  launchDutyRecordIndexPath = null,
+  launchDutyRecordIndexState = null
 } = {}) {
   const queue = receiptVisibilityConfirmationQueue && typeof receiptVisibilityConfirmationQueue === "object"
     ? receiptVisibilityConfirmationQueue
@@ -28162,34 +28274,53 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   const stabilizationCloseoutSourceRecordKeys = Array.isArray(stabilizationCloseoutRecord?.sourceRecordKeys)
     ? stabilizationCloseoutRecord.sourceRecordKeys.filter(Boolean)
     : [];
-  const stabilizationRecordedRecordKeys = [];
+  const normalizedLaunchDutyRecordIndexState = normalizeLaunchDutyRecordIndexState(launchDutyRecordIndexState);
+  const recordedRecordKeySet = new Set(
+    Array.isArray(normalizedLaunchDutyRecordIndexState?.recordedKeys)
+      ? normalizedLaunchDutyRecordIndexState.recordedKeys
+      : []
+  );
+  const stabilizationRecordKeys = stabilizationReceiptWriteRecords
+    .map((record) => record.recordKey)
+    .filter(Boolean);
+  const stabilizationRecordedRecordKeys = stabilizationRecordKeys.filter((key) => recordedRecordKeySet.has(key));
+  const stabilizationPendingRecordKeys = stabilizationRecordKeys.filter((key) => !recordedRecordKeySet.has(key));
   const stabilizationReceiptCompletionRecords = stabilizationReceiptWriteRecords.map((record) => {
     const sourceRecordKeys = Array.isArray(record.sourceRecordKeys) ? record.sourceRecordKeys.filter(Boolean) : [];
     const isCloseoutRecord = record.recordKey === stabilizationCloseoutRecord?.recordKey;
+    const indexRecord = normalizedLaunchDutyRecordIndexState?.records?.[record.recordKey] || null;
+    const recorded = recordedRecordKeySet.has(record.recordKey);
     return {
       recordKey: record.recordKey || null,
       actionKey: record.actionKey || null,
       artifact: record.artifact || null,
       status: record.status || null,
-      completionStatus: isCloseoutRecord && stabilizationCloseoutSourceRecordKeys.length
-        ? "blocked_until_source_records"
-        : "pending_record",
-      recorded: false,
+      completionStatus: recorded
+        ? "recorded"
+        : isCloseoutRecord && stabilizationCloseoutSourceRecordKeys.some((key) => !recordedRecordKeySet.has(key))
+          ? "blocked_until_source_records"
+          : "pending_record",
+      recorded,
       blocksCloseout: stabilizationCloseoutSourceRecordKeys.includes(record.recordKey),
-      blockedByRecordKeys: isCloseoutRecord ? stabilizationCloseoutSourceRecordKeys : [],
+      blockedByRecordKeys: isCloseoutRecord
+        ? stabilizationCloseoutSourceRecordKeys.filter((key) => !recordedRecordKeySet.has(key))
+        : [],
+      recordIndexStatus: indexRecord?.status || null,
+      recordIndexArtifactPath: indexRecord?.artifactPath || null,
+      recordedAt: indexRecord?.recordedAt || null,
       sourceRecordKeys,
       launchDutyRecordIndexPath: record.launchDutyRecordIndexPath || null
     };
   });
-  const stabilizationPendingRecordKeys = stabilizationReceiptCompletionRecords
-    .filter((record) => record.recorded !== true)
-    .map((record) => record.recordKey)
-    .filter(Boolean);
   const stabilizationCloseoutBlockedByRecordKeys = stabilizationCloseoutSourceRecordKeys
     .filter((key) => !stabilizationRecordedRecordKeys.includes(key));
+  const stabilizationNextRecordKey = stabilizationPendingRecordKeys[0] || null;
+  const stabilizationCompletionStatus = stabilizationPendingRecordKeys.length === 0
+    ? "complete"
+    : stabilizationQueueStatus;
   const stabilizationReceiptCompletionState = stabilizationReceiptWriteRecords.length ? {
     version: "developer-ops-launch-operations-operator-stabilization-receipt-completion-state/v1",
-    status: stabilizationQueueStatus,
+    status: stabilizationCompletionStatus,
     readyForHandoff: ready,
     readyForReceiptWrites: false,
     recordedRecordKeys: stabilizationRecordedRecordKeys,
@@ -28197,12 +28328,13 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     recordedRecordCount: stabilizationRecordedRecordKeys.length,
     pendingRecordCount: stabilizationPendingRecordKeys.length,
     totalRecordCount: stabilizationReceiptCompletionRecords.length,
-    currentRecordKey: stabilizationPendingRecordKeys[0] || null,
-    nextRecordKey: stabilizationPendingRecordKeys[0] || null,
+    currentRecordKey: stabilizationNextRecordKey,
+    nextRecordKey: stabilizationNextRecordKey,
     closeoutRecordKey: stabilizationCloseoutRecord?.recordKey || null,
     closeoutReady: stabilizationCloseoutRecord ? stabilizationCloseoutBlockedByRecordKeys.length === 0 : false,
     closeoutBlockedByRecordKeys: stabilizationCloseoutBlockedByRecordKeys,
     records: stabilizationReceiptCompletionRecords,
+    launchDutyRecordIndexState: normalizedLaunchDutyRecordIndexState,
     launchDutyRecordIndexPath: launchDutyRecordIndexPath || packet?.launchDutyRecordIndexPath || queue.launchDutyRecordIndexPath || null
   } : null;
   const stabilizationReceiptWriteQueue = stabilizationReceiptWriteRecords.length ? {
@@ -28211,7 +28343,7 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     readyForHandoff: ready,
     readyForReceiptWrites: false,
     dependsOnRecordKey: nextReceiptWriteRecord?.key || null,
-    currentRecordKey: stabilizationReceiptWriteRecords[0]?.recordKey || null,
+    currentRecordKey: stabilizationReceiptCompletionState?.nextRecordKey || stabilizationReceiptWriteRecords[0]?.recordKey || null,
     recordCount: stabilizationReceiptWriteRecords.length,
     closeoutRecordKey: stabilizationCloseoutRecord?.recordKey || null,
     closeoutSourceRecordKeys: stabilizationCloseoutSourceRecordKeys,
@@ -28355,8 +28487,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
           : null
       }
     : null;
+  const latestSteadyStateDutyPlanReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
   const receiptConfirmation = buildDeveloperOpsLaunchOperationsOperatorReceiptConfirmation(
-    latestSteadyStateDutyPlanReceipt,
+    latestSteadyStateDutyPlanReceiptPayload || latestSteadyStateDutyPlanReceipt,
     { launchDutyRecordIndexPath }
   );
   const receiptRecoveryAction = buildDeveloperOpsLaunchOperationsOperatorReceiptRecoveryAction(receiptConfirmation);
@@ -28409,7 +28542,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     receiptVisibilityConfirmationQueue,
     postSignoffExecutionChecklist,
     postSignoffWatchReceiptPlan,
-    launchDutyRecordIndexPath
+    launchDutyRecordIndexPath,
+    launchDutyRecordIndexState: latestSteadyStateDutyPlanReceiptPayload?.launchDutyRecordIndexState || null
   });
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
@@ -52199,6 +52333,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           ?? body.dutyPlanLaunchOpsOverviewContextLaunchDutyRecordIndexPath
           ?? ""
       ).trim().slice(0, 1000);
+      const launchDutyRecordIndexState = normalizeLaunchDutyRecordIndexState(
+        body.launchDutyRecordIndexState
+          || body.launchDutyRecordIndexSnapshot
+          || null
+      );
       const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
       const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
@@ -52247,6 +52386,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessNextGateCanEnterInitialLaunch,
           launchReadinessNextGateLaunchDutyRecordIndexPath,
           launchOpsOverviewContextLaunchDutyRecordIndexPath,
+          launchDutyRecordIndexState,
           focusKind,
           focusReason,
           note,
@@ -52284,6 +52424,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessNextGateCanEnterInitialLaunch,
           launchReadinessNextGateLaunchDutyRecordIndexPath,
           launchOpsOverviewContextLaunchDutyRecordIndexPath,
+          launchDutyRecordIndexState,
           focusKind,
           focusReason,
           note,

@@ -21221,6 +21221,111 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationProgress=0\/4/
     );
 
+    const launchDutyRecordIndexReadbackReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        action: "record_index_readback",
+        intent: "launch_duty_record_index_progress",
+        planKind: "record_index",
+        planMode: "readback",
+        targetType: "launch-duty-record-index",
+        href: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        fileName: "launch-duty-record-index.json",
+        format: "launch-duty-record-index",
+        launchOpsOverviewContextKind: "launch_ops_overview_status",
+        launchOpsOverviewDownloadKey: "ops_launch_operations_overview_status",
+        launchOpsOverviewDownloadFileName: "developer-ops-launch-operations-overview-status.txt",
+        launchOpsOverviewDownloadFormat: "launch-operations-overview-status",
+        launchOpsOverviewDownloadHref: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        launchReadinessNextGateStatus: expectedSteadyStateGoLiveGate.status,
+        launchReadinessNextGateDecision: expectedSteadyStateGoLiveGate.decision,
+        launchReadinessNextGateCurrentGate: expectedSteadyStateGoLiveGate.currentGate,
+        launchReadinessNextGateCanEnterInitialLaunch: expectedSteadyStateGoLiveGate.canEnterInitialLaunch,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchDutyRecordIndexState: {
+          mode: "staging-launch-duty-record-index",
+          status: "in_progress",
+          recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+          recordedKeys: [
+            "launch_day_watch_summary",
+            "receipt_visibility_snapshot",
+            "first_wave_incident_log",
+            "rollback_signal_review"
+          ],
+          pendingKeys: ["stabilization_owner_handoff", "first_wave_closeout"],
+          nextRecordKey: "stabilization_owner_handoff",
+          records: {
+            first_wave_incident_log: {
+              status: "recorded",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-incident-log.md",
+              recordedAt: "2026-05-14T09:30:00.000Z"
+            },
+            rollback_signal_review: {
+              status: "recorded",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/rollback-signal-review.md",
+              recordedAt: "2026-05-14T09:40:00.000Z"
+            }
+          }
+        },
+        note: "launch-duty record index read back after first stabilization writes"
+      },
+      ownerSession.token
+    );
+    assert.equal(launchDutyRecordIndexReadbackReceipt.launchDutyRecordIndexState.status, "in_progress");
+    assert.equal(launchDutyRecordIndexReadbackReceipt.launchDutyRecordIndexState.recordedCount, 4);
+    assert.equal(launchDutyRecordIndexReadbackReceipt.launchDutyRecordIndexState.pendingCount, 2);
+    assert.equal(launchDutyRecordIndexReadbackReceipt.launchDutyRecordIndexState.nextRecordKey, "stabilization_owner_handoff");
+    assert.deepEqual(
+      launchDutyRecordIndexReadbackReceipt.receiptVisibility.failureRecovery.payload.launchDutyRecordIndexState.pendingKeys,
+      ["stabilization_owner_handoff", "first_wave_closeout"]
+    );
+    const launchDutyRecordIndexReadbackSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const launchDutyRecordIndexReadbackQueue = launchDutyRecordIndexReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyHandoffAction?.stabilizationReceiptWriteQueue;
+    assert.ok(launchDutyRecordIndexReadbackQueue);
+    assert.equal(launchDutyRecordIndexReadbackQueue.currentRecordKey, "stabilization_owner_handoff");
+    assert.equal(launchDutyRecordIndexReadbackQueue.completionState.recordedRecordCount, 2);
+    assert.equal(launchDutyRecordIndexReadbackQueue.completionState.pendingRecordCount, 2);
+    assert.equal(launchDutyRecordIndexReadbackQueue.completionState.nextRecordKey, "stabilization_owner_handoff");
+    assert.equal(launchDutyRecordIndexReadbackQueue.completionState.closeoutReady, false);
+    assert.deepEqual(
+      launchDutyRecordIndexReadbackQueue.completionState.closeoutBlockedByRecordKeys,
+      ["stabilization_owner_handoff"]
+    );
+    assert.deepEqual(
+      launchDutyRecordIndexReadbackQueue.completionState.records.map((item) => [
+        item.recordKey,
+        item.completionStatus,
+        item.recorded
+      ]),
+      [
+        ["first_wave_incident_log", "recorded", true],
+        ["rollback_signal_review", "recorded", true],
+        ["stabilization_owner_handoff", "pending_record", false],
+        ["first_wave_closeout", "blocked_until_source_records", false]
+      ]
+    );
+    assert.match(
+      launchDutyRecordIndexReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationProgress=2\/4/
+    );
+    assert.match(
+      launchDutyRecordIndexReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationNext=stabilization_owner_handoff/
+    );
+    assert.match(
+      launchDutyRecordIndexReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationBlockedBy=stabilization_owner_handoff/
+    );
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

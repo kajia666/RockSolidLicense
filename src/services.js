@@ -19108,6 +19108,20 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
         item.body || ""
       );
     }
+    const opsCsv = payload.opsSnapshot.csv || {};
+    const csvFiles = [
+      ["projects.csv", opsCsv.projects],
+      ["accounts.csv", opsCsv.accounts],
+      ["entitlements.csv", opsCsv.entitlements],
+      ["sessions.csv", opsCsv.sessions],
+      ["device-bindings.csv", opsCsv.bindings],
+      ["device-blocks.csv", opsCsv.blocks],
+      ["audit-logs.csv", opsCsv.auditLogs],
+      ["launch-receipt-follow-ups.csv", opsCsv.launchReceiptFollowUps]
+    ];
+    for (const [fileName, body] of csvFiles) {
+      appendLaunchWorkflowFileIfPresent(files, `ops/csv/${fileName}`, body || "");
+    }
   }
   appendLaunchWorkflowFileIfPresent(
     files,

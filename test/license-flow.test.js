@@ -22011,6 +22011,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/route-review\/developer-ops-next-audit-summary\.txt/);
     assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/route-review\/developer-ops-remaining-summary\.txt/);
     assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/route-review\/developer-ops-sessions-summary\.txt/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/csv\/projects\.csv/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/csv\/accounts\.csv/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/csv\/entitlements\.csv/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/csv\/sessions\.csv/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/csv\/device-bindings\.csv/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/csv\/device-blocks\.csv/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/csv\/audit-logs\.csv/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/csv\/launch-receipt-follow-ups\.csv/);
 
     const launchMainlineRouteReviewZipDownload = await getBinary(
       baseUrl,
@@ -22027,6 +22035,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewZipText, /Route Review Next Match/);
     assert.match(launchMainlineRouteReviewZipText, /Route Review Remaining Matches/);
     assert.match(launchMainlineRouteReviewZipText, /Route Review Section: sessions/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/csv\/projects\.csv/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/csv\/accounts\.csv/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/csv\/entitlements\.csv/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/csv\/sessions\.csv/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/csv\/device-bindings\.csv/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/csv\/device-blocks\.csv/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/csv\/audit-logs\.csv/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/csv\/launch-receipt-follow-ups\.csv/);
+    assert.match(launchMainlineRouteReviewZipText, /alphaexport/);
+    assert.match(launchMainlineRouteReviewZipText, /session\.revoke/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

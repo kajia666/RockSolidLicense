@@ -27850,6 +27850,20 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     : handoffConfirmed
       ? "current"
       : "pending_confirmation_receipt";
+  const overviewRefreshAction = {
+    version: "developer-ops-launch-operations-operator-overview-refresh-action/v1",
+    key: "refresh_developer_ops_overview",
+    status: stepFourStatus,
+    ready: parityAligned && handoffConfirmed,
+    method: "GET",
+    route: "/api/developer/ops/export",
+    href: overviewHref,
+    manualCheckpointStatus,
+    manualCheckpointClosed,
+    confirmationAuditLogId: confirmationReceipt?.auditLogId || null,
+    launchDutyRecordIndexPath: resolvedRecordIndexPath,
+    expectedOutcome: "Refresh Developer Ops overview and confirm the closed checkpoint remains visible from the same record index context."
+  };
   const steps = [
     {
       stepNumber: 1,
@@ -27888,12 +27902,12 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       stepNumber: 4,
       key: "refresh_developer_ops_overview",
       status: stepFourStatus,
-      method: "GET",
-      route: "/api/developer/ops/export",
-      href: overviewHref,
-      launchDutyRecordIndexPath: resolvedRecordIndexPath,
-      confirmationAuditLogId: confirmationReceipt?.auditLogId || null,
-      expectedOutcome: "Developer Ops snapshot refresh confirms parity and confirmation receipts remain visible."
+      method: overviewRefreshAction.method,
+      route: overviewRefreshAction.route,
+      href: overviewRefreshAction.href,
+      launchDutyRecordIndexPath: overviewRefreshAction.launchDutyRecordIndexPath,
+      confirmationAuditLogId: overviewRefreshAction.confirmationAuditLogId,
+      expectedOutcome: overviewRefreshAction.expectedOutcome
     }
   ];
   const status = !parityAligned
@@ -27917,6 +27931,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     manualCheckpointStatus,
     manualCheckpointClosed,
     confirmationReceipt,
+    overviewRefreshAction,
     currentStepKey,
     nextStepKey,
     stepCount: steps.length,
@@ -28141,7 +28156,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     receiptVisibilityConfirmationQueue,
     primaryPostSignoffActionKey: postSignoffWatchQueue[0]?.key || null,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, firstLaunchDoorway=${firstLaunchConfirmationDoorway?.status || "-"}, firstLaunchDoorwayCurrent=${firstLaunchConfirmationDoorway?.currentPhaseKey || "-"}, firstLaunchDoorwayNext=${firstLaunchConfirmationDoorway?.nextActionKey || "-"}, receiptParity=${receiptVisibilityParityCheck?.status || "-"}, receiptParityReady=${receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}, receiptConfirmationQueue=${receiptVisibilityConfirmationQueue?.status || "-"}, receiptQueueCurrent=${receiptVisibilityConfirmationQueue?.currentStepKey || "-"}, receiptQueueHandoffConfirmed=${receiptVisibilityConfirmationQueue?.handoffConfirmed === true}, receiptQueueCheckpoint=${receiptVisibilityConfirmationQueue?.manualCheckpointStatus || "-"}, receiptQueueCheckpointClosed=${receiptVisibilityConfirmationQueue?.manualCheckpointClosed === true}, receiptQueueAudit=${receiptVisibilityConfirmationQueue?.confirmationReceipt?.auditLogId || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, firstLaunchDoorway=${firstLaunchConfirmationDoorway?.status || "-"}, firstLaunchDoorwayCurrent=${firstLaunchConfirmationDoorway?.currentPhaseKey || "-"}, firstLaunchDoorwayNext=${firstLaunchConfirmationDoorway?.nextActionKey || "-"}, receiptParity=${receiptVisibilityParityCheck?.status || "-"}, receiptParityReady=${receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}, receiptConfirmationQueue=${receiptVisibilityConfirmationQueue?.status || "-"}, receiptQueueCurrent=${receiptVisibilityConfirmationQueue?.currentStepKey || "-"}, receiptQueueHandoffConfirmed=${receiptVisibilityConfirmationQueue?.handoffConfirmed === true}, receiptQueueCheckpoint=${receiptVisibilityConfirmationQueue?.manualCheckpointStatus || "-"}, receiptQueueCheckpointClosed=${receiptVisibilityConfirmationQueue?.manualCheckpointClosed === true}, receiptQueueAudit=${receiptVisibilityConfirmationQueue?.confirmationReceipt?.auditLogId || "-"}, receiptQueueRefreshAction=${receiptVisibilityConfirmationQueue?.overviewRefreshAction?.status || "-"}, receiptQueueRefreshReady=${receiptVisibilityConfirmationQueue?.overviewRefreshAction?.ready === true}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -34632,6 +34647,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | receiptQueueCheckpoint=${receiptVisibilityConfirmationQueue.manualCheckpointStatus || "-"}`
           + ` | receiptQueueCheckpointClosed=${receiptVisibilityConfirmationQueue.manualCheckpointClosed === true}`
           + ` | receiptQueueAudit=${receiptVisibilityConfirmationQueue.confirmationReceipt?.auditLogId || "-"}`
+          + ` | receiptQueueRefreshAction=${receiptVisibilityConfirmationQueue.overviewRefreshAction?.status || "-"}`
+          + ` | receiptQueueRefreshReady=${receiptVisibilityConfirmationQueue.overviewRefreshAction?.ready === true}`
           + ` | receiptQueueConfirm=${receiptVisibilityConfirmationQueue.confirmationMethod || "-"} ${receiptVisibilityConfirmationQueue.confirmationEndpoint || "-"}`
           + ` | launchDutyRecordIndex=${receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath || "-"}`
         );
@@ -35478,6 +35495,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | checkpoint=${receiptVisibilityConfirmationQueue.manualCheckpointStatus || "-"}`
         + ` | checkpointClosed=${receiptVisibilityConfirmationQueue.manualCheckpointClosed === true}`
         + ` | receiptAudit=${receiptVisibilityConfirmationQueue.confirmationReceipt?.auditLogId || "-"}`
+        + ` | refreshAction=${receiptVisibilityConfirmationQueue.overviewRefreshAction?.status || "-"}`
+        + ` | refreshReady=${receiptVisibilityConfirmationQueue.overviewRefreshAction?.ready === true}`
         + ` | confirm=${receiptVisibilityConfirmationQueue.confirmationMethod || "-"} ${receiptVisibilityConfirmationQueue.confirmationEndpoint || "-"}`
       );
     }
@@ -36898,6 +36917,8 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | receiptQueueCheckpoint=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.manualCheckpointStatus || "-"}`
       + ` | receiptQueueCheckpointClosed=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.manualCheckpointClosed === true}`
       + ` | receiptQueueAudit=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.confirmationReceipt?.auditLogId || "-"}`
+      + ` | receiptQueueRefreshAction=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.overviewRefreshAction?.status || "-"}`
+      + ` | receiptQueueRefreshReady=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.overviewRefreshAction?.ready === true}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -37787,6 +37808,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | checkpoint=${receiptVisibilityConfirmationQueue.manualCheckpointStatus || "-"}`
       + ` | checkpointClosed=${receiptVisibilityConfirmationQueue.manualCheckpointClosed === true}`
       + ` | receiptAudit=${receiptVisibilityConfirmationQueue.confirmationReceipt?.auditLogId || "-"}`
+      + ` | refreshAction=${receiptVisibilityConfirmationQueue.overviewRefreshAction?.status || "-"}`
+      + ` | refreshReady=${receiptVisibilityConfirmationQueue.overviewRefreshAction?.ready === true}`
       + ` | confirm=${receiptVisibilityConfirmationQueue.confirmationMethod || "-"} ${receiptVisibilityConfirmationQueue.confirmationEndpoint || "-"}`
       + ` | launchDutyRecordIndex=${receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath || "-"}`
     );
@@ -37796,6 +37819,19 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         + ` | decision=${receiptVisibilityConfirmationQueue.confirmationReceipt.decision || "-"}`
         + ` | confirmedAt=${receiptVisibilityConfirmationQueue.confirmationReceipt.confirmedAt || "-"}`
         + ` | confirmedBy=${receiptVisibilityConfirmationQueue.confirmationReceipt.confirmedByUsername || "-"}`
+      );
+    }
+    if (receiptVisibilityConfirmationQueue.overviewRefreshAction) {
+      const action = receiptVisibilityConfirmationQueue.overviewRefreshAction;
+      lines.push(
+        `- refreshAction=${action.key || "-"}`
+        + ` | status=${action.status || "-"}`
+        + ` | ready=${action.ready === true ? "yes" : "no"}`
+        + ` | ${action.method || "-"} ${action.href || action.route || "-"}`
+        + ` | checkpoint=${action.manualCheckpointStatus || "-"}`
+        + ` | checkpointClosed=${action.manualCheckpointClosed === true}`
+        + ` | receiptAudit=${action.confirmationAuditLogId || "-"}`
+        + ` | launchDutyRecordIndex=${action.launchDutyRecordIndexPath || "-"}`
       );
     }
     const queueSteps = Array.isArray(receiptVisibilityConfirmationQueue.steps)

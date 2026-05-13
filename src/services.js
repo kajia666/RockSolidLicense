@@ -17824,6 +17824,10 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
     + (launchOperationsOverviewRecordIndexPath ? ` | launchDutyRecordIndex=${launchOperationsOverviewRecordIndexPath}` : "")
     + formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads)
   );
+  appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(
+    lines,
+    traceability.launchDutyRecordIndexSelectionChecklistStep
+  );
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "-"}`);
   if (stabilizationConfirmation) {
@@ -20166,6 +20170,7 @@ function buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload = {}) {
 
 function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {}) {
   const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
+  const initialLaunchOpsReadiness = opsSnapshot.summary?.initialLaunchOpsReadiness || null;
   const mainlineSummary = payload.mainlineSummary || {};
   const lifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || {};
   const launchReceiptAuditBackfill = Number(
@@ -20178,12 +20183,16 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
     ? opsSnapshot.overview.latestLaunchReceipts[0]
     : null;
   const launchReceiptNextFollowUp = opsSnapshot.summary?.launchReceiptNextFollowUp
-    || opsSnapshot.summary?.initialLaunchOpsReadiness?.nextFollowUp
+    || initialLaunchOpsReadiness?.nextFollowUp
     || null;
-  const initialLaunchOpsContract = opsSnapshot.summary?.initialLaunchOpsReadiness?.contract || null;
-  const initialLaunchOperatorHeadline = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorHeadline || null;
-  const initialLaunchOperatorNextAction = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorNextAction || null;
-  const initialLaunchOperatorActionManifest = opsSnapshot.summary?.initialLaunchOpsReadiness?.operatorActionManifest || null;
+  const initialLaunchOpsContract = initialLaunchOpsReadiness?.contract || null;
+  const initialLaunchOperatorHeadline = initialLaunchOpsReadiness?.operatorHeadline || null;
+  const initialLaunchOperatorNextAction = initialLaunchOpsReadiness?.operatorNextAction || null;
+  const initialLaunchOperatorActionManifest = initialLaunchOpsReadiness?.operatorActionManifest || null;
+  const launchDutyRecordIndexSelectionChecklistStep = findLaunchDutyRecordIndexSelectionChecklistStep(
+    initialLaunchOpsReadiness,
+    opsSnapshot.scope || {}
+  );
   const lifecyclePrimaryDownload = lifecycle.primaryRecommendedDownload && typeof lifecycle.primaryRecommendedDownload === "object"
     ? lifecycle.primaryRecommendedDownload
     : null;
@@ -20315,6 +20324,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
     initialLaunchOperatorNextAction,
     initialLaunchOperatorActionManifest,
     stabilizationHandoffConfirmation,
+    launchDutyRecordIndexSelectionChecklistStep,
     opsFiles: {
       summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
       handoffIndex: "ops/handoff-index.txt",
@@ -20476,6 +20486,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | launchDayWatchEntry=${launchOpsOverviewWatchEntry || "-"}`
     + (launchOperationsOverviewRecordIndexPath ? ` | launchDutyRecordIndex=${launchOperationsOverviewRecordIndexPath}` : "")
     + formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads)
+  );
+  appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(
+    lines,
+    traceability.launchDutyRecordIndexSelectionChecklistStep
   );
   if (appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource)) {
     lines.push("");
@@ -27355,10 +27369,9 @@ function findLaunchDutyRecordIndexSelectionChecklistStep(readiness = {}, scope =
     : null;
 }
 
-function appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness = {}, scope = {}) {
-  const step = findLaunchDutyRecordIndexSelectionChecklistStep(readiness, scope);
-  if (!step) {
-    return;
+function appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(lines = [], step = null) {
+  if (!Array.isArray(lines) || !step || typeof step !== "object") {
+    return false;
   }
   lines.push("Launch Duty Record Index Selection Checklist Step:");
   lines.push(
@@ -27369,6 +27382,12 @@ function appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness
     + ` | href=${step.href || "-"}`
     + ` | launchDutyRecordIndex=${step.launchDutyRecordIndexPath || "-"}`
   );
+  return true;
+}
+
+function appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness = {}, scope = {}) {
+  const step = findLaunchDutyRecordIndexSelectionChecklistStep(readiness, scope);
+  return appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(lines, step);
 }
 
 function buildDeveloperOpsLaunchOperationsOperatorReceiptConfirmation(

@@ -27374,6 +27374,87 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(po
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorPostSignoffExecutionChecklist(
+  postSignoffWatchBridge = null,
+  postSignoffWatchReceiptPlan = null
+) {
+  const bridge = postSignoffWatchBridge && typeof postSignoffWatchBridge === "object"
+    ? postSignoffWatchBridge
+    : null;
+  const receiptPlan = postSignoffWatchReceiptPlan && typeof postSignoffWatchReceiptPlan === "object"
+    ? postSignoffWatchReceiptPlan
+    : null;
+  if (!bridge || !receiptPlan) {
+    return null;
+  }
+  const records = Array.isArray(receiptPlan.records) ? receiptPlan.records : [];
+  const watchSummaryRecord = records.find((item) => item.key === "launch_day_watch_summary") || null;
+  const firstWaveCloseoutRecord = records.find((item) => item.key === "first_wave_closeout") || null;
+  const stabilizationRecordKeys = [
+    "receipt_visibility_snapshot",
+    "first_wave_incident_log",
+    "rollback_signal_review",
+    "stabilization_owner_handoff"
+  ];
+  const stabilizationReceiptOperations = records
+    .filter((item) => stabilizationRecordKeys.includes(item.key))
+    .flatMap((item) => Array.isArray(item.receiptOperations) ? item.receiptOperations : []);
+  const phases = [
+    {
+      stepNumber: 1,
+      key: "archive_signoff_packet",
+      status: "current",
+      actionKey: "archive_production_signoff_packet",
+      artifact: bridge.productionSignoffPacket || null,
+      command: null,
+      archiveIndex: bridge.launchDutyArchiveIndex || null,
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      acceptanceCriteria: "Signed production packet is archived beside the launch-duty archive index before cutover watch starts."
+    },
+    {
+      stepNumber: 2,
+      key: "record_launch_day_watch",
+      status: "blocked_until_signoff_archive",
+      actionKey: "record_launch_day_watch_summary",
+      artifact: bridge.launchDayWatchSummaryArtifact || watchSummaryRecord?.artifact || null,
+      command: bridge.watchRecordCommand || null,
+      receiptOperations: watchSummaryRecord?.receiptOperations || [],
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      acceptanceCriteria: watchSummaryRecord?.expectedEvidence || "Launch-day watch summary is recorded with required cutover receipts."
+    },
+    {
+      stepNumber: 3,
+      key: "collect_stabilization_evidence",
+      status: "blocked_until_watch_summary",
+      actionKey: "collect_stabilization_evidence",
+      recordKeys: stabilizationRecordKeys,
+      receiptOperations: [...new Set(stabilizationReceiptOperations)],
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      acceptanceCriteria: "Receipt visibility, incident, rollback, and stabilization owner records are captured before first-wave closeout."
+    },
+    {
+      stepNumber: 4,
+      key: "close_first_wave",
+      status: "blocked_until_source_records",
+      actionKey: "close_first_wave",
+      artifact: bridge.firstWaveCloseoutArtifact || firstWaveCloseoutRecord?.artifact || null,
+      command: bridge.firstWaveCloseoutCommand || null,
+      receiptOperations: firstWaveCloseoutRecord?.receiptOperations || [],
+      sourceRecordKeys: firstWaveCloseoutRecord?.sourceRecordKeys || bridge.sourceRecordKeys || [],
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      acceptanceCriteria: firstWaveCloseoutRecord?.expectedEvidence || "First-wave closeout is recorded after incident, rollback, and stabilization owner records exist."
+    }
+  ];
+  return {
+    version: "developer-ops-launch-operations-operator-post-signoff-execution-checklist/v1",
+    status: "ready_after_full_test",
+    currentPhaseKey: phases[0]?.key || null,
+    phaseCount: phases.length,
+    phases,
+    nextAction: "Archive the production sign-off packet, then advance through watch recording, stabilization evidence, and first-wave closeout."
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -27479,6 +27560,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   const postSignoffWatchBridge = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchBridge(stagingReadinessBridge);
   const postSignoffWatchQueue = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(postSignoffWatchBridge);
   const postSignoffWatchReceiptPlan = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(postSignoffWatchBridge);
+  const postSignoffExecutionChecklist = buildDeveloperOpsLaunchOperationsOperatorPostSignoffExecutionChecklist(
+    postSignoffWatchBridge,
+    postSignoffWatchReceiptPlan
+  );
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27534,9 +27619,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     postSignoffWatchBridge,
     postSignoffWatchQueue,
     postSignoffWatchReceiptPlan,
+    postSignoffExecutionChecklist,
     primaryPostSignoffActionKey: postSignoffWatchQueue[0]?.key || null,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -33959,6 +34045,14 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | receiptQueue=${Array.isArray(postSignoffWatchReceiptPlan.receiptQueue) ? postSignoffWatchReceiptPlan.receiptQueue.length : 0}`
         );
       }
+      const postSignoffExecutionChecklist = launchOperationsOperatorEntry.postSignoffExecutionChecklist || null;
+      if (postSignoffExecutionChecklist) {
+        lines.push(
+          `- postSignoffExecutionChecklist=${postSignoffExecutionChecklist.status || "-"}`
+          + ` | currentPostSignoffPhase=${postSignoffExecutionChecklist.currentPhaseKey || "-"}`
+          + ` | phaseCount=${postSignoffExecutionChecklist.phaseCount ?? 0}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -34727,6 +34821,14 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | currentRecord=${postSignoffWatchReceiptPlan.currentRecordKey || "-"}`
         + ` | currentReceiptOps=${Array.isArray(postSignoffWatchReceiptPlan.currentReceiptOperations) ? postSignoffWatchReceiptPlan.currentReceiptOperations.join(",") : "-"}`
         + ` | receiptQueue=${Array.isArray(postSignoffWatchReceiptPlan.receiptQueue) ? postSignoffWatchReceiptPlan.receiptQueue.length : 0}`
+      );
+    }
+    const postSignoffExecutionChecklist = launchOperationsOperatorEntry.postSignoffExecutionChecklist || null;
+    if (postSignoffExecutionChecklist) {
+      lines.push(
+        `- Post-Signoff Execution Checklist: ${postSignoffExecutionChecklist.status || "-"}`
+        + ` | currentPhase=${postSignoffExecutionChecklist.currentPhaseKey || "-"}`
+        + ` | phaseCount=${postSignoffExecutionChecklist.phaseCount ?? 0}`
       );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
@@ -36132,6 +36234,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | currentStagingAction=${readiness.launchOperationsOperatorEntry?.primaryStagingActionKey || "-"}`
       + ` | postSignoffWatch=${readiness.launchOperationsOperatorEntry?.primaryPostSignoffActionKey || "-"}`
       + ` | postSignoffReceipts=${Array.isArray(readiness.launchOperationsOperatorEntry?.postSignoffWatchReceiptPlan?.currentReceiptOperations) ? readiness.launchOperationsOperatorEntry.postSignoffWatchReceiptPlan.currentReceiptOperations.join(",") : "-"}`
+      + ` | postSignoffPhase=${readiness.launchOperationsOperatorEntry?.postSignoffExecutionChecklist?.currentPhaseKey || "-"}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -36848,6 +36951,44 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       ? postSignoffWatchReceiptPlan.receiptQueue
       : [];
     lines.push(`Post-Signoff Receipt Queue: ${receiptQueue.map((item) => `${item.recordKey || "-"}=${item.operation || "-"}:${item.status || "-"}`).join("; ") || "-"}`);
+    lines.push("");
+  }
+  const postSignoffExecutionChecklist = entry.postSignoffExecutionChecklist || null;
+  if (postSignoffExecutionChecklist) {
+    lines.push("Post-Signoff Execution Checklist:");
+    lines.push(
+      `- status=${postSignoffExecutionChecklist.status || "-"}`
+      + ` | currentPhase=${postSignoffExecutionChecklist.currentPhaseKey || "-"}`
+      + ` | phaseCount=${postSignoffExecutionChecklist.phaseCount ?? 0}`
+      + ` | next=${postSignoffExecutionChecklist.nextAction || "-"}`
+    );
+    const phases = Array.isArray(postSignoffExecutionChecklist.phases) ? postSignoffExecutionChecklist.phases : [];
+    for (const item of phases) {
+      const parts = [
+        `${item.stepNumber || "-"}. ${item.key || "-"}`,
+        `status=${item.status || "-"}`,
+        `action=${item.actionKey || "-"}`
+      ];
+      if (Array.isArray(item.recordKeys) && item.recordKeys.length) {
+        parts.push(`records=${item.recordKeys.join(",")}`);
+      } else {
+        parts.push(`artifact=${item.artifact || "-"}`);
+      }
+      if (Array.isArray(item.sourceRecordKeys) && item.sourceRecordKeys.length) {
+        parts.push(`sourceRecords=${item.sourceRecordKeys.join(",")}`);
+      }
+      if (Array.isArray(item.receiptOperations) && item.receiptOperations.length) {
+        parts.push(`receipts=${item.receiptOperations.join(",")}`);
+      }
+      if (item.command) {
+        parts.push(`command=${item.command}`);
+      }
+      if (item.archiveIndex) {
+        parts.push(`archiveIndex=${item.archiveIndex}`);
+      }
+      parts.push(`acceptance=${item.acceptanceCriteria || "-"}`);
+      lines.push(parts.join(" | "));
+    }
     lines.push("");
   }
   lines.push("Checklist Steps:");

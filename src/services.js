@@ -19017,6 +19017,21 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-operations-handoff-summary.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-operations-daily-brief.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsDailyBriefText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-operations-shift-action-plan.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-receipt-next-follow-up.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchReceiptNextFollowUpText(payload.opsSnapshot) : ""
   );

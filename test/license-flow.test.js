@@ -20999,6 +20999,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-file-index\.json/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-checklist\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-handoff-summary\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-daily-brief\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-shift-action-plan\.txt/);
 
     const launchMainlineOpsRouteMirrorZipDownload = await getBinary(
       baseUrl,
@@ -21015,6 +21018,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Checklist/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Entry/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /continue_launch_duty_record_index_selection_handoff/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-handoff-summary\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-daily-brief\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-shift-action-plan\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Handoff Summary/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Daily Brief/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Shift Action Plan/);
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,

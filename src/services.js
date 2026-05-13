@@ -27339,6 +27339,38 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklist({
   };
 }
 
+function findLaunchDutyRecordIndexSelectionChecklistStep(readiness = {}, scope = {}) {
+  if (!readiness || typeof readiness !== "object") {
+    return null;
+  }
+  const checklist = readiness.launchOperationsOperatorChecklist || buildDeveloperOpsLaunchOperationsOperatorChecklist({
+    scope,
+    launchOperationsFileIndex: readiness.launchOperationsFileIndex || [],
+    launchOperationsOverviewStatus: readiness.launchOperationsOverviewStatus || null,
+    launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope),
+    launchDutyRecordIndexReceiptSelection: readiness.launchDutyRecordIndexReceiptSelection || null
+  });
+  return Array.isArray(checklist?.steps)
+    ? checklist.steps.find((item) => item?.key === "continue_launch_duty_record_index_selection_handoff") || null
+    : null;
+}
+
+function appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness = {}, scope = {}) {
+  const step = findLaunchDutyRecordIndexSelectionChecklistStep(readiness, scope);
+  if (!step) {
+    return;
+  }
+  lines.push("Launch Duty Record Index Selection Checklist Step:");
+  lines.push(
+    `- key=${step.key || "-"}`
+    + ` | order=${step.order || "-"}`
+    + ` | file=${step.fileName || "-"}`
+    + ` | format=${step.format || "-"}`
+    + ` | href=${step.href || "-"}`
+    + ` | launchDutyRecordIndex=${step.launchDutyRecordIndexPath || "-"}`
+  );
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorReceiptConfirmation(
   latestSteadyStateDutyPlanReceipt = null,
   {
@@ -35244,6 +35276,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
         + ` | href=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadHref || "-"}`
       );
+      appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, initialLaunchOpsReadiness, scope);
       lines.push(`- next=${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     }
     const launchOperationsEvidenceChain = initialLaunchOpsReadiness.launchOperationsEvidenceChain || null;
@@ -36151,6 +36184,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
       + ` | href=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadHref || "-"}`
     );
+    appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
     lines.push(`- next=${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     lines.push("");
   }

@@ -20835,6 +20835,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationNext=first_wave_incident_log/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationCloseoutReady=false/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationBlockedBy=first_wave_incident_log,rollback_signal_review,stabilization_owner_handoff/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-launch-operations-operator-entry\.txt \| format=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+
+    const launchOperationsInitialReadinessDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=initial-launch-ops-readiness",
+      ownerSession.token
+    );
+    assert.match(launchOperationsInitialReadinessDownload.body, /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-launch-operations-operator-entry\.txt \| format=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -21712,6 +21720,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       staleLaunchDutyReadbackSnapshot.summaryText,
       /Launch Duty Record Index Receipt Selection:[\s\S]*status=preserved_complete_over_latest_stale_readback \| selected=.* \| selectedProgress=6\/6 \| latest=.* \| latestProgress=5\/6 \| ignoredLatest=yes/
+    );
+    assert.match(
+      staleLaunchDutyReadbackSnapshot.summaryText,
+      /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const staleLaunchDutyReadbackInitialReadinessDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=initial-launch-ops-readiness",
+      ownerSession.token
+    );
+    assert.match(
+      staleLaunchDutyReadbackInitialReadinessDownload.body,
+      /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const staleLaunchDutyReadbackOperatorEntryDownload = await getText(
       baseUrl,

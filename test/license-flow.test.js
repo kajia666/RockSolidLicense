@@ -20187,7 +20187,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         "open_launch_operations_overview_status",
         "review_launch_review_receipt_visibility_summary",
         "review_launch_smoke_receipt_visibility_summary",
-        "open_launch_mainline_handoff_routes"
+        "open_launch_mainline_handoff_routes",
+        "continue_launch_duty_record_index_selection_handoff"
       ]
     );
     assert.ok(launchOperationsOperatorChecklist.steps.every((item, index) => (
@@ -20208,6 +20209,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.fileName === "developer-ops-launch-mainline-handoff-routes.txt"
       && item.format === "launch-mainline-handoff-routes"
     )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "continue_launch_duty_record_index_selection_handoff"
+      && item.sourceKey === "ops_launch_operations_operator_entry"
+      && item.fileName === "developer-ops-launch-operations-operator-entry.txt"
+      && item.format === "launch-operations-operator-entry"
+      && /\/api\/developer\/ops\/export\/download\?/.test(item.href || "")
+      && /format=launch-operations-operator-entry/.test(item.href || "")
+    )));
     const launchOperationsOperatorEntry = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOperatorEntry;
     assert.ok(launchOperationsOperatorEntry);
     assert.equal(launchOperationsOperatorEntry.version, "developer-ops-launch-operations-operator-entry/v1");
@@ -20216,7 +20225,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOperatorEntry.status, launchOperationsOverviewStatus.status);
     assert.equal(launchOperationsOperatorEntry.receiptVisibilityStatus, launchOperationsOverviewStatus.receiptVisibilityStatus);
     assert.equal(launchOperationsOperatorEntry.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
-    assert.equal(launchOperationsOperatorEntry.checklistStepCount, 7);
+    assert.equal(launchOperationsOperatorEntry.checklistStepCount, 8);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
     assert.equal(launchOperationsOperatorEntry.checklistStepKeys[0], "open_launch_operations_handoff_summary");
     assert.ok(launchOperationsOperatorEntry.workspaceAction?.href);
@@ -20949,6 +20958,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorChecklistDownload.body, /5\. review_launch_review_receipt_visibility_summary[^\n]*launch-review\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /6\. review_launch_smoke_receipt_visibility_summary[^\n]*launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /7\. open_launch_mainline_handoff_routes[^\n]*developer-ops-launch-mainline-handoff-routes\.txt/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /8\. continue_launch_duty_record_index_selection_handoff[^\n]*developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry/);
 
     const launchOperationsOperatorEntryDownload = await getText(
       baseUrl,
@@ -21674,6 +21684,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.ok(staleLaunchDutyReadbackOperatorEntry.quickAccessDownloads.some((item) => (
       item.key === "ops_steady_state_handoff_brief"
+      && item.format === "steady-state-handoff-brief"
+      && /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/.test(item.href || "")
+    )));
+    const staleLaunchDutyReadbackChecklist = staleLaunchDutyReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorChecklist;
+    assert.equal(staleLaunchDutyReadbackChecklist.stepCount, 8);
+    assert.ok(staleLaunchDutyReadbackChecklist.steps.some((item) => (
+      item.key === "continue_launch_duty_record_index_selection_handoff"
+      && item.sourceKey === "ops_steady_state_handoff_brief"
+      && item.fileName === "developer-ops-steady-state-handoff-brief.txt"
       && item.format === "steady-state-handoff-brief"
       && /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/.test(item.href || "")
     )));

@@ -27204,7 +27204,8 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklist({
   scope = {},
   launchOperationsFileIndex = [],
   launchOperationsOverviewStatus = null,
-  launchMainlineHandoffRoutesDownload = null
+  launchMainlineHandoffRoutesDownload = null,
+  launchDutyRecordIndexReceiptSelection = null
 } = {}) {
   const fileRows = Array.isArray(launchOperationsFileIndex) ? launchOperationsFileIndex : [];
   const productCode = launchOperationsOverviewStatus?.productCode || scope.productCode || "";
@@ -27299,6 +27300,29 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklist({
     fileName: launchMainlineHandoffRoutesDownload?.fileName || null,
     format: launchMainlineHandoffRoutesDownload?.format || null,
     href: launchMainlineHandoffRoutesDownload?.href || null,
+    launchDutyRecordIndexPath
+  });
+  const launchDutySelectionOperatorAction = launchDutyRecordIndexReceiptSelection?.operatorAction
+    && typeof launchDutyRecordIndexReceiptSelection.operatorAction === "object"
+      ? launchDutyRecordIndexReceiptSelection.operatorAction
+      : null;
+  const launchDutySelectionFormat = launchDutySelectionOperatorAction?.nextDownloadFormat || null;
+  const launchDutySelectionFileName = launchDutySelectionFormat === "steady-state-handoff-brief"
+    ? "developer-ops-steady-state-handoff-brief.txt"
+    : launchDutySelectionFormat === "handoff-index"
+      ? "developer-ops-handoff-index.txt"
+      : launchDutySelectionFormat === "launch-operations-operator-entry"
+        ? "developer-ops-launch-operations-operator-entry.txt"
+        : "developer-ops-launch-duty-selection.txt";
+  pushStep({
+    key: "continue_launch_duty_record_index_selection_handoff",
+    label: "Continue Launch Duty record-index selection handoff",
+    source: "developer-ops-launch-duty-record-index-selection",
+    sourceKey: launchDutySelectionOperatorAction?.nextDownloadKey || null,
+    status: launchDutyRecordIndexReceiptSelection?.status || null,
+    fileName: launchDutySelectionFileName,
+    format: launchDutySelectionFormat,
+    href: launchDutySelectionOperatorAction?.nextDownloadHref || null,
     launchDutyRecordIndexPath
   });
   return {
@@ -29425,7 +29449,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     scope,
     launchOperationsFileIndex,
     launchOperationsOverviewStatus,
-    launchMainlineHandoffRoutesDownload
+    launchMainlineHandoffRoutesDownload,
+    launchDutyRecordIndexReceiptSelection
   });
   const launchOperationsOperatorEntry = buildDeveloperOpsLaunchOperationsOperatorEntry({
     scope,
@@ -38334,7 +38359,8 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklistText(payload = {}) {
     scope,
     launchOperationsFileIndex: readiness.launchOperationsFileIndex || [],
     launchOperationsOverviewStatus: readiness.launchOperationsOverviewStatus || null,
-    launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope)
+    launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope),
+    launchDutyRecordIndexReceiptSelection: readiness.launchDutyRecordIndexReceiptSelection || null
   });
   const lines = [
     "RockSolid Developer Ops Launch Operations Operator Checklist",
@@ -38396,7 +38422,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     scope,
     launchOperationsFileIndex: fileIndex,
     launchOperationsOverviewStatus: readiness.launchOperationsOverviewStatus || null,
-    launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope)
+    launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope),
+    launchDutyRecordIndexReceiptSelection: readiness.launchDutyRecordIndexReceiptSelection || null
   });
   const entry = readiness.launchOperationsOperatorEntry || buildDeveloperOpsLaunchOperationsOperatorEntry({
     scope,

@@ -37077,6 +37077,7 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       + formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads)
     );
   }
+  appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
   lines.push("");
   lines.push("Operator Order:");
   lines.push("- Open this file from the Developer Ops export when handing launch duty to a reviewer who does not have the Launch Mainline zip open.");
@@ -37218,6 +37219,8 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   } else {
     lines.push("- none");
   }
+  lines.push("");
+  appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
   return lines.join("\n");
 }
 
@@ -37358,6 +37361,8 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   } else {
     lines.push("- none");
   }
+  lines.push("");
+  appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
   return lines.join("\n");
 }
 
@@ -37571,6 +37576,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   } else {
     lines.push("- none");
   }
+  lines.push("");
+  appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
   return lines.join("\n");
 }
 
@@ -37695,6 +37702,8 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
   } else {
     lines.push("- none");
   }
+  lines.push("");
+  appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
   return lines.join("\n");
 }
 

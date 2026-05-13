@@ -22059,6 +22059,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewZipText, /artifacts\/staging\/EXPORT_ALPHA\/beta\/launch-duty-record-index\.json/);
     assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-launch-duty-archive-index/);
     assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-launch-duty-record-index/);
+    assert.match(launchMainlineRouteReviewZipText, /recordCommands/);
+    assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-launch-duty-record-command/);
+    assert.match(launchMainlineRouteReviewZipText, /--key launch_day_watch_summary/);
+    assert.match(launchMainlineRouteReviewZipText, /--key first_wave_closeout/);
     assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-packet-reference/);
   } finally {
     await app.close();

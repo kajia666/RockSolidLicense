@@ -38536,6 +38536,17 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
       body: JSON.stringify(body, null, 2)
     });
   };
+  const launchDutyRecordKeys = [
+    "launch_day_watch_summary",
+    "receipt_visibility_snapshot",
+    "first_wave_incident_log",
+    "rollback_signal_review",
+    "stabilization_owner_handoff",
+    "first_wave_closeout"
+  ];
+  const buildLaunchDutyRecordCommand = (key) => common.launchDutyRecordIndex
+    ? `npm.cmd run staging:launch-duty:record -- --record-index-file ${common.launchDutyRecordIndex} --key ${key}`
+    : null;
   pushJsonFile(files.launchDutyArchiveIndex, {
     mode: "developer-ops-staging-launch-duty-archive-index",
     ...common,
@@ -38548,17 +38559,14 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
       path: common.launchDutyRecordIndex,
       archiveIndexPath: common.launchDutyArchiveIndex,
       status: "awaiting_launch_duty_records",
-      expectedRecordKeys: [
-        "launch_day_watch_summary",
-        "receipt_visibility_snapshot",
-        "first_wave_incident_log",
-        "rollback_signal_review",
-        "stabilization_owner_handoff",
-        "first_wave_closeout"
-      ],
-      writeCommand: common.launchDutyRecordIndex
-        ? `npm.cmd run staging:launch-duty:record -- --record-index-file ${common.launchDutyRecordIndex}`
-        : null
+      expectedRecordKeys: launchDutyRecordKeys,
+      recordCommands: launchDutyRecordKeys.map((key, index) => ({
+        mode: "developer-ops-staging-launch-duty-record-command",
+        order: index + 1,
+        key,
+        command: buildLaunchDutyRecordCommand(key)
+      })),
+      writeCommand: buildLaunchDutyRecordCommand(launchDutyRecordKeys[0])
     }
   });
   const packetFiles = Array.isArray(archive.packetFiles) ? archive.packetFiles : [];

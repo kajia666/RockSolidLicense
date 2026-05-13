@@ -27991,6 +27991,57 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
+  receiptVisibilityConfirmationQueue = null,
+  postSignoffExecutionChecklist = null,
+  launchDutyRecordIndexPath = null
+} = {}) {
+  const queue = receiptVisibilityConfirmationQueue && typeof receiptVisibilityConfirmationQueue === "object"
+    ? receiptVisibilityConfirmationQueue
+    : null;
+  if (!queue) {
+    return null;
+  }
+  const packet = queue.operatorHandoffPacket && typeof queue.operatorHandoffPacket === "object"
+    ? queue.operatorHandoffPacket
+    : null;
+  const refreshAction = queue.overviewRefreshAction && typeof queue.overviewRefreshAction === "object"
+    ? queue.overviewRefreshAction
+    : null;
+  const checklist = postSignoffExecutionChecklist && typeof postSignoffExecutionChecklist === "object"
+    ? postSignoffExecutionChecklist
+    : null;
+  const phases = Array.isArray(checklist?.phases) ? checklist.phases : [];
+  const nextLaunchDutyPhase = phases.find((item) => item?.key === checklist?.currentPhaseKey)
+    || phases[0]
+    || null;
+  const ready = packet?.ready === true && refreshAction?.ready === true;
+  const status = ready
+    ? "ready_for_launch_duty_handoff"
+    : queue.status === "blocked_by_receipt_parity"
+      ? "blocked_by_receipt_parity"
+      : "awaiting_first_wave_confirmation";
+  return {
+    version: "developer-ops-launch-operations-operator-launch-duty-handoff-action/v1",
+    status,
+    ready,
+    currentActionKey: ready
+      ? refreshAction?.key || "refresh_developer_ops_overview"
+      : packet?.currentActionKey || "confirm_first_wave_handoff",
+    overviewRefreshHref: refreshAction?.href || packet?.overviewRefreshHref || null,
+    confirmationAuditLogId: packet?.confirmationAuditLogId || queue.confirmationReceipt?.auditLogId || null,
+    nextLaunchDutyPhaseKey: nextLaunchDutyPhase?.key || null,
+    nextLaunchDutyActionKey: nextLaunchDutyPhase?.actionKey || null,
+    nextLaunchDutyArtifact: nextLaunchDutyPhase?.artifact || null,
+    nextLaunchDutyPhaseStatus: nextLaunchDutyPhase?.status || null,
+    launchDutyRecordIndexPath: launchDutyRecordIndexPath || packet?.launchDutyRecordIndexPath || queue.launchDutyRecordIndexPath || null,
+    evidenceItems: Array.isArray(packet?.evidenceItems) ? packet.evidenceItems : [],
+    nextAction: ready
+      ? "Refresh Developer Ops overview, then continue with the current launch-duty post-signoff phase."
+      : "Complete first-wave confirmation and refresh Developer Ops before handing launch duty to the post-signoff phase."
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -28135,6 +28186,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchReviewSummaryDownload,
     launchSmokeSummaryDownload
   });
+  const launchDutyHandoffAction = buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
+    receiptVisibilityConfirmationQueue,
+    postSignoffExecutionChecklist,
+    launchDutyRecordIndexPath
+  });
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -28197,9 +28253,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     firstLaunchConfirmationDoorway,
     receiptVisibilityParityCheck,
     receiptVisibilityConfirmationQueue,
+    launchDutyHandoffAction,
     primaryPostSignoffActionKey: postSignoffWatchQueue[0]?.key || null,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, firstLaunchDoorway=${firstLaunchConfirmationDoorway?.status || "-"}, firstLaunchDoorwayCurrent=${firstLaunchConfirmationDoorway?.currentPhaseKey || "-"}, firstLaunchDoorwayNext=${firstLaunchConfirmationDoorway?.nextActionKey || "-"}, receiptParity=${receiptVisibilityParityCheck?.status || "-"}, receiptParityReady=${receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}, receiptConfirmationQueue=${receiptVisibilityConfirmationQueue?.status || "-"}, receiptQueueCurrent=${receiptVisibilityConfirmationQueue?.currentStepKey || "-"}, receiptQueueHandoffConfirmed=${receiptVisibilityConfirmationQueue?.handoffConfirmed === true}, receiptQueueCheckpoint=${receiptVisibilityConfirmationQueue?.manualCheckpointStatus || "-"}, receiptQueueCheckpointClosed=${receiptVisibilityConfirmationQueue?.manualCheckpointClosed === true}, receiptQueueAudit=${receiptVisibilityConfirmationQueue?.confirmationReceipt?.auditLogId || "-"}, receiptQueueRefreshAction=${receiptVisibilityConfirmationQueue?.overviewRefreshAction?.status || "-"}, receiptQueueRefreshReady=${receiptVisibilityConfirmationQueue?.overviewRefreshAction?.ready === true}, receiptQueueHandoffPacket=${receiptVisibilityConfirmationQueue?.operatorHandoffPacket?.status || "-"}, receiptQueueHandoffReady=${receiptVisibilityConfirmationQueue?.operatorHandoffPacket?.ready === true}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, firstLaunchDoorway=${firstLaunchConfirmationDoorway?.status || "-"}, firstLaunchDoorwayCurrent=${firstLaunchConfirmationDoorway?.currentPhaseKey || "-"}, firstLaunchDoorwayNext=${firstLaunchConfirmationDoorway?.nextActionKey || "-"}, receiptParity=${receiptVisibilityParityCheck?.status || "-"}, receiptParityReady=${receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}, receiptConfirmationQueue=${receiptVisibilityConfirmationQueue?.status || "-"}, receiptQueueCurrent=${receiptVisibilityConfirmationQueue?.currentStepKey || "-"}, receiptQueueHandoffConfirmed=${receiptVisibilityConfirmationQueue?.handoffConfirmed === true}, receiptQueueCheckpoint=${receiptVisibilityConfirmationQueue?.manualCheckpointStatus || "-"}, receiptQueueCheckpointClosed=${receiptVisibilityConfirmationQueue?.manualCheckpointClosed === true}, receiptQueueAudit=${receiptVisibilityConfirmationQueue?.confirmationReceipt?.auditLogId || "-"}, receiptQueueRefreshAction=${receiptVisibilityConfirmationQueue?.overviewRefreshAction?.status || "-"}, receiptQueueRefreshReady=${receiptVisibilityConfirmationQueue?.overviewRefreshAction?.ready === true}, receiptQueueHandoffPacket=${receiptVisibilityConfirmationQueue?.operatorHandoffPacket?.status || "-"}, receiptQueueHandoffReady=${receiptVisibilityConfirmationQueue?.operatorHandoffPacket?.ready === true}, launchDutyHandoffAction=${launchDutyHandoffAction?.status || "-"}, launchDutyHandoffReady=${launchDutyHandoffAction?.ready === true}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -34698,6 +34755,18 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyRecordIndex=${receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath || "-"}`
         );
       }
+      const launchDutyHandoffAction = launchOperationsOperatorEntry.launchDutyHandoffAction || null;
+      if (launchDutyHandoffAction) {
+        lines.push(
+          `- launchDutyHandoffAction=${launchDutyHandoffAction.status || "-"}`
+          + ` | launchDutyHandoffReady=${launchDutyHandoffAction.ready === true}`
+          + ` | currentAction=${launchDutyHandoffAction.currentActionKey || "-"}`
+          + ` | nextLaunchDutyPhase=${launchDutyHandoffAction.nextLaunchDutyPhaseKey || "-"}`
+          + ` | refresh=${launchDutyHandoffAction.overviewRefreshHref || "-"}`
+          + ` | receiptAudit=${launchDutyHandoffAction.confirmationAuditLogId || "-"}`
+          + ` | launchDutyRecordIndex=${launchDutyHandoffAction.launchDutyRecordIndexPath || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -35545,6 +35614,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | handoffPacket=${receiptVisibilityConfirmationQueue.operatorHandoffPacket?.status || "-"}`
         + ` | handoffReady=${receiptVisibilityConfirmationQueue.operatorHandoffPacket?.ready === true}`
         + ` | confirm=${receiptVisibilityConfirmationQueue.confirmationMethod || "-"} ${receiptVisibilityConfirmationQueue.confirmationEndpoint || "-"}`
+      );
+    }
+    const launchDutyHandoffAction = launchOperationsOperatorEntry.launchDutyHandoffAction || null;
+    if (launchDutyHandoffAction) {
+      lines.push(
+        `- Launch Duty Handoff Action: ${launchDutyHandoffAction.status || "-"}`
+        + ` | ready=${launchDutyHandoffAction.ready === true ? "yes" : "no"}`
+        + ` | currentAction=${launchDutyHandoffAction.currentActionKey || "-"}`
+        + ` | nextLaunchDutyPhase=${launchDutyHandoffAction.nextLaunchDutyPhaseKey || "-"}`
+        + ` | refresh=${launchDutyHandoffAction.overviewRefreshHref || "-"}`
       );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
@@ -36968,6 +37047,8 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | receiptQueueRefreshReady=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.overviewRefreshAction?.ready === true}`
       + ` | receiptQueueHandoffPacket=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.operatorHandoffPacket?.status || "-"}`
       + ` | receiptQueueHandoffReady=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.operatorHandoffPacket?.ready === true}`
+      + ` | launchDutyHandoffAction=${readiness.launchOperationsOperatorEntry?.launchDutyHandoffAction?.status || "-"}`
+      + ` | launchDutyHandoffReady=${readiness.launchOperationsOperatorEntry?.launchDutyHandoffAction?.ready === true}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -37920,6 +38001,25 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       );
     }
     lines.push(`Confirmation Queue Next: ${receiptVisibilityConfirmationQueue.nextAction || "-"}`);
+    lines.push("");
+  }
+  const launchDutyHandoffAction = entry.launchDutyHandoffAction || null;
+  if (launchDutyHandoffAction) {
+    lines.push("Launch Duty Handoff Action:");
+    lines.push(
+      `- status=${launchDutyHandoffAction.status || "-"}`
+      + ` | ready=${launchDutyHandoffAction.ready === true ? "yes" : "no"}`
+      + ` | currentAction=${launchDutyHandoffAction.currentActionKey || "-"}`
+      + ` | nextLaunchDutyPhase=${launchDutyHandoffAction.nextLaunchDutyPhaseKey || "-"}`
+      + ` | nextLaunchDutyAction=${launchDutyHandoffAction.nextLaunchDutyActionKey || "-"}`
+      + ` | refresh=${launchDutyHandoffAction.overviewRefreshHref || "-"}`
+      + ` | receiptAudit=${launchDutyHandoffAction.confirmationAuditLogId || "-"}`
+      + ` | launchDutyRecordIndex=${launchDutyHandoffAction.launchDutyRecordIndexPath || "-"}`
+    );
+    if (launchDutyHandoffAction.nextLaunchDutyArtifact) {
+      lines.push(`- nextArtifact=${launchDutyHandoffAction.nextLaunchDutyArtifact}`);
+    }
+    lines.push(`Launch Duty Handoff Next: ${launchDutyHandoffAction.nextAction || "-"}`);
     lines.push("");
   }
   lines.push("Checklist Steps:");

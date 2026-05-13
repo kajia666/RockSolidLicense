@@ -20605,6 +20605,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(receiptVisibilityConfirmationQueue.steps[3].href || "", /\/api\/developer\/ops\/export\?/);
     assert.match(receiptVisibilityConfirmationQueue.steps[3].href || "", /productCode=EXPORT_CLOSEOUT_READY/);
     assert.match(receiptVisibilityConfirmationQueue.steps[3].href || "", /channel=stable/);
+    const launchDutyHandoffAction = launchOperationsOperatorEntry.launchDutyHandoffAction;
+    assert.ok(launchDutyHandoffAction);
+    assert.equal(
+      launchDutyHandoffAction.version,
+      "developer-ops-launch-operations-operator-launch-duty-handoff-action/v1"
+    );
+    assert.equal(launchDutyHandoffAction.status, "awaiting_first_wave_confirmation");
+    assert.equal(launchDutyHandoffAction.ready, false);
+    assert.equal(launchDutyHandoffAction.currentActionKey, "confirm_first_wave_handoff");
+    assert.equal(launchDutyHandoffAction.nextLaunchDutyPhaseKey, "archive_signoff_packet");
+    assert.equal(launchDutyHandoffAction.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20674,6 +20685,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueRefreshReady=false/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueHandoffPacket=awaiting_first_wave_confirmation/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueHandoffReady=false/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffAction=awaiting_first_wave_confirmation/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffReady=false/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20753,6 +20766,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueRefreshReady=false/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueHandoffPacket=awaiting_first_wave_confirmation/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueHandoffReady=false/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffAction=awaiting_first_wave_confirmation/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffReady=false/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20849,6 +20864,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*refreshAction=pending_confirmation_receipt \| refreshReady=false/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*handoffPacket=awaiting_first_wave_confirmation \| handoffReady=false/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Handoff Packet Evidence: receipt_visibility_parity=ready; first_wave_handoff_confirmation=pending; developer_ops_overview_refresh=pending_confirmation_receipt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*status=awaiting_first_wave_confirmation \| ready=no \| currentAction=confirm_first_wave_handoff \| nextLaunchDutyPhase=archive_signoff_packet/);
     assert.match(launchOperationsOperatorEntryDownload.body, /1\. review_launch_review_summary \| status=current \| file=launch-review\.txt \| format=summary/);
     assert.match(launchOperationsOperatorEntryDownload.body, /2\. review_launch_smoke_summary \| status=next \| file=launch-smoke-kit\.txt \| format=summary/);
     assert.match(launchOperationsOperatorEntryDownload.body, /3\. confirm_first_wave_handoff \| status=ready_after_summary_review \| POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
@@ -20968,6 +20985,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       exportCloseoutConfirmedSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*receiptQueueHandoffReady=true/
+    );
+    const confirmedLaunchDutyHandoffAction = exportCloseoutConfirmedSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyHandoffAction;
+    assert.ok(confirmedLaunchDutyHandoffAction);
+    assert.equal(confirmedLaunchDutyHandoffAction.status, "ready_for_launch_duty_handoff");
+    assert.equal(confirmedLaunchDutyHandoffAction.ready, true);
+    assert.equal(confirmedLaunchDutyHandoffAction.currentActionKey, "refresh_developer_ops_overview");
+    assert.equal(confirmedLaunchDutyHandoffAction.nextLaunchDutyPhaseKey, "archive_signoff_packet");
+    assert.equal(confirmedLaunchDutyHandoffAction.confirmationAuditLogId, exportCloseoutHandoffConfirmation.auditLogId);
+    assert.equal(confirmedLaunchDutyHandoffAction.overviewRefreshHref, confirmedReceiptVisibilityQueue.overviewRefreshAction?.href);
+    assert.match(
+      exportCloseoutConfirmedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffAction=ready_for_launch_duty_handoff/
+    );
+    assert.match(
+      exportCloseoutConfirmedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffReady=true/
     );
 
     const forbiddenExport = await getJsonExpectError(

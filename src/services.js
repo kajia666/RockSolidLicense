@@ -22367,6 +22367,15 @@ function buildLaunchDutyRecordIndexReceiptSelectionState(receipts = [], selected
         reviewRequired: false,
         nextDownloadFormat: "steady-state-handoff-brief",
         nextDownloadKey: "ops_steady_state_handoff_brief",
+        nextDownloadHref: buildLaunchWorkflowDownloadHref(
+          "developer-ops",
+          "steady-state-handoff-brief",
+          {
+            productCode: selected?.productCode || latest?.productCode || productCode || "",
+            channel: selected?.channel || latest?.channel || channel || "stable",
+            limit: 80
+          }
+        ),
         nextAction: "Continue steady-state handoff from the selected complete launch-duty readback."
       }
     : ignoredLatestReceipt
@@ -22375,6 +22384,15 @@ function buildLaunchDutyRecordIndexReceiptSelectionState(receipts = [], selected
           reviewRequired: true,
           nextDownloadFormat: "handoff-index",
           nextDownloadKey: "ops_handoff_index",
+          nextDownloadHref: buildLaunchWorkflowDownloadHref(
+            "developer-ops",
+            "handoff-index",
+            {
+              productCode: selected?.productCode || latest?.productCode || productCode || "",
+              channel: selected?.channel || latest?.channel || channel || "stable",
+              limit: 80
+            }
+          ),
           nextAction: "Review the latest stale launch-duty readback before continuing the handoff."
         }
       : {
@@ -22382,6 +22400,15 @@ function buildLaunchDutyRecordIndexReceiptSelectionState(receipts = [], selected
           reviewRequired: false,
           nextDownloadFormat: "launch-operations-operator-entry",
           nextDownloadKey: "ops_launch_operations_operator_entry",
+          nextDownloadHref: buildLaunchWorkflowDownloadHref(
+            "developer-ops",
+            "launch-operations-operator-entry",
+            {
+              productCode: selected?.productCode || latest?.productCode || productCode || "",
+              channel: selected?.channel || latest?.channel || channel || "stable",
+              limit: 80
+            }
+          ),
           nextAction: "Continue from the latest launch-duty readback in Developer Ops."
         };
   return {
@@ -35158,6 +35185,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         `- operatorAction=${launchDutyRecordIndexReceiptSelection.operatorAction?.key || "-"}`
         + ` | reviewRequired=${launchDutyRecordIndexReceiptSelection.operatorAction?.reviewRequired === true ? "yes" : "no"}`
         + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
+        + ` | href=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadHref || "-"}`
       );
       lines.push(`- next=${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     }
@@ -36064,6 +36092,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       `- operatorAction=${launchDutyRecordIndexReceiptSelection.operatorAction?.key || "-"}`
       + ` | reviewRequired=${launchDutyRecordIndexReceiptSelection.operatorAction?.reviewRequired === true ? "yes" : "no"}`
       + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
+      + ` | href=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadHref || "-"}`
     );
     lines.push(`- next=${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     lines.push("");
@@ -37802,6 +37831,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` operatorAction=${launchDutyRecordIndexReceiptSelection.operatorAction?.key || "-"}`
       + ` | reviewRequired=${launchDutyRecordIndexReceiptSelection.operatorAction?.reviewRequired === true ? "yes" : "no"}`
       + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
+      + ` | href=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadHref || "-"}`
     );
     lines.push(`Launch Duty Record Index Selection Next: ${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     lines.push("");
@@ -38768,6 +38798,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       `- operatorAction=${launchDutyRecordIndexReceiptSelection.operatorAction?.key || "-"}`
       + ` | reviewRequired=${launchDutyRecordIndexReceiptSelection.operatorAction?.reviewRequired === true ? "yes" : "no"}`
       + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
+      + ` | href=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadHref || "-"}`
     );
     lines.push(`Selection Next: ${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     lines.push("");

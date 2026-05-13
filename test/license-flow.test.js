@@ -21652,6 +21652,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(staleLaunchDutyReadbackSelection.operatorAction.key, "continue_steady_state_handoff");
     assert.equal(staleLaunchDutyReadbackSelection.operatorAction.reviewRequired, false);
     assert.equal(staleLaunchDutyReadbackSelection.operatorAction.nextDownloadFormat, "steady-state-handoff-brief");
+    assert.match(
+      staleLaunchDutyReadbackSelection.operatorAction.nextDownloadHref,
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
     assert.equal(staleLaunchDutyReadbackQueue.status, "complete");
     assert.equal(staleLaunchDutyReadbackQueue.currentRecordKey, null);
     assert.equal(staleLaunchDutyReadbackQueue.handoffComplete, true);
@@ -21680,6 +21684,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackOperatorEntryDownload.body,
       /Launch Duty Record Index Receipt Selection:[\s\S]*operatorAction=continue_steady_state_handoff \| reviewRequired=no \| nextDownload=steady-state-handoff-brief/
     );
+    assert.match(
+      staleLaunchDutyReadbackOperatorEntryDownload.body,
+      /Launch Duty Record Index Receipt Selection:[\s\S]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
     const staleLaunchDutyReadbackHandoffIndexDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=handoff-index",
@@ -21692,6 +21700,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       staleLaunchDutyReadbackHandoffIndexDownload.body,
       /Launch Duty Record Index Receipt Selection:[\s\S]*operatorAction=continue_steady_state_handoff \| reviewRequired=no \| nextDownload=steady-state-handoff-brief/
+    );
+    assert.match(
+      staleLaunchDutyReadbackHandoffIndexDownload.body,
+      /Launch Duty Record Index Receipt Selection:[\s\S]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
 
     const forbiddenExport = await getJsonExpectError(

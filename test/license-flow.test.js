@@ -20687,6 +20687,30 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key receipt_visibility_snapshot/
     );
     assert.equal(launchDutyHandoffAction.nextReceiptWritePacket.refreshAfterPreviousWrite.method, "GET");
+    assert.equal(
+      launchDutyHandoffAction.stabilizationReceiptWriteQueue.version,
+      "developer-ops-launch-operations-operator-stabilization-receipt-write-queue/v1"
+    );
+    assert.equal(launchDutyHandoffAction.stabilizationReceiptWriteQueue.status, "blocked_until_first_wave_confirmation");
+    assert.equal(launchDutyHandoffAction.stabilizationReceiptWriteQueue.readyForHandoff, false);
+    assert.equal(launchDutyHandoffAction.stabilizationReceiptWriteQueue.currentRecordKey, "first_wave_incident_log");
+    assert.equal(launchDutyHandoffAction.stabilizationReceiptWriteQueue.closeoutRecordKey, "first_wave_closeout");
+    assert.deepEqual(
+      launchDutyHandoffAction.stabilizationReceiptWriteQueue.records.map((item) => item.recordKey),
+      ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff", "first_wave_closeout"]
+    );
+    assert.match(
+      launchDutyHandoffAction.stabilizationReceiptWriteQueue.records[0].command,
+      /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key first_wave_incident_log/
+    );
+    assert.deepEqual(
+      launchDutyHandoffAction.stabilizationReceiptWriteQueue.records[1].receiptPlaceholders,
+      ["<record_rollback_walkthrough-receipt-id>", "<record_launch_stabilization_review-receipt-id>"]
+    );
+    assert.deepEqual(
+      launchDutyHandoffAction.stabilizationReceiptWriteQueue.closeoutSourceRecordKeys,
+      ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+    );
     assert.equal(launchDutyHandoffAction.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
@@ -20768,6 +20792,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyNextReceiptPacket=blocked_until_first_wave_confirmation/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyNextReceiptRecord=receipt_visibility_snapshot/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyNextReceiptDependsOn=launch_day_watch_summary/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationQueue=blocked_until_first_wave_confirmation/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationCurrent=first_wave_incident_log/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationCloseout=first_wave_closeout/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20858,6 +20885,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyNextReceiptPacket=blocked_until_first_wave_confirmation/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyNextReceiptRecord=receipt_visibility_snapshot/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyNextReceiptDependsOn=launch_day_watch_summary/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyStabilizationQueue=blocked_until_first_wave_confirmation/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyStabilizationCurrent=first_wave_incident_log/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyStabilizationCloseout=first_wave_closeout/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20970,6 +21000,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Next Receipt Write Packet:[\s\S]*artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/receipt-visibility-snapshot\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Next Receipt Write Packet:[\s\S]*receiptPlaceholders=<record_post_launch_ops_sweep-receipt-id>/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Next Receipt Write Packet:[\s\S]*command=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key receipt_visibility_snapshot/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Stabilization Receipt Write Queue:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Stabilization Receipt Write Queue:[\s\S]*status=blocked_until_first_wave_confirmation \| handoffReady=no \| current=first_wave_incident_log \| records=4 \| closeout=first_wave_closeout/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Stabilization Receipt Write Queue:[\s\S]*1\. first_wave_incident_log \| action=record_first_wave_incident_log \| status=pending_operator_entry \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-incident-log\.md \| receipts=record_post_launch_ops_sweep/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Stabilization Receipt Write Queue:[\s\S]*2\. rollback_signal_review \| action=record_rollback_signal_review \| status=pending_operator_entry \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/rollback-signal-review\.md \| receipts=record_rollback_walkthrough,record_launch_stabilization_review/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Stabilization Receipt Write Queue:[\s\S]*4\. first_wave_closeout \| action=close_first_wave \| status=blocked_until_source_records \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| receipts=record_launch_closeout_review \| sourceRecords=first_wave_incident_log,rollback_signal_review,stabilization_owner_handoff/);
     assert.match(launchOperationsOperatorEntryDownload.body, /1\. review_launch_review_summary \| status=current \| file=launch-review\.txt \| format=summary/);
     assert.match(launchOperationsOperatorEntryDownload.body, /2\. review_launch_smoke_summary \| status=next \| file=launch-smoke-kit\.txt \| format=summary/);
     assert.match(launchOperationsOperatorEntryDownload.body, /3\. confirm_first_wave_handoff \| status=ready_after_summary_review \| POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
@@ -21108,6 +21143,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(confirmedLaunchDutyHandoffAction.nextReceiptWritePacket.readyForReceiptWrite, false);
     assert.equal(confirmedLaunchDutyHandoffAction.nextReceiptWritePacket.recordKey, "receipt_visibility_snapshot");
     assert.equal(confirmedLaunchDutyHandoffAction.nextReceiptWritePacket.refreshAfterPreviousWrite.href, confirmedReceiptVisibilityQueue.overviewRefreshAction?.href);
+    assert.equal(confirmedLaunchDutyHandoffAction.stabilizationReceiptWriteQueue.status, "blocked_until_receipt_visibility_snapshot");
+    assert.equal(confirmedLaunchDutyHandoffAction.stabilizationReceiptWriteQueue.readyForHandoff, true);
+    assert.equal(confirmedLaunchDutyHandoffAction.stabilizationReceiptWriteQueue.currentRecordKey, "first_wave_incident_log");
     assert.deepEqual(
       confirmedLaunchDutyHandoffAction.firstReceiptWriteOperations,
       ["record_cutover_walkthrough", "record_launch_day_readiness_review"]
@@ -21133,6 +21171,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       exportCloseoutConfirmedSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyNextReceiptPacket=blocked_until_first_receipt_write/
+    );
+    assert.match(
+      exportCloseoutConfirmedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationQueue=blocked_until_receipt_visibility_snapshot/
     );
 
     const forbiddenExport = await getJsonExpectError(

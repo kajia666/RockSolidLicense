@@ -27817,11 +27817,26 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     channel
   })}`;
   const parityStatus = parity?.status || "review";
+  const parityAligned = parityStatus === "aligned";
+  const handoffConfirmed = doorway?.handoffConfirmed === true
+    || normalizeDeveloperOpsConfirmationToken(doorway?.handoffConfirmationStatus, "") === "confirmed";
+  const stepOneStatus = parityAligned && handoffConfirmed ? "completed" : "current";
+  const stepTwoStatus = parityAligned && handoffConfirmed ? "completed" : "next";
+  const stepThreeStatus = !parityAligned
+    ? "blocked_by_receipt_parity"
+    : handoffConfirmed
+      ? "completed"
+      : "ready_after_summary_review";
+  const stepFourStatus = !parityAligned
+    ? "blocked_by_receipt_parity"
+    : handoffConfirmed
+      ? "current"
+      : "pending_confirmation_receipt";
   const steps = [
     {
       stepNumber: 1,
       key: "review_launch_review_summary",
-      status: "current",
+      status: stepOneStatus,
       fileName: reviewDownload?.fileName || null,
       format: reviewDownload?.format || null,
       href: reviewDownload?.href || null,
@@ -27832,7 +27847,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     {
       stepNumber: 2,
       key: "review_launch_smoke_summary",
-      status: "next",
+      status: stepTwoStatus,
       fileName: smokeDownload?.fileName || null,
       format: smokeDownload?.format || null,
       href: smokeDownload?.href || null,
@@ -27843,7 +27858,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     {
       stepNumber: 3,
       key: "confirm_first_wave_handoff",
-      status: "ready_after_summary_review",
+      status: stepThreeStatus,
       method: confirmationMethod,
       route: confirmationEndpoint,
       payload: confirmationPayload,
@@ -27853,7 +27868,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     {
       stepNumber: 4,
       key: "refresh_developer_ops_overview",
-      status: "pending_confirmation_receipt",
+      status: stepFourStatus,
       method: "GET",
       route: "/api/developer/ops/export",
       href: overviewHref,
@@ -27861,24 +27876,37 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       expectedOutcome: "Developer Ops snapshot refresh confirms parity and confirmation receipts remain visible."
     }
   ];
-  const status = parityStatus === "aligned"
-    ? "ready_for_first_wave_confirmation"
-    : "blocked_by_receipt_parity";
+  const status = !parityAligned
+    ? "blocked_by_receipt_parity"
+    : handoffConfirmed
+      ? "confirmation_recorded_refresh_overview"
+      : "ready_for_first_wave_confirmation";
+  const currentStepKey = handoffConfirmed && parityAligned
+    ? "refresh_developer_ops_overview"
+    : "review_launch_review_summary";
+  const nextStepKey = handoffConfirmed && parityAligned
+    ? null
+    : "review_launch_smoke_summary";
   return {
     version: "developer-ops-launch-operations-operator-receipt-visibility-confirmation-queue/v1",
     status,
     parityStatus,
-    currentStepKey: steps[0]?.key || null,
-    nextStepKey: steps[1]?.key || null,
+    handoffConfirmed,
+    handoffConfirmationStatus: doorway?.handoffConfirmationStatus || null,
+    handoffConfirmationAuditLogId: doorway?.handoffConfirmationAuditLogId || null,
+    currentStepKey,
+    nextStepKey,
     stepCount: steps.length,
     requiredStepCount: steps.length,
     launchDutyRecordIndexPath: resolvedRecordIndexPath,
     confirmationMethod,
     confirmationEndpoint,
     steps,
-    nextAction: status === "ready_for_first_wave_confirmation"
-      ? "Review Launch Review/Smoke summaries, confirm first-wave handoff, then refresh Developer Ops overview."
-      : "Repair receipt visibility parity first, then continue first-wave confirmation."
+    nextAction: !parityAligned
+      ? "Repair receipt visibility parity first, then continue first-wave confirmation."
+      : handoffConfirmed
+        ? "Refresh Developer Ops overview to confirm first-wave confirmation visibility from the same record index context."
+        : "Review Launch Review/Smoke summaries, confirm first-wave handoff, then refresh Developer Ops overview."
   };
 }
 
@@ -28090,7 +28118,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     receiptVisibilityConfirmationQueue,
     primaryPostSignoffActionKey: postSignoffWatchQueue[0]?.key || null,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, firstLaunchDoorway=${firstLaunchConfirmationDoorway?.status || "-"}, firstLaunchDoorwayCurrent=${firstLaunchConfirmationDoorway?.currentPhaseKey || "-"}, firstLaunchDoorwayNext=${firstLaunchConfirmationDoorway?.nextActionKey || "-"}, receiptParity=${receiptVisibilityParityCheck?.status || "-"}, receiptParityReady=${receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}, receiptConfirmationQueue=${receiptVisibilityConfirmationQueue?.status || "-"}, receiptQueueCurrent=${receiptVisibilityConfirmationQueue?.currentStepKey || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, firstLaunchDoorway=${firstLaunchConfirmationDoorway?.status || "-"}, firstLaunchDoorwayCurrent=${firstLaunchConfirmationDoorway?.currentPhaseKey || "-"}, firstLaunchDoorwayNext=${firstLaunchConfirmationDoorway?.nextActionKey || "-"}, receiptParity=${receiptVisibilityParityCheck?.status || "-"}, receiptParityReady=${receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}, receiptConfirmationQueue=${receiptVisibilityConfirmationQueue?.status || "-"}, receiptQueueCurrent=${receiptVisibilityConfirmationQueue?.currentStepKey || "-"}, receiptQueueHandoffConfirmed=${receiptVisibilityConfirmationQueue?.handoffConfirmed === true}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -34577,6 +34605,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | receiptQueueNext=${receiptVisibilityConfirmationQueue.nextStepKey || "-"}`
           + ` | receiptQueueSteps=${receiptVisibilityConfirmationQueue.stepCount ?? 0}`
           + ` | receiptQueueParity=${receiptVisibilityConfirmationQueue.parityStatus || "-"}`
+          + ` | receiptQueueHandoffConfirmed=${receiptVisibilityConfirmationQueue.handoffConfirmed === true}`
           + ` | receiptQueueConfirm=${receiptVisibilityConfirmationQueue.confirmationMethod || "-"} ${receiptVisibilityConfirmationQueue.confirmationEndpoint || "-"}`
           + ` | launchDutyRecordIndex=${receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath || "-"}`
         );
@@ -35419,6 +35448,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | current=${receiptVisibilityConfirmationQueue.currentStepKey || "-"}`
         + ` | next=${receiptVisibilityConfirmationQueue.nextStepKey || "-"}`
         + ` | steps=${receiptVisibilityConfirmationQueue.stepCount ?? 0}`
+        + ` | handoffConfirmed=${receiptVisibilityConfirmationQueue.handoffConfirmed === true}`
         + ` | confirm=${receiptVisibilityConfirmationQueue.confirmationMethod || "-"} ${receiptVisibilityConfirmationQueue.confirmationEndpoint || "-"}`
       );
     }
@@ -36835,6 +36865,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | receiptParityReady=${readiness.launchOperationsOperatorEntry?.receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${readiness.launchOperationsOperatorEntry?.receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}`
       + ` | receiptConfirmationQueue=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.status || "-"}`
       + ` | receiptQueueCurrent=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.currentStepKey || "-"}`
+      + ` | receiptQueueHandoffConfirmed=${readiness.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.handoffConfirmed === true}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -37720,6 +37751,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | current=${receiptVisibilityConfirmationQueue.currentStepKey || "-"}`
       + ` | steps=${receiptVisibilityConfirmationQueue.stepCount ?? 0}`
       + ` | next=${receiptVisibilityConfirmationQueue.nextStepKey || "-"}`
+      + ` | handoffConfirmed=${receiptVisibilityConfirmationQueue.handoffConfirmed === true}`
       + ` | confirm=${receiptVisibilityConfirmationQueue.confirmationMethod || "-"} ${receiptVisibilityConfirmationQueue.confirmationEndpoint || "-"}`
       + ` | launchDutyRecordIndex=${receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath || "-"}`
     );

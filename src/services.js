@@ -19037,13 +19037,28 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-receipt-backfill-status.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchReceiptBackfillStatusText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/first-wave-audit-backfill-status.txt",
     payload.opsSnapshot ? buildDeveloperOpsFirstWaveAuditBackfillStatusText(payload.opsSnapshot) : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/first-wave-runtime-evidence.txt",
+    payload.opsSnapshot ? buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/initial-launch-ops-readiness.txt",
     payload.opsSnapshot ? buildDeveloperOpsInitialLaunchOpsReadinessText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/staging-launch-duty-archive.txt",
+    payload.opsSnapshot ? buildDeveloperOpsStagingLaunchDutyArchiveText(payload.opsSnapshot) : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -19059,6 +19074,31 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     "ops/stabilization-handoff.txt",
     payload.opsSnapshot ? buildDeveloperOpsStabilizationHandoffText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/steady-state-operational-review.txt",
+    payload.opsSnapshot ? buildDeveloperOpsSteadyStateOperationalReviewText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/steady-state-exception-digest.txt",
+    payload.opsSnapshot ? buildDeveloperOpsSteadyStateExceptionDigestText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/steady-state-handoff-brief.txt",
+    payload.opsSnapshot ? buildDeveloperOpsSteadyStateHandoffBriefText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/steady-state-duty-board.txt",
+    payload.opsSnapshot ? buildDeveloperOpsSteadyStateDutyBoardText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/steady-state-duty-action-links.txt",
+    payload.opsSnapshot ? buildDeveloperOpsSteadyStateDutyActionLinksText(payload.opsSnapshot) : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,

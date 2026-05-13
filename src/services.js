@@ -19002,6 +19002,21 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-operations-file-index.json",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsFileIndexJsonText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-operations-operator-checklist.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsOperatorChecklistText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-operations-operator-entry.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsOperatorEntryText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-receipt-next-follow-up.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchReceiptNextFollowUpText(payload.opsSnapshot) : ""
   );

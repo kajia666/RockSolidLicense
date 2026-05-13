@@ -20996,6 +20996,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-mainline-handoff-routes\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-file-index\.json/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-checklist\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
 
     const launchMainlineOpsRouteMirrorZipDownload = await getBinary(
       baseUrl,
@@ -21006,6 +21009,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-mainline-handoff-routes\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
     assert.match(launchMainlineOpsRouteMirrorZipText, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-file-index\.json/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-checklist\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Checklist/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Entry/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /continue_launch_duty_record_index_selection_handoff/);
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,

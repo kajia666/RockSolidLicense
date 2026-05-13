@@ -21656,6 +21656,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackSelection.operatorAction.nextDownloadHref,
       /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
+    const staleLaunchDutyReadbackOperatorEntry = staleLaunchDutyReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry;
+    assert.equal(staleLaunchDutyReadbackOperatorEntry.launchDutyRecordIndexOperatorActionKey, "continue_steady_state_handoff");
+    assert.equal(staleLaunchDutyReadbackOperatorEntry.launchDutyRecordIndexReviewRequired, false);
+    assert.match(
+      staleLaunchDutyReadbackOperatorEntry.launchDutyRecordIndexNextDownloadHref,
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.match(
+      staleLaunchDutyReadbackOperatorEntry.operatorSummary,
+      /launchDutyRecordIndexOperatorAction=continue_steady_state_handoff/
+    );
+    assert.match(
+      staleLaunchDutyReadbackOperatorEntry.operatorSummary,
+      /launchDutyRecordIndexNextDownload=steady-state-handoff-brief/
+    );
+    assert.ok(staleLaunchDutyReadbackOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "ops_steady_state_handoff_brief"
+      && item.format === "steady-state-handoff-brief"
+      && /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/.test(item.href || "")
+    )));
     assert.equal(staleLaunchDutyReadbackQueue.status, "complete");
     assert.equal(staleLaunchDutyReadbackQueue.currentRecordKey, null);
     assert.equal(staleLaunchDutyReadbackQueue.handoffComplete, true);

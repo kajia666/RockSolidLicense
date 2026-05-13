@@ -20115,6 +20115,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.launchOpsOverviewContextLaunchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
       && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
     )));
+    const launchOperationsFileIndex = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsFileIndex;
+    assert.ok(Array.isArray(launchOperationsFileIndex));
+    assert.deepEqual(
+      launchOperationsFileIndex.map((item) => item.key),
+      [
+        "launch_operations_handoff_summary",
+        "launch_operations_daily_brief",
+        "launch_operations_shift_action_plan",
+        "launch_operations_overview_status"
+      ]
+    );
+    assert.ok(launchOperationsFileIndex.every((item) => (
+      item.launchOpsOverviewContextLaunchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+      && /\.txt$/.test(item.fileName || "")
+    )));
     assert.match(launchOperationsOverviewStatus.overviewDownload.href, /format=launch-operations-overview-status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /overviewStatus=.*receipt=visible/);

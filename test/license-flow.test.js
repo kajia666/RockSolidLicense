@@ -20329,6 +20329,40 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsOperatorEntry.stagingActionQueue[3].artifact,
       "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
     );
+    assert.ok(launchOperationsOperatorEntry.postSignoffWatchBridge);
+    assert.equal(launchOperationsOperatorEntry.postSignoffWatchBridge.status, "ready_after_full_test");
+    assert.equal(
+      launchOperationsOperatorEntry.postSignoffWatchBridge.productionSignoffPacket,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.postSignoffWatchBridge.launchDutyArchiveIndex,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-launch-duty-archive-index.json"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.postSignoffWatchBridge.launchDayWatchSummaryArtifact,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.postSignoffWatchBridge.launchDutyRecordIndexPath,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+    );
+    assert.match(
+      launchOperationsOperatorEntry.postSignoffWatchBridge.watchRecordCommand,
+      /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key launch_day_watch_summary/
+    );
+    assert.ok(Array.isArray(launchOperationsOperatorEntry.postSignoffWatchQueue));
+    assert.equal(launchOperationsOperatorEntry.postSignoffWatchQueue.length, 3);
+    assert.equal(launchOperationsOperatorEntry.primaryPostSignoffActionKey, "archive_production_signoff_packet");
+    assert.equal(launchOperationsOperatorEntry.postSignoffWatchQueue[0].key, "archive_production_signoff_packet");
+    assert.equal(launchOperationsOperatorEntry.postSignoffWatchQueue[0].artifact, "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json");
+    assert.equal(launchOperationsOperatorEntry.postSignoffWatchQueue[1].key, "record_launch_day_watch_summary");
+    assert.equal(launchOperationsOperatorEntry.postSignoffWatchQueue[1].command, launchOperationsOperatorEntry.postSignoffWatchBridge.watchRecordCommand);
+    assert.equal(launchOperationsOperatorEntry.postSignoffWatchQueue[2].key, "prepare_first_wave_closeout");
+    assert.deepEqual(
+      launchOperationsOperatorEntry.postSignoffWatchQueue[2].sourceRecordKeys,
+      ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+    );
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20375,6 +20409,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*stagingReadinessStatus=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*stagingActionQueue=4/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*currentStagingAction=refresh_staging_readiness_status/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*postSignoffWatchBridge=ready_after_full_test/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*currentPostSignoffAction=archive_production_signoff_packet/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20436,6 +20472,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptRecovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*stagingReadiness=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*currentStagingAction=refresh_staging_readiness_status/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*postSignoffWatch=archive_production_signoff_packet/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20489,6 +20526,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /2\. reload_staging_rehearsal \| status=next \| command=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /3\. run_full_test_window \| status=blocked_until_rehearsal_reload \| command=npm\.cmd test/);
     assert.match(launchOperationsOperatorEntryDownload.body, /4\. review_production_signoff_packet \| status=blocked_until_full_test/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Post-Signoff Watch Bridge:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Post-Signoff Watch Bridge:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Post-Signoff Watch Queue:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /1\. archive_production_signoff_packet \| status=blocked_until_full_test \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /2\. record_launch_day_watch_summary \| status=blocked_until_signoff_archive \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /3\. prepare_first_wave_closeout \| status=blocked_until_launch_day_watch_summary \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

@@ -27200,6 +27200,88 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingActionQueue(stagingRead
   ];
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchBridge(stagingReadinessBridge = null) {
+  const bridge = stagingReadinessBridge && typeof stagingReadinessBridge === "object"
+    ? stagingReadinessBridge
+    : null;
+  if (!bridge) {
+    return null;
+  }
+  const archiveRoot = bridge.archiveRoot || "artifacts/staging/product/stable";
+  const launchDayWatchSummaryArtifact = `${archiveRoot}/launch-day-watch-summary.md`;
+  const receiptVisibilitySnapshotArtifact = `${archiveRoot}/receipt-visibility-snapshot.txt`;
+  const firstWaveIncidentLogArtifact = `${archiveRoot}/first-wave-incident-log.md`;
+  const rollbackSignalReviewArtifact = `${archiveRoot}/rollback-signal-review.md`;
+  const stabilizationOwnerHandoffArtifact = `${archiveRoot}/stabilization-owner-handoff.md`;
+  const firstWaveCloseoutArtifact = `${archiveRoot}/first-wave-closeout.md`;
+  const recordCommandBase = `npm.cmd run staging:launch-duty:record -- --closeout-input-file ${bridge.filledCloseoutInputFile || `${archiveRoot}/filled-closeout-input.json`}`;
+  const recordIndexArg = `--record-index-file ${bridge.launchDutyRecordIndexPath || `${archiveRoot}/launch-duty-record-index.json`}`;
+  const actionsArg = `--actions-file ${bridge.readinessActionQueueFile || `${archiveRoot}/readiness-action-queue.md`}`;
+  return {
+    version: "developer-ops-launch-operations-operator-post-signoff-watch-bridge/v1",
+    status: "ready_after_full_test",
+    archiveRoot,
+    productionSignoffPacket: bridge.productionSignoffPacket || `${archiveRoot}/staging-production-signoff-packet.json`,
+    launchDutyArchiveIndex: bridge.launchDutyArchiveIndex || `${archiveRoot}/staging-launch-duty-archive-index.json`,
+    launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || `${archiveRoot}/launch-duty-record-index.json`,
+    filledCloseoutInputFile: bridge.filledCloseoutInputFile || `${archiveRoot}/filled-closeout-input.json`,
+    readinessActionQueueFile: bridge.readinessActionQueueFile || `${archiveRoot}/readiness-action-queue.md`,
+    launchDayWatchSummaryArtifact,
+    receiptVisibilitySnapshotArtifact,
+    firstWaveIncidentLogArtifact,
+    rollbackSignalReviewArtifact,
+    stabilizationOwnerHandoffArtifact,
+    firstWaveCloseoutArtifact,
+    watchRecordCommand: `${recordCommandBase} --key launch_day_watch_summary --artifact-path ${launchDayWatchSummaryArtifact} --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> ${recordIndexArg} ${actionsArg}`,
+    firstWaveCloseoutCommand: `${recordCommandBase} --key first_wave_closeout --artifact-path ${firstWaveCloseoutArtifact} --value-json <redacted-json> --receipt-id <record_launch_closeout_review-receipt-id> ${recordIndexArg} ${actionsArg}`,
+    sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"],
+    nextAction: "Archive production sign-off, record launch_day_watch_summary, then keep first-wave closeout source records attached to the launch-duty record index."
+  };
+}
+
+function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(postSignoffWatchBridge = null) {
+  const bridge = postSignoffWatchBridge && typeof postSignoffWatchBridge === "object"
+    ? postSignoffWatchBridge
+    : null;
+  if (!bridge) {
+    return [];
+  }
+  return [
+    {
+      stepNumber: 1,
+      key: "archive_production_signoff_packet",
+      label: "Archive production sign-off packet",
+      status: "blocked_until_full_test",
+      artifact: bridge.productionSignoffPacket || null,
+      command: null,
+      launchDutyArchiveIndex: bridge.launchDutyArchiveIndex || null,
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      nextAction: "Archive the signed packet beside the launch-duty archive index before cutover watch starts."
+    },
+    {
+      stepNumber: 2,
+      key: "record_launch_day_watch_summary",
+      label: "Record launch-day watch summary",
+      status: "blocked_until_signoff_archive",
+      artifact: bridge.launchDayWatchSummaryArtifact || null,
+      command: bridge.watchRecordCommand || null,
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      nextAction: "Record cutover watch evidence and attach the returned receipt ids before first-wave follow-up."
+    },
+    {
+      stepNumber: 3,
+      key: "prepare_first_wave_closeout",
+      label: "Prepare first-wave closeout",
+      status: "blocked_until_launch_day_watch_summary",
+      artifact: bridge.firstWaveCloseoutArtifact || null,
+      command: bridge.firstWaveCloseoutCommand || null,
+      sourceRecordKeys: bridge.sourceRecordKeys || [],
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      nextAction: "Collect incident, rollback, and stabilization owner records before closing first-wave launch duty."
+    }
+  ];
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -27302,6 +27384,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchDutyRecordIndexPath
   });
   const stagingActionQueue = buildDeveloperOpsLaunchOperationsOperatorStagingActionQueue(stagingReadinessBridge);
+  const postSignoffWatchBridge = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchBridge(stagingReadinessBridge);
+  const postSignoffWatchQueue = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(postSignoffWatchBridge);
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27354,8 +27438,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     stagingActionQueue,
     primaryStagingActionKey: stagingActionQueue[0]?.key || null,
     nextStagingActionKey: stagingActionQueue[1]?.key || null,
+    postSignoffWatchBridge,
+    postSignoffWatchQueue,
+    primaryPostSignoffActionKey: postSignoffWatchQueue[0]?.key || null,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -33756,6 +33843,19 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | currentCommand=${stagingActionQueue[0]?.command || "-"}`
         );
       }
+      const postSignoffWatchBridge = launchOperationsOperatorEntry.postSignoffWatchBridge || null;
+      if (postSignoffWatchBridge) {
+        const postSignoffWatchQueue = Array.isArray(launchOperationsOperatorEntry.postSignoffWatchQueue)
+          ? launchOperationsOperatorEntry.postSignoffWatchQueue
+          : [];
+        lines.push(
+          `- postSignoffWatchBridge=${postSignoffWatchBridge.status || "-"}`
+          + ` | currentPostSignoffAction=${launchOperationsOperatorEntry.primaryPostSignoffActionKey || postSignoffWatchQueue[0]?.key || "-"}`
+          + ` | productionSignoffPacket=${postSignoffWatchBridge.productionSignoffPacket || "-"}`
+          + ` | watchSummary=${postSignoffWatchBridge.launchDayWatchSummaryArtifact || "-"}`
+          + ` | launchDutyRecordIndex=${postSignoffWatchBridge.launchDutyRecordIndexPath || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -34502,6 +34602,19 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | current=${launchOperationsOperatorEntry.primaryStagingActionKey || stagingActionQueue[0]?.key || "-"}`
         + ` | next=${launchOperationsOperatorEntry.nextStagingActionKey || stagingActionQueue[1]?.key || "-"}`
         + ` | currentCommand=${stagingActionQueue[0]?.command || "-"}`
+      );
+    }
+    const postSignoffWatchBridge = launchOperationsOperatorEntry.postSignoffWatchBridge || null;
+    if (postSignoffWatchBridge) {
+      const postSignoffWatchQueue = Array.isArray(launchOperationsOperatorEntry.postSignoffWatchQueue)
+        ? launchOperationsOperatorEntry.postSignoffWatchQueue
+        : [];
+      lines.push(
+        `- Post-Signoff Watch Bridge: ${postSignoffWatchBridge.status || "-"}`
+        + ` | current=${launchOperationsOperatorEntry.primaryPostSignoffActionKey || postSignoffWatchQueue[0]?.key || "-"}`
+        + ` | productionSignoffPacket=${postSignoffWatchBridge.productionSignoffPacket || "-"}`
+        + ` | watchSummary=${postSignoffWatchBridge.launchDayWatchSummaryArtifact || "-"}`
+        + ` | launchDutyRecordIndex=${postSignoffWatchBridge.launchDutyRecordIndexPath || "-"}`
       );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
@@ -35905,6 +36018,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | receiptRecovery=${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.method || "-"} ${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.route || "-"}`
       + ` | stagingReadiness=${readiness.launchOperationsOperatorEntry?.stagingReadinessBridge?.readinessStatusCommand || "-"}`
       + ` | currentStagingAction=${readiness.launchOperationsOperatorEntry?.primaryStagingActionKey || "-"}`
+      + ` | postSignoffWatch=${readiness.launchOperationsOperatorEntry?.primaryPostSignoffActionKey || "-"}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -36558,6 +36672,39 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       );
     }
     lines.push(`Staging Queue Next: ${stagingActionQueue[0]?.nextAction || "-"}`);
+    lines.push("");
+  }
+  const postSignoffWatchBridge = entry.postSignoffWatchBridge || null;
+  if (postSignoffWatchBridge) {
+    lines.push("Post-Signoff Watch Bridge:");
+    lines.push(
+      `- status=${postSignoffWatchBridge.status || "-"}`
+      + ` | productionSignoffPacket=${postSignoffWatchBridge.productionSignoffPacket || "-"}`
+      + ` | archiveIndex=${postSignoffWatchBridge.launchDutyArchiveIndex || "-"}`
+      + ` | watchArtifact=${postSignoffWatchBridge.launchDayWatchSummaryArtifact || "-"}`
+      + ` | firstWaveCloseout=${postSignoffWatchBridge.firstWaveCloseoutArtifact || "-"}`
+      + ` | recordIndex=${postSignoffWatchBridge.launchDutyRecordIndexPath || "-"}`
+      + ` | watchRecordCommand=${postSignoffWatchBridge.watchRecordCommand || "-"}`
+    );
+    lines.push(`Post-Signoff Watch Next: ${postSignoffWatchBridge.nextAction || "-"}`);
+    lines.push("");
+  }
+  const postSignoffWatchQueue = Array.isArray(entry.postSignoffWatchQueue) ? entry.postSignoffWatchQueue : [];
+  if (postSignoffWatchQueue.length) {
+    lines.push("Post-Signoff Watch Queue:");
+    for (const item of postSignoffWatchQueue) {
+      lines.push(
+        `${item.stepNumber || "-"}. ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | artifact=${item.artifact || "-"}`
+        + ` | command=${item.command || "-"}`
+        + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+        + (Array.isArray(item.sourceRecordKeys) && item.sourceRecordKeys.length
+          ? ` | sourceRecords=${item.sourceRecordKeys.join(",")}`
+          : "")
+      );
+    }
+    lines.push(`Post-Signoff Queue Next: ${postSignoffWatchQueue[0]?.nextAction || "-"}`);
     lines.push("");
   }
   lines.push("Checklist Steps:");

@@ -27024,6 +27024,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   launchOperationsOperatorChecklist = null,
   launchOperationsOperatorChecklistDownload = null,
   launchOperationsOperatorEntryDownload = null,
+  launchOperationsShiftActionPlan = null,
   launchOperationsFileIndex = [],
   launchMainlineHandoffRoutesDownload = null
 } = {}) {
@@ -27058,6 +27059,54 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     || {};
   const launchReviewSummaryDownload = receiptVisibilitySummaryDownloads.launchReviewSummary || null;
   const launchSmokeSummaryDownload = receiptVisibilitySummaryDownloads.launchSmokeSummary || null;
+  const currentActionSource = launchOperationsShiftActionPlan?.primaryAction
+    && typeof launchOperationsShiftActionPlan.primaryAction === "object"
+      ? launchOperationsShiftActionPlan.primaryAction
+      : null;
+  const currentReceiptPlan = currentActionSource?.executionPlan?.receiptPlan
+    && typeof currentActionSource.executionPlan.receiptPlan === "object"
+      ? currentActionSource.executionPlan.receiptPlan
+      : null;
+  const currentAction = currentActionSource
+    ? {
+        key: currentActionSource.key || null,
+        label: currentActionSource.label || currentActionSource.key || null,
+        priority: currentActionSource.priority || null,
+        kind: currentActionSource.kind || null,
+        status: currentActionSource.status || null,
+        href: currentActionSource.href || null,
+        fileName: currentActionSource.fileName || null,
+        format: currentActionSource.format || null,
+        source: currentActionSource.source || null,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath: currentActionSource.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || launchDutyRecordIndexPath
+          || null,
+        launchDutyRecordIndexPath: currentActionSource.launchDutyRecordIndexPath || launchDutyRecordIndexPath || null,
+        executionPlan: currentActionSource.executionPlan && typeof currentActionSource.executionPlan === "object"
+          ? {
+              status: currentActionSource.executionPlan.status || null,
+              mode: currentActionSource.executionPlan.mode || null,
+              method: currentActionSource.executionPlan.method || null,
+              href: currentActionSource.executionPlan.href || null,
+              fileName: currentActionSource.executionPlan.fileName || null,
+              format: currentActionSource.executionPlan.format || null,
+              source: currentActionSource.executionPlan.source || null,
+              prefill: currentActionSource.executionPlan.prefill || null,
+              receiptPlan: currentReceiptPlan
+                ? {
+                    status: currentReceiptPlan.status || null,
+                    method: currentReceiptPlan.method || null,
+                    route: currentReceiptPlan.route || null,
+                    eventType: currentReceiptPlan.eventType || null,
+                    entityType: currentReceiptPlan.entityType || null,
+                    payload: currentReceiptPlan.payload || null,
+                    operatorHint: currentReceiptPlan.operatorHint || null
+                  }
+                : null
+            }
+          : null
+      }
+    : null;
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27103,6 +27152,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchReviewSummaryDownload,
     launchSmokeSummaryDownload,
     launchMainlineHandoffRoutesDownload: launchMainlineHandoffRoutesDownload || null,
+    currentAction,
     quickAccessDownloads,
     operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
@@ -27640,6 +27690,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsOperatorChecklist,
     launchOperationsOperatorChecklistDownload,
     launchOperationsOperatorEntryDownload,
+    launchOperationsShiftActionPlan,
     launchOperationsFileIndex,
     launchMainlineHandoffRoutesDownload
   });
@@ -33442,6 +33493,22 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         `- workspace=${launchOperationsOperatorEntry.workspaceAction?.label || "-"}@${launchOperationsOperatorEntry.workspaceAction?.autofocus || "-"}`
         + ` | href=${launchOperationsOperatorEntry.workspaceAction?.href || "-"}`
       );
+      const currentAction = launchOperationsOperatorEntry.currentAction || null;
+      if (currentAction) {
+        const receiptPlan = currentAction.executionPlan?.receiptPlan || null;
+        lines.push(
+          `- currentAction=${currentAction.key || "-"}`
+          + ` | label=${currentAction.label || "-"}`
+          + ` | file=${currentAction.fileName || "-"}`
+          + ` | href=${currentAction.href || "-"}`
+          + ` | launchDutyRecordIndex=${currentAction.launchDutyRecordIndexPath || "-"}`
+        );
+        lines.push(
+          `- receiptPlan=${receiptPlan?.method || "-"} ${receiptPlan?.route || "-"}`
+          + ` | launchOpsOverviewContextRecordIndex=${receiptPlan?.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+          + ` | launchDutyRecordIndex=${receiptPlan?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || currentAction.launchDutyRecordIndexPath || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -34129,6 +34196,23 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       `- Workspace: ${launchOperationsOperatorEntry.workspaceAction?.label || "-"}`
       + ` | href=${launchOperationsOperatorEntry.workspaceAction?.href || "-"}`
     );
+    const currentAction = launchOperationsOperatorEntry.currentAction || null;
+    if (currentAction) {
+      const receiptPlan = currentAction.executionPlan?.receiptPlan || null;
+      lines.push(
+        `- Current Action: ${currentAction.key || "-"}`
+        + ` | label=${currentAction.label || "-"}`
+        + ` | file=${currentAction.fileName || "-"}`
+        + ` | href=${currentAction.href || "-"}`
+        + ` | launchDutyRecordIndex=${currentAction.launchDutyRecordIndexPath || "-"}`
+      );
+      lines.push(
+        `- Receipt Plan: ${receiptPlan?.method || "-"} ${receiptPlan?.route || "-"}`
+        + ` | launchOpsOverviewContextRecordIndex=${receiptPlan?.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+        + ` | launchDutyRecordIndex=${receiptPlan?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || currentAction.launchDutyRecordIndexPath || "-"}`
+        + ` | note=${receiptPlan?.payload?.note || "-"}`
+      );
+    }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
       ? launchOperationsOperatorEntry.quickAccessDownloads
       : [];
@@ -36068,6 +36152,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     launchOperationsOperatorChecklist: checklist,
     launchOperationsOperatorChecklistDownload: readiness.launchOperationsOperatorChecklistDownload || buildDeveloperOpsLaunchOperationsOperatorChecklistDownload(scope),
     launchOperationsOperatorEntryDownload: readiness.launchOperationsOperatorEntryDownload || buildDeveloperOpsLaunchOperationsOperatorEntryDownload(scope),
+    launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
     launchOperationsFileIndex: fileIndex,
     launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope)
   });
@@ -36086,6 +36171,29 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     `Primary Download: ${entry.primaryDownload?.fileName || "-"} | format=${entry.primaryDownload?.format || "-"} | href=${entry.primaryDownload?.href || "-"}`,
     ""
   ];
+  const currentAction = entry.currentAction || null;
+  if (currentAction) {
+    const receiptPlan = currentAction.executionPlan?.receiptPlan || null;
+    lines.push("Current Action:");
+    lines.push(
+      `- ${currentAction.key || "-"}`
+      + ` | label=${currentAction.label || "-"}`
+      + ` | status=${currentAction.status || "-"}`
+      + ` | file=${currentAction.fileName || "-"}`
+      + ` | format=${currentAction.format || "-"}`
+      + ` | href=${currentAction.href || "-"}`
+      + ` | launchDutyRecordIndex=${currentAction.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(
+      `Receipt Plan: ${receiptPlan?.method || "-"} ${receiptPlan?.route || "-"}`
+      + ` | status=${receiptPlan?.status || "-"}`
+      + ` | event=${receiptPlan?.eventType || "-"}`
+      + ` | launchOpsOverviewContextRecordIndex=${receiptPlan?.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+      + ` | launchDutyRecordIndex=${receiptPlan?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || currentAction.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`Receipt Note: ${receiptPlan?.payload?.note || "-"}`);
+    lines.push("");
+  }
   lines.push("Checklist Steps:");
   const stepKeys = Array.isArray(entry.checklistStepKeys) ? entry.checklistStepKeys : [];
   if (stepKeys.length) {

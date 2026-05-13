@@ -20223,6 +20223,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOperatorEntry.primaryDownload?.key, "ops_launch_operations_operator_entry");
     assert.equal(launchOperationsOperatorEntry.primaryDownload?.format, "launch-operations-operator-entry");
     assert.equal(launchOperationsOperatorEntry.primaryDownload?.fileName, "developer-ops-launch-operations-operator-entry.txt");
+    assert.ok(launchOperationsOperatorEntry.currentAction);
+    assert.equal(launchOperationsOperatorEntry.currentAction.key, launchOperationsShiftActionPlan.primaryAction.key);
+    assert.equal(launchOperationsOperatorEntry.currentAction.label, launchOperationsShiftActionPlan.primaryAction.label);
+    assert.equal(launchOperationsOperatorEntry.currentAction.executionPlan?.receiptPlan?.method, "POST");
+    assert.equal(launchOperationsOperatorEntry.currentAction.executionPlan?.receiptPlan?.route, "/api/developer/ops/steady-state-duty-plan/receipt");
+    assert.equal(
+      launchOperationsOperatorEntry.currentAction.executionPlan?.receiptPlan?.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.currentAction.executionPlan?.receiptPlan?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.match(
+      launchOperationsOperatorEntry.currentAction.executionPlan?.receiptPlan?.payload?.note || "",
+      /launch_operations_shift_action:/
+    );
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20259,6 +20276,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*primaryDownload=developer-ops-launch-operations-operator-entry\.txt/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*currentAction=/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptPlan=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20353,6 +20372,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.contentDisposition || "", /developer-ops-launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /RockSolid Developer Ops Launch Operations Operator Entry/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Primary Download: developer-ops-launch-operations-operator-entry\.txt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Current Action:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Plan: POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);

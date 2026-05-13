@@ -27149,6 +27149,57 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorStagingActionQueue(stagingReadinessBridge = null) {
+  const bridge = stagingReadinessBridge && typeof stagingReadinessBridge === "object"
+    ? stagingReadinessBridge
+    : null;
+  if (!bridge) {
+    return [];
+  }
+  return [
+    {
+      stepNumber: 1,
+      key: "refresh_staging_readiness_status",
+      label: "Refresh staging readiness status",
+      status: "current",
+      command: bridge.readinessStatusCommand || null,
+      artifact: bridge.readinessActionQueueFile || null,
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      nextAction: "Open the refreshed readiness action queue and confirm the current staging gate before reloading rehearsal."
+    },
+    {
+      stepNumber: 2,
+      key: "reload_staging_rehearsal",
+      label: "Reload staging rehearsal",
+      status: "next",
+      command: bridge.rehearsalReloadCommand || bridge.closeoutReloadCommand || null,
+      artifact: bridge.filledCloseoutInputFile || null,
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      nextAction: "Review the refreshed rehearsal output and confirm the full-test/signoff handoff is still aligned."
+    },
+    {
+      stepNumber: 3,
+      key: "run_full_test_window",
+      label: "Run guarded full-test window",
+      status: "blocked_until_rehearsal_reload",
+      command: bridge.fullTestWindowCommand || "npm.cmd test",
+      artifact: bridge.filledCloseoutInputFile || null,
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      nextAction: "Capture the full-test result artifact before moving to production sign-off evidence."
+    },
+    {
+      stepNumber: 4,
+      key: "review_production_signoff_packet",
+      label: "Review production sign-off packet",
+      status: "blocked_until_full_test",
+      command: bridge.closeoutReloadCommand || bridge.rehearsalReloadCommand || null,
+      artifact: bridge.productionSignoffPacket || null,
+      launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      nextAction: "Archive the production sign-off packet, then continue into launch-day watch readiness."
+    }
+  ];
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -27250,6 +27301,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     stagingLaunchDutyArchive,
     launchDutyRecordIndexPath
   });
+  const stagingActionQueue = buildDeveloperOpsLaunchOperationsOperatorStagingActionQueue(stagingReadinessBridge);
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27299,8 +27351,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     receiptConfirmation,
     receiptRecoveryAction,
     stagingReadinessBridge,
+    stagingActionQueue,
+    primaryStagingActionKey: stagingActionQueue[0]?.key || null,
+    nextStagingActionKey: stagingActionQueue[1]?.key || null,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -33690,6 +33745,17 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
         );
       }
+      const stagingActionQueue = Array.isArray(launchOperationsOperatorEntry.stagingActionQueue)
+        ? launchOperationsOperatorEntry.stagingActionQueue
+        : [];
+      if (stagingActionQueue.length) {
+        lines.push(
+          `- stagingActionQueue=${stagingActionQueue.length}`
+          + ` | currentStagingAction=${launchOperationsOperatorEntry.primaryStagingActionKey || stagingActionQueue[0]?.key || "-"}`
+          + ` | nextStagingAction=${launchOperationsOperatorEntry.nextStagingActionKey || stagingActionQueue[1]?.key || "-"}`
+          + ` | currentCommand=${stagingActionQueue[0]?.command || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -34425,6 +34491,17 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | rehearsalReload=${stagingReadinessBridge.rehearsalReloadCommand || "-"}`
         + ` | actionQueue=${stagingReadinessBridge.readinessActionQueueFile || "-"}`
         + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
+      );
+    }
+    const stagingActionQueue = Array.isArray(launchOperationsOperatorEntry.stagingActionQueue)
+      ? launchOperationsOperatorEntry.stagingActionQueue
+      : [];
+    if (stagingActionQueue.length) {
+      lines.push(
+        `- Staging Action Queue: ${stagingActionQueue.length}`
+        + ` | current=${launchOperationsOperatorEntry.primaryStagingActionKey || stagingActionQueue[0]?.key || "-"}`
+        + ` | next=${launchOperationsOperatorEntry.nextStagingActionKey || stagingActionQueue[1]?.key || "-"}`
+        + ` | currentCommand=${stagingActionQueue[0]?.command || "-"}`
       );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
@@ -35827,6 +35904,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | receiptAudit=${readiness.launchOperationsOperatorEntry?.receiptConfirmation?.auditLogId || "-"}`
       + ` | receiptRecovery=${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.method || "-"} ${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.route || "-"}`
       + ` | stagingReadiness=${readiness.launchOperationsOperatorEntry?.stagingReadinessBridge?.readinessStatusCommand || "-"}`
+      + ` | currentStagingAction=${readiness.launchOperationsOperatorEntry?.primaryStagingActionKey || "-"}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -36465,6 +36543,21 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
     );
     lines.push(`Staging Bridge Next: ${stagingReadinessBridge.nextAction || "-"}`);
+    lines.push("");
+  }
+  const stagingActionQueue = Array.isArray(entry.stagingActionQueue) ? entry.stagingActionQueue : [];
+  if (stagingActionQueue.length) {
+    lines.push("Staging Action Queue:");
+    for (const item of stagingActionQueue) {
+      lines.push(
+        `${item.stepNumber || "-"}. ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | command=${item.command || "-"}`
+        + ` | artifact=${item.artifact || "-"}`
+        + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+      );
+    }
+    lines.push(`Staging Queue Next: ${stagingActionQueue[0]?.nextAction || "-"}`);
     lines.push("");
   }
   lines.push("Checklist Steps:");

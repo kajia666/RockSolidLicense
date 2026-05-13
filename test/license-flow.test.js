@@ -20310,6 +20310,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsOperatorEntry.stagingReadinessBridge.launchDutyRecordIndexPath,
       "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
     );
+    assert.ok(Array.isArray(launchOperationsOperatorEntry.stagingActionQueue));
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue.length, 4);
+    assert.equal(launchOperationsOperatorEntry.primaryStagingActionKey, "refresh_staging_readiness_status");
+    assert.equal(launchOperationsOperatorEntry.nextStagingActionKey, "reload_staging_rehearsal");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[0].key, "refresh_staging_readiness_status");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[0].status, "current");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[0].command, launchOperationsOperatorEntry.stagingReadinessBridge.readinessStatusCommand);
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[1].key, "reload_staging_rehearsal");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[1].status, "next");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[1].command, launchOperationsOperatorEntry.stagingReadinessBridge.rehearsalReloadCommand);
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[2].key, "run_full_test_window");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[2].status, "blocked_until_rehearsal_reload");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[2].command, "npm.cmd test");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[3].key, "review_production_signoff_packet");
+    assert.equal(launchOperationsOperatorEntry.stagingActionQueue[3].status, "blocked_until_full_test");
+    assert.equal(
+      launchOperationsOperatorEntry.stagingActionQueue[3].artifact,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+    );
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20354,6 +20373,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptRecovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*stagingReadinessBridge=ready/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*stagingReadinessStatus=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*stagingActionQueue=4/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*currentStagingAction=refresh_staging_readiness_status/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20414,6 +20435,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptRecovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*stagingReadiness=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*currentStagingAction=refresh_staging_readiness_status/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20462,6 +20484,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Staging Readiness Bridge:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Staging Readiness Bridge:[\s\S]*readinessStatus=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Staging Readiness Bridge:[\s\S]*rehearsalReload=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Staging Action Queue:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /1\. refresh_staging_readiness_status \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /2\. reload_staging_rehearsal \| status=next \| command=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /3\. run_full_test_window \| status=blocked_until_rehearsal_reload \| command=npm\.cmd test/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /4\. review_production_signoff_packet \| status=blocked_until_full_test/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

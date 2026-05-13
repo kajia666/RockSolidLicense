@@ -22064,6 +22064,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewZipText, /--key launch_day_watch_summary/);
     assert.match(launchMainlineRouteReviewZipText, /--key first_wave_closeout/);
     assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-packet-reference/);
+    assert.match(launchMainlineRouteReviewZipText, /packetOperatorAction/);
+    assert.match(launchMainlineRouteReviewZipText, /packetCommand/);
+    assert.match(launchMainlineRouteReviewZipText, /operator_reload_closeout_packet/);
+    assert.match(launchMainlineRouteReviewZipText, /--closeout-input-file artifacts\/staging\/EXPORT_ALPHA\/beta\/filled-closeout-input\.json/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

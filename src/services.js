@@ -38547,6 +38547,20 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
   const buildLaunchDutyRecordCommand = (key) => common.launchDutyRecordIndex
     ? `npm.cmd run staging:launch-duty:record -- --record-index-file ${common.launchDutyRecordIndex} --key ${key}`
     : null;
+  const packetOperatorActions = {
+    run_record_index: "operator_review_run_record_index",
+    artifact_manifest: "operator_review_artifact_manifest",
+    backup_restore_packet: "operator_review_backup_restore_packet",
+    closeout_reload_packet: "operator_reload_closeout_packet",
+    readiness_review_packet: "operator_review_readiness_packet",
+    production_signoff_packet: "operator_review_production_signoff_packet"
+  };
+  const buildPacketCommand = (key) => {
+    if (key === "closeout_reload_packet") {
+      return archive.commands?.closeoutReload || archive.commands?.profileDrivenDryRun || null;
+    }
+    return archive.commands?.profileDrivenDryRun || archive.commands?.closeoutReload || null;
+  };
   pushJsonFile(files.launchDutyArchiveIndex, {
     mode: "developer-ops-staging-launch-duty-archive-index",
     ...common,
@@ -38576,7 +38590,9 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
       ...common,
       packetKey: packet?.key || null,
       packetPath: packet?.path || null,
-      packetStatus: packet?.path ? "listed_for_staging_rehearsal" : "missing_path"
+      packetStatus: packet?.path ? "listed_for_staging_rehearsal" : "missing_path",
+      packetOperatorAction: packetOperatorActions[packet?.key] || "operator_review_staging_packet",
+      packetCommand: buildPacketCommand(packet?.key)
     });
   }
   return artifactFiles;

@@ -20170,6 +20170,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status: [^\n]*recoveryLaunchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-handoff-summary\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-daily-brief\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-shift-action-plan\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-overview-status\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

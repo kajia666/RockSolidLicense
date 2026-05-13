@@ -20932,6 +20932,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyStabilizationNext=first_wave_incident_log/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyStabilizationCloseoutReady=false/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyStabilizationBlockedBy=first_wave_incident_log,rollback_signal_review,stabilization_owner_handoff/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Duty Record Index Selection Checklist Step: [^\n]*key=continue_launch_duty_record_index_selection_handoff[^\n]*order=8[^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -21745,6 +21746,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       staleLaunchDutyReadbackHandoffIndexDownload.body,
       /Launch Duty Record Index Receipt Selection:[\s\S]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.match(
+      staleLaunchDutyReadbackHandoffIndexDownload.body,
+      /Launch Duty Record Index Selection Checklist Step: [^\n]*key=continue_launch_duty_record_index_selection_handoff[^\n]*order=8[^\n]*file=developer-ops-steady-state-handoff-brief\.txt[^\n]*format=steady-state-handoff-brief[^\n]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
 
     const forbiddenExport = await getJsonExpectError(

@@ -37743,6 +37743,16 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     || launchDutyStabilizationCompletionState?.handoffComplete === true;
   const launchDutyStabilizationCloseoutExecutionState = launchDutyStabilizationReceiptQueue?.closeoutExecutionState || null;
   const launchDutyRecordIndexReceiptSelection = readiness.launchDutyRecordIndexReceiptSelection || null;
+  const launchOperationsOperatorChecklist = readiness.launchOperationsOperatorChecklist || buildDeveloperOpsLaunchOperationsOperatorChecklist({
+    scope,
+    launchOperationsFileIndex,
+    launchOperationsOverviewStatus,
+    launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope),
+    launchDutyRecordIndexReceiptSelection
+  });
+  const launchDutyRecordIndexSelectionChecklistStep = Array.isArray(launchOperationsOperatorChecklist?.steps)
+    ? launchOperationsOperatorChecklist.steps.find((item) => item?.key === "continue_launch_duty_record_index_selection_handoff") || null
+    : null;
   const includedFiles = [
     payload.fileName || "developer-ops.json",
     payload.summaryFileName || "developer-ops-summary.txt",
@@ -37890,6 +37900,17 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
       + ` | href=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadHref || "-"}`
     );
+    if (launchDutyRecordIndexSelectionChecklistStep) {
+      lines.push(
+        "Launch Duty Record Index Selection Checklist Step:"
+        + ` key=${launchDutyRecordIndexSelectionChecklistStep.key || "-"}`
+        + ` | order=${launchDutyRecordIndexSelectionChecklistStep.order || "-"}`
+        + ` | file=${launchDutyRecordIndexSelectionChecklistStep.fileName || "-"}`
+        + ` | format=${launchDutyRecordIndexSelectionChecklistStep.format || "-"}`
+        + ` | href=${launchDutyRecordIndexSelectionChecklistStep.href || "-"}`
+        + ` | launchDutyRecordIndex=${launchDutyRecordIndexSelectionChecklistStep.launchDutyRecordIndexPath || "-"}`
+      );
+    }
     lines.push(`Launch Duty Record Index Selection Next: ${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     lines.push("");
   }

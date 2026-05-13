@@ -22024,6 +22024,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewChecksumsDownload.body, /artifacts\/staging\/EXPORT_ALPHA\/beta\/staging-closeout-reload-packet\.json/);
     assert.match(launchMainlineRouteReviewChecksumsDownload.body, /artifacts\/staging\/EXPORT_ALPHA\/beta\/staging-readiness-review-packet\.json/);
     assert.match(launchMainlineRouteReviewChecksumsDownload.body, /artifacts\/staging\/EXPORT_ALPHA\/beta\/staging-production-signoff-packet\.json/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /artifacts\/staging\/EXPORT_ALPHA\/beta\/launch-duty-record-index\.json/);
 
     const launchMainlineRouteReviewZipDownload = await getBinary(
       baseUrl,
@@ -22055,7 +22056,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewZipText, /artifacts\/staging\/EXPORT_ALPHA\/beta\/staging-closeout-reload-packet\.json/);
     assert.match(launchMainlineRouteReviewZipText, /artifacts\/staging\/EXPORT_ALPHA\/beta\/staging-readiness-review-packet\.json/);
     assert.match(launchMainlineRouteReviewZipText, /artifacts\/staging\/EXPORT_ALPHA\/beta\/staging-production-signoff-packet\.json/);
+    assert.match(launchMainlineRouteReviewZipText, /artifacts\/staging\/EXPORT_ALPHA\/beta\/launch-duty-record-index\.json/);
     assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-launch-duty-archive-index/);
+    assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-launch-duty-record-index/);
     assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-packet-reference/);
   } finally {
     await app.close();

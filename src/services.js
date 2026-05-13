@@ -38541,6 +38541,26 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
     ...common,
     archive
   });
+  pushJsonFile(common.launchDutyRecordIndex, {
+    mode: "developer-ops-staging-launch-duty-record-index",
+    ...common,
+    recordIndex: {
+      path: common.launchDutyRecordIndex,
+      archiveIndexPath: common.launchDutyArchiveIndex,
+      status: "awaiting_launch_duty_records",
+      expectedRecordKeys: [
+        "launch_day_watch_summary",
+        "receipt_visibility_snapshot",
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff",
+        "first_wave_closeout"
+      ],
+      writeCommand: common.launchDutyRecordIndex
+        ? `npm.cmd run staging:launch-duty:record -- --record-index-file ${common.launchDutyRecordIndex}`
+        : null
+    }
+  });
   const packetFiles = Array.isArray(archive.packetFiles) ? archive.packetFiles : [];
   for (const packet of packetFiles) {
     pushJsonFile(packet?.path, {

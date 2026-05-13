@@ -27500,6 +27500,51 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchSwitchReadinessSummary({
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorLaunchSwitchOperatorRunbook({
+  stagingActionQueue = [],
+  launchSwitchReadinessSummary = null
+} = {}) {
+  const stagingQueue = Array.isArray(stagingActionQueue) ? stagingActionQueue : [];
+  const summary = launchSwitchReadinessSummary && typeof launchSwitchReadinessSummary === "object"
+    ? launchSwitchReadinessSummary
+    : null;
+  if (!stagingQueue.length || !summary) {
+    return null;
+  }
+  const currentStep = stagingQueue.find((item) => item?.key === summary.currentActionKey)
+    || stagingQueue.find((item) => item?.status === "current")
+    || stagingQueue[0]
+    || null;
+  const nextStep = stagingQueue.find((item) => item?.key === summary.nextActionKey)
+    || stagingQueue.find((item) => item?.status === "next")
+    || stagingQueue[1]
+    || null;
+  const fullTestStep = stagingQueue.find((item) => item?.key === "run_full_test_window") || null;
+  const signoffReviewStep = stagingQueue.find((item) => item?.key === "review_production_signoff_packet") || null;
+  return {
+    version: "developer-ops-launch-operations-operator-launch-switch-operator-runbook/v1",
+    status: summary.status || "blocked_until_full_test_and_signoff",
+    currentStepKey: currentStep?.key || null,
+    currentCommand: currentStep?.command || null,
+    nextStepKey: nextStep?.key || null,
+    nextCommand: nextStep?.command || null,
+    guardedFullTestCommand: fullTestStep?.command || null,
+    signoffReviewArtifact: signoffReviewStep?.artifact || summary.productionSignoffPacket || null,
+    switchPhaseKey: summary.switchPhaseKey || null,
+    launchDutyRecordIndexPath: summary.launchDutyRecordIndexPath || null,
+    runbookSteps: stagingQueue.map((item) => ({
+      stepNumber: item?.stepNumber || null,
+      key: item?.key || null,
+      status: item?.status || null,
+      command: item?.key === "review_production_signoff_packet" ? null : item?.command || null,
+      artifact: item?.artifact || null,
+      launchDutyRecordIndexPath: item?.launchDutyRecordIndexPath || summary.launchDutyRecordIndexPath || null,
+      nextAction: item?.nextAction || null
+    })),
+    nextAction: "Run the current readiness command, reload rehearsal, complete the guarded full-test window, then review the production sign-off packet before switching."
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -27615,6 +27660,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     postSignoffWatchReceiptPlan,
     postSignoffExecutionChecklist
   });
+  const launchSwitchOperatorRunbook = buildDeveloperOpsLaunchOperationsOperatorLaunchSwitchOperatorRunbook({
+    stagingActionQueue,
+    launchSwitchReadinessSummary
+  });
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27672,9 +27721,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     postSignoffWatchReceiptPlan,
     postSignoffExecutionChecklist,
     launchSwitchReadinessSummary,
+    launchSwitchOperatorRunbook,
     primaryPostSignoffActionKey: postSignoffWatchQueue[0]?.key || null,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -34116,6 +34166,16 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | pendingReceipts=${launchSwitchReadinessSummary.pendingReceiptCount ?? 0}`
         );
       }
+      const launchSwitchOperatorRunbook = launchOperationsOperatorEntry.launchSwitchOperatorRunbook || null;
+      if (launchSwitchOperatorRunbook) {
+        lines.push(
+          `- launchSwitchRunbook=${launchSwitchOperatorRunbook.status || "-"}`
+          + ` | switchCurrentStep=${launchSwitchOperatorRunbook.currentStepKey || "-"}`
+          + ` | switchCurrentCommand=${launchSwitchOperatorRunbook.currentCommand || "-"}`
+          + ` | switchNextCommand=${launchSwitchOperatorRunbook.nextCommand || "-"}`
+          + ` | guardedFullTest=${launchSwitchOperatorRunbook.guardedFullTestCommand || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -34903,6 +34963,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | nextAction=${launchSwitchReadinessSummary.nextActionKey || "-"}`
         + ` | switchPhase=${launchSwitchReadinessSummary.switchPhaseKey || "-"}`
         + ` | pendingReceipts=${launchSwitchReadinessSummary.pendingReceiptCount ?? 0}`
+      );
+    }
+    const launchSwitchOperatorRunbook = launchOperationsOperatorEntry.launchSwitchOperatorRunbook || null;
+    if (launchSwitchOperatorRunbook) {
+      lines.push(
+        `- Launch Switch Operator Runbook: ${launchSwitchOperatorRunbook.status || "-"}`
+        + ` | currentStep=${launchSwitchOperatorRunbook.currentStepKey || "-"}`
+        + ` | currentCommand=${launchSwitchOperatorRunbook.currentCommand || "-"}`
+        + ` | nextCommand=${launchSwitchOperatorRunbook.nextCommand || "-"}`
+        + ` | fullTest=${launchSwitchOperatorRunbook.guardedFullTestCommand || "-"}`
       );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
@@ -36310,6 +36380,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | postSignoffReceipts=${Array.isArray(readiness.launchOperationsOperatorEntry?.postSignoffWatchReceiptPlan?.currentReceiptOperations) ? readiness.launchOperationsOperatorEntry.postSignoffWatchReceiptPlan.currentReceiptOperations.join(",") : "-"}`
       + ` | postSignoffPhase=${readiness.launchOperationsOperatorEntry?.postSignoffExecutionChecklist?.currentPhaseKey || "-"}`
       + ` | launchSwitchReadiness=${readiness.launchOperationsOperatorEntry?.launchSwitchReadinessSummary?.status || "-"}`
+      + ` | launchSwitchRunbook=${readiness.launchOperationsOperatorEntry?.launchSwitchOperatorRunbook?.currentStepKey || "-"}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -37085,6 +37156,33 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       : [];
     lines.push(`Required Before Switch: ${requiredBeforeSwitch.map((item) => `${item.key || "-"}:${item.status || "-"}`).join("; ") || "-"}`);
     lines.push(`Launch Switch Next: ${launchSwitchReadinessSummary.nextAction || "-"}`);
+    lines.push("");
+  }
+  const launchSwitchOperatorRunbook = entry.launchSwitchOperatorRunbook || null;
+  if (launchSwitchOperatorRunbook) {
+    lines.push("Launch Switch Operator Runbook:");
+    lines.push(
+      `- status=${launchSwitchOperatorRunbook.status || "-"}`
+      + ` | currentStep=${launchSwitchOperatorRunbook.currentStepKey || "-"}`
+      + ` | currentCommand=${launchSwitchOperatorRunbook.currentCommand || "-"}`
+      + ` | nextStep=${launchSwitchOperatorRunbook.nextStepKey || "-"}`
+      + ` | nextCommand=${launchSwitchOperatorRunbook.nextCommand || "-"}`
+      + ` | fullTest=${launchSwitchOperatorRunbook.guardedFullTestCommand || "-"}`
+      + ` | signoffArtifact=${launchSwitchOperatorRunbook.signoffReviewArtifact || "-"}`
+      + ` | launchDutyRecordIndex=${launchSwitchOperatorRunbook.launchDutyRecordIndexPath || "-"}`
+    );
+    const runbookSteps = Array.isArray(launchSwitchOperatorRunbook.runbookSteps)
+      ? launchSwitchOperatorRunbook.runbookSteps
+      : [];
+    for (const item of runbookSteps) {
+      lines.push(
+        `${item.stepNumber || "-"}. ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + (item.command ? ` | command=${item.command}` : ` | artifact=${item.artifact || "-"}`)
+        + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+      );
+    }
+    lines.push(`Launch Switch Runbook Next: ${launchSwitchOperatorRunbook.nextAction || "-"}`);
     lines.push("");
   }
   lines.push("Checklist Steps:");

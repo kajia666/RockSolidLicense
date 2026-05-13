@@ -20442,6 +20442,40 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ["review_production_signoff_packet", "blocked_until_full_test"]
       ]
     );
+    assert.ok(launchOperationsOperatorEntry.launchSwitchOperatorRunbook);
+    assert.equal(launchOperationsOperatorEntry.launchSwitchOperatorRunbook.status, "blocked_until_full_test_and_signoff");
+    assert.equal(launchOperationsOperatorEntry.launchSwitchOperatorRunbook.currentStepKey, "refresh_staging_readiness_status");
+    assert.equal(
+      launchOperationsOperatorEntry.launchSwitchOperatorRunbook.currentCommand,
+      "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.launchSwitchOperatorRunbook.nextCommand,
+      "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
+    );
+    assert.equal(launchOperationsOperatorEntry.launchSwitchOperatorRunbook.guardedFullTestCommand, "npm.cmd test");
+    assert.equal(
+      launchOperationsOperatorEntry.launchSwitchOperatorRunbook.signoffReviewArtifact,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+    );
+    assert.equal(launchOperationsOperatorEntry.launchSwitchOperatorRunbook.runbookSteps.length, 4);
+    assert.deepEqual(
+      launchOperationsOperatorEntry.launchSwitchOperatorRunbook.runbookSteps.map((item) => [item.key, item.status, item.command || item.artifact]),
+      [
+        [
+          "refresh_staging_readiness_status",
+          "current",
+          "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+        ],
+        [
+          "reload_staging_rehearsal",
+          "next",
+          "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
+        ],
+        ["run_full_test_window", "blocked_until_rehearsal_reload", "npm.cmd test"],
+        ["review_production_signoff_packet", "blocked_until_full_test", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"]
+      ]
+    );
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20496,6 +20530,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*currentPostSignoffPhase=archive_signoff_packet/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchSwitchReadiness=blocked_until_full_test_and_signoff/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*switchDecision=hold_until_full_test_and_signoff/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchSwitchRunbook=blocked_until_full_test_and_signoff/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*switchCurrentCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20561,6 +20597,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*postSignoffReceipts=record_cutover_walkthrough,record_launch_day_readiness_review/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*postSignoffPhase=archive_signoff_packet/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchSwitchReadiness=blocked_until_full_test_and_signoff/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchSwitchRunbook=refresh_staging_readiness_status/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20635,6 +20672,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Readiness Summary:[\s\S]*status=blocked_until_full_test_and_signoff \| decision=hold_until_full_test_and_signoff \| currentAction=refresh_staging_readiness_status \| nextAction=reload_staging_rehearsal/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Readiness Summary:[\s\S]*switchPhase=archive_signoff_packet \| postSwitchPhases=4 \| pendingReceipts=8/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Required Before Switch: refresh_staging_readiness_status:current; reload_staging_rehearsal:next; run_full_test_window:blocked_until_rehearsal_reload; review_production_signoff_packet:blocked_until_full_test/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*status=blocked_until_full_test_and_signoff \| currentStep=refresh_staging_readiness_status \| currentCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*nextCommand=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json \| fullTest=npm\.cmd test/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*4\. review_production_signoff_packet \| status=blocked_until_full_test \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

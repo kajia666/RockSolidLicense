@@ -19122,6 +19122,9 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     for (const [fileName, body] of csvFiles) {
       appendLaunchWorkflowFileIfPresent(files, `ops/csv/${fileName}`, body || "");
     }
+    for (const item of buildDeveloperOpsStagingArtifactMirrorFiles(payload.opsSnapshot)) {
+      appendLaunchWorkflowFileIfPresent(files, item.path, item.body || "");
+    }
   }
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -38505,6 +38508,50 @@ function buildDeveloperOpsRouteReviewExportFiles(payload = {}) {
     appendRouteReviewFile(descriptor, buildDeveloperOpsRouteReviewSectionSummaryText(payload, section));
   }
   return files;
+}
+
+function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || {};
+  const archive = readiness.stagingLaunchDutyArchive || buildDeveloperOpsStagingLaunchDutyArchive(scope);
+  const files = archive?.files && typeof archive.files === "object" ? archive.files : {};
+  const artifactFiles = [];
+  const common = {
+    generatedAt: payload.generatedAt || null,
+    projectCode: archive.projectCode || scope.productCode || null,
+    channel: archive.channel || scope.channel || "stable",
+    archiveRoot: archive.archiveRoot || null,
+    launchDutyArchiveIndex: files.launchDutyArchiveIndex || archive.indexFile || null,
+    launchDutyRecordIndex: files.launchDutyRecordIndex || archive.launchDutyRecordIndexPath || null,
+    packetCompleteness: archive.packetCompleteness || null,
+    nextAction: archive.nextAction || null
+  };
+  const pushJsonFile = (path, body) => {
+    if (!path) {
+      return;
+    }
+    artifactFiles.push({
+      path,
+      body: JSON.stringify(body, null, 2)
+    });
+  };
+  pushJsonFile(files.launchDutyArchiveIndex, {
+    mode: "developer-ops-staging-launch-duty-archive-index",
+    ...common,
+    archive
+  });
+  const packetFiles = Array.isArray(archive.packetFiles) ? archive.packetFiles : [];
+  for (const packet of packetFiles) {
+    pushJsonFile(packet?.path, {
+      mode: "developer-ops-staging-packet-reference",
+      ...common,
+      packetKey: packet?.key || null,
+      packetPath: packet?.path || null,
+      packetStatus: packet?.path ? "listed_for_staging_rehearsal" : "missing_path"
+    });
+  }
+  return artifactFiles;
 }
 
 function buildDeveloperOpsLaunchOperationsFileIndexJsonText(payload = {}) {

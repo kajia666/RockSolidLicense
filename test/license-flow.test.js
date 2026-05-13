@@ -20990,6 +20990,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
 
+    const launchMainlineOpsRouteMirrorChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-mainline-handoff-routes\.txt/);
+
+    const launchMainlineOpsRouteMirrorZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const launchMainlineOpsRouteMirrorZipText = launchMainlineOpsRouteMirrorZipDownload.body.toString("latin1");
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-mainline-handoff-routes\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, latestLaunchDutySelectionChecklistStepPattern);
+
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",

@@ -19022,6 +19022,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-mainline-handoff-routes.txt",
+    payload.opsSnapshot ? buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/stabilization-handoff.txt",
     payload.opsSnapshot ? buildDeveloperOpsStabilizationHandoffText(payload.opsSnapshot) : ""
   );

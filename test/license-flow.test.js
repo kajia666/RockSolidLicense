@@ -20172,6 +20172,42 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && /readinessGateRecordIndex=/.test(item.receiptVisibilitySummaryDownloads.launchReviewSummary.href || "")
       && /readinessGateRecordIndex=/.test(item.receiptVisibilitySummaryDownloads.launchSmokeSummary.href || "")
     )));
+    const launchOperationsOperatorChecklist = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOperatorChecklist;
+    assert.ok(launchOperationsOperatorChecklist);
+    assert.equal(launchOperationsOperatorChecklist.version, "developer-ops-launch-operations-operator-checklist/v1");
+    assert.equal(launchOperationsOperatorChecklist.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(launchOperationsOperatorChecklist.channel, "stable");
+    assert.equal(launchOperationsOperatorChecklist.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    assert.deepEqual(
+      launchOperationsOperatorChecklist.steps.map((item) => item.key),
+      [
+        "open_launch_operations_handoff_summary",
+        "open_launch_operations_daily_brief",
+        "open_launch_operations_shift_action_plan",
+        "open_launch_operations_overview_status",
+        "review_launch_review_receipt_visibility_summary",
+        "review_launch_smoke_receipt_visibility_summary",
+        "open_launch_mainline_handoff_routes"
+      ]
+    );
+    assert.ok(launchOperationsOperatorChecklist.steps.every((item, index) => (
+      item.order === index + 1
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+      && item.fileName
+      && item.format
+      && item.href
+    )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "review_launch_review_receipt_visibility_summary"
+      && item.fileName === "launch-review.txt"
+      && /\/api\/developer\/launch-review\/download\?/.test(item.href || "")
+      && /readinessGateRecordIndex=/.test(item.href || "")
+    )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "open_launch_mainline_handoff_routes"
+      && item.fileName === "developer-ops-launch-mainline-handoff-routes.txt"
+      && item.format === "launch-mainline-handoff-routes"
+    )));
     assert.match(launchOperationsOverviewStatus.overviewDownload.href, /format=launch-operations-overview-status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /overviewStatus=.*receipt=visible/);
@@ -20236,6 +20272,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchSmokeSummaryFile=launch-smoke-kit\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchReviewSummaryHref=.*readinessGateRecordIndex=/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchSmokeSummaryHref=.*readinessGateRecordIndex=/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
 
     const launchOperationsFileIndexDownload = await getText(
       baseUrl,
@@ -20247,12 +20284,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     const launchOperationsFileIndexJson = JSON.parse(launchOperationsFileIndexDownload.body);
     assert.deepEqual(launchOperationsFileIndexJson, launchOperationsFileIndex);
 
+    const launchOperationsOperatorChecklistDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-checklist",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsOperatorChecklistDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchOperationsOperatorChecklistDownload.contentDisposition || "", /developer-ops-launch-operations-operator-checklist\.txt/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /RockSolid Developer Ops Launch Operations Operator Checklist/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /Operator Execution Checklist:/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /1\. open_launch_operations_handoff_summary[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /5\. review_launch_review_receipt_visibility_summary[^\n]*launch-review\.txt[^\n]*readinessGateRecordIndex=/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /6\. review_launch_smoke_receipt_visibility_summary[^\n]*launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /7\. open_launch_mainline_handoff_routes[^\n]*developer-ops-launch-mainline-handoff-routes\.txt/);
+
     const launchOperationsChecksumsDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=checksums",
       ownerSession.token
     );
     assert.match(launchOperationsChecksumsDownload.body, /launch-operations-file-index\.json/);
+    assert.match(launchOperationsChecksumsDownload.body, /launch-operations-operator-checklist\.txt/);
 
     const launchOperationsZipDownload = await getBinary(
       baseUrl,
@@ -20262,6 +20314,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsZipDownload.contentType, "application/zip");
     const launchOperationsZipText = launchOperationsZipDownload.body.toString("latin1");
     assert.match(launchOperationsZipText, /launch-operations-file-index\.json/);
+    assert.match(launchOperationsZipText, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsZipText, /launchOpsOverviewContextLaunchDutyRecordIndexPath/);
     assert.match(launchOperationsZipText, /artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
 

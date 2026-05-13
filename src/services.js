@@ -22251,6 +22251,68 @@ function buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs = [], limit = 
     .slice(0, Math.max(1, Number(limit || 5)));
 }
 
+function getLaunchDutyRecordIndexStateProgressScore(receipt = null) {
+  const state = normalizeLaunchDutyRecordIndexState(receipt?.launchDutyRecordIndexState);
+  if (!state) {
+    return {
+      hasState: false,
+      complete: false,
+      recordedCount: -1,
+      pendingCount: Number.POSITIVE_INFINITY
+    };
+  }
+  const recordedCount = Number(state.recordedCount ?? (Array.isArray(state.recordedKeys) ? state.recordedKeys.length : 0));
+  const pendingCount = Number(state.pendingCount ?? (Array.isArray(state.pendingKeys) ? state.pendingKeys.length : 0));
+  return {
+    hasState: true,
+    complete: state.status === "complete" || pendingCount === 0,
+    recordedCount: Number.isFinite(recordedCount) ? recordedCount : 0,
+    pendingCount: Number.isFinite(pendingCount) ? pendingCount : 0
+  };
+}
+
+function compareLaunchDutyRecordIndexReceiptProgress(left = null, right = null) {
+  const leftScore = getLaunchDutyRecordIndexStateProgressScore(left);
+  const rightScore = getLaunchDutyRecordIndexStateProgressScore(right);
+  if (leftScore.hasState !== rightScore.hasState) {
+    return leftScore.hasState ? 1 : -1;
+  }
+  if (leftScore.complete !== rightScore.complete) {
+    return leftScore.complete ? 1 : -1;
+  }
+  if (leftScore.recordedCount !== rightScore.recordedCount) {
+    return leftScore.recordedCount - rightScore.recordedCount;
+  }
+  if (leftScore.pendingCount !== rightScore.pendingCount) {
+    return rightScore.pendingCount - leftScore.pendingCount;
+  }
+  return snapshotDateMs(left?.recordedAt || left?.createdAt) - snapshotDateMs(right?.recordedAt || right?.createdAt);
+}
+
+function selectSteadyStateDutyPlanReceiptForLaunchDuty(receipts = [], {
+  productCode = "",
+  channel = ""
+} = {}) {
+  const normalizedProductCode = String(productCode || "").trim().toUpperCase();
+  const normalizedChannel = channel ? normalizeChannel(channel, "stable") : "";
+  const matchingReceipts = (Array.isArray(receipts) ? receipts : [])
+    .filter((item) => {
+      if (!item || typeof item !== "object") {
+        return false;
+      }
+      const itemProductCode = String(item.productCode || "").trim().toUpperCase();
+      const itemChannel = item.channel ? normalizeChannel(item.channel, "stable") : "";
+      const productMatches = !normalizedProductCode || itemProductCode === normalizedProductCode;
+      const channelMatches = !normalizedChannel || itemChannel === normalizedChannel;
+      return productMatches && channelMatches;
+    });
+  const candidates = matchingReceipts.length ? matchingReceipts : (Array.isArray(receipts) ? receipts.filter(Boolean) : []);
+  return candidates
+    .slice()
+    .sort((left, right) => compareLaunchDutyRecordIndexReceiptProgress(right, left))
+    [0] || null;
+}
+
 function buildSnapshotLaunchReceiptFollowUps(latestLaunchReceipts = [], limit = 6, options = {}) {
   const followUps = [];
   const firstWaveRuntimeEvidence = options?.firstWaveRuntimeEvidence && typeof options.firstWaveRuntimeEvidence === "object"
@@ -28824,16 +28886,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     const channelMatches = !targetChannel || normalizeChannel(item.channel, "stable") === normalizeChannel(targetChannel, "stable");
     return productMatches && channelMatches;
   }) || firstWaveReadinessBridges[0] || null;
-  const latestSteadyStateDutyPlanReceipt = steadyStateDutyPlanReceipts.find((item) => {
-    if (!item || typeof item !== "object") {
-      return false;
+  const latestSteadyStateDutyPlanReceipt = selectSteadyStateDutyPlanReceiptForLaunchDuty(
+    steadyStateDutyPlanReceipts,
+    {
+      productCode: latestReceipt?.productCode || scope.productCode || "",
+      channel: latestReceipt?.channel || scope.channel || "stable"
     }
-    const targetProductCode = latestReceipt?.productCode || scope.productCode || "";
-    const targetChannel = latestReceipt?.channel || scope.channel || item.channel || "stable";
-    const productMatches = !targetProductCode || item.productCode === targetProductCode;
-    const channelMatches = !targetChannel || item.channel === targetChannel;
-    return productMatches && channelMatches;
-  }) || steadyStateDutyPlanReceipts[0] || null;
+  );
   const firstWaveConfirmationChain = buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation);
   const operatorActionReceipts = buildDeveloperOpsInitialLaunchOperatorActionReceipts(overview.latestLaunchReceipts, 5);
   const primaryWorkspaceAction = launchReceiptNextFollowUp?.recommendedAction?.workspaceAction

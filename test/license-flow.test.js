@@ -20982,6 +20982,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, latestLaunchDutySelectionChecklistStepPattern);
 
+    const launchMainlineHandoffDownloadRoutesSelectionDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",

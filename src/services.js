@@ -18620,11 +18620,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const project = manifest.project || {};
   const traceability = payload.postLaunchHandoffTraceability || {};
   const opsFiles = traceability.opsFiles || {};
+  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
   const launchReceiptAuditBackfill = Number(traceability.launchReceiptAuditBackfill || 0);
   const launchReceiptAuditBackfillStatus = traceability.launchReceiptAuditBackfillStatus
     || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
-  const launchDutyActionOrder = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
-  const launchOperationsOverviewStatus = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
+  const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
+  const launchOperationsOverviewStatus = initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
   const stagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations || null;
   const launchOpsOverviewProductionSignoffPacket = launchOperationsOverviewStatus?.productionSignoffPacket
     || stagingArchiveNextOperations?.productionSignoffPacket
@@ -18672,6 +18673,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     productCode: opsScope.productCode || payload.filters?.productCode || project.code || "",
     channel: opsScope.channel || payload.filters?.channel || manifest.channel || "stable"
   };
+  const launchDutyRecordIndexSelectionChecklistStep = traceability.launchDutyRecordIndexSelectionChecklistStep
+    || findLaunchDutyRecordIndexSelectionChecklistStep(initialLaunchOpsReadiness, opsDownloadScope);
   const launchOpsOverviewContext = buildScopedLaunchOpsOverviewContext(
     opsDownloadScope,
     stabilizationConfirmation?.launchOpsOverviewContext
@@ -18937,6 +18940,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     );
   }
 
+  appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(lines, launchDutyRecordIndexSelectionChecklistStep);
   lines.push("");
   lines.push("Launch Mainline Recommended Downloads:");
   if (recommendedDownloads.length) {

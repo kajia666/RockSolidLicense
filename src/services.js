@@ -17791,6 +17791,11 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
   const launchOperationsOverviewRecordIndexPath = resolveLaunchReadinessGateRecordIndexPath(nextFollowUp)
     || resolveLaunchReadinessGateRecordIndexPath(latestReceipt);
+  const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
+    productCode: latestReceipt.productCode || nextFollowUp.productCode || "",
+    channel: latestReceipt.channel || nextFollowUp.channel || "stable",
+    launchDutyRecordIndexPath: launchOperationsOverviewRecordIndexPath
+  });
   lines.push("");
   lines.push("Post-Launch Handoff Traceability:");
   lines.push(
@@ -17816,6 +17821,7 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
   lines.push(
     `- Launch Operations Overview Status: ${opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"}`
     + (launchOperationsOverviewRecordIndexPath ? ` | launchDutyRecordIndex=${launchOperationsOverviewRecordIndexPath}` : "")
+    + formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads)
   );
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "-"}`);
   lines.push(`- Ops Stabilization Handoff: ${opsFiles.stabilizationHandoff || "-"}`);
@@ -18775,6 +18781,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   }
   lines.push("Critical Handoff Routes:");
   const pushRoute = (key, label, path, download = {}) => {
+    const receiptSummaryBridgeSuffix = key === "launch-ops-overview-status"
+      ? formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads)
+      : "";
     lines.push(
       `- ${key}: ${path || "-"}`
       + ` | label=${label || download.label || download.key || "-"}`
@@ -18783,6 +18792,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | source=${download.source || "-"}`
       + ` | href=${download.href || "-"}`
       + `${download.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${download.launchDutyRecordIndexPath}` : ""}`
+      + receiptSummaryBridgeSuffix
     );
   };
   pushRoute(
@@ -20464,6 +20474,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | productionSignoffPacket=${launchOpsOverviewProductionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${launchOpsOverviewWatchEntry || "-"}`
     + (launchOperationsOverviewRecordIndexPath ? ` | launchDutyRecordIndex=${launchOperationsOverviewRecordIndexPath}` : "")
+    + formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads)
   );
   if (appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource)) {
     lines.push("");
@@ -31803,6 +31814,17 @@ function buildLaunchDutyReceiptVisibilitySummaryDownloads({
   };
 }
 
+function formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads = {}) {
+  const launchReviewSummary = receiptVisibilitySummaryDownloads?.launchReviewSummary || null;
+  const launchSmokeSummary = receiptVisibilitySummaryDownloads?.launchSmokeSummary || null;
+  return (launchReviewSummary?.fileName ? ` | launchReviewSummaryFile=${launchReviewSummary.fileName}` : "")
+    + (launchReviewSummary?.href ? ` | launchReviewSummaryHref=${launchReviewSummary.href}` : "")
+    + (launchReviewSummary?.launchDutyRecordIndexPath ? ` | launchReviewSummaryRecordIndex=${launchReviewSummary.launchDutyRecordIndexPath}` : "")
+    + (launchSmokeSummary?.fileName ? ` | launchSmokeSummaryFile=${launchSmokeSummary.fileName}` : "")
+    + (launchSmokeSummary?.href ? ` | launchSmokeSummaryHref=${launchSmokeSummary.href}` : "")
+    + (launchSmokeSummary?.launchDutyRecordIndexPath ? ` | launchSmokeSummaryRecordIndex=${launchSmokeSummary.launchDutyRecordIndexPath}` : "");
+}
+
 function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadinessSummary = null, {
   title = "Closeout Readiness Summary:"
 } = {}) {
@@ -34365,6 +34387,27 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
   const launchReadinessNextGateSource = normalizeLaunchReadinessNextGateForHandoff(latestLaunchReceipt)
     ? latestLaunchReceipt
     : findLaunchReadinessNextGateReceipt(latestLaunchReceipts, readiness.nextFollowUp || latestLaunchReceipt);
+  const receiptVisibilitySummaryRecordIndexPath = resolveLaunchReadinessGateRecordIndexPath(launchReadinessNextGateSource)
+    || resolveLaunchReadinessGateRecordIndexPath(readiness.nextFollowUp)
+    || launchOpsOverviewDownload?.launchDutyRecordIndexPath
+    || "";
+  const receiptVisibilitySummaryDownloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
+    productCode: overviewStatusScope.productCode || "",
+    channel: overviewStatusScope.channel || "stable",
+    launchDutyRecordIndexPath: receiptVisibilitySummaryRecordIndexPath
+  });
+  if (receiptVisibilitySummaryDownloads.launchReviewSummary) {
+    downloads.push([
+      "launch-review-receipt-visibility-summary",
+      receiptVisibilitySummaryDownloads.launchReviewSummary
+    ]);
+  }
+  if (receiptVisibilitySummaryDownloads.launchSmokeSummary) {
+    downloads.push([
+      "launch-smoke-receipt-visibility-summary",
+      receiptVisibilitySummaryDownloads.launchSmokeSummary
+    ]);
+  }
   const lines = [
     "RockSolid Developer Ops Launch Mainline Handoff Routes",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -34382,7 +34425,10 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     lines.push("");
     lines.push("Launch Ops Overview Context:");
     lines.push(`- ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}`);
-    lines.push(`- download=${formatLaunchHandoffDownloadText(launchOpsOverviewDownload, { fileSeparator: " | " })}`);
+    lines.push(
+      `- download=${formatLaunchHandoffDownloadText(launchOpsOverviewDownload, { fileSeparator: " | " })}`
+      + formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads)
+    );
   }
   lines.push("");
   lines.push("Operator Order:");

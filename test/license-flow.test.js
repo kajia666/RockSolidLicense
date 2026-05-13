@@ -18438,6 +18438,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       opsLaunchMainlineRouteMapDownload.body,
+      /launch-review-receipt-visibility-summary: .*launch-review\.txt.*href=.*\/api\/developer\/launch-review\/download\?.*readinessGateRecordIndex=.*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-smoke-receipt-visibility-summary: .*launch-smoke-kit\.txt.*href=.*\/api\/developer\/launch-smoke-kit\/download\?.*readinessGateRecordIndex=.*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
       /context=launch_ops_overview_status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
     );
 
@@ -18471,6 +18479,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineHandoffRoutesDownload.body,
       /launch-ops-overview-status: [^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /launch-ops-overview-status: [^\n]*launchReviewSummaryFile=launch-review\.txt[^\n]*launchSmokeSummaryFile=launch-smoke-kit\.txt/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /launch-ops-overview-status: [^\n]*launchReviewSummaryHref=.*readinessGateRecordIndex=.*launchSmokeSummaryHref=.*readinessGateRecordIndex=/
     );
     assert.match(
       launchMainlineHandoffRoutesDownload.body,
@@ -18513,6 +18529,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexDownload.body,
       /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt[^\n]*launchReviewSummaryFile=launch-review\.txt[^\n]*launchSmokeSummaryFile=launch-smoke-kit\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexDownload.body,
+      /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt[^\n]*launchReviewSummaryHref=.*readinessGateRecordIndex=.*launchSmokeSummaryHref=.*readinessGateRecordIndex=/
     );
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status:[\s\S]*receipt=pending/);
     assert.match(launchMainlinePostLaunchIndexDownload.body, /Launch Operations Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/);

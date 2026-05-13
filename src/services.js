@@ -27685,6 +27685,94 @@ function buildDeveloperOpsLaunchOperationsOperatorFirstLaunchConfirmationDoorway
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityParityCheck({
+  launchDutyRecordIndexPath = null,
+  launchReviewSummaryDownload = null,
+  launchSmokeSummaryDownload = null
+} = {}) {
+  const expectedRecordIndex = String(launchDutyRecordIndexPath || "").trim();
+  const readQueryParam = (href = "", key = "") => {
+    const text = String(href || "").trim();
+    if (!text || !key) {
+      return "";
+    }
+    try {
+      const params = new URL(text, "https://codex.local").searchParams;
+      return String(params.get(key) || "").trim();
+    } catch {
+      const queryIndex = text.indexOf("?");
+      if (queryIndex < 0) {
+        return "";
+      }
+      const params = new URLSearchParams(text.slice(queryIndex + 1));
+      return String(params.get(key) || "").trim();
+    }
+  };
+  const buildSummaryStatus = (key, label, download) => {
+    const row = download && typeof download === "object" ? download : null;
+    const declaredRecordIndex = String(row?.launchDutyRecordIndexPath || "").trim();
+    const routeRecordIndex = readQueryParam(row?.href || "", "readinessGateRecordIndex");
+    const recordIndexAligned = !expectedRecordIndex || (
+      declaredRecordIndex !== ""
+      && declaredRecordIndex === expectedRecordIndex
+    );
+    const routeIndexAligned = !expectedRecordIndex || (
+      routeRecordIndex !== ""
+      && routeRecordIndex === expectedRecordIndex
+    );
+    const hasDownload = Boolean(row?.href && row?.fileName && row?.format);
+    const status = !hasDownload
+      ? "missing"
+      : recordIndexAligned && routeIndexAligned
+        ? "aligned"
+        : "mismatch";
+    return {
+      key,
+      label,
+      status,
+      fileName: row?.fileName || null,
+      format: row?.format || null,
+      href: row?.href || null,
+      launchDutyRecordIndexPath: declaredRecordIndex || null,
+      readinessGateRecordIndex: routeRecordIndex || null,
+      recordIndexAligned,
+      routeIndexAligned
+    };
+  };
+  const launchReviewSummary = buildSummaryStatus(
+    "launch_review_summary",
+    "Launch Review summary",
+    launchReviewSummaryDownload
+  );
+  const launchSmokeSummary = buildSummaryStatus(
+    "launch_smoke_summary",
+    "Launch Smoke summary",
+    launchSmokeSummaryDownload
+  );
+  const summaries = [launchReviewSummary, launchSmokeSummary];
+  const requiredSummaryCount = summaries.length;
+  const alignedSummaryCount = summaries.filter((item) => item.status === "aligned").length;
+  const mismatchCount = summaries.filter((item) => item.status !== "aligned").length;
+  const status = mismatchCount === 0
+    ? "aligned"
+    : summaries.some((item) => item.status === "missing")
+      ? "missing_summaries"
+      : "record_index_mismatch";
+  return {
+    version: "developer-ops-launch-operations-operator-receipt-visibility-parity/v1",
+    status,
+    requiredSummaryCount,
+    alignedSummaryCount,
+    mismatchCount,
+    launchDutyRecordIndexPath: expectedRecordIndex || null,
+    launchReviewSummary,
+    launchSmokeSummary,
+    nextAction: status === "aligned"
+      ? "Continue from Launch Operations Operator Entry; receipt visibility summary record indexes are aligned."
+      : "Rebuild Launch Review and Launch Smoke summary downloads from the same launch-duty record index before continuing."
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -27815,6 +27903,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     firstWaveConfirmationChain,
     launchDutyRecordIndexPath
   });
+  const receiptVisibilityParityCheck = buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityParityCheck({
+    launchDutyRecordIndexPath,
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  });
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27875,9 +27968,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchSwitchReadinessSummary,
     launchSwitchOperatorRunbook,
     firstLaunchConfirmationDoorway,
+    receiptVisibilityParityCheck,
     primaryPostSignoffActionKey: postSignoffWatchQueue[0]?.key || null,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, firstLaunchDoorway=${firstLaunchConfirmationDoorway?.status || "-"}, firstLaunchDoorwayCurrent=${firstLaunchConfirmationDoorway?.currentPhaseKey || "-"}, firstLaunchDoorwayNext=${firstLaunchConfirmationDoorway?.nextActionKey || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, stagingActionQueue=${stagingActionQueue.length}, postSignoffWatchBridge=${postSignoffWatchBridge?.status || "-"}, postSignoffReceiptPlan=${postSignoffWatchReceiptPlan?.status || "-"}, postSignoffExecutionChecklist=${postSignoffExecutionChecklist?.status || "-"}, launchSwitchReadiness=${launchSwitchReadinessSummary?.status || "-"}, launchSwitchRunbook=${launchSwitchOperatorRunbook?.currentStepKey || "-"}, firstLaunchDoorway=${firstLaunchConfirmationDoorway?.status || "-"}, firstLaunchDoorwayCurrent=${firstLaunchConfirmationDoorway?.currentPhaseKey || "-"}, firstLaunchDoorwayNext=${firstLaunchConfirmationDoorway?.nextActionKey || "-"}, receiptParity=${receiptVisibilityParityCheck?.status || "-"}, receiptParityReady=${receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -34345,6 +34439,17 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyRecordIndex=${firstLaunchConfirmationDoorway.launchDutyRecordIndexPath || "-"}`
         );
       }
+      const receiptVisibilityParityCheck = launchOperationsOperatorEntry.receiptVisibilityParityCheck || null;
+      if (receiptVisibilityParityCheck) {
+        lines.push(
+          `- receiptParity=${receiptVisibilityParityCheck.status || "-"}`
+          + ` | receiptParityReady=${receiptVisibilityParityCheck.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck.requiredSummaryCount ?? 0}`
+          + ` | mismatches=${receiptVisibilityParityCheck.mismatchCount ?? 0}`
+          + ` | launchReviewRouteIndex=${receiptVisibilityParityCheck.launchReviewSummary?.readinessGateRecordIndex || "-"}`
+          + ` | launchSmokeRouteIndex=${receiptVisibilityParityCheck.launchSmokeSummary?.readinessGateRecordIndex || "-"}`
+          + ` | launchDutyRecordIndex=${receiptVisibilityParityCheck.launchDutyRecordIndexPath || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -35164,6 +35269,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
           lines.push(`  - ${item.key || "-"} | status=${item.status || "-"} | ready=${item.ready === true ? "yes" : "no"}`);
         }
       }
+    }
+    const receiptVisibilityParityCheck = launchOperationsOperatorEntry.receiptVisibilityParityCheck || null;
+    if (receiptVisibilityParityCheck) {
+      lines.push(
+        `- Receipt Visibility Parity: ${receiptVisibilityParityCheck.status || "-"}`
+        + ` | aligned=${receiptVisibilityParityCheck.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck.requiredSummaryCount ?? 0}`
+        + ` | mismatches=${receiptVisibilityParityCheck.mismatchCount ?? 0}`
+        + ` | launchReviewRouteIndex=${receiptVisibilityParityCheck.launchReviewSummary?.readinessGateRecordIndex || "-"}`
+        + ` | launchSmokeRouteIndex=${receiptVisibilityParityCheck.launchSmokeSummary?.readinessGateRecordIndex || "-"}`
+      );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
       ? launchOperationsOperatorEntry.quickAccessDownloads
@@ -36574,6 +36689,8 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | firstLaunchDoorway=${readiness.launchOperationsOperatorEntry?.firstLaunchConfirmationDoorway?.status || "-"}`
       + ` | firstLaunchDoorwayNext=${readiness.launchOperationsOperatorEntry?.firstLaunchConfirmationDoorway?.nextActionKey || "-"}`
       + ` | firstLaunchDoorwayConfirm=${readiness.launchOperationsOperatorEntry?.firstLaunchConfirmationDoorway?.confirmationMethod || "-"} ${readiness.launchOperationsOperatorEntry?.firstLaunchConfirmationDoorway?.confirmationEndpoint || "-"}`
+      + ` | receiptParity=${readiness.launchOperationsOperatorEntry?.receiptVisibilityParityCheck?.status || "-"}`
+      + ` | receiptParityReady=${readiness.launchOperationsOperatorEntry?.receiptVisibilityParityCheck?.alignedSummaryCount ?? 0}/${readiness.launchOperationsOperatorEntry?.receiptVisibilityParityCheck?.requiredSummaryCount ?? 0}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -37420,6 +37537,34 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       }
     }
     lines.push(`Doorway Next: ${firstLaunchConfirmationDoorway.nextAction || "-"}`);
+    lines.push("");
+  }
+  const receiptVisibilityParityCheck = entry.receiptVisibilityParityCheck || null;
+  if (receiptVisibilityParityCheck) {
+    lines.push("Receipt Visibility Parity Check:");
+    lines.push(
+      `- status=${receiptVisibilityParityCheck.status || "-"}`
+      + ` | aligned=${receiptVisibilityParityCheck.alignedSummaryCount ?? 0}/${receiptVisibilityParityCheck.requiredSummaryCount ?? 0}`
+      + ` | mismatches=${receiptVisibilityParityCheck.mismatchCount ?? 0}`
+      + ` | launchDutyRecordIndex=${receiptVisibilityParityCheck.launchDutyRecordIndexPath || "-"}`
+    );
+    const parityRows = [
+      receiptVisibilityParityCheck.launchReviewSummary,
+      receiptVisibilityParityCheck.launchSmokeSummary
+    ].filter((item) => item && typeof item === "object");
+    for (const item of parityRows) {
+      lines.push(
+        `${item.key === "launch_smoke_summary" ? 2 : 1}. ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | format=${item.format || "-"}`
+        + ` | recordIndexAligned=${item.recordIndexAligned === true ? "yes" : "no"}`
+        + ` | routeIndexAligned=${item.routeIndexAligned === true ? "yes" : "no"}`
+        + ` | readinessGateRecordIndex=${item.readinessGateRecordIndex || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+    }
+    lines.push(`Parity Next: ${receiptVisibilityParityCheck.nextAction || "-"}`);
     lines.push("");
   }
   lines.push("Checklist Steps:");

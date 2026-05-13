@@ -20513,6 +20513,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(firstLaunchConfirmationDoorway.confirmationDraft?.productCode, "EXPORT_CLOSEOUT_READY");
     assert.equal(firstLaunchConfirmationDoorway.confirmationDraft?.channel, "stable");
     assert.equal(firstLaunchConfirmationDoorway.confirmationDraft?.decision, "confirmed");
+    const receiptVisibilityParityCheck = launchOperationsOperatorEntry.receiptVisibilityParityCheck;
+    assert.ok(receiptVisibilityParityCheck);
+    assert.equal(
+      receiptVisibilityParityCheck.version,
+      "developer-ops-launch-operations-operator-receipt-visibility-parity/v1"
+    );
+    assert.equal(receiptVisibilityParityCheck.status, "aligned");
+    assert.equal(
+      receiptVisibilityParityCheck.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(receiptVisibilityParityCheck.requiredSummaryCount, 2);
+    assert.equal(receiptVisibilityParityCheck.alignedSummaryCount, 2);
+    assert.equal(receiptVisibilityParityCheck.mismatchCount, 0);
+    assert.equal(
+      receiptVisibilityParityCheck.launchReviewSummary.readinessGateRecordIndex,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(
+      receiptVisibilityParityCheck.launchSmokeSummary.readinessGateRecordIndex,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(receiptVisibilityParityCheck.launchReviewSummary.recordIndexAligned, true);
+    assert.equal(receiptVisibilityParityCheck.launchSmokeSummary.recordIndexAligned, true);
+    assert.equal(receiptVisibilityParityCheck.launchReviewSummary.routeIndexAligned, true);
+    assert.equal(receiptVisibilityParityCheck.launchSmokeSummary.routeIndexAligned, true);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20571,6 +20597,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*switchCurrentCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*firstLaunchDoorway=/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*firstLaunchDoorwayConfirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptParity=aligned/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptParityReady=2\/2/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20639,6 +20667,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchSwitchRunbook=refresh_staging_readiness_status/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*firstLaunchDoorway=/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*firstLaunchDoorwayConfirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptParity=aligned/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptParityReady=2\/2/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20724,6 +20754,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /2\. first_card_delivery_export \| status=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /3\. first_wave_handoff_confirmation \| status=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /4\. first_user_runtime_validation \| status=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Parity Check:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Parity Check:[\s\S]*status=aligned \| aligned=2\/2 \| mismatches=0/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /1\. launch_review_summary \| status=aligned \| file=launch-review\.txt \| format=summary \| recordIndexAligned=yes \| routeIndexAligned=yes/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /2\. launch_smoke_summary \| status=aligned \| file=launch-smoke-kit\.txt \| format=summary \| recordIndexAligned=yes \| routeIndexAligned=yes/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

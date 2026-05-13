@@ -21639,7 +21639,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const staleLaunchDutyReadbackQueue = staleLaunchDutyReadbackSnapshot.summary.initialLaunchOpsReadiness
       .launchOperationsOperatorEntry?.launchDutyHandoffAction?.stabilizationReceiptWriteQueue;
+    const staleLaunchDutyReadbackSelection = staleLaunchDutyReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchDutyRecordIndexReceiptSelection;
     assert.ok(staleLaunchDutyReadbackQueue);
+    assert.ok(staleLaunchDutyReadbackSelection);
+    assert.equal(staleLaunchDutyReadbackSelection.status, "preserved_complete_over_latest_stale_readback");
+    assert.equal(staleLaunchDutyReadbackSelection.selectedAuditLogId, launchDutyCloseoutRecordedReceipt.auditLogId);
+    assert.equal(staleLaunchDutyReadbackSelection.latestAuditLogId, staleLaunchDutyReadbackReceipt.auditLogId);
+    assert.equal(staleLaunchDutyReadbackSelection.selectedProgress, "6/6");
+    assert.equal(staleLaunchDutyReadbackSelection.latestProgress, "5/6");
+    assert.equal(staleLaunchDutyReadbackSelection.ignoredLatestReceipt, true);
     assert.equal(staleLaunchDutyReadbackQueue.status, "complete");
     assert.equal(staleLaunchDutyReadbackQueue.currentRecordKey, null);
     assert.equal(staleLaunchDutyReadbackQueue.handoffComplete, true);
@@ -21650,6 +21659,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       staleLaunchDutyReadbackSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationProgress=4\/4/
+    );
+    assert.match(
+      staleLaunchDutyReadbackSnapshot.summaryText,
+      /Launch Duty Record Index Receipt Selection:[\s\S]*status=preserved_complete_over_latest_stale_readback \| selected=.* \| selectedProgress=6\/6 \| latest=.* \| latestProgress=5\/6 \| ignoredLatest=yes/
+    );
+    const staleLaunchDutyReadbackOperatorEntryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
+      ownerSession.token
+    );
+    assert.match(
+      staleLaunchDutyReadbackOperatorEntryDownload.body,
+      /Launch Duty Record Index Receipt Selection:[\s\S]*status=preserved_complete_over_latest_stale_readback \| selected=.* \| selectedProgress=6\/6 \| latest=.* \| latestProgress=5\/6 \| ignoredLatest=yes/
     );
 
     const forbiddenExport = await getJsonExpectError(

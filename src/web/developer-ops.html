@@ -2947,6 +2947,25 @@
         throw { code: "UNSUPPORTED_LAUNCH_DUTY_ORDER", message: `Unsupported launch duty action-order action: ${normalizedAction || "-"}` };
       }
 
+      async function handleLaunchDutyRecordIndexSelectionAction(action = "", data = {}) {
+        const normalizedAction = String(action || "").trim().toLowerCase();
+        if (normalizedAction === "download-next") {
+          const href = String(data.launchDutySelectionDownloadHref || "").trim();
+          if (!href) {
+            throw { code: "MISSING_DOWNLOAD", message: "No launch duty record-index selection download is available." };
+          }
+          const result = await downloadApiFile(
+            href,
+            data.launchDutySelectionDownloadFileName || "developer-ops-launch-duty-selection.txt"
+          );
+          lastExportDownload = result;
+          renderSnapshotOverview();
+          setStatus(`Launch duty selection handoff downloaded: ${result.fileName}`);
+          return;
+        }
+        throw { code: "UNSUPPORTED_LAUNCH_DUTY_SELECTION", message: `Unsupported launch duty record-index selection action: ${normalizedAction || "-"}` };
+      }
+
       async function handleStabilizationHandoffAction(action = "", data = {}) {
         const normalizedAction = String(action || "").trim().toLowerCase();
         const productCode = String(data.productCode || el("filter-product-code").value || requestedProductCode || "").trim();
@@ -5801,6 +5820,61 @@
         `;
       }
 
+      function renderLaunchDutyRecordIndexSelection(initialLaunchOpsReadiness = {}) {
+        const selection = initialLaunchOpsReadiness?.launchDutyRecordIndexReceiptSelection;
+        if (!selection || typeof selection !== "object") {
+          return "";
+        }
+        const operatorAction = selection.operatorAction && typeof selection.operatorAction === "object"
+          ? selection.operatorAction
+          : {};
+        const status = String(selection.status || "unknown").toLowerCase();
+        const reviewRequired = operatorAction.reviewRequired === true;
+        const statusClass = reviewRequired ? "warning" : "ok";
+        const nextDownloadHref = String(operatorAction.nextDownloadHref || "").trim();
+        const nextDownloadFormat = String(operatorAction.nextDownloadFormat || "").trim();
+        const nextDownloadFileName = nextDownloadFormat === "steady-state-handoff-brief"
+          ? "developer-ops-steady-state-handoff-brief.txt"
+          : nextDownloadFormat === "handoff-index"
+            ? "developer-ops-handoff-index.txt"
+            : nextDownloadFormat === "launch-operations-operator-entry"
+              ? "developer-ops-launch-operations-operator-entry.txt"
+              : "developer-ops-launch-duty-selection.txt";
+        const actionAttrs = [
+          `data-launch-duty-record-index-selection-action="download-next"`,
+          nextDownloadHref ? `data-launch-duty-selection-download-href="${esc(nextDownloadHref)}"` : "",
+          `data-launch-duty-selection-download-file-name="${esc(nextDownloadFileName)}"`,
+          `data-launch-duty-selection-download-label="${esc(operatorAction.nextDownloadFormat || "Launch duty selection handoff")}"`
+        ].filter(Boolean).join(" ");
+        const selectedDetails = [
+          `selected=${esc(selection.selectedAuditLogId || "-")}`,
+          `selectedProgress=${esc(selection.selectedProgress || "-")}`,
+          `latest=${esc(selection.latestAuditLogId || "-")}`,
+          `latestProgress=${esc(selection.latestProgress || "-")}`,
+          `ignoredLatest=${selection.ignoredLatestReceipt === true ? "yes" : "no"}`
+        ].join(" | ");
+        const actionDetails = [
+          `operatorAction=${esc(operatorAction.key || "-")}`,
+          `reviewRequired=${reviewRequired ? "yes" : "no"}`,
+          `nextDownload=${esc(operatorAction.nextDownloadFormat || "-")}`,
+          `nextDownloadHref=${esc(nextDownloadHref || "-")}`
+        ].join(" | ");
+        return `
+          <div class="snapshot-recap launch-duty-record-index-selection" data-launch-duty-record-index-selection="${esc(status)}">
+            <div class="snapshot-recap-head">
+              <strong>Launch Duty Record Index Selection</strong>
+              <span class="tag ${statusClass}">${esc(status.toUpperCase())}</span>
+            </div>
+            <div class="hint">${esc(selection.nextAction || "Continue from the selected launch-duty readback.")}</div>
+            <div class="snapshot-focus-meta">${selectedDetails}</div>
+            <div class="snapshot-focus-meta">${actionDetails}</div>
+            <div class="snapshot-recap-actions">
+              <button type="button" class="snapshot-inline-button" ${actionAttrs} ${(token && nextDownloadHref) ? "" : "disabled"}>Download Next Handoff</button>
+            </div>
+          </div>
+        `;
+      }
+
       function renderStabilizationHandoff(initialLaunchOpsReadiness = {}) {
         const item = initialLaunchOpsReadiness?.stabilizationHandoff;
         if (!item || typeof item !== "object") {
@@ -6412,6 +6486,7 @@
           ${renderFirstWaveHandoffConfirmation(firstWaveHandoffConfirmation)}
           ${renderOperationalExceptionSignals(initialLaunchOpsReadiness)}
           ${renderLaunchDutyActionOrder(initialLaunchOpsReadiness)}
+          ${renderLaunchDutyRecordIndexSelection(initialLaunchOpsReadiness)}
           ${renderStagingLaunchDutyArchive(initialLaunchOpsReadiness)}
           ${renderStabilizationHandoff(initialLaunchOpsReadiness)}
           <div>${highlights.length ? `<ul class="snapshot-list">${highlights.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>` : `<div class="hint">No overview highlights yet.</div>`}</div>
@@ -6565,6 +6640,14 @@
         bindRows("#snapshot-overview [data-launch-duty-action-order-action]", async (data) => {
           try {
             await handleLaunchDutyActionOrderAction(data.launchDutyActionOrderAction, data);
+          } catch (error) {
+            setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
+            setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });
+          }
+        });
+        bindRows("#snapshot-overview [data-launch-duty-record-index-selection-action]", async (data) => {
+          try {
+            await handleLaunchDutyRecordIndexSelectionAction(data.launchDutyRecordIndexSelectionAction, data);
           } catch (error) {
             setStatus(`${error.code || "REQUEST_FAILED"}: ${error.message}`, true);
             setOutput({ code:error.code || "REQUEST_FAILED", message:error.message });

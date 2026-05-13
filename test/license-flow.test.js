@@ -25406,6 +25406,12 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /copyLaunchDutyRunwayValue/);
     assert.match(html, /data-launch-duty-action-order-action="download-step"/);
     assert.match(html, /data-launch-duty-step-key/);
+    assert.match(html, /Launch Duty Record Index Selection/);
+    assert.match(html, /renderLaunchDutyRecordIndexSelection/);
+    assert.match(html, /handleLaunchDutyRecordIndexSelectionAction/);
+    assert.match(html, /data-launch-duty-record-index-selection-action="download-next"/);
+    assert.match(html, /data-launch-duty-selection-download-href/);
+    assert.match(html, /nextDownloadHref/);
     assert.match(html, /staging-launch-duty-archive/);
     assert.match(html, /renderStagingLaunchDutyArchive/);
     assert.match(html, /packetCompleteness/);

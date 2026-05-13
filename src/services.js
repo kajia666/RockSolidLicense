@@ -26764,6 +26764,44 @@ function buildDeveloperOpsLaunchOperationsFileIndex({
     || resolveContextRecordIndexPath(source)
     || fallbackRecordIndexPath
     || "";
+  const fallbackProductCode = launchOperationsOverviewStatus?.productCode
+    || launchOperationsShiftActionPlan?.productCode
+    || launchOperationsDailyBrief?.productCode
+    || launchOperationsHandoffSummary?.productCode
+    || "";
+  const fallbackChannel = launchOperationsOverviewStatus?.channel
+    || launchOperationsShiftActionPlan?.channel
+    || launchOperationsDailyBrief?.channel
+    || launchOperationsHandoffSummary?.channel
+    || "stable";
+  const normalizeReceiptVisibilitySummaryDownload = (download = null, launchDutyRecordIndexPath = "") => download
+    ? {
+        key: download.key || null,
+        label: download.label || download.title || download.key || null,
+        fileName: download.fileName || null,
+        format: download.format || null,
+        href: download.href || null,
+        source: download.source || null,
+        launchDutyRecordIndexPath: download.launchDutyRecordIndexPath || launchDutyRecordIndexPath || null
+      }
+    : null;
+  const buildReceiptVisibilitySummaryDownloads = (source = null, launchDutyRecordIndexPath = "") => {
+    const downloads = buildLaunchDutyReceiptVisibilitySummaryDownloads({
+      productCode: source?.productCode || fallbackProductCode || "",
+      channel: source?.channel || fallbackChannel || "stable",
+      launchDutyRecordIndexPath: launchDutyRecordIndexPath || ""
+    });
+    return {
+      launchReviewSummary: normalizeReceiptVisibilitySummaryDownload(
+        downloads.launchReviewSummary,
+        launchDutyRecordIndexPath
+      ),
+      launchSmokeSummary: normalizeReceiptVisibilitySummaryDownload(
+        downloads.launchSmokeSummary,
+        launchDutyRecordIndexPath
+      )
+    };
+  };
   const rows = [
     {
       key: "launch_operations_handoff_summary",
@@ -26771,6 +26809,9 @@ function buildDeveloperOpsLaunchOperationsFileIndex({
       status: launchOperationsHandoffSummary?.status || "-",
       fileName: launchOperationsHandoffSummary?.handoffDownload?.fileName || "launch-operations-handoff-summary.txt",
       href: launchOperationsHandoffSummary?.handoffDownload?.href || "",
+      format: launchOperationsHandoffSummary?.handoffDownload?.format || "launch-operations-handoff-summary",
+      downloadKey: launchOperationsHandoffSummary?.handoffDownload?.key || "ops_launch_operations_handoff_summary",
+      download: launchOperationsHandoffSummary?.handoffDownload || null,
       source: launchOperationsHandoffSummary
     },
     {
@@ -26779,6 +26820,9 @@ function buildDeveloperOpsLaunchOperationsFileIndex({
       status: launchOperationsDailyBrief?.status || "-",
       fileName: launchOperationsDailyBrief?.briefDownload?.fileName || "launch-operations-daily-brief.txt",
       href: launchOperationsDailyBrief?.briefDownload?.href || "",
+      format: launchOperationsDailyBrief?.briefDownload?.format || "launch-operations-daily-brief",
+      downloadKey: launchOperationsDailyBrief?.briefDownload?.key || "ops_launch_operations_daily_brief",
+      download: launchOperationsDailyBrief?.briefDownload || null,
       source: launchOperationsDailyBrief
     },
     {
@@ -26787,6 +26831,9 @@ function buildDeveloperOpsLaunchOperationsFileIndex({
       status: launchOperationsShiftActionPlan?.status || "-",
       fileName: launchOperationsShiftActionPlan?.actionPlanDownload?.fileName || "launch-operations-shift-action-plan.txt",
       href: launchOperationsShiftActionPlan?.actionPlanDownload?.href || "",
+      format: launchOperationsShiftActionPlan?.actionPlanDownload?.format || "launch-operations-shift-action-plan",
+      downloadKey: launchOperationsShiftActionPlan?.actionPlanDownload?.key || "ops_launch_operations_shift_action_plan",
+      download: launchOperationsShiftActionPlan?.actionPlanDownload || null,
       source: launchOperationsShiftActionPlan
     },
     {
@@ -26795,14 +26842,27 @@ function buildDeveloperOpsLaunchOperationsFileIndex({
       status: launchOperationsOverviewStatus?.status || "-",
       fileName: launchOperationsOverviewStatus?.overviewDownload?.fileName || "launch-operations-overview-status.txt",
       href: launchOperationsOverviewStatus?.overviewDownload?.href || "",
+      format: launchOperationsOverviewStatus?.overviewDownload?.format || "launch-operations-overview-status",
+      downloadKey: launchOperationsOverviewStatus?.overviewDownload?.key || "ops_launch_operations_overview_status",
+      download: launchOperationsOverviewStatus?.overviewDownload || null,
       source: launchOperationsOverviewStatus
     }
   ];
-  return rows.map(({ source, ...row }) => ({
-    ...row,
-    launchOpsOverviewContextLaunchDutyRecordIndexPath: resolveContextRecordIndexPath(source) || null,
-    launchDutyRecordIndexPath: resolveRecordIndexPath(source) || null
-  }));
+  return rows.map(({ source, download, ...row }) => {
+    const launchOpsOverviewContextLaunchDutyRecordIndexPath = resolveContextRecordIndexPath(source) || null;
+    const launchDutyRecordIndexPath = resolveRecordIndexPath(source) || null;
+    return {
+      ...row,
+      format: row.format || download?.format || null,
+      downloadKey: row.downloadKey || download?.key || row.key || null,
+      launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      launchDutyRecordIndexPath,
+      receiptVisibilitySummaryDownloads: buildReceiptVisibilitySummaryDownloads(
+        source,
+        launchDutyRecordIndexPath || ""
+      )
+    };
+  });
 }
 
 function buildDeveloperOpsInitialLaunchStabilizationHandoff({
@@ -35079,12 +35139,20 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
 
   lines.push("Launch Operations File Index:");
   for (const item of launchOperationsFileIndex) {
+    const launchReviewSummaryDownload = item.receiptVisibilitySummaryDownloads?.launchReviewSummary || null;
+    const launchSmokeSummaryDownload = item.receiptVisibilitySummaryDownloads?.launchSmokeSummary || null;
     lines.push(
       `- ${item.key}`
       + ` | ${item.label}`
       + ` | status=${item.status || "-"}`
       + ` | file=${item.fileName || "-"}`
+      + ` | format=${item.format || "-"}`
+      + ` | downloadKey=${item.downloadKey || "-"}`
       + ` | href=${item.href || "-"}`
+      + (launchReviewSummaryDownload?.fileName ? ` | launchReviewSummaryFile=${launchReviewSummaryDownload.fileName}` : "")
+      + (launchReviewSummaryDownload?.href ? ` | launchReviewSummaryHref=${launchReviewSummaryDownload.href}` : "")
+      + (launchSmokeSummaryDownload?.fileName ? ` | launchSmokeSummaryFile=${launchSmokeSummaryDownload.fileName}` : "")
+      + (launchSmokeSummaryDownload?.href ? ` | launchSmokeSummaryHref=${launchSmokeSummaryDownload.href}` : "")
       + formatLaunchOperationsFileRecordIndexSuffix(item)
     );
   }

@@ -20131,6 +20131,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
       && /\.txt$/.test(item.fileName || "")
     )));
+    assert.ok(launchOperationsFileIndex.every((item) => (
+      item.format
+      && item.downloadKey
+      && item.receiptVisibilitySummaryDownloads
+      && item.receiptVisibilitySummaryDownloads.launchReviewSummary
+      && item.receiptVisibilitySummaryDownloads.launchSmokeSummary
+      && item.receiptVisibilitySummaryDownloads.launchReviewSummary.fileName === "launch-review.txt"
+      && item.receiptVisibilitySummaryDownloads.launchSmokeSummary.fileName === "launch-smoke-kit.txt"
+      && item.receiptVisibilitySummaryDownloads.launchReviewSummary.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+      && item.receiptVisibilitySummaryDownloads.launchSmokeSummary.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
+    assert.ok(launchOperationsFileIndex.every((item) => (
+      /format=summary/.test(item.receiptVisibilitySummaryDownloads.launchReviewSummary.href || "")
+      && /format=summary/.test(item.receiptVisibilitySummaryDownloads.launchSmokeSummary.href || "")
+      && /readinessGateRecordIndex=/.test(item.receiptVisibilitySummaryDownloads.launchReviewSummary.href || "")
+      && /readinessGateRecordIndex=/.test(item.receiptVisibilitySummaryDownloads.launchSmokeSummary.href || "")
+    )));
     assert.match(launchOperationsOverviewStatus.overviewDownload.href, /format=launch-operations-overview-status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /overviewStatus=.*receipt=visible/);
@@ -20191,6 +20208,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-daily-brief\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-shift-action-plan\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-overview-status\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchReviewSummaryFile=launch-review\.txt/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchSmokeSummaryFile=launch-smoke-kit\.txt/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchReviewSummaryHref=.*readinessGateRecordIndex=/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchSmokeSummaryHref=.*readinessGateRecordIndex=/);
 
     const launchOperationsFileIndexDownload = await getText(
       baseUrl,

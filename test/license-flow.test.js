@@ -20280,6 +20280,36 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsOperatorEntry.receiptRecoveryAction.payload.launchReadinessNextGateLaunchDutyRecordIndexPath,
       expectedSteadyStateLaunchDutyRecordIndexPath
     );
+    assert.ok(launchOperationsOperatorEntry.stagingReadinessBridge);
+    assert.equal(launchOperationsOperatorEntry.stagingReadinessBridge.status, "ready");
+    assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.archiveRoot,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.filledCloseoutInputFile,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.readinessActionQueueFile,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.readinessStatusCommand,
+      "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.rehearsalReloadCommand,
+      "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.profileDrivenDryRunCommand,
+      steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.stagingLaunchDutyArchive.commands.profileDrivenDryRun
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.launchDutyRecordIndexPath,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+    );
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20322,6 +20352,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`Launch Operations Operator Entry:[\\s\\S]*receiptAudit=${steadyStateDutyPlanReceipt.auditLogId}`));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptRecoveryAction=ready/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptRecovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*stagingReadinessBridge=ready/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*stagingReadinessStatus=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20381,6 +20413,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchSmokeSummaryHref=.*readinessGateRecordIndex=/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptRecovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*stagingReadiness=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20426,6 +20459,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Recovery Action:[\s\S]*status=ready/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Recovery Action:[\s\S]*POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Recovery Action:[\s\S]*payloadAction=download/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Staging Readiness Bridge:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Staging Readiness Bridge:[\s\S]*readinessStatus=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Staging Readiness Bridge:[\s\S]*rehearsalReload=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

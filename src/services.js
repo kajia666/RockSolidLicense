@@ -27112,6 +27112,43 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptRecoveryAction(receiptC
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
+  scope = {},
+  stagingLaunchDutyArchive = null,
+  launchDutyRecordIndexPath = null
+} = {}) {
+  const productCode = sanitizeExportNameSegment(scope.productCode || stagingLaunchDutyArchive?.projectCode || "product", "product");
+  const channel = sanitizeExportNameSegment(scope.channel || stagingLaunchDutyArchive?.channel || "stable", "stable");
+  const archiveRoot = stagingLaunchDutyArchive?.archiveRoot || `artifacts/staging/${productCode}/${channel}`;
+  const files = stagingLaunchDutyArchive?.files && typeof stagingLaunchDutyArchive.files === "object"
+    ? stagingLaunchDutyArchive.files
+    : {};
+  const filledCloseoutInputFile = files.filledCloseoutInput || `${archiveRoot}/filled-closeout-input.json`;
+  const readinessActionQueueFile = files.readinessActionQueue || `${archiveRoot}/readiness-action-queue.md`;
+  const launchDutyRecordIndex = files.launchDutyRecordIndex
+    || stagingLaunchDutyArchive?.launchDutyRecordIndexPath
+    || launchDutyRecordIndexPath
+    || `${archiveRoot}/launch-duty-record-index.json`;
+  return {
+    version: "developer-ops-launch-operations-operator-staging-readiness-bridge/v1",
+    status: "ready",
+    productCode,
+    channel,
+    archiveRoot,
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexPath: launchDutyRecordIndex,
+    readinessStatusCommand: `npm.cmd run staging:readiness:status -- --input-file ${filledCloseoutInputFile} --actions-file ${readinessActionQueueFile}`,
+    rehearsalReloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${filledCloseoutInputFile}`,
+    profileDrivenDryRunCommand: stagingLaunchDutyArchive?.commands?.profileDrivenDryRun || null,
+    closeoutReloadCommand: stagingLaunchDutyArchive?.commands?.closeoutReload || null,
+    fullTestWindowCommand: stagingLaunchDutyArchive?.commands?.fullTestWindow || "npm.cmd test",
+    productionSignoffPacket: files.productionSignoffPacket || `${archiveRoot}/staging-production-signoff-packet.json`,
+    launchDutyArchiveIndex: files.launchDutyArchiveIndex || `${archiveRoot}/staging-launch-duty-archive-index.json`,
+    nextAction: "Refresh staging readiness status, then reload rehearsal with the filled closeout input before moving to the full-test window."
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -27120,6 +27157,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   launchOperationsOperatorEntryDownload = null,
   launchOperationsShiftActionPlan = null,
   latestSteadyStateDutyPlanReceipt = null,
+  stagingLaunchDutyArchive = null,
   launchOperationsFileIndex = [],
   launchMainlineHandoffRoutesDownload = null
 } = {}) {
@@ -27207,6 +27245,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     { launchDutyRecordIndexPath }
   );
   const receiptRecoveryAction = buildDeveloperOpsLaunchOperationsOperatorReceiptRecoveryAction(receiptConfirmation);
+  const stagingReadinessBridge = buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
+    scope: { ...scope, productCode, channel },
+    stagingLaunchDutyArchive,
+    launchDutyRecordIndexPath
+  });
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27255,8 +27298,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     currentAction,
     receiptConfirmation,
     receiptRecoveryAction,
+    stagingReadinessBridge,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, stagingReadinessBridge=${stagingReadinessBridge.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -27794,6 +27838,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsOperatorEntryDownload,
     launchOperationsShiftActionPlan,
     latestSteadyStateDutyPlanReceipt,
+    stagingLaunchDutyArchive,
     launchOperationsFileIndex,
     launchMainlineHandoffRoutesDownload
   });
@@ -33635,6 +33680,16 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyRecordIndex=${receiptRecoveryAction.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptRecoveryAction.launchDutyRecordIndexPath || "-"}`
         );
       }
+      const stagingReadinessBridge = launchOperationsOperatorEntry.stagingReadinessBridge || null;
+      if (stagingReadinessBridge) {
+        lines.push(
+          `- stagingReadinessBridge=${stagingReadinessBridge.status || "-"}`
+          + ` | stagingReadinessStatus=${stagingReadinessBridge.readinessStatusCommand || "-"}`
+          + ` | rehearsalReload=${stagingReadinessBridge.rehearsalReloadCommand || "-"}`
+          + ` | actionQueue=${stagingReadinessBridge.readinessActionQueueFile || "-"}`
+          + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -34360,6 +34415,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | payloadIntent=${receiptRecoveryAction.payload?.intent || "-"}`
         + ` | launchOpsOverviewContextRecordIndex=${receiptRecoveryAction.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath || receiptRecoveryAction.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
         + ` | launchDutyRecordIndex=${receiptRecoveryAction.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptRecoveryAction.launchDutyRecordIndexPath || "-"}`
+      );
+    }
+    const stagingReadinessBridge = launchOperationsOperatorEntry.stagingReadinessBridge || null;
+    if (stagingReadinessBridge) {
+      lines.push(
+        `- Staging Readiness Bridge: ${stagingReadinessBridge.status || "-"}`
+        + ` | readinessStatus=${stagingReadinessBridge.readinessStatusCommand || "-"}`
+        + ` | rehearsalReload=${stagingReadinessBridge.rehearsalReloadCommand || "-"}`
+        + ` | actionQueue=${stagingReadinessBridge.readinessActionQueueFile || "-"}`
+        + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
       );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
@@ -35761,6 +35826,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | receiptConfirmation=${readiness.launchOperationsOperatorEntry?.receiptConfirmation?.status || "-"}`
       + ` | receiptAudit=${readiness.launchOperationsOperatorEntry?.receiptConfirmation?.auditLogId || "-"}`
       + ` | receiptRecovery=${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.method || "-"} ${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.route || "-"}`
+      + ` | stagingReadiness=${readiness.launchOperationsOperatorEntry?.stagingReadinessBridge?.readinessStatusCommand || "-"}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -36306,6 +36372,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     launchOperationsOperatorEntryDownload: readiness.launchOperationsOperatorEntryDownload || buildDeveloperOpsLaunchOperationsOperatorEntryDownload(scope),
     launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
     latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null,
+    stagingLaunchDutyArchive: readiness.stagingLaunchDutyArchive || null,
     launchOperationsFileIndex: fileIndex,
     launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope)
   });
@@ -36384,6 +36451,20 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | visibleIn=${receiptRecoveryAction.expectedResult?.visibleIn || "-"}`
     );
     lines.push(`Receipt Recovery Hint: ${receiptRecoveryAction.operatorHint || "-"}`);
+    lines.push("");
+  }
+  const stagingReadinessBridge = entry.stagingReadinessBridge || null;
+  if (stagingReadinessBridge) {
+    lines.push("Staging Readiness Bridge:");
+    lines.push(
+      `- status=${stagingReadinessBridge.status || "-"}`
+      + ` | readinessStatus=${stagingReadinessBridge.readinessStatusCommand || "-"}`
+      + ` | rehearsalReload=${stagingReadinessBridge.rehearsalReloadCommand || "-"}`
+      + ` | profileDryRun=${stagingReadinessBridge.profileDrivenDryRunCommand || "-"}`
+      + ` | actionQueue=${stagingReadinessBridge.readinessActionQueueFile || "-"}`
+      + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`Staging Bridge Next: ${stagingReadinessBridge.nextAction || "-"}`);
     lines.push("");
   }
   lines.push("Checklist Steps:");

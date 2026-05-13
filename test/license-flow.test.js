@@ -20260,6 +20260,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsOperatorEntry.receiptConfirmation.launchReadinessNextGateLaunchDutyRecordIndexPath,
       expectedSteadyStateLaunchDutyRecordIndexPath
     );
+    assert.ok(launchOperationsOperatorEntry.receiptRecoveryAction);
+    assert.equal(launchOperationsOperatorEntry.receiptRecoveryAction.status, "ready");
+    assert.equal(launchOperationsOperatorEntry.receiptRecoveryAction.key, "retry_steady_state_duty_plan_receipt");
+    assert.equal(launchOperationsOperatorEntry.receiptRecoveryAction.method, "POST");
+    assert.equal(
+      launchOperationsOperatorEntry.receiptRecoveryAction.route,
+      "/api/developer/ops/steady-state-duty-plan/receipt"
+    );
+    assert.equal(launchOperationsOperatorEntry.receiptRecoveryAction.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(launchOperationsOperatorEntry.receiptRecoveryAction.payload.productCode, "EXPORT_CLOSEOUT_READY");
+    assert.equal(launchOperationsOperatorEntry.receiptRecoveryAction.payload.action, "download");
+    assert.equal(launchOperationsOperatorEntry.receiptRecoveryAction.payload.intent, "download_asset");
+    assert.equal(
+      launchOperationsOperatorEntry.receiptRecoveryAction.payload.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.receiptRecoveryAction.payload.launchReadinessNextGateLaunchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
@@ -20300,6 +20320,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptPlan=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptConfirmation=recorded/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`Launch Operations Operator Entry:[\\s\\S]*receiptAudit=${steadyStateDutyPlanReceipt.auditLogId}`));
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptRecoveryAction=ready/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptRecovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -20358,6 +20380,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchReviewSummaryHref=.*readinessGateRecordIndex=/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launchSmokeSummaryHref=.*readinessGateRecordIndex=/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptRecovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
 
@@ -20399,6 +20422,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Confirmation:/);
     assert.match(launchOperationsOperatorEntryDownload.body, new RegExp(`Receipt Confirmation:[\\s\\S]*audit=${steadyStateDutyPlanReceipt.auditLogId}`));
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Confirmation:[\s\S]*recovery=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Recovery Action:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Recovery Action:[\s\S]*status=ready/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Recovery Action:[\s\S]*POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Recovery Action:[\s\S]*payloadAction=download/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);

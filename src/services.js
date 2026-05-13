@@ -27071,6 +27071,47 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptConfirmation(
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorReceiptRecoveryAction(receiptConfirmation = null) {
+  const confirmation = receiptConfirmation && typeof receiptConfirmation === "object"
+    ? receiptConfirmation
+    : null;
+  const payload = confirmation?.recoveryPayload && typeof confirmation.recoveryPayload === "object"
+    ? confirmation.recoveryPayload
+    : null;
+  const method = confirmation?.recoveryMethod || "POST";
+  const route = confirmation?.recoveryRoute || "/api/developer/ops/steady-state-duty-plan/receipt";
+  const launchOpsOverviewContextLaunchDutyRecordIndexPath = confirmation?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || null;
+  const launchReadinessNextGateLaunchDutyRecordIndexPath = confirmation?.launchReadinessNextGateLaunchDutyRecordIndexPath
+    || payload?.launchReadinessNextGateLaunchDutyRecordIndexPath
+    || null;
+  return {
+    version: "developer-ops-launch-operations-operator-receipt-recovery-action/v1",
+    status: payload ? "ready" : "missing_payload",
+    key: "retry_steady_state_duty_plan_receipt",
+    label: "Retry steady-state duty plan receipt",
+    method,
+    route,
+    payload,
+    auditLogId: confirmation?.auditLogId || null,
+    receiptVisibilityStatus: confirmation?.receiptVisibilityStatus || "pending",
+    launchOpsOverviewContextLaunchDutyRecordIndexPath,
+    launchReadinessNextGateLaunchDutyRecordIndexPath,
+    launchDutyRecordIndexPath: confirmation?.launchDutyRecordIndexPath
+      || launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || launchReadinessNextGateLaunchDutyRecordIndexPath
+      || null,
+    expectedResult: {
+      version: "developer-ops-steady-state-duty-plan-receipt/v1",
+      status: "recorded",
+      visibleIn: "initial_launch_ops_readiness",
+      auditLogId: "returned_by_receipt_api"
+    },
+    operatorHint: confirmation?.operatorHint || "Retry this POST payload if the operator entry does not show the latest receipt as visible."
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -27165,6 +27206,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     latestSteadyStateDutyPlanReceipt,
     { launchDutyRecordIndexPath }
   );
+  const receiptRecoveryAction = buildDeveloperOpsLaunchOperationsOperatorReceiptRecoveryAction(receiptConfirmation);
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -27212,8 +27254,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchMainlineHandoffRoutesDownload: launchMainlineHandoffRoutesDownload || null,
     currentAction,
     receiptConfirmation,
+    receiptRecoveryAction,
     quickAccessDownloads,
-    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
+    operatorSummary: `Launch operations operator entry: primary=${primaryDownload?.fileName || "-"}, checklistSteps=${Number(checklist?.stepCount ?? 0)}, status=${checklist?.status || launchOperationsOverviewStatus?.status || "-"}, receipt=${checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || "-"}, receiptConfirmation=${receiptConfirmation.status || "-"}, receiptRecoveryAction=${receiptRecoveryAction.status || "-"}, recordIndex=${launchDutyRecordIndexPath || "-"}.`
   };
 }
 
@@ -33581,6 +33624,17 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyRecordIndex=${receiptConfirmation.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptConfirmation.launchDutyRecordIndexPath || "-"}`
         );
       }
+      const receiptRecoveryAction = launchOperationsOperatorEntry.receiptRecoveryAction || null;
+      if (receiptRecoveryAction) {
+        lines.push(
+          `- receiptRecoveryAction=${receiptRecoveryAction.status || "-"}`
+          + ` | receiptRecovery=${receiptRecoveryAction.method || "-"} ${receiptRecoveryAction.route || "-"}`
+          + ` | payloadAction=${receiptRecoveryAction.payload?.action || "-"}`
+          + ` | payloadIntent=${receiptRecoveryAction.payload?.intent || "-"}`
+          + ` | launchOpsOverviewContextRecordIndex=${receiptRecoveryAction.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath || receiptRecoveryAction.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+          + ` | launchDutyRecordIndex=${receiptRecoveryAction.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptRecoveryAction.launchDutyRecordIndexPath || "-"}`
+        );
+      }
       const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
         ? launchOperationsOperatorEntry.quickAccessDownloads
         : [];
@@ -34295,6 +34349,17 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | recovery=${receiptConfirmation.recoveryMethod || "-"} ${receiptConfirmation.recoveryRoute || "-"}`
         + ` | launchOpsOverviewContextRecordIndex=${receiptConfirmation.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
         + ` | launchDutyRecordIndex=${receiptConfirmation.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptConfirmation.launchDutyRecordIndexPath || "-"}`
+      );
+    }
+    const receiptRecoveryAction = launchOperationsOperatorEntry.receiptRecoveryAction || null;
+    if (receiptRecoveryAction) {
+      lines.push(
+        `- Receipt Recovery Action: ${receiptRecoveryAction.status || "-"}`
+        + ` | ${receiptRecoveryAction.method || "-"} ${receiptRecoveryAction.route || "-"}`
+        + ` | payloadAction=${receiptRecoveryAction.payload?.action || "-"}`
+        + ` | payloadIntent=${receiptRecoveryAction.payload?.intent || "-"}`
+        + ` | launchOpsOverviewContextRecordIndex=${receiptRecoveryAction.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath || receiptRecoveryAction.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+        + ` | launchDutyRecordIndex=${receiptRecoveryAction.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptRecoveryAction.launchDutyRecordIndexPath || "-"}`
       );
     }
     const quickAccessDownloads = Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads)
@@ -35695,6 +35760,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | receipt=${readiness.launchOperationsOperatorEntry?.receiptVisibilityStatus || "-"}`
       + ` | receiptConfirmation=${readiness.launchOperationsOperatorEntry?.receiptConfirmation?.status || "-"}`
       + ` | receiptAudit=${readiness.launchOperationsOperatorEntry?.receiptConfirmation?.auditLogId || "-"}`
+      + ` | receiptRecovery=${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.method || "-"} ${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.route || "-"}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -36297,6 +36363,27 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | launchDutyRecordIndex=${receiptConfirmation.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptConfirmation.launchDutyRecordIndexPath || "-"}`
     );
     lines.push(`Receipt Confirmation Hint: ${receiptConfirmation.operatorHint || "-"}`);
+    lines.push("");
+  }
+  const receiptRecoveryAction = entry.receiptRecoveryAction || null;
+  if (receiptRecoveryAction) {
+    lines.push("Receipt Recovery Action:");
+    lines.push(
+      `- status=${receiptRecoveryAction.status || "-"}`
+      + ` | key=${receiptRecoveryAction.key || "-"}`
+      + ` | ${receiptRecoveryAction.method || "-"} ${receiptRecoveryAction.route || "-"}`
+      + ` | payloadAction=${receiptRecoveryAction.payload?.action || "-"}`
+      + ` | payloadIntent=${receiptRecoveryAction.payload?.intent || "-"}`
+      + ` | payloadFormat=${receiptRecoveryAction.payload?.format || "-"}`
+      + ` | launchOpsOverviewContextRecordIndex=${receiptRecoveryAction.payload?.launchOpsOverviewContextLaunchDutyRecordIndexPath || receiptRecoveryAction.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+      + ` | launchDutyRecordIndex=${receiptRecoveryAction.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || receiptRecoveryAction.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(
+      `Expected Result: ${receiptRecoveryAction.expectedResult?.version || "-"}`
+      + ` | status=${receiptRecoveryAction.expectedResult?.status || "-"}`
+      + ` | visibleIn=${receiptRecoveryAction.expectedResult?.visibleIn || "-"}`
+    );
+    lines.push(`Receipt Recovery Hint: ${receiptRecoveryAction.operatorHint || "-"}`);
     lines.push("");
   }
   lines.push("Checklist Steps:");

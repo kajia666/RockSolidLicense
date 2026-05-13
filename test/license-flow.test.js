@@ -21673,6 +21673,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackOperatorEntryDownload.body,
       /Launch Duty Record Index Receipt Selection:[\s\S]*status=preserved_complete_over_latest_stale_readback \| selected=.* \| selectedProgress=6\/6 \| latest=.* \| latestProgress=5\/6 \| ignoredLatest=yes/
     );
+    const staleLaunchDutyReadbackHandoffIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      staleLaunchDutyReadbackHandoffIndexDownload.body,
+      /Launch Duty Record Index Receipt Selection:[\s\S]*status=preserved_complete_over_latest_stale_readback \| selected=.* \| selectedProgress=6\/6 \| latest=.* \| latestProgress=5\/6 \| ignoredLatest=yes/
+    );
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

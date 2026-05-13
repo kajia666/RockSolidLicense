@@ -37622,6 +37622,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const launchDutyStabilizationHandoffComplete = launchDutyStabilizationReceiptQueue?.handoffComplete === true
     || launchDutyStabilizationCompletionState?.handoffComplete === true;
   const launchDutyStabilizationCloseoutExecutionState = launchDutyStabilizationReceiptQueue?.closeoutExecutionState || null;
+  const launchDutyRecordIndexReceiptSelection = readiness.launchDutyRecordIndexReceiptSelection || null;
   const includedFiles = [
     payload.fileName || "developer-ops.json",
     payload.summaryFileName || "developer-ops-summary.txt",
@@ -37740,6 +37741,10 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | launchDutyStabilizationCloseoutStatus=${launchDutyStabilizationCloseoutExecutionState?.status || "-"}`
       + ` | launchDutyStabilizationCloseoutAction=${launchDutyStabilizationCloseoutExecutionState?.actionKey || "-"}`
       + ` | launchDutyStabilizationBlockedBy=${launchDutyStabilizationBlockedBy || "-"}`
+      + ` | launchDutyRecordIndexReceiptSelection=${launchDutyRecordIndexReceiptSelection?.status || "-"}`
+      + ` | launchDutyRecordIndexSelectedProgress=${launchDutyRecordIndexReceiptSelection?.selectedProgress || "-"}`
+      + ` | launchDutyRecordIndexLatestProgress=${launchDutyRecordIndexReceiptSelection?.latestProgress || "-"}`
+      + ` | launchDutyRecordIndexIgnoredLatest=${launchDutyRecordIndexReceiptSelection?.ignoredLatestReceipt === true}`
       + ` | steps=${readiness.launchOperationsOperatorEntry?.checklistStepCount ?? 0}`
       + ` | file=${readiness.launchOperationsOperatorEntry?.primaryDownload?.fileName || readiness.launchOperationsOperatorEntryDownload?.fileName || "-"}`
       + ` | format=${readiness.launchOperationsOperatorEntry?.primaryDownload?.format || readiness.launchOperationsOperatorEntryDownload?.format || "-"}`
@@ -37747,6 +37752,20 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | launchDutyRecordIndex=${readiness.launchOperationsOperatorEntry?.launchDutyRecordIndexPath || "-"}`,
     ""
   ];
+
+  if (launchDutyRecordIndexReceiptSelection) {
+    lines.push(
+      "Launch Duty Record Index Receipt Selection:"
+      + ` status=${launchDutyRecordIndexReceiptSelection.status || "-"}`
+      + ` | selected=${launchDutyRecordIndexReceiptSelection.selectedAuditLogId || "-"}`
+      + ` | selectedProgress=${launchDutyRecordIndexReceiptSelection.selectedProgress || "-"}`
+      + ` | latest=${launchDutyRecordIndexReceiptSelection.latestAuditLogId || "-"}`
+      + ` | latestProgress=${launchDutyRecordIndexReceiptSelection.latestProgress || "-"}`
+      + ` | ignoredLatest=${launchDutyRecordIndexReceiptSelection.ignoredLatestReceipt === true ? "yes" : "no"}`
+    );
+    lines.push(`Launch Duty Record Index Selection Next: ${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
+    lines.push("");
+  }
 
   lines.push("Launch Operations File Index:");
   for (const item of launchOperationsFileIndex) {

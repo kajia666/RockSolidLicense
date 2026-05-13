@@ -21649,6 +21649,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(staleLaunchDutyReadbackSelection.selectedProgress, "6/6");
     assert.equal(staleLaunchDutyReadbackSelection.latestProgress, "5/6");
     assert.equal(staleLaunchDutyReadbackSelection.ignoredLatestReceipt, true);
+    assert.equal(staleLaunchDutyReadbackSelection.operatorAction.key, "continue_steady_state_handoff");
+    assert.equal(staleLaunchDutyReadbackSelection.operatorAction.reviewRequired, false);
+    assert.equal(staleLaunchDutyReadbackSelection.operatorAction.nextDownloadFormat, "steady-state-handoff-brief");
     assert.equal(staleLaunchDutyReadbackQueue.status, "complete");
     assert.equal(staleLaunchDutyReadbackQueue.currentRecordKey, null);
     assert.equal(staleLaunchDutyReadbackQueue.handoffComplete, true);
@@ -21673,6 +21676,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackOperatorEntryDownload.body,
       /Launch Duty Record Index Receipt Selection:[\s\S]*status=preserved_complete_over_latest_stale_readback \| selected=.* \| selectedProgress=6\/6 \| latest=.* \| latestProgress=5\/6 \| ignoredLatest=yes/
     );
+    assert.match(
+      staleLaunchDutyReadbackOperatorEntryDownload.body,
+      /Launch Duty Record Index Receipt Selection:[\s\S]*operatorAction=continue_steady_state_handoff \| reviewRequired=no \| nextDownload=steady-state-handoff-brief/
+    );
     const staleLaunchDutyReadbackHandoffIndexDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=handoff-index",
@@ -21681,6 +21688,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       staleLaunchDutyReadbackHandoffIndexDownload.body,
       /Launch Duty Record Index Receipt Selection:[\s\S]*status=preserved_complete_over_latest_stale_readback \| selected=.* \| selectedProgress=6\/6 \| latest=.* \| latestProgress=5\/6 \| ignoredLatest=yes/
+    );
+    assert.match(
+      staleLaunchDutyReadbackHandoffIndexDownload.body,
+      /Launch Duty Record Index Receipt Selection:[\s\S]*operatorAction=continue_steady_state_handoff \| reviewRequired=no \| nextDownload=steady-state-handoff-brief/
     );
 
     const forbiddenExport = await getJsonExpectError(

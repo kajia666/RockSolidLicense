@@ -22361,6 +22361,29 @@ function buildLaunchDutyRecordIndexReceiptSelectionState(receipts = [], selected
     : ignoredLatestReceipt && selectedProgressBetter
       ? "selected_stronger_progress_over_latest_readback"
       : "selected_latest_readback";
+  const operatorAction = ignoredLatestReceipt && selectedScore.complete
+    ? {
+        key: "continue_steady_state_handoff",
+        reviewRequired: false,
+        nextDownloadFormat: "steady-state-handoff-brief",
+        nextDownloadKey: "ops_steady_state_handoff_brief",
+        nextAction: "Continue steady-state handoff from the selected complete launch-duty readback."
+      }
+    : ignoredLatestReceipt
+      ? {
+          key: "review_stale_launch_duty_readback",
+          reviewRequired: true,
+          nextDownloadFormat: "handoff-index",
+          nextDownloadKey: "ops_handoff_index",
+          nextAction: "Review the latest stale launch-duty readback before continuing the handoff."
+        }
+      : {
+          key: "continue_latest_launch_duty_readback",
+          reviewRequired: false,
+          nextDownloadFormat: "launch-operations-operator-entry",
+          nextDownloadKey: "ops_launch_operations_operator_entry",
+          nextAction: "Continue from the latest launch-duty readback in Developer Ops."
+        };
   return {
     version: "developer-ops-launch-duty-record-index-receipt-selection/v1",
     status,
@@ -22380,6 +22403,7 @@ function buildLaunchDutyRecordIndexReceiptSelectionState(receipts = [], selected
     latestComplete: latestScore.complete === true,
     ignoredLatestReceipt,
     candidateCount: candidates.length,
+    operatorAction,
     nextAction: ignoredLatestReceipt
       ? "Keep the selected higher-progress launch-duty readback and review the latest stale receipt only if operators expected a rollback."
       : "Continue using the latest launch-duty readback for Developer Ops readiness."
@@ -35130,6 +35154,11 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         + ` | latestProgress=${launchDutyRecordIndexReceiptSelection.latestProgress || "-"}`
         + ` | ignoredLatest=${launchDutyRecordIndexReceiptSelection.ignoredLatestReceipt === true ? "yes" : "no"}`
       );
+      lines.push(
+        `- operatorAction=${launchDutyRecordIndexReceiptSelection.operatorAction?.key || "-"}`
+        + ` | reviewRequired=${launchDutyRecordIndexReceiptSelection.operatorAction?.reviewRequired === true ? "yes" : "no"}`
+        + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
+      );
       lines.push(`- next=${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     }
     const launchOperationsEvidenceChain = initialLaunchOpsReadiness.launchOperationsEvidenceChain || null;
@@ -36030,6 +36059,11 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       + ` | latest=${launchDutyRecordIndexReceiptSelection.latestAuditLogId || "-"}`
       + ` | latestProgress=${launchDutyRecordIndexReceiptSelection.latestProgress || "-"}`
       + ` | ignoredLatest=${launchDutyRecordIndexReceiptSelection.ignoredLatestReceipt === true ? "yes" : "no"}`
+    );
+    lines.push(
+      `- operatorAction=${launchDutyRecordIndexReceiptSelection.operatorAction?.key || "-"}`
+      + ` | reviewRequired=${launchDutyRecordIndexReceiptSelection.operatorAction?.reviewRequired === true ? "yes" : "no"}`
+      + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
     );
     lines.push(`- next=${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     lines.push("");
@@ -37763,6 +37797,12 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | latestProgress=${launchDutyRecordIndexReceiptSelection.latestProgress || "-"}`
       + ` | ignoredLatest=${launchDutyRecordIndexReceiptSelection.ignoredLatestReceipt === true ? "yes" : "no"}`
     );
+    lines.push(
+      "Launch Duty Record Index Operator Action:"
+      + ` operatorAction=${launchDutyRecordIndexReceiptSelection.operatorAction?.key || "-"}`
+      + ` | reviewRequired=${launchDutyRecordIndexReceiptSelection.operatorAction?.reviewRequired === true ? "yes" : "no"}`
+      + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
+    );
     lines.push(`Launch Duty Record Index Selection Next: ${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     lines.push("");
   }
@@ -38723,6 +38763,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | latest=${launchDutyRecordIndexReceiptSelection.latestAuditLogId || "-"}`
       + ` | latestProgress=${launchDutyRecordIndexReceiptSelection.latestProgress || "-"}`
       + ` | ignoredLatest=${launchDutyRecordIndexReceiptSelection.ignoredLatestReceipt === true ? "yes" : "no"}`
+    );
+    lines.push(
+      `- operatorAction=${launchDutyRecordIndexReceiptSelection.operatorAction?.key || "-"}`
+      + ` | reviewRequired=${launchDutyRecordIndexReceiptSelection.operatorAction?.reviewRequired === true ? "yes" : "no"}`
+      + ` | nextDownload=${launchDutyRecordIndexReceiptSelection.operatorAction?.nextDownloadFormat || "-"}`
     );
     lines.push(`Selection Next: ${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
     lines.push("");

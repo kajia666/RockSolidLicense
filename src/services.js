@@ -35023,6 +35023,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "steady-state-duty-board.txt",
     "steady-state-duty-action-links.txt",
     "launch-operations-handoff-summary.txt",
+    "launch-operations-file-index.json",
     "launch-operations-daily-brief.txt",
     "launch-operations-shift-action-plan.txt",
     "launch-operations-overview-status.txt",
@@ -35496,6 +35497,28 @@ function buildDeveloperOpsRouteReviewExportFiles(payload = {}) {
   return files;
 }
 
+function buildDeveloperOpsLaunchOperationsFileIndexJsonText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const fileIndex = Array.isArray(readiness.launchOperationsFileIndex)
+    ? readiness.launchOperationsFileIndex
+    : buildDeveloperOpsLaunchOperationsFileIndex({
+        launchOperationsHandoffSummary: readiness.launchOperationsHandoffSummary,
+        launchOperationsDailyBrief: readiness.launchOperationsDailyBrief,
+        launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan,
+        launchOperationsOverviewStatus: readiness.launchOperationsOverviewStatus
+      });
+  return JSON.stringify(fileIndex, null, 2);
+}
+
 function buildDeveloperOpsExportFiles(payload) {
   return [
     {
@@ -35509,6 +35532,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "handoff-index.txt",
       body: buildDeveloperOpsHandoffIndexText(payload)
+    },
+    {
+      path: "launch-operations-file-index.json",
+      body: buildDeveloperOpsLaunchOperationsFileIndexJsonText(payload)
     },
     {
       path: "launch-receipt-next-follow-up.txt",
@@ -36302,7 +36329,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "launch-operations-file-index", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -36337,6 +36364,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-handoff-index.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsHandoffIndexText(payload)
+    };
+  }
+
+  if (normalizedFormat === "launch-operations-file-index") {
+    return {
+      fileName: "developer-ops-launch-operations-file-index.json",
+      contentType: "application/json; charset=utf-8",
+      body: buildDeveloperOpsLaunchOperationsFileIndexJsonText(payload)
     };
   }
 

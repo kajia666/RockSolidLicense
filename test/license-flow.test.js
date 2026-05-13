@@ -20192,6 +20192,34 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-shift-action-plan\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-overview-status\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
 
+    const launchOperationsFileIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-file-index",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsFileIndexDownload.contentType, "application/json; charset=utf-8");
+    assert.match(launchOperationsFileIndexDownload.contentDisposition || "", /developer-ops-launch-operations-file-index\.json/);
+    const launchOperationsFileIndexJson = JSON.parse(launchOperationsFileIndexDownload.body);
+    assert.deepEqual(launchOperationsFileIndexJson, launchOperationsFileIndex);
+
+    const launchOperationsChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=checksums",
+      ownerSession.token
+    );
+    assert.match(launchOperationsChecksumsDownload.body, /launch-operations-file-index\.json/);
+
+    const launchOperationsZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=zip",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsZipDownload.contentType, "application/zip");
+    const launchOperationsZipText = launchOperationsZipDownload.body.toString("latin1");
+    assert.match(launchOperationsZipText, /launch-operations-file-index\.json/);
+    assert.match(launchOperationsZipText, /launchOpsOverviewContextLaunchDutyRecordIndexPath/);
+    assert.match(launchOperationsZipText, /artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+
     const forbiddenExport = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/export?productCode=EXPORT_BETA",

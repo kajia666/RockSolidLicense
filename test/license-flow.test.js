@@ -22001,6 +22001,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(zipText, /stabilization-handoff\.txt/);
     assert.match(zipText, /csv\/audit-logs\.csv/);
     assert.match(zipText, /SHA256SUMS\.txt/);
+
+    const launchMainlineRouteReviewChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=beta&eventType=session.revoke&reviewMode=matched&format=checksums",
+      operatorSession.token
+    );
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/route-review\/developer-ops-primary-session-summary\.txt/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/route-review\/developer-ops-next-audit-summary\.txt/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/route-review\/developer-ops-remaining-summary\.txt/);
+    assert.match(launchMainlineRouteReviewChecksumsDownload.body, /ops\/route-review\/developer-ops-sessions-summary\.txt/);
+
+    const launchMainlineRouteReviewZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_ALPHA&channel=beta&eventType=session.revoke&reviewMode=matched&format=zip",
+      operatorSession.token
+    );
+    assert.match(launchMainlineRouteReviewZipDownload.contentType || "", /^application\/zip/);
+    const launchMainlineRouteReviewZipText = launchMainlineRouteReviewZipDownload.body.toString("latin1");
+    assert.match(launchMainlineRouteReviewZipText, /ops\/route-review\/developer-ops-primary-session-summary\.txt/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/route-review\/developer-ops-next-audit-summary\.txt/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/route-review\/developer-ops-remaining-summary\.txt/);
+    assert.match(launchMainlineRouteReviewZipText, /ops\/route-review\/developer-ops-sessions-summary\.txt/);
+    assert.match(launchMainlineRouteReviewZipText, /Route Review Primary Match/);
+    assert.match(launchMainlineRouteReviewZipText, /Route Review Next Match/);
+    assert.match(launchMainlineRouteReviewZipText, /Route Review Remaining Matches/);
+    assert.match(launchMainlineRouteReviewZipText, /Route Review Section: sessions/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

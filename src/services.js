@@ -19100,6 +19100,15 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     "ops/steady-state-duty-action-links.txt",
     payload.opsSnapshot ? buildDeveloperOpsSteadyStateDutyActionLinksText(payload.opsSnapshot) : ""
   );
+  if (payload.opsSnapshot) {
+    for (const item of buildDeveloperOpsRouteReviewExportFiles(payload.opsSnapshot)) {
+      appendLaunchWorkflowFileIfPresent(
+        files,
+        `ops/${item.path}`,
+        item.body || ""
+      );
+    }
+  }
   appendLaunchWorkflowFileIfPresent(
     files,
     payload.productionHandoffFileName || "developer-launch-mainline-production-handoff.txt",

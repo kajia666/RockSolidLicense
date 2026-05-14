@@ -19314,6 +19314,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   lines.push("Operator Order:");
   lines.push("- Use this route map when reviewing the Launch Mainline zip offline.");
   lines.push("- Prefer the href values here over reconstructing download URLs from source and format names.");
+  if (steadyStateDutyReceiptReview) {
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   lines.push("- Keep this file with SHA256SUMS.txt so handoff reviewers can verify both content and download routes.");
   return lines.join("\n");
 }
@@ -21085,6 +21088,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   lines.push("- Open operations-handoff first to verify monitoring, alert, and shift handover coverage.");
   lines.push("- Use post-launch-sweep-handoff for first-wave runtime sweep evidence.");
   lines.push("- Use closeout-handoff after first-wave sweep is captured.");
+  if (steadyStateDutyReceiptReview) {
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   lines.push("- Use stabilization-handoff when daily operations and steady-state signals are ready to hand over.");
   lines.push("- Keep recovery-drill-handoff and initial-launch-ops-readiness available while the lane is still HOLD or REVIEW.");
   return lines.join("\n");
@@ -38425,6 +38431,9 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
   lines.push("Operator Order:");
   lines.push("- Open this file from the Developer Ops export when handing launch duty to a reviewer who does not have the Launch Mainline zip open.");
   lines.push("- Prefer the handoff-download-routes link when the reviewer needs the complete Launch Mainline route map.");
+  if (latestSteadyStateDutyPlanReceipt) {
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   lines.push("- Keep this file beside handoff-index.txt so Ops and Launch Mainline reviewers share the same download hrefs.");
   return lines.join("\n");
 }

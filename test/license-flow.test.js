@@ -21312,6 +21312,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsMainlineHandoffRoutesDownload.body,
       /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    const steadyStateDutyReceiptOperatorOrderPattern = /Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./;
+    assert.match(launchOperationsMainlineHandoffRoutesDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchMainlineHandoffDownloadRoutesSelectionDownload = await getText(
       baseUrl,
@@ -21328,6 +21330,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchMainlineOpsRouteMirrorChecksumsDownload = await getText(
       baseUrl,
@@ -21387,6 +21390,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Handoff Brief/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Board/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Action Links/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,
@@ -21403,6 +21407,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Steady-state duty receipt review: ops\/steady-state-duty-board\.txt/
     );
+    assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchMainlineSummarySelectionDownload = await getText(
       baseUrl,

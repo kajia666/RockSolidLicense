@@ -183,6 +183,25 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         "handoff_download_routes"
       ]
     );
+    assert.deepEqual(
+      Array.isArray(visibility?.operatorNextCommands)
+        ? visibility.operatorNextCommands.map((item) => [item.order, item.key, item.status, item.kind, item.workspaceKey, item.downloadKey])
+        : [],
+      [
+        [1, "developer_ops_summary", "current", "download", "ops", "ops_summary"],
+        [2, "launch_receipt_next_follow_up", "next", "download", "ops", "ops_launch_receipt_next_follow_up"],
+        [3, "post_launch_sweep_handoff", "next", "download", "launch-mainline", "launch_mainline_post_launch_sweep_handoff"],
+        [4, "closeout_handoff", "next", "download", "launch-mainline", "launch_mainline_closeout_handoff"],
+        [5, "stabilization_handoff", "next", "download", "launch-mainline", "launch_mainline_stabilization_handoff"],
+        [6, "post_launch_handoff_index", "next", "download", "launch-mainline", "launch_mainline_post_launch_handoff_index"],
+        [7, "handoff_download_routes", "next", "download", "launch-mainline", "launch_mainline_handoff_download_routes"]
+      ]
+    );
+    assert.match(visibility?.operatorNextCommands?.[0]?.target || "", /\/api\/developer\/ops\/export\/download\?productCode=VISIBILITY_ALPHA.*format=summary/);
+    assert.equal(
+      visibility?.operatorNextCommands?.[1]?.launchDutyRecordIndexPath,
+      "artifacts/staging/VISIBILITY_ALPHA/stable/launch-duty-record-index.json"
+    );
     assert.equal(visibility?.stagingResultBackfill?.status, "awaiting_staging_result_backfill");
     assert.equal(visibility?.stagingResultBackfill?.willModifyData, false);
     assert.deepEqual(
@@ -237,6 +256,7 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       Array.isArray(visibilitySection?.cards) ? visibilitySection.cards.map((item) => item?.key) : [],
       [
         "receipt_visibility_summary",
+        "receipt_visibility_operator_next_commands",
         "receipt_visibility_staging_result_backfill",
         "receipt_visibility_developer_ops_summary",
         "receipt_visibility_launch_receipt_next_follow_up",
@@ -246,6 +266,18 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         "receipt_visibility_post_launch_handoff_index",
         "receipt_visibility_handoff_download_routes"
       ]
+    );
+    const operatorNextCommandsCard = Array.isArray(visibilitySection?.cards)
+      ? visibilitySection.cards.find((item) => item?.key === "receipt_visibility_operator_next_commands")
+      : null;
+    assert.ok(operatorNextCommandsCard);
+    assert.equal(
+      Array.isArray(operatorNextCommandsCard.details)
+        ? operatorNextCommandsCard.details.some((item) =>
+            /1\. developer_ops_summary \| current \| download -> .*format=summary/.test(item)
+          )
+        : false,
+      true
     );
     assert.equal(
       Array.isArray(nextFollowUpVisibilityCard?.details)
@@ -322,6 +354,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       /checkpoint[:=].*Open launch receipt next follow-up.*developer-ops-launch-receipt-next-follow-up\.txt.*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/;
 
     assert.match(actionResult.receipt?.handoffText || "", /Receipt Visibility:/);
+    assert.match(
+      actionResult.receipt?.handoffText || "",
+      /Receipt Visibility Operator Commands:[\s\S]*1\. developer_ops_summary \| current \| download -> .*format=summary/
+    );
     assert.match(actionResult.receipt?.handoffText || "", /developer-ops-launch-receipt-next-follow-up\.txt/i);
     assert.match(actionResult.receipt?.handoffText || "", nextFollowUpDownloadRecordIndexPattern);
     assert.match(actionResult.receipt?.handoffText || "", nextFollowUpCheckpointRecordIndexPattern);
@@ -420,7 +456,25 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         { key: "handoff_download_routes", workspaceKey: "launch-mainline", downloadKey: "launch_mainline_handoff_download_routes", launchDutyRecordIndexPath: null }
       ]
     );
+    assert.deepEqual(
+      Array.isArray(latestReceipt?.receiptVisibility?.operatorNextCommands)
+        ? latestReceipt.receiptVisibility.operatorNextCommands.map((item) => [item.order, item.key, item.status, item.kind, item.workspaceKey, item.downloadKey])
+        : [],
+      [
+        [1, "developer_ops_summary", "current", "download", "ops", "ops_summary"],
+        [2, "launch_receipt_next_follow_up", "next", "download", "ops", "ops_launch_receipt_next_follow_up"],
+        [3, "post_launch_sweep_handoff", "next", "download", "launch-mainline", "launch_mainline_post_launch_sweep_handoff"],
+        [4, "closeout_handoff", "next", "download", "launch-mainline", "launch_mainline_closeout_handoff"],
+        [5, "stabilization_handoff", "next", "download", "launch-mainline", "launch_mainline_stabilization_handoff"],
+        [6, "post_launch_handoff_index", "next", "download", "launch-mainline", "launch_mainline_post_launch_handoff_index"],
+        [7, "handoff_download_routes", "next", "download", "launch-mainline", "launch_mainline_handoff_download_routes"]
+      ]
+    );
     assert.match(opsExport.summaryText || "", /Receipt Visibility:/);
+    assert.match(
+      opsExport.summaryText || "",
+      /Receipt Visibility Operator Commands:[\s\S]*1\. developer_ops_summary \| current \| download -> .*format=summary/
+    );
     assert.match(opsExport.summaryText || "", /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(opsExport.summaryText || "", nextFollowUpDownloadRecordIndexPattern);
     assert.match(opsExport.summaryText || "", nextFollowUpCheckpointRecordIndexPattern);
@@ -440,6 +494,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     );
     assert.equal(opsSummaryDownload.contentType, "text/plain; charset=utf-8");
     assert.match(opsSummaryDownload.body, /Receipt Visibility:/);
+    assert.match(
+      opsSummaryDownload.body,
+      /Receipt Visibility Operator Commands:[\s\S]*1\. developer_ops_summary \| current \| download -> .*format=summary/
+    );
     assert.match(opsSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(
       opsSummaryDownload.body,
@@ -464,6 +522,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     );
     assert.equal(opsLaunchReceiptNextFollowUp.contentType, "text/plain; charset=utf-8");
     assert.match(opsLaunchReceiptNextFollowUp.body, /Receipt Visibility:/);
+    assert.match(
+      opsLaunchReceiptNextFollowUp.body,
+      /Receipt Visibility Operator Commands:[\s\S]*2\. launch_receipt_next_follow_up \| next \| download -> .*launchDutyRecordIndex=artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(opsLaunchReceiptNextFollowUp.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(
       opsLaunchReceiptNextFollowUp.body,
@@ -497,6 +559,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     assert.match(launchReviewSummaryDownload.body, /Launch Review Receipt Visibility:/);
     assert.match(
       launchReviewSummaryDownload.body,
+      /Receipt Visibility Operator Commands:[\s\S]*7\. handoff_download_routes \| next \| download -> .*format=handoff-download-routes/
+    );
+    assert.match(
+      launchReviewSummaryDownload.body,
       /^- Launch Duty Record Index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json$/m
     );
     assert.match(launchReviewSummaryDownload.body, /developer-ops-launch-receipt-next-follow-up\.txt/);
@@ -515,6 +581,10 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
     );
     assert.equal(launchSmokeSummaryDownload.contentType, "text/plain; charset=utf-8");
     assert.match(launchSmokeSummaryDownload.body, /Launch Smoke Receipt Visibility:/);
+    assert.match(
+      launchSmokeSummaryDownload.body,
+      /Receipt Visibility Operator Commands:[\s\S]*7\. handoff_download_routes \| next \| download -> .*format=handoff-download-routes/
+    );
     assert.match(
       launchSmokeSummaryDownload.body,
       /^- Launch Duty Record Index: artifacts\/staging\/VISIBILITY_ALPHA\/stable\/launch-duty-record-index\.json$/m

@@ -4589,6 +4589,46 @@ function buildLaunchMainlineStagingResultBackfill({
   };
 }
 
+function buildLaunchReceiptVisibilityOperatorNextCommands(checkpoints = []) {
+  return (Array.isArray(checkpoints) ? checkpoints : [])
+    .map((item, index) => {
+      const workspace = item?.workspaceAction && typeof item.workspaceAction === "object"
+        ? item.workspaceAction
+        : null;
+      const download = item?.recommendedDownload && typeof item.recommendedDownload === "object"
+        ? item.recommendedDownload
+        : null;
+      const kind = download?.key || download?.href
+        ? "download"
+        : workspace?.key || workspace?.href
+          ? "workspace"
+          : "note";
+      return {
+        order: index + 1,
+        key: item?.key || `receipt_visibility_step_${index + 1}`,
+        label: item?.label || item?.key || "Receipt visibility step",
+        summary: item?.summary || null,
+        status: index === 0 ? "current" : "next",
+        sourceStatus: item?.status || null,
+        kind,
+        target: download?.href || workspace?.href || "-",
+        workspaceKey: workspace?.key || null,
+        workspaceHref: workspace?.href || null,
+        downloadKey: download?.key || null,
+        downloadFormat: download?.format || null,
+        downloadFileName: download?.fileName || null,
+        downloadHref: download?.href || null,
+        launchDutyRecordIndexPath: download?.launchDutyRecordIndexPath || null
+      };
+    })
+    .filter((item) => item.key);
+}
+
+function formatLaunchReceiptVisibilityOperatorCommandLine(item = {}) {
+  return `${item.order ?? "-"}. ${item.key || "-"} | ${item.status || "-"} | ${item.kind || "-"} -> ${item.target || item.downloadHref || item.workspaceHref || "-"}`
+    + (item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : "");
+}
+
 function buildLaunchMainlineActionReceiptVisibility({
   operation = "",
   operationLabel = "",
@@ -4721,6 +4761,57 @@ function buildLaunchMainlineActionReceiptVisibility({
     launchMainlineWorkspace,
     launchDutyRecordIndexPath
   });
+  const checkpoints = [
+    {
+      key: "developer_ops_summary",
+      label: "Review Developer Ops summary",
+      summary: "Confirm the latest scoped receipt and its follow-up are visible in the Developer Ops export snapshot.",
+      workspaceAction: developerOpsWorkspace,
+      recommendedDownload: developerOpsSummary
+    },
+    {
+      key: "launch_receipt_next_follow_up",
+      label: "Open launch receipt next follow-up",
+      summary: "Use the receipt follow-up asset to continue the next production evidence or post-launch lifecycle action.",
+      workspaceAction: developerOpsWorkspace,
+      recommendedDownload: launchReceiptNextFollowUp
+    },
+    {
+      key: "post_launch_sweep_handoff",
+      label: "Reopen post-launch sweep handoff",
+      summary: "Verify the first-wave ops sweep handoff reflects the newly recorded receipt.",
+      workspaceAction: launchMainlineWorkspace,
+      recommendedDownload: postLaunchSweepHandoff
+    },
+    {
+      key: "closeout_handoff",
+      label: "Reopen closeout handoff",
+      summary: "Use the closeout handoff to finish launch-day review and first-wave operations sweep checks.",
+      workspaceAction: launchMainlineWorkspace,
+      recommendedDownload: closeoutHandoff
+    },
+    {
+      key: "stabilization_handoff",
+      label: "Reopen stabilization handoff",
+      summary: "Use the stabilization handoff when handing the lane from launch watch to steady-state operations.",
+      workspaceAction: launchMainlineWorkspace,
+      recommendedDownload: stabilizationHandoff
+    },
+    {
+      key: "post_launch_handoff_index",
+      label: "Open post-launch handoff index",
+      summary: "Use the post-launch handoff index as the cross-workspace traceability view for this receipt.",
+      workspaceAction: launchMainlineWorkspace,
+      recommendedDownload: postLaunchHandoffIndex
+    },
+    {
+      key: "handoff_download_routes",
+      label: "Open handoff download routes",
+      summary: "Use the route map to verify the exact download hrefs before handing launch duty to the next reviewer.",
+      workspaceAction: launchMainlineWorkspace,
+      recommendedDownload: handoffDownloadRoutes
+    }
+  ];
   return {
     status: "ready",
     headline: `${operationLabel || operation || "Launch mainline action"} receipt is now visible in Developer Ops and Launch Mainline follow-up assets.`,
@@ -4745,57 +4836,8 @@ function buildLaunchMainlineActionReceiptVisibility({
       handoffDownloadRoutes
     },
     stagingResultBackfill,
-    checkpoints: [
-      {
-        key: "developer_ops_summary",
-        label: "Review Developer Ops summary",
-        summary: "Confirm the latest scoped receipt and its follow-up are visible in the Developer Ops export snapshot.",
-        workspaceAction: developerOpsWorkspace,
-        recommendedDownload: developerOpsSummary
-      },
-      {
-        key: "launch_receipt_next_follow_up",
-        label: "Open launch receipt next follow-up",
-        summary: "Use the receipt follow-up asset to continue the next production evidence or post-launch lifecycle action.",
-        workspaceAction: developerOpsWorkspace,
-        recommendedDownload: launchReceiptNextFollowUp
-      },
-      {
-        key: "post_launch_sweep_handoff",
-        label: "Reopen post-launch sweep handoff",
-        summary: "Verify the first-wave ops sweep handoff reflects the newly recorded receipt.",
-        workspaceAction: launchMainlineWorkspace,
-        recommendedDownload: postLaunchSweepHandoff
-      },
-      {
-        key: "closeout_handoff",
-        label: "Reopen closeout handoff",
-        summary: "Use the closeout handoff to finish launch-day review and first-wave operations sweep checks.",
-        workspaceAction: launchMainlineWorkspace,
-        recommendedDownload: closeoutHandoff
-      },
-      {
-        key: "stabilization_handoff",
-        label: "Reopen stabilization handoff",
-        summary: "Use the stabilization handoff when handing the lane from launch watch to steady-state operations.",
-        workspaceAction: launchMainlineWorkspace,
-        recommendedDownload: stabilizationHandoff
-      },
-      {
-        key: "post_launch_handoff_index",
-        label: "Open post-launch handoff index",
-        summary: "Use the post-launch handoff index as the cross-workspace traceability view for this receipt.",
-        workspaceAction: launchMainlineWorkspace,
-        recommendedDownload: postLaunchHandoffIndex
-      },
-      {
-        key: "handoff_download_routes",
-        label: "Open handoff download routes",
-        summary: "Use the route map to verify the exact download hrefs before handing launch duty to the next reviewer.",
-        workspaceAction: launchMainlineWorkspace,
-        recommendedDownload: handoffDownloadRoutes
-      }
-    ]
+    checkpoints,
+    operatorNextCommands: buildLaunchReceiptVisibilityOperatorNextCommands(checkpoints)
   };
 }
 
@@ -4815,6 +4857,21 @@ function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
     : [];
   const stagingBackfillLaunchReviewDownload = stagingBackfillDownloads.find((item) => item?.key === "launch_review_summary") || null;
   const stagingBackfillLaunchSmokeDownload = stagingBackfillDownloads.find((item) => item?.key === "launch_smoke_kit_summary") || null;
+  const operatorNextCommands = Array.isArray(visibility.operatorNextCommands) ? visibility.operatorNextCommands : [];
+  const operatorNextCommandsCard = operatorNextCommands.length
+    ? {
+        key: "receipt_visibility_operator_next_commands",
+        title: "Operator Next Commands",
+        summary: "Run these receipt visibility checks in order before handing launch duty to the next reviewer.",
+        tags: [
+          { label: "commands", value: operatorNextCommands.length, strong: true },
+          operatorNextCommands[0]?.key ? { label: "current", value: operatorNextCommands[0].key, strong: true } : null
+        ].filter(Boolean),
+        details: operatorNextCommands
+          .slice(0, 8)
+          .map((item) => formatLaunchReceiptVisibilityOperatorCommandLine(item))
+      }
+    : null;
   const stagingBackfillCard = stagingBackfill
     ? {
         key: "receipt_visibility_staging_result_backfill",
@@ -4896,6 +4953,7 @@ function buildLaunchMainlineActionReceiptVisibilitySection(visibility = null) {
           workspaceAction: item
         }))
       },
+      operatorNextCommandsCard,
       stagingBackfillCard,
       ...checkpointCards
     ].filter(Boolean)
@@ -5169,6 +5227,16 @@ function buildLaunchMainlineActionReceiptHandoffText({
         + `${item.workspaceAction ? ` | workspace=${item.workspaceAction.label || item.workspaceAction.key || "-"}@${item.workspaceAction.autofocus || "-"} | href=${item.workspaceAction.href || "-"}` : ""}`
         + `${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload, { fileSeparator: " | " })}` : ""}`
       );
+    }
+    const operatorNextCommands = Array.isArray(visibility.operatorNextCommands)
+      ? visibility.operatorNextCommands
+      : [];
+    if (operatorNextCommands.length) {
+      lines.push("");
+      lines.push("Receipt Visibility Operator Commands:");
+      for (const item of operatorNextCommands.slice(0, 8)) {
+        lines.push(`- ${formatLaunchReceiptVisibilityOperatorCommandLine(item)}`);
+      }
     }
     const stagingBackfill = visibility.stagingResultBackfill && typeof visibility.stagingResultBackfill === "object"
       ? visibility.stagingResultBackfill
@@ -7078,6 +7146,29 @@ function summarizeLaunchReceiptVisibilityDownload(item = null) {
   };
 }
 
+function summarizeLaunchReceiptVisibilityOperatorNextCommand(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  return {
+    order: Number.isFinite(Number(item.order)) ? Number(item.order) : null,
+    key: item.key || null,
+    label: item.label || null,
+    summary: item.summary || null,
+    status: item.status || null,
+    sourceStatus: item.sourceStatus || null,
+    kind: item.kind || null,
+    target: item.target || item.downloadHref || item.workspaceHref || null,
+    workspaceKey: item.workspaceKey || null,
+    workspaceHref: item.workspaceHref || null,
+    downloadKey: item.downloadKey || null,
+    downloadFormat: item.downloadFormat || null,
+    downloadFileName: item.downloadFileName || null,
+    downloadHref: item.downloadHref || null,
+    launchDutyRecordIndexPath: item.launchDutyRecordIndexPath || null
+  };
+}
+
 function summarizeLaunchReceiptStagingResultBackfill(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -7138,6 +7229,9 @@ function buildLaunchReceiptAuditVisibility(visibility = null) {
       };
     })
     .filter((item) => item.key);
+  const operatorNextCommands = (Array.isArray(visibility.operatorNextCommands) ? visibility.operatorNextCommands : [])
+    .map((item) => summarizeLaunchReceiptVisibilityOperatorNextCommand(item))
+    .filter((item) => item?.key);
   return {
     status: visibility.status || null,
     headline: visibility.headline || null,
@@ -7156,6 +7250,7 @@ function buildLaunchReceiptAuditVisibility(visibility = null) {
     workspaces,
     downloads,
     checkpoints,
+    operatorNextCommands,
     stagingResultBackfill: summarizeLaunchReceiptStagingResultBackfill(visibility.stagingResultBackfill)
   };
 }
@@ -35074,6 +35169,15 @@ function appendDeveloperOpsReceiptVisibilityText(lines = [], receipt = null) {
       + ` | href=${item.downloadHref || "-"}`
       + `${item.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath}` : ""}`
     );
+  }
+  const operatorNextCommands = Array.isArray(visibility.operatorNextCommands)
+    ? visibility.operatorNextCommands
+    : [];
+  if (operatorNextCommands.length) {
+    lines.push("Receipt Visibility Operator Commands:");
+    for (const item of operatorNextCommands.slice(0, 8)) {
+      lines.push(`- ${formatLaunchReceiptVisibilityOperatorCommandLine(item)}`);
+    }
   }
   const stagingBackfill = visibility.stagingResultBackfill && typeof visibility.stagingResultBackfill === "object"
     ? visibility.stagingResultBackfill

@@ -39508,6 +39508,9 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use steady-state-handoff-brief.txt as the single operator-facing handoff cover sheet.");
   lines.push("- Use steady-state-duty-board.txt as the active duty board with quick actions and handoff assets.");
   lines.push("- Use steady-state-duty-action-links.txt to jump from duty board actions to workspace, control, and download links.");
+  if (readiness.latestSteadyStateDutyPlanReceipt) {
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   lines.push("- Use launch-operations-handoff-summary.txt as the latest launch operations evidence summary for shift handoff.");
   lines.push("- Use launch-operations-daily-brief.txt as the shift-start daily brief for launch-day watch and stable-lane handoff.");
   lines.push("- Use launch-operations-shift-action-plan.txt as the ordered operator checklist for the active launch watch shift.");

@@ -20127,6 +20127,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`nextReview=${launchOperationsEvidenceChain.nextReviewAction.key}`)
     );
     const latestLaunchDutySelectionChecklistStepPattern = /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-launch-operations-operator-entry\.txt \| format=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/;
+    const steadyStateDutyReceiptOperatorOrderPattern = /Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./;
 
     const launchOperationsHandoffDownload = await getText(
       baseUrl,
@@ -21271,6 +21272,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Duty Record Index Selection Checklist Step: [^\n]*key=continue_launch_duty_record_index_selection_handoff[^\n]*order=8[^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
+    assert.match(launchOperationsHandoffIndexDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsFileIndexDownload = await getText(
       baseUrl,
@@ -21312,7 +21314,6 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsMainlineHandoffRoutesDownload.body,
       /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    const steadyStateDutyReceiptOperatorOrderPattern = /Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./;
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchMainlineHandoffDownloadRoutesSelectionDownload = await getText(

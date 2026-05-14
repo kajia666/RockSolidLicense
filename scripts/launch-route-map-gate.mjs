@@ -25,6 +25,7 @@ function parseOptions(argv) {
   const options = {
     productCode: "ROUTE_MAP_GATE",
     channel: "stable",
+    stagingBaseUrl: "https://staging.example.com",
     closeoutInputFile: null,
     actionsFile: null
   };
@@ -39,6 +40,8 @@ function parseOptions(argv) {
       options.productCode = value.toUpperCase();
     } else if (name === "--channel") {
       options.channel = value.toLowerCase();
+    } else if (name === "--staging-base-url") {
+      options.stagingBaseUrl = value;
     } else if (name === "--closeout-input-file") {
       options.closeoutInputFile = value;
     } else if (name === "--actions-file") {
@@ -286,6 +289,14 @@ function defaultArtifactRoot() {
   return `artifacts/staging/${options.productCode}/${options.channel}`;
 }
 
+function defaultFilledCloseoutInputFile() {
+  return `${defaultArtifactRoot()}/filled-closeout-input.json`;
+}
+
+function defaultReadinessActionQueueFile() {
+  return `${defaultArtifactRoot()}/readiness-action-queue.md`;
+}
+
 function defaultLaunchDutyRecordIndexFile() {
   return `${defaultArtifactRoot()}/launch-duty-record-index.json`;
 }
@@ -334,8 +345,8 @@ function buildLaunchSmokeReceiptVisibilityQueue() {
 
 function buildRouteMapCloseoutBackfill() {
   const artifactRoot = defaultArtifactRoot();
-  const filledCloseoutInputFile = options.closeoutInputFile || `${artifactRoot}/filled-closeout-input.json`;
-  const readinessActionQueueFile = options.actionsFile || `${artifactRoot}/readiness-action-queue.md`;
+  const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile();
+  const readinessActionQueueFile = options.actionsFile || defaultReadinessActionQueueFile();
   const artifactPath = `${artifactRoot}/route-map-gate-output.txt`;
   const command = [
     "npm.cmd run staging:closeout:backfill --",
@@ -352,13 +363,7 @@ function buildRouteMapCloseoutBackfill() {
     "--actions-file",
     commandValue(readinessActionQueueFile)
   ].join(" ");
-  const statusCommand = [
-    "npm.cmd run staging:readiness:status --",
-    "--input-file",
-    commandValue(filledCloseoutInputFile),
-    "--actions-file",
-    commandValue(readinessActionQueueFile)
-  ].join(" ");
+  const statusCommand = buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQueueFile);
   return {
     version: "launch-route-map-gate-closeout-backfill/v1",
     status: "ready_for_route_map_gate_backfill",
@@ -369,6 +374,90 @@ function buildRouteMapCloseoutBackfill() {
     command,
     statusCommand,
     nextAction: "After the route-map gate passes, backfill route_map_gate_result, then refresh staging readiness status."
+  };
+}
+
+function buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQueueFile) {
+  return [
+    "npm.cmd run staging:readiness:status --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
+function buildLaunchSwitchWatchHandoff() {
+  const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile();
+  const readinessActionQueueFile = options.actionsFile || defaultReadinessActionQueueFile();
+  const launchDutyRecordIndexPath = defaultLaunchDutyRecordIndexFile();
+  const currentCommand = buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQueueFile);
+  const launchSmokeCommand = [
+    "npm.cmd run launch:smoke:staging --",
+    "--base-url",
+    commandValue(options.stagingBaseUrl),
+    "--allow-live-writes",
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel),
+    "--closeout-input-file",
+    commandValue(filledCloseoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+  const backfillSequence = [
+    {
+      key: "route_map_gate_result",
+      label: "Route-map targeted gate result",
+      status: "current",
+      source: "launch-route-map-gate"
+    },
+    {
+      key: "live_write_smoke_result",
+      label: "Remote live-write smoke result",
+      status: "blocked_until_launch_smoke",
+      source: "launch-smoke closeout backfill"
+    },
+    {
+      key: "launch_smoke_handoff",
+      label: "Launch Smoke handoff archive",
+      status: "blocked_until_launch_smoke",
+      source: "launch-smoke closeout backfill"
+    },
+    {
+      key: "launch_mainline_evidence_receipts",
+      label: "Launch Mainline evidence receipts",
+      status: "blocked_until_launch_smoke",
+      source: "launch-smoke closeout backfill"
+    },
+    {
+      key: "receipt_visibility_review",
+      label: "Receipt visibility review",
+      status: "blocked_until_receipt_visibility_review",
+      source: "launch-smoke receipt visibility queue"
+    }
+  ].map((item, index) => ({
+    order: index + 1,
+    ...item,
+    launchDutyRecordIndexPath
+  }));
+  return {
+    version: "launch-route-map-gate-switch-watch-handoff/v1",
+    status: "ready_for_staging_readiness_and_launch_smoke_switch",
+    currentActionKey: "refresh_staging_readiness",
+    currentCommand,
+    nextActionKey: "run_launch_smoke_staging",
+    launchSmokeCommand,
+    credentialEnv: [
+      "RSL_SMOKE_DEVELOPER_USERNAME",
+      "RSL_SMOKE_DEVELOPER_PASSWORD"
+    ],
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexPath,
+    backfillSequence,
+    nextAction: "Refresh staging readiness after route_map_gate_result is backfilled, then run launchSmokeCommand with staging smoke credentials to produce the remaining closeout and receipt-visibility evidence."
   };
 }
 
@@ -383,6 +472,7 @@ function payload(status = "pass") {
       scope: "Launch Mainline / Launch Smoke / Developer Ops route-map visibility, first-batch runtime evidence, and launch download surface targeted gate"
     },
     closeoutBackfill: buildRouteMapCloseoutBackfill(),
+    launchSwitchWatchHandoff: buildLaunchSwitchWatchHandoff(),
     launchSmokeReceiptVisibilityQueue: buildLaunchSmokeReceiptVisibilityQueue(),
     commands: commands.map(publicCommand)
   };
@@ -399,6 +489,7 @@ function printHelp() {
     "  --json     Print machine-readable output. Intended for --dry-run.",
     "  --product-code <code>  Product code used for default staging artifact paths.",
     "  --channel <channel>    Channel used for default staging artifact paths.",
+    "  --staging-base-url <url>  Base URL used in the staging Launch Smoke command template.",
     "  --closeout-input-file <path>  Override the filled closeout input path.",
     "  --actions-file <path>  Override the readiness action queue path.",
     "  --help     Show this help."
@@ -416,11 +507,18 @@ if (dryRun) {
     console.log(JSON.stringify(payload(), null, 2));
   } else {
     const closeoutBackfill = buildRouteMapCloseoutBackfill();
+    const launchSwitchWatchHandoff = buildLaunchSwitchWatchHandoff();
     const launchSmokeReceiptVisibilityQueue = buildLaunchSmokeReceiptVisibilityQueue();
     console.log("Launch route-map targeted gate dry run:");
     console.log(`Route-map closeout backfill current: ${closeoutBackfill.key}`);
     console.log(`Route-map closeout backfill command: ${closeoutBackfill.command}`);
     console.log(`Route-map readiness status: ${closeoutBackfill.statusCommand}`);
+    console.log(`Launch switch watch handoff: ${launchSwitchWatchHandoff.status}`);
+    console.log(`Launch switch current: ${launchSwitchWatchHandoff.currentActionKey} -> ${launchSwitchWatchHandoff.currentCommand}`);
+    console.log(`Launch switch next: ${launchSwitchWatchHandoff.nextActionKey} -> ${launchSwitchWatchHandoff.launchSmokeCommand}`);
+    console.log(`Launch switch evidence sequence: ${launchSwitchWatchHandoff.backfillSequence.map((item) => item.key).join(" -> ")}`);
+    console.log(`Launch switch credential env: ${launchSwitchWatchHandoff.credentialEnv.join(", ")}`);
+    console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
     console.log("Launch Smoke receipt visibility queue:");
     for (const item of launchSmokeReceiptVisibilityQueue) {
       console.log(

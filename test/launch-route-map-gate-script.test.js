@@ -39,6 +39,32 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     output.closeoutBackfill.statusCommand,
     "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md"
   );
+  assert.equal(output.launchSwitchWatchHandoff.status, "ready_for_staging_readiness_and_launch_smoke_switch");
+  assert.equal(output.launchSwitchWatchHandoff.currentActionKey, "refresh_staging_readiness");
+  assert.equal(
+    output.launchSwitchWatchHandoff.currentCommand,
+    "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md"
+  );
+  assert.equal(output.launchSwitchWatchHandoff.nextActionKey, "run_launch_smoke_staging");
+  assert.equal(
+    output.launchSwitchWatchHandoff.launchSmokeCommand,
+    "npm.cmd run launch:smoke:staging -- --base-url https://staging.example.com --allow-live-writes --product-code ROUTE_MAP_GATE --channel stable --closeout-input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md"
+  );
+  assert.deepEqual(
+    output.launchSwitchWatchHandoff.backfillSequence.map((item) => [item.order, item.key, item.status]),
+    [
+      [1, "route_map_gate_result", "current"],
+      [2, "live_write_smoke_result", "blocked_until_launch_smoke"],
+      [3, "launch_smoke_handoff", "blocked_until_launch_smoke"],
+      [4, "launch_mainline_evidence_receipts", "blocked_until_launch_smoke"],
+      [5, "receipt_visibility_review", "blocked_until_receipt_visibility_review"]
+    ]
+  );
+  assert.deepEqual(output.launchSwitchWatchHandoff.credentialEnv, [
+    "RSL_SMOKE_DEVELOPER_USERNAME",
+    "RSL_SMOKE_DEVELOPER_PASSWORD"
+  ]);
+  assert.equal(output.launchSwitchWatchHandoff.launchDutyRecordIndexPath, "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json");
   assert.deepEqual(
     output.launchSmokeReceiptVisibilityQueue.map((item) => [item.order, item.key, item.status, item.kind]),
     [
@@ -201,6 +227,12 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /Route-map closeout backfill current: route_map_gate_result/);
   assert.match(result.stdout, /Route-map closeout backfill command: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /Route-map readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch switch watch handoff: ready_for_staging_readiness_and_launch_smoke_switch/);
+  assert.match(result.stdout, /Launch switch current: refresh_staging_readiness -> npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch switch next: run_launch_smoke_staging -> npm\.cmd run launch:smoke:staging -- --base-url https:\/\/staging\.example\.com --allow-live-writes --product-code PILOT_ALPHA --channel stable --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch switch evidence sequence: route_map_gate_result -> live_write_smoke_result -> launch_smoke_handoff -> launch_mainline_evidence_receipts -> receipt_visibility_review/);
+  assert.match(result.stdout, /Launch switch credential env: RSL_SMOKE_DEVELOPER_USERNAME, RSL_SMOKE_DEVELOPER_PASSWORD/);
+  assert.match(result.stdout, /Launch switch record index: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /Launch Smoke receipt visibility queue:/);
   assert.match(result.stdout, /1\. verify_launch_review_receipt_visibility: current download -> \/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /5\. download_ops_handoff_index: next download -> \/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=handoff-index&limit=20 \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);

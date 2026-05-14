@@ -16019,17 +16019,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
+  const steadyStateDutyReceiptReviewOperatorOrder = Array.isArray(steadyStateDutyReceiptReview?.operatorOrder)
+    ? steadyStateDutyReceiptReview.operatorOrder
+    : [];
   const steadyStateHandoffHeroControls = steadyStateHandoffLanding
     ? [
         steadyStateHandoffLanding.recommendedDownload ? {
           kind: "download",
           label: "Open Steady-State Handoff Brief",
-          recommendedDownload: steadyStateHandoffLanding.recommendedDownload
+          recommendedDownload: steadyStateHandoffLanding.recommendedDownload,
+          operatorOrder: steadyStateHandoffLandingOperatorOrder
         } : null,
         steadyStateHandoffLanding.workspaceAction ? {
           kind: "workspace",
           label: "Open Steady-State Ops Workspace",
-          workspaceAction: steadyStateHandoffLanding.workspaceAction
+          workspaceAction: steadyStateHandoffLanding.workspaceAction,
+          operatorOrder: steadyStateHandoffLandingOperatorOrder
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
@@ -16038,12 +16043,14 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         steadyStateDutyReceiptReview.recommendedDownload ? {
           kind: "download",
           label: "Review Steady-State Duty Receipt",
-          recommendedDownload: steadyStateDutyReceiptReview.recommendedDownload
+          recommendedDownload: steadyStateDutyReceiptReview.recommendedDownload,
+          operatorOrder: steadyStateDutyReceiptReviewOperatorOrder
         } : null,
         steadyStateDutyReceiptReview.workspaceAction ? {
           kind: "workspace",
           label: "Open Steady-State Duty Receipt",
-          workspaceAction: steadyStateDutyReceiptReview.workspaceAction
+          workspaceAction: steadyStateDutyReceiptReview.workspaceAction,
+          operatorOrder: steadyStateDutyReceiptReviewOperatorOrder
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
@@ -16179,12 +16186,14 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         steadyStateStep.recommendedDownload ? ensureLaunchMainlineControlHrefs({
           kind: "download",
           label: "Open Steady-State Handoff Brief",
-          recommendedDownload: steadyStateStep.recommendedDownload
+          recommendedDownload: steadyStateStep.recommendedDownload,
+          operatorOrder: steadyStateStep.operatorOrder
         }, params) : null,
         steadyStateStep.workspaceAction ? ensureLaunchMainlineControlHrefs({
           kind: "workspace",
           label: steadyStateStep.workspaceAction.label || "Open Steady-State Ops Workspace",
-          workspaceAction: steadyStateStep.workspaceAction
+          workspaceAction: steadyStateStep.workspaceAction,
+          operatorOrder: steadyStateStep.operatorOrder
         }, params) : null
       ].filter(Boolean)
     });
@@ -16207,12 +16216,14 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         steadyStateDutyReceiptStep.recommendedDownload ? ensureLaunchMainlineControlHrefs({
           kind: "download",
           label: "Review Steady-State Duty Receipt",
-          recommendedDownload: steadyStateDutyReceiptStep.recommendedDownload
+          recommendedDownload: steadyStateDutyReceiptStep.recommendedDownload,
+          operatorOrder: steadyStateDutyReceiptStep.operatorOrder
         }, params) : null,
         steadyStateDutyReceiptStep.workspaceAction ? ensureLaunchMainlineControlHrefs({
           kind: "workspace",
           label: steadyStateDutyReceiptStep.workspaceAction.label || "Open Steady-State Duty Receipt",
-          workspaceAction: steadyStateDutyReceiptStep.workspaceAction
+          workspaceAction: steadyStateDutyReceiptStep.workspaceAction,
+          operatorOrder: steadyStateDutyReceiptStep.operatorOrder
         }, params) : null
       ].filter(Boolean)
     });
@@ -16509,9 +16520,6 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
-  const steadyStateDutyReceiptReviewOperatorOrder = Array.isArray(steadyStateDutyReceiptReview?.operatorOrder)
-    ? steadyStateDutyReceiptReview.operatorOrder
-    : [];
   const steadyStateDutyReceiptReviewCard = steadyStateDutyReceiptReview
     ? {
         key: "steady_state_duty_receipt_review",
@@ -16741,20 +16749,25 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     entityType: filters.entityType || "",
     limit: String(filters.limit || 60)
   };
-  const actionPlanCards = actionPlan.map((item) => ({
-    key: item?.key || null,
-    title: item?.title || item?.key || "Step",
-    summary: item?.summary || "-",
-    tags: [
-      item?.priority ? { label: "priority", value: item.priority, strong: true } : null,
-      item?.status ? { label: "status", value: item.status, strong: false } : null
-    ].filter(Boolean),
-    details: [
-      formatLaunchWorkflowActionContextText(item?.context)
-    ].filter(Boolean),
-    context: item?.context || null,
-    controls: Array.isArray(item?.controls) ? item.controls : []
-  })).filter((item) => item.key || item.summary || item.controls.length);
+  const actionPlanCards = actionPlan.map((item) => {
+    const operatorOrder = Array.isArray(item?.operatorOrder) ? item.operatorOrder : [];
+    return {
+      key: item?.key || null,
+      title: item?.title || item?.key || "Step",
+      summary: item?.summary || "-",
+      operatorOrder,
+      tags: [
+        item?.priority ? { label: "priority", value: item.priority, strong: true } : null,
+        item?.status ? { label: "status", value: item.status, strong: false } : null
+      ].filter(Boolean),
+      details: [
+        formatLaunchWorkflowActionContextText(item?.context),
+        ...operatorOrder.map((orderItem) => `Operator order: ${orderItem}`)
+      ].filter(Boolean),
+      context: item?.context || null,
+      controls: Array.isArray(item?.controls) ? item.controls : []
+    };
+  }).filter((item) => item.key || item.summary || item.controls.length);
   const buildProductionEvidenceQueueControls = (item = null) => [
     item?.workspaceAction ? ensureLaunchMainlineControlHrefs({
       kind: "workspace",
@@ -18497,6 +18510,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
         + `${confirmationDraft ? ` | draft=${confirmationDraft}` : ""}`
         + `${item?.confirmation?.payloadTemplate?.handoffFileName ? ` | file=${item.confirmation.payloadTemplate.handoffFileName}` : ""}`
       );
+      const operatorOrder = Array.isArray(item?.operatorOrder) ? item.operatorOrder : [];
+      if (operatorOrder.length) {
+        lines.push("  Operator Order:");
+        for (const orderItem of operatorOrder) {
+          lines.push(`  - ${orderItem}`);
+        }
+      }
     }
   }
   appendOperationalReadinessTextLines(lines, mainlineSummary.operationalReadiness, formatWorkspaceActionText);

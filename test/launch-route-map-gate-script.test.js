@@ -40,6 +40,19 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md"
   );
   assert.deepEqual(
+    output.launchSmokeReceiptVisibilityQueue.map((item) => [item.order, item.key, item.status, item.kind]),
+    [
+      [1, "verify_launch_review_receipt_visibility", "current", "download"],
+      [2, "verify_launch_smoke_receipt_visibility", "next", "download"],
+      [3, "verify_launch_ops_overview_status", "next", "download"],
+      [4, "verify_mainline_route_map_overview_evidence", "next", "download"],
+      [5, "download_ops_handoff_index", "next", "download"]
+    ]
+  );
+  assert.equal(output.launchSmokeReceiptVisibilityQueue[0].target, "/api/developer/launch-review/download?productCode=ROUTE_MAP_GATE&channel=stable&source=launch-smoke&handoff=first-wave&format=summary");
+  assert.equal(output.launchSmokeReceiptVisibilityQueue[0].launchDutyRecordIndexPath, "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json");
+  assert.equal(output.launchSmokeReceiptVisibilityQueue[4].target, "/api/developer/ops/export/download?productCode=ROUTE_MAP_GATE&format=handoff-index&limit=20");
+  assert.deepEqual(
     output.commands.map((command) => command.key),
     [
       "launch_mainline_action_visibility",
@@ -188,4 +201,7 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /Route-map closeout backfill current: route_map_gate_result/);
   assert.match(result.stdout, /Route-map closeout backfill command: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /Route-map readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch Smoke receipt visibility queue:/);
+  assert.match(result.stdout, /1\. verify_launch_review_receipt_visibility: current download -> \/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
+  assert.match(result.stdout, /5\. download_ops_handoff_index: next download -> \/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=handoff-index&limit=20 \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
 });

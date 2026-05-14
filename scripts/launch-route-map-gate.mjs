@@ -286,6 +286,52 @@ function defaultArtifactRoot() {
   return `artifacts/staging/${options.productCode}/${options.channel}`;
 }
 
+function defaultLaunchDutyRecordIndexFile() {
+  return `${defaultArtifactRoot()}/launch-duty-record-index.json`;
+}
+
+function buildLaunchSmokeReceiptVisibilityQueue() {
+  const productCode = options.productCode;
+  const channel = options.channel;
+  const launchDutyRecordIndexPath = defaultLaunchDutyRecordIndexFile();
+  const downloads = [
+    {
+      key: "verify_launch_review_receipt_visibility",
+      label: "Verify Launch Review receipt visibility",
+      target: `/api/developer/launch-review/download?productCode=${productCode}&channel=${channel}&source=launch-smoke&handoff=first-wave&format=summary`
+    },
+    {
+      key: "verify_launch_smoke_receipt_visibility",
+      label: "Verify Launch Smoke receipt visibility",
+      target: `/api/developer/launch-smoke-kit/download?productCode=${productCode}&channel=${channel}&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`
+    },
+    {
+      key: "verify_launch_ops_overview_status",
+      label: "Verify Launch Ops overview status",
+      target: `/api/developer/ops/export/download?productCode=${productCode}&format=launch-operations-overview-status&limit=20`
+    },
+    {
+      key: "verify_mainline_route_map_overview_evidence",
+      label: "Verify Mainline route map overview evidence",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&source=launch-smoke&handoff=first-wave&format=handoff-download-routes`
+    },
+    {
+      key: "download_ops_handoff_index",
+      label: "Download Ops handoff index",
+      target: `/api/developer/ops/export/download?productCode=${productCode}&format=handoff-index&limit=20`
+    }
+  ];
+  return downloads.map((item, index) => ({
+    order: index + 1,
+    key: item.key,
+    label: item.label,
+    status: index === 0 ? "current" : "next",
+    kind: "download",
+    target: item.target,
+    launchDutyRecordIndexPath
+  }));
+}
+
 function buildRouteMapCloseoutBackfill() {
   const artifactRoot = defaultArtifactRoot();
   const filledCloseoutInputFile = options.closeoutInputFile || `${artifactRoot}/filled-closeout-input.json`;
@@ -337,6 +383,7 @@ function payload(status = "pass") {
       scope: "Launch Mainline / Launch Smoke / Developer Ops route-map visibility, first-batch runtime evidence, and launch download surface targeted gate"
     },
     closeoutBackfill: buildRouteMapCloseoutBackfill(),
+    launchSmokeReceiptVisibilityQueue: buildLaunchSmokeReceiptVisibilityQueue(),
     commands: commands.map(publicCommand)
   };
 }
@@ -369,10 +416,18 @@ if (dryRun) {
     console.log(JSON.stringify(payload(), null, 2));
   } else {
     const closeoutBackfill = buildRouteMapCloseoutBackfill();
+    const launchSmokeReceiptVisibilityQueue = buildLaunchSmokeReceiptVisibilityQueue();
     console.log("Launch route-map targeted gate dry run:");
     console.log(`Route-map closeout backfill current: ${closeoutBackfill.key}`);
     console.log(`Route-map closeout backfill command: ${closeoutBackfill.command}`);
     console.log(`Route-map readiness status: ${closeoutBackfill.statusCommand}`);
+    console.log("Launch Smoke receipt visibility queue:");
+    for (const item of launchSmokeReceiptVisibilityQueue) {
+      console.log(
+        `${item.order}. ${item.key}: ${item.status} ${item.kind} -> ${item.target}`
+        + ` | recordIndex=${item.launchDutyRecordIndexPath}`
+      );
+    }
     for (const [index, command] of commands.entries()) {
       console.log(`${index + 1}. ${command.label}`);
       console.log(`   ${commandLine(command)}`);

@@ -23517,6 +23517,37 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     handoffCurrentKey: firstHandoffCheck,
     handoffAdvanceWhen: "packet_and_record_checks_confirmed"
   };
+  const packetReadyForHandoff = packetReviewQueue.length === 0;
+  const recordReadyForHandoff = recordCursorComplete || recordWriteQueue.length === 0;
+  const handoffBlockedBy = [
+    packetReadyForHandoff ? "" : "packet_result_review",
+    recordReadyForHandoff ? "" : "launch_duty_record_writes"
+  ].filter(Boolean);
+  const handoffReadinessCheck = {
+    mode: "developer-ops-staging-launch-duty-offline-handoff-readiness-check",
+    status: handoffBlockedBy.length === 0
+      ? "ready_for_handoff_checks"
+      : handoffBlockedBy.length === 1 && handoffBlockedBy[0] === "packet_result_review"
+        ? "blocked_until_packet_result_review"
+        : handoffBlockedBy.length === 1 && handoffBlockedBy[0] === "launch_duty_record_writes"
+          ? "blocked_until_launch_duty_record_writes"
+          : "blocked_until_packet_and_record_checks",
+    packetLaneStatus: packetReadyForHandoff
+      ? "packet_result_review_complete"
+      : firstPacketResultCheck?.status || "awaiting_operator_result_check",
+    recordLaneStatus: recordReadyForHandoff
+      ? "record_index_complete"
+      : recordCurrentStatus || "awaiting_record_write_confirmation",
+    packetReady: packetReadyForHandoff,
+    recordReady: recordReadyForHandoff,
+    handoffReady: handoffBlockedBy.length === 0,
+    blockedBy: handoffBlockedBy,
+    nextCheckKey: !packetReadyForHandoff
+      ? "review_staging_packet_results"
+      : !recordReadyForHandoff
+        ? "verify_launch_duty_record_writes"
+        : "handoff_checks_ready"
+  };
   return {
     mode: "developer-ops-staging-launch-duty-offline-execution-plan",
     status: "awaiting_operator_execution",
@@ -23561,6 +23592,7 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     nextRecordWriteAfterCurrent,
     currentExecutionCursor,
     cursorAdvanceBasis,
+    handoffReadinessCheck,
     firstHandoffCheck,
     nextAction: recordCursorComplete
       ? "Launch-duty record writes are complete from the selected record-index readback; continue packet result review and handoff checks before steady-state handoff."
@@ -23880,6 +23912,20 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         + ` | selection=${basis.recordReadbackStatus || cursor.recordReadbackStatus || "-"}`
         + ` | selectedProgress=${cursor.recordProgress || basis.recordReadbackSelectedProgress || "-"}`
         + ` | selectedNext=${cursor.recordCurrentKey || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.handoffReadinessCheck) {
+      const handoffReadiness = offlineExecutionPlan.handoffReadinessCheck;
+      const blockedBy = Array.isArray(handoffReadiness.blockedBy) && handoffReadiness.blockedBy.length
+        ? handoffReadiness.blockedBy.join(", ")
+        : "-";
+      lines.push(
+        `- Offline Execution Plan Handoff Readiness: status=${handoffReadiness.status || "-"}`
+        + ` | packetReady=${handoffReadiness.packetReady === true ? "yes" : "no"}`
+        + ` | recordReady=${handoffReadiness.recordReady === true ? "yes" : "no"}`
+        + ` | handoffReady=${handoffReadiness.handoffReady === true ? "yes" : "no"}`
+        + ` | blockedBy=${blockedBy}`
+        + ` | nextCheck=${handoffReadiness.nextCheckKey || "-"}`
       );
     }
     if (offlineExecutionPlan.firstHandoffCheck) {

@@ -22003,6 +22003,30 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.cursorAdvanceBasis.recordAdvanceWhen,
       "selected_record_index_complete"
     );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.handoffReadinessCheck.status,
+      "blocked_until_packet_result_review"
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.handoffReadinessCheck.recordReady,
+      true
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.handoffReadinessCheck.packetReady,
+      false
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.handoffReadinessCheck.handoffReady,
+      false
+    );
+    assert.deepEqual(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.handoffReadinessCheck.blockedBy,
+      ["packet_result_review"]
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.handoffReadinessCheck.nextCheckKey,
+      "review_staging_packet_results"
+    );
     assert.match(
       launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.nextAction,
       /Launch-duty record writes are complete/
@@ -22030,6 +22054,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
       /Offline Execution Plan Cursor Receipt Source: recordSource=selected_launch_duty_record_index_readback \| selection=selected_latest_readback \| selectedProgress=6\/6 \| selectedNext=-/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Offline Execution Plan Handoff Readiness: status=blocked_until_packet_result_review \| packetReady=no \| recordReady=yes \| handoffReady=no \| blockedBy=packet_result_review \| nextCheck=review_staging_packet_results/
     );
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,

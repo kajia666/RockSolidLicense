@@ -22262,6 +22262,140 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackHandoffIndexDownload.body,
       /Launch Duty Record Index Selection Checklist Step: [^\n]*key=continue_launch_duty_record_index_selection_handoff[^\n]*order=8[^\n]*file=developer-ops-steady-state-handoff-brief\.txt[^\n]*format=steady-state-handoff-brief[^\n]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    const launchDutyPacketReviewReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        action: "packet_review_readback",
+        intent: "launch_duty_packet_review_complete",
+        planKind: "packet_review",
+        planMode: "readback",
+        targetType: "launch-duty-packet-review",
+        href: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        fileName: "staging-launch-duty-archive-index.json",
+        format: "launch-duty-packet-review",
+        launchOpsOverviewContextKind: "launch_ops_overview_status",
+        launchOpsOverviewDownloadKey: "ops_launch_operations_overview_status",
+        launchOpsOverviewDownloadFileName: "developer-ops-launch-operations-overview-status.txt",
+        launchOpsOverviewDownloadFormat: "launch-operations-overview-status",
+        launchOpsOverviewDownloadHref: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        launchReadinessNextGateStatus: expectedSteadyStateGoLiveGate.status,
+        launchReadinessNextGateDecision: expectedSteadyStateGoLiveGate.decision,
+        launchReadinessNextGateCurrentGate: expectedSteadyStateGoLiveGate.currentGate,
+        launchReadinessNextGateCanEnterInitialLaunch: expectedSteadyStateGoLiveGate.canEnterInitialLaunch,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchDutyRecordIndexState: {
+          mode: "staging-launch-duty-record-index",
+          status: "complete",
+          recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+          recordedKeys: [
+            "launch_day_watch_summary",
+            "receipt_visibility_snapshot",
+            "first_wave_incident_log",
+            "rollback_signal_review",
+            "stabilization_owner_handoff",
+            "first_wave_closeout"
+          ],
+          pendingKeys: [],
+          nextRecordKey: null
+        },
+        launchDutyPacketReviewState: {
+          mode: "staging-launch-duty-packet-review",
+          status: "complete",
+          archiveIndexFile: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-launch-duty-archive-index.json",
+          reviewedKeys: [
+            "run_record_index",
+            "artifact_manifest",
+            "backup_restore_packet",
+            "closeout_reload_packet",
+            "readiness_review_packet",
+            "production_signoff_packet"
+          ],
+          pendingKeys: [],
+          nextPacketKey: null
+        },
+        note: "launch-duty packet review read back after packet result checks"
+      },
+      ownerSession.token
+    );
+    assert.equal(launchDutyPacketReviewReceipt.launchDutyPacketReviewState.status, "complete");
+    assert.equal(launchDutyPacketReviewReceipt.launchDutyPacketReviewState.reviewedCount, 6);
+    assert.equal(launchDutyPacketReviewReceipt.launchDutyPacketReviewState.pendingCount, 0);
+    assert.equal(launchDutyPacketReviewReceipt.launchDutyPacketReviewState.nextPacketKey, null);
+    const launchDutyPacketReviewSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const launchDutyPacketReviewActionOrder = launchDutyPacketReviewSnapshot.summary.initialLaunchOpsReadiness
+      .launchDutyActionOrder;
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.currentExecutionCursor.packetCursorSource,
+      "selected_launch_duty_packet_review_readback"
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.currentExecutionCursor.packetProgress,
+      "6/6"
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.currentExecutionCursor.packetCurrentOrder,
+      null
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.currentExecutionCursor.packetNextOrder,
+      null
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.remainingPacketReviewCount,
+      0
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.cursorAdvanceBasis.packetCurrentStatus,
+      "packet_result_review_complete"
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.cursorAdvanceBasis.packetAdvanceWhen,
+      "selected_packet_review_complete"
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.handoffReadinessCheck.status,
+      "ready_for_handoff_checks"
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.handoffReadinessCheck.packetReady,
+      true
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.handoffReadinessCheck.recordReady,
+      true
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.handoffReadinessCheck.handoffReady,
+      true
+    );
+    assert.deepEqual(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.handoffReadinessCheck.blockedBy,
+      []
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.handoffReadinessCheck.nextCheckKey,
+      "handoff_checks_ready"
+    );
+    assert.match(
+      launchDutyPacketReviewSnapshot.summaryText,
+      /Offline Execution Plan Cursor: packetCurrent=-\.- \| packetNext=-\.- \| recordCurrent=-\.- \| recordNext=-\.- \| handoffCurrent=review_staging_packet_results/
+    );
+    assert.match(
+      launchDutyPacketReviewSnapshot.summaryText,
+      /Offline Execution Plan Packet Receipt Source: packetSource=selected_launch_duty_packet_review_readback \| selection=selected_latest_packet_review_readback \| selectedProgress=6\/6 \| selectedNext=-/
+    );
+    assert.match(
+      launchDutyPacketReviewSnapshot.summaryText,
+      /Offline Execution Plan Handoff Readiness: status=ready_for_handoff_checks \| packetReady=yes \| recordReady=yes \| handoffReady=yes \| blockedBy=- \| nextCheck=handoff_checks_ready/
+    );
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

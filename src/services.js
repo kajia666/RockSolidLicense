@@ -21960,6 +21960,15 @@ const LAUNCH_DUTY_RECORD_INDEX_SEQUENCE = [
   "first_wave_closeout"
 ];
 
+const LAUNCH_DUTY_PACKET_REVIEW_SEQUENCE = [
+  "run_record_index",
+  "artifact_manifest",
+  "backup_restore_packet",
+  "closeout_reload_packet",
+  "readiness_review_packet",
+  "production_signoff_packet"
+];
+
 function normalizeLaunchDutyRecordIndexKey(value = "") {
   return String(value || "")
     .trim()
@@ -22052,6 +22061,45 @@ function normalizeLaunchDutyRecordIndexState(value = null) {
   };
 }
 
+function normalizeLaunchDutyPacketReviewState(value = null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const packets = normalizeLaunchDutyRecordIndexRecords(value.packets || value.packetResults);
+  const reviewedFromPackets = Object.entries(packets)
+    .filter(([, packet]) => packet.status === "reviewed" || packet.status === "complete" || packet.status === "confirmed")
+    .map(([key]) => key);
+  const reviewedKeys = normalizeLaunchDutyRecordIndexKeyList(value.reviewedKeys || value.reviewedPacketKeys);
+  const resolvedReviewedKeys = reviewedKeys.length ? reviewedKeys : reviewedFromPackets;
+  const pendingKeys = normalizeLaunchDutyRecordIndexKeyList(value.pendingKeys || value.pendingPacketKeys);
+  const knownKeys = LAUNCH_DUTY_PACKET_REVIEW_SEQUENCE.filter((key) => (
+    resolvedReviewedKeys.includes(key)
+    || pendingKeys.includes(key)
+    || Object.prototype.hasOwnProperty.call(packets, key)
+  ));
+  const resolvedPendingKeys = pendingKeys.length
+    ? pendingKeys
+    : knownKeys.filter((key) => !resolvedReviewedKeys.includes(key));
+  const nextPacketKey = normalizeLaunchDutyRecordIndexKey(value.nextPacketKey || value.currentPacketKey)
+    || resolvedPendingKeys[0]
+    || null;
+  return {
+    version: "developer-ops-launch-duty-packet-review-state/v1",
+    mode: normalizeDeveloperOpsConfirmationToken(value.mode, "staging-launch-duty-packet-review"),
+    status: normalizeDeveloperOpsConfirmationToken(
+      value.status,
+      resolvedPendingKeys.length ? "in_progress" : "complete"
+    ),
+    archiveIndexFile: String(value.archiveIndexFile || value.launchDutyArchiveIndexPath || value.path || "").trim().slice(0, 1000),
+    reviewedKeys: resolvedReviewedKeys,
+    pendingKeys: resolvedPendingKeys,
+    reviewedCount: resolvedReviewedKeys.length,
+    pendingCount: resolvedPendingKeys.length,
+    nextPacketKey,
+    packets
+  };
+}
+
 function buildSteadyStateDutyPlanReceiptPayload(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -22139,6 +22187,13 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       || metadata.launchDutyRecordIndexSnapshot
       || null
   );
+  const launchDutyPacketReviewState = normalizeLaunchDutyPacketReviewState(
+    item.launchDutyPacketReviewState
+      || item.launchDutyPacketReviewSnapshot
+      || metadata.launchDutyPacketReviewState
+      || metadata.launchDutyPacketReviewSnapshot
+      || null
+  );
   const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
   const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
   const note = String(item.note ?? metadata.note ?? "").trim();
@@ -22171,6 +22226,7 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     launchReadinessNextGateLaunchDutyRecordIndexPath,
     launchOpsOverviewContextLaunchDutyRecordIndexPath,
     launchDutyRecordIndexState,
+    launchDutyPacketReviewState,
     focusKind,
     focusReason,
     note,
@@ -22205,6 +22261,7 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       launchReadinessNextGateLaunchDutyRecordIndexPath,
       launchOpsOverviewContextLaunchDutyRecordIndexPath,
       launchDutyRecordIndexState,
+      launchDutyPacketReviewState,
       focusKind,
       focusReason,
       note,
@@ -22243,6 +22300,7 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
     launchReadinessNextGateCanEnterInitialLaunch: receipt.launchReadinessNextGateCanEnterInitialLaunch === true,
     launchReadinessNextGateLaunchDutyRecordIndexPath: String(receipt.launchReadinessNextGateLaunchDutyRecordIndexPath || "").trim(),
     launchDutyRecordIndexState: normalizeLaunchDutyRecordIndexState(receipt.launchDutyRecordIndexState),
+    launchDutyPacketReviewState: normalizeLaunchDutyPacketReviewState(receipt.launchDutyPacketReviewState),
     focusKind: normalizeDeveloperOpsConfirmationToken(receipt.focusKind, ""),
     focusReason: String(receipt.focusReason || "").trim(),
     note: String(receipt.note || "").trim()
@@ -22414,6 +22472,39 @@ function formatLaunchDutyRecordIndexStateProgress(score = null) {
   return `${recordedCount}/${totalCount}`;
 }
 
+function getLaunchDutyPacketReviewStateProgressScore(receipt = null) {
+  const state = normalizeLaunchDutyPacketReviewState(receipt?.launchDutyPacketReviewState);
+  if (!state) {
+    return {
+      hasState: false,
+      complete: false,
+      reviewedCount: -1,
+      pendingCount: Number.POSITIVE_INFINITY
+    };
+  }
+  const reviewedCount = Number(state.reviewedCount ?? (Array.isArray(state.reviewedKeys) ? state.reviewedKeys.length : 0));
+  const pendingCount = Number(state.pendingCount ?? (Array.isArray(state.pendingKeys) ? state.pendingKeys.length : 0));
+  return {
+    hasState: true,
+    complete: state.status === "complete" || pendingCount === 0,
+    reviewedCount: Number.isFinite(reviewedCount) ? reviewedCount : 0,
+    pendingCount: Number.isFinite(pendingCount) ? pendingCount : 0
+  };
+}
+
+function formatLaunchDutyPacketReviewStateProgress(score = null) {
+  if (!score?.hasState) {
+    return "-";
+  }
+  const reviewedCount = Number(score.reviewedCount ?? 0);
+  const pendingCount = Number(score.pendingCount ?? 0);
+  const totalCount = Math.max(
+    reviewedCount + pendingCount,
+    LAUNCH_DUTY_PACKET_REVIEW_SEQUENCE.length
+  );
+  return `${reviewedCount}/${totalCount}`;
+}
+
 function compareLaunchDutyRecordIndexReceiptProgress(left = null, right = null) {
   const leftScore = getLaunchDutyRecordIndexStateProgressScore(left);
   const rightScore = getLaunchDutyRecordIndexStateProgressScore(right);
@@ -22425,6 +22516,24 @@ function compareLaunchDutyRecordIndexReceiptProgress(left = null, right = null) 
   }
   if (leftScore.recordedCount !== rightScore.recordedCount) {
     return leftScore.recordedCount - rightScore.recordedCount;
+  }
+  if (leftScore.pendingCount !== rightScore.pendingCount) {
+    return rightScore.pendingCount - leftScore.pendingCount;
+  }
+  return snapshotDateMs(left?.recordedAt || left?.createdAt) - snapshotDateMs(right?.recordedAt || right?.createdAt);
+}
+
+function compareLaunchDutyPacketReviewReceiptProgress(left = null, right = null) {
+  const leftScore = getLaunchDutyPacketReviewStateProgressScore(left);
+  const rightScore = getLaunchDutyPacketReviewStateProgressScore(right);
+  if (leftScore.hasState !== rightScore.hasState) {
+    return leftScore.hasState ? 1 : -1;
+  }
+  if (leftScore.complete !== rightScore.complete) {
+    return leftScore.complete ? 1 : -1;
+  }
+  if (leftScore.reviewedCount !== rightScore.reviewedCount) {
+    return leftScore.reviewedCount - rightScore.reviewedCount;
   }
   if (leftScore.pendingCount !== rightScore.pendingCount) {
     return rightScore.pendingCount - leftScore.pendingCount;
@@ -22461,6 +22570,78 @@ function selectSteadyStateDutyPlanReceiptForLaunchDuty(receipts = [], {
     .slice()
     .sort((left, right) => compareLaunchDutyRecordIndexReceiptProgress(right, left))
     [0] || null;
+}
+
+function selectSteadyStateDutyPlanPacketReviewReceiptForLaunchDuty(receipts = [], {
+  productCode = "",
+  channel = ""
+} = {}) {
+  const candidates = filterSteadyStateDutyPlanReceiptsForLaunchDuty(receipts, { productCode, channel })
+    .filter((item) => getLaunchDutyPacketReviewStateProgressScore(item).hasState);
+  return candidates
+    .slice()
+    .sort((left, right) => compareLaunchDutyPacketReviewReceiptProgress(right, left))
+    [0] || null;
+}
+
+function buildLaunchDutyPacketReviewReceiptSelectionState(receipts = [], selectedReceipt = null, {
+  productCode = "",
+  channel = ""
+} = {}) {
+  const candidates = filterSteadyStateDutyPlanReceiptsForLaunchDuty(receipts, { productCode, channel })
+    .filter((item) => getLaunchDutyPacketReviewStateProgressScore(item).hasState);
+  if (!candidates.length && !selectedReceipt) {
+    return null;
+  }
+  const selected = selectedReceipt || selectSteadyStateDutyPlanPacketReviewReceiptForLaunchDuty(candidates, { productCode, channel });
+  const latest = candidates
+    .slice()
+    .sort((left, right) => snapshotDateMs(right?.recordedAt || right?.createdAt) - snapshotDateMs(left?.recordedAt || left?.createdAt))
+    [0] || selected || null;
+  const selectedScore = getLaunchDutyPacketReviewStateProgressScore(selected);
+  const latestScore = getLaunchDutyPacketReviewStateProgressScore(latest);
+  const selectedState = normalizeLaunchDutyPacketReviewState(selected?.launchDutyPacketReviewState);
+  const latestState = normalizeLaunchDutyPacketReviewState(latest?.launchDutyPacketReviewState);
+  const ignoredLatestReceipt = Boolean(
+    selected
+    && latest
+    && (selected.auditLogId || selected.recordedAt || selected.createdAt)
+    && (latest.auditLogId || latest.recordedAt || latest.createdAt)
+    && (selected.auditLogId !== latest.auditLogId)
+  );
+  const selectedProgressBetter = compareLaunchDutyPacketReviewReceiptProgress(selected, latest) > 0;
+  const status = ignoredLatestReceipt && selectedProgressBetter
+    ? "selected_stronger_packet_review_over_latest_readback"
+    : "selected_latest_packet_review_readback";
+  return {
+    version: "developer-ops-launch-duty-packet-review-receipt-selection/v1",
+    status,
+    productCode: selected?.productCode || latest?.productCode || productCode || null,
+    channel: selected?.channel || latest?.channel || channel || "stable",
+    selectedAuditLogId: selected?.auditLogId || null,
+    selectedRecordedAt: selected?.recordedAt || selected?.createdAt || null,
+    selectedProgress: formatLaunchDutyPacketReviewStateProgress(selectedScore),
+    selectedReviewedCount: selectedScore.hasState ? selectedScore.reviewedCount : null,
+    selectedPendingCount: selectedScore.hasState ? selectedScore.pendingCount : null,
+    selectedReviewedKeys: selectedState?.reviewedKeys || [],
+    selectedPendingKeys: selectedState?.pendingKeys || [],
+    selectedNextPacketKey: selectedState?.nextPacketKey || null,
+    selectedComplete: selectedScore.complete === true,
+    latestAuditLogId: latest?.auditLogId || null,
+    latestRecordedAt: latest?.recordedAt || latest?.createdAt || null,
+    latestProgress: formatLaunchDutyPacketReviewStateProgress(latestScore),
+    latestReviewedCount: latestScore.hasState ? latestScore.reviewedCount : null,
+    latestPendingCount: latestScore.hasState ? latestScore.pendingCount : null,
+    latestReviewedKeys: latestState?.reviewedKeys || [],
+    latestPendingKeys: latestState?.pendingKeys || [],
+    latestNextPacketKey: latestState?.nextPacketKey || null,
+    latestComplete: latestScore.complete === true,
+    ignoredLatestReceipt,
+    candidateCount: candidates.length,
+    nextAction: selectedScore.complete
+      ? "Continue to launch-duty handoff checks from the completed packet review readback."
+      : "Continue packet result review from the selected packet readback."
+  };
 }
 
 function buildLaunchDutyRecordIndexReceiptSelectionState(receipts = [], selectedReceipt = null, {
@@ -23350,6 +23531,10 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     && typeof options.launchDutyRecordIndexReceiptSelection === "object"
       ? options.launchDutyRecordIndexReceiptSelection
       : null;
+  const launchDutyPacketReviewReceiptSelection = options?.launchDutyPacketReviewReceiptSelection
+    && typeof options.launchDutyPacketReviewReceiptSelection === "object"
+      ? options.launchDutyPacketReviewReceiptSelection
+      : null;
   const files = stagingLaunchDutyArchive.files && typeof stagingLaunchDutyArchive.files === "object"
     ? stagingLaunchDutyArchive.files
     : {};
@@ -23456,8 +23641,21 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     launchDutyRecordIndexPath,
     command: buildRecordCommand(key)
   }));
-  const currentPacketReviewStep = packetReviewQueue[0] || null;
-  const nextPacketReviewAfterCurrent = packetReviewQueue[1] || null;
+  const selectedNextPacketKey = normalizeLaunchDutyRecordIndexKey(
+    launchDutyPacketReviewReceiptSelection?.selectedNextPacketKey
+  );
+  const selectedPacketCursorIndex = selectedNextPacketKey
+    ? packetReviewQueue.findIndex((item) => item.key === selectedNextPacketKey)
+    : -1;
+  const packetCursorComplete = launchDutyPacketReviewReceiptSelection?.selectedComplete === true;
+  const currentPacketReviewStep = packetCursorComplete
+    ? null
+    : selectedPacketCursorIndex >= 0
+      ? packetReviewQueue[selectedPacketCursorIndex]
+      : packetReviewQueue[0] || null;
+  const nextPacketReviewAfterCurrent = currentPacketReviewStep
+    ? packetReviewQueue[currentPacketReviewStep.order] || null
+    : null;
   const selectedNextRecordKey = normalizeLaunchDutyRecordIndexKey(
     launchDutyRecordIndexReceiptSelection?.selectedNextRecordKey
   );
@@ -23485,12 +23683,20 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     ? "selected_record_index_complete"
     : "record_artifact_exists_and_index_includes_key";
   const firstHandoffCheck = "review_staging_packet_results";
+  const packetCursorSource = launchDutyPacketReviewReceiptSelection
+    ? "selected_launch_duty_packet_review_readback"
+    : "default_offline_plan_start";
+  const packetReadbackStatus = launchDutyPacketReviewReceiptSelection?.status || null;
+  const packetReadbackSelectedProgress = launchDutyPacketReviewReceiptSelection?.selectedProgress || null;
   const currentExecutionCursor = {
     mode: "developer-ops-staging-launch-duty-offline-execution-cursor",
     packetCurrentOrder: currentPacketReviewStep?.order || null,
     packetCurrentKey: currentPacketReviewStep?.key || null,
     packetNextOrder: nextPacketReviewAfterCurrent?.order || null,
     packetNextKey: nextPacketReviewAfterCurrent?.key || null,
+    packetCursorSource,
+    packetProgress: packetReadbackSelectedProgress,
+    packetReadbackStatus,
     recordCurrentOrder: currentRecordWriteStep?.order || null,
     recordCurrentKey: currentRecordWriteStep?.key || null,
     recordNextOrder: nextRecordWriteAfterCurrent?.order || null,
@@ -23502,10 +23708,18 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
   };
   const cursorAdvanceBasis = {
     mode: "developer-ops-staging-launch-duty-offline-cursor-advance-basis",
-    packetCurrentStatus: firstPacketResultCheck?.status || null,
-    packetAdvanceWhen: "expected_artifact_exists_and_result_check_confirmed",
+    packetCurrentStatus: packetCursorComplete
+      ? "packet_result_review_complete"
+      : firstPacketResultCheck?.status || null,
+    packetAdvanceWhen: packetCursorComplete
+      ? "selected_packet_review_complete"
+      : "expected_artifact_exists_and_result_check_confirmed",
     packetNextOrder: nextPacketReviewAfterCurrent?.order || null,
     packetNextKey: nextPacketReviewAfterCurrent?.key || null,
+    packetCursorSource,
+    packetReadbackStatus,
+    packetReadbackSelectedProgress,
+    packetReadbackSelectedAuditLogId: launchDutyPacketReviewReceiptSelection?.selectedAuditLogId || null,
     recordCurrentStatus,
     recordAdvanceWhen,
     recordNextOrder: nextRecordWriteAfterCurrent?.order || null,
@@ -23517,7 +23731,7 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     handoffCurrentKey: firstHandoffCheck,
     handoffAdvanceWhen: "packet_and_record_checks_confirmed"
   };
-  const packetReadyForHandoff = packetReviewQueue.length === 0;
+  const packetReadyForHandoff = packetCursorComplete || packetReviewQueue.length === 0;
   const recordReadyForHandoff = recordCursorComplete || recordWriteQueue.length === 0;
   const handoffBlockedBy = [
     packetReadyForHandoff ? "" : "packet_result_review",
@@ -23571,7 +23785,9 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
       : null,
     firstPacketResultCheck,
     packetReviewQueue,
-    remainingPacketReviewCount: Math.max(0, packetReviewQueue.length - 1),
+    remainingPacketReviewCount: currentPacketReviewStep
+      ? Math.max(0, packetReviewQueue.length - currentPacketReviewStep.order)
+      : 0,
     currentPacketReviewStep,
     nextPacketReviewAfterCurrent,
     firstRecordWriteStep: firstRecordKey
@@ -23610,7 +23826,8 @@ function buildDeveloperOpsLaunchDutyActionOrder({
   nextFollowUpDownload = null,
   primaryWorkspaceAction = null,
   launchReadinessNextGate = null,
-  launchDutyRecordIndexReceiptSelection = null
+  launchDutyRecordIndexReceiptSelection = null,
+  launchDutyPacketReviewReceiptSelection = null
 } = {}) {
   const normalizedStatus = String(status || "unknown").trim().toLowerCase() || "unknown";
   const nextFollowUpStatus = launchReceiptNextFollowUp
@@ -23666,7 +23883,10 @@ function buildDeveloperOpsLaunchDutyActionOrder({
     : null;
   const offlineExecutionPlan = buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(
     stagingLaunchDutyArchive,
-    { launchDutyRecordIndexReceiptSelection }
+    {
+      launchDutyRecordIndexReceiptSelection,
+      launchDutyPacketReviewReceiptSelection
+    }
   );
   const steps = [
     {
@@ -23871,6 +24091,16 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         + ` | recordCurrent=${cursor.recordCurrentOrder || "-"}.${cursor.recordCurrentKey || "-"}`
         + ` | recordNext=${cursor.recordNextOrder || "-"}.${cursor.recordNextKey || "-"}`
         + ` | handoffCurrent=${cursor.handoffCurrentKey || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.currentExecutionCursor?.packetCursorSource) {
+      const cursor = offlineExecutionPlan.currentExecutionCursor;
+      const basis = offlineExecutionPlan.cursorAdvanceBasis || {};
+      lines.push(
+        `- Offline Execution Plan Packet Receipt Source: packetSource=${cursor.packetCursorSource || "-"}`
+        + ` | selection=${basis.packetReadbackStatus || cursor.packetReadbackStatus || "-"}`
+        + ` | selectedProgress=${cursor.packetProgress || basis.packetReadbackSelectedProgress || "-"}`
+        + ` | selectedNext=${cursor.packetCurrentKey || "-"}`
       );
     }
     if (offlineExecutionPlan.nextPacketReviewAfterCurrent) {
@@ -29683,6 +29913,21 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       channel: latestReceipt?.channel || scope.channel || "stable"
     }
   );
+  const latestSteadyStateDutyPlanPacketReviewReceipt = selectSteadyStateDutyPlanPacketReviewReceiptForLaunchDuty(
+    steadyStateDutyPlanReceipts,
+    {
+      productCode: latestReceipt?.productCode || scope.productCode || "",
+      channel: latestReceipt?.channel || scope.channel || "stable"
+    }
+  );
+  const launchDutyPacketReviewReceiptSelection = buildLaunchDutyPacketReviewReceiptSelectionState(
+    steadyStateDutyPlanReceipts,
+    latestSteadyStateDutyPlanPacketReviewReceipt,
+    {
+      productCode: latestReceipt?.productCode || scope.productCode || "",
+      channel: latestReceipt?.channel || scope.channel || "stable"
+    }
+  );
   const firstWaveConfirmationChain = buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation);
   const operatorActionReceipts = buildDeveloperOpsInitialLaunchOperatorActionReceipts(overview.latestLaunchReceipts, 5);
   const primaryWorkspaceAction = launchReceiptNextFollowUp?.recommendedAction?.workspaceAction
@@ -30299,7 +30544,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     nextFollowUpDownload,
     primaryWorkspaceAction,
     launchReadinessNextGate,
-    launchDutyRecordIndexReceiptSelection
+    launchDutyRecordIndexReceiptSelection,
+    launchDutyPacketReviewReceiptSelection
   });
   const currentFirstWaveReadinessBridge = firstWaveReadinessBridge && firstLaunchOperatingChain
     ? {
@@ -30413,6 +30659,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateDutyActionLinks,
     latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
     launchDutyRecordIndexReceiptSelection,
+    launchDutyPacketReviewReceiptSelection,
     launchOperationsEvidenceChain,
     launchOperationsHandoffSummary,
     launchOperationsDailyBrief,
@@ -53591,6 +53838,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           || body.launchDutyRecordIndexSnapshot
           || null
       );
+      const launchDutyPacketReviewState = normalizeLaunchDutyPacketReviewState(
+        body.launchDutyPacketReviewState
+          || body.launchDutyPacketReviewSnapshot
+          || null
+      );
       const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
       const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
@@ -53640,6 +53892,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessNextGateLaunchDutyRecordIndexPath,
           launchOpsOverviewContextLaunchDutyRecordIndexPath,
           launchDutyRecordIndexState,
+          launchDutyPacketReviewState,
           focusKind,
           focusReason,
           note,
@@ -53678,6 +53931,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchReadinessNextGateLaunchDutyRecordIndexPath,
           launchOpsOverviewContextLaunchDutyRecordIndexPath,
           launchDutyRecordIndexState,
+          launchDutyPacketReviewState,
           focusKind,
           focusReason,
           note,

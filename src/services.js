@@ -23357,6 +23357,38 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
   if (!archiveIndexPath && !launchDutyRecordIndexPath && !packetReviewStepCount) {
     return null;
   }
+  const packetOperatorActions = {
+    run_record_index: "operator_review_run_record_index",
+    artifact_manifest: "operator_review_artifact_manifest",
+    backup_restore_packet: "operator_review_backup_restore_packet",
+    closeout_reload_packet: "operator_reload_closeout_packet",
+    readiness_review_packet: "operator_review_readiness_packet",
+    production_signoff_packet: "operator_review_production_signoff_packet"
+  };
+  const firstPacket = packetFiles[0] || null;
+  const firstRecordKey = LAUNCH_DUTY_RECORD_INDEX_SEQUENCE[0] || null;
+  const archiveRoot = String(stagingLaunchDutyArchive.archiveRoot || "").trim();
+  const firstRecordArtifactPath = firstRecordKey
+    ? `${archiveRoot ? `${archiveRoot}/` : ""}${String(firstRecordKey).replaceAll("_", "-")}.md`
+    : null;
+  const firstRecordCommand = launchDutyRecordIndexPath && firstRecordKey && firstRecordArtifactPath
+    ? "npm.cmd run staging:launch-duty:record -- "
+      + `--record-index-file ${launchDutyRecordIndexPath} `
+      + `--key ${firstRecordKey} `
+      + `--artifact-path ${firstRecordArtifactPath} `
+      + "--value-json <redacted-json>"
+    : null;
+  const buildPacketCommand = (packet = null) => {
+    const packetKey = packet?.key || null;
+    if (packetKey === "closeout_reload_packet") {
+      return stagingLaunchDutyArchive.commands?.closeoutReload
+        || stagingLaunchDutyArchive.commands?.profileDrivenDryRun
+        || null;
+    }
+    return stagingLaunchDutyArchive.commands?.profileDrivenDryRun
+      || stagingLaunchDutyArchive.commands?.closeoutReload
+      || null;
+  };
   return {
     mode: "developer-ops-staging-launch-duty-offline-execution-plan",
     status: "awaiting_operator_execution",
@@ -23369,6 +23401,25 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
       "review_staging_packet_results",
       "verify_launch_duty_record_writes"
     ],
+    firstPacketReviewStep: firstPacket
+      ? {
+          order: 1,
+          key: firstPacket.key || null,
+          packetPath: firstPacket.path || null,
+          operatorAction: packetOperatorActions[firstPacket.key] || "operator_review_staging_packet",
+          command: buildPacketCommand(firstPacket)
+        }
+      : null,
+    firstRecordWriteStep: firstRecordKey
+      ? {
+          order: 1,
+          key: firstRecordKey,
+          expectedRecordArtifactPath: firstRecordArtifactPath,
+          launchDutyRecordIndexPath,
+          command: firstRecordCommand
+        }
+      : null,
+    firstHandoffCheck: "review_staging_packet_results",
     nextAction: "Open the archive index first, review packet results, write launch-duty records, then verify record writes before handoff."
   };
 }
@@ -23572,6 +23623,28 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
       + ` | recordWriteSteps=${recordWriteStepCount}`
       + ` | handoffChecks=${handoffChecks.length ? handoffChecks.join(", ") : "-"}`
     );
+    if (offlineExecutionPlan.firstPacketReviewStep) {
+      const firstPacket = offlineExecutionPlan.firstPacketReviewStep;
+      lines.push(
+        `- Offline Execution Plan First Packet: order=${firstPacket.order || "-"}`
+        + ` | key=${firstPacket.key || "-"}`
+        + ` | action=${firstPacket.operatorAction || "-"}`
+        + ` | path=${firstPacket.packetPath || "-"}`
+        + ` | command=${firstPacket.command || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.firstRecordWriteStep) {
+      const firstRecord = offlineExecutionPlan.firstRecordWriteStep;
+      lines.push(
+        `- Offline Execution Plan First Record: order=${firstRecord.order || "-"}`
+        + ` | key=${firstRecord.key || "-"}`
+        + ` | artifact=${firstRecord.expectedRecordArtifactPath || "-"}`
+        + ` | command=${firstRecord.command || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.firstHandoffCheck) {
+      lines.push(`- Offline Execution Plan First Handoff Check: ${offlineExecutionPlan.firstHandoffCheck}`);
+    }
     lines.push(`- Offline Execution Plan Next Action: ${offlineExecutionPlan.nextAction || "-"}`);
   }
   lines.push("- Steps:");

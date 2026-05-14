@@ -17489,6 +17489,33 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyActionOrder.offlineExecutionPlan.handoffChecks,
       ["review_staging_packet_results", "verify_launch_duty_record_writes"]
     );
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstPacketReviewStep.key, "run_record_index");
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstPacketReviewStep.packetPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/staging-run-record-index.json"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstPacketReviewStep.operatorAction,
+      "operator_review_run_record_index"
+    );
+    assert.match(
+      launchDutyActionOrder.offlineExecutionPlan.firstPacketReviewStep.command,
+      /npm\.cmd run staging:rehearsal/
+    );
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.key, "launch_day_watch_summary");
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.expectedRecordArtifactPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/launch-day-watch-summary.md"
+    );
+    assert.match(
+      launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.command,
+      /--record-index-file artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.command,
+      /--key launch_day_watch_summary --artifact-path artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md/
+    );
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstHandoffCheck, "review_staging_packet_results");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key, "ops_launch_receipt_next_follow_up");
@@ -18498,6 +18525,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineHandoffRoutesDownload.body,
       /Offline Execution Plan Counts: packetReviewSteps=6 \| recordWriteSteps=6 \| handoffChecks=review_staging_packet_results, verify_launch_duty_record_writes/
     );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan First Packet: order=1 \| key=run_record_index \| action=operator_review_run_record_index \| path=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json \| command=npm\.cmd run staging:rehearsal/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan First Record: order=1 \| key=launch_day_watch_summary \| artifact=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md \| command=npm\.cmd run staging:launch-duty:record/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan First Handoff Check: review_staging_packet_results/
+    );
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Status: USED/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
@@ -19076,6 +19115,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       /Offline Execution Plan Counts: packetReviewSteps=6 \| recordWriteSteps=6 \| handoffChecks=review_staging_packet_results, verify_launch_duty_record_writes/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan First Packet: order=1 \| key=run_record_index \| action=operator_review_run_record_index \| path=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json \| command=npm\.cmd run staging:rehearsal/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan First Record: order=1 \| key=launch_day_watch_summary \| artifact=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md \| command=npm\.cmd run staging:launch-duty:record/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan First Handoff Check: review_staging_packet_results/
     );
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,

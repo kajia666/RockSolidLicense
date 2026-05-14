@@ -14706,6 +14706,15 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         params
       )
     : null;
+  const steadyStateHandoffLandingOperatorOrder = launchDutySteadyStateHandoffLandingSource
+    ? (Array.isArray(launchDutySteadyStateHandoffLandingSource.operatorOrder)
+        && launchDutySteadyStateHandoffLandingSource.operatorOrder.length
+          ? launchDutySteadyStateHandoffLandingSource.operatorOrder
+          : [
+              launchDutySteadyStateHandoffLandingSource.nextAction
+                || "Open the steady-state handoff brief before handing launch duty into stable operations."
+            ])
+    : [];
   const steadyStateHandoffLanding = launchDutySteadyStateHandoffLandingSource
     ? {
         mode: "developer-launch-mainline-steady-state-handoff-landing",
@@ -14718,6 +14727,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         launchDutyRecordIndexPath: launchDutySteadyStateHandoffLandingSource.launchDutyRecordIndexPath
           || launchOperationsOperatorEntry?.launchDutyRecordIndexPath
           || null,
+        operatorOrder: steadyStateHandoffLandingOperatorOrder,
         nextAction: launchDutySteadyStateHandoffLandingSource.nextAction
           || "Open the steady-state handoff brief before handing launch duty into stable operations.",
         recommendedDownload: launchDutySteadyStateHandoffDownload,
@@ -16428,6 +16438,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         title: "Steady-State Handoff Landing",
         summary: steadyStateHandoffLanding.nextAction
           || "Open the steady-state handoff brief before handing launch duty into stable operations.",
+        operatorOrder: steadyStateHandoffLandingOperatorOrder,
         tags: [
           {
             label: "status",
@@ -16448,7 +16459,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         details: [
           `File: ${steadyStateHandoffLanding.fileName || "-"}`,
           `Format: ${steadyStateHandoffLanding.format || "-"}`,
-          `Launch duty record index: ${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`
+          `Launch duty record index: ${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`,
+          ...steadyStateHandoffLandingOperatorOrder.map((item) => `Operator order: ${item}`)
         ],
         controls: [
           steadyStateHandoffLanding.recommendedDownload ? ensureLaunchMainlineControlHrefs({
@@ -16464,12 +16476,16 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
+  const steadyStateDutyReceiptReviewOperatorOrder = Array.isArray(steadyStateDutyReceiptReview?.operatorOrder)
+    ? steadyStateDutyReceiptReview.operatorOrder
+    : [];
   const steadyStateDutyReceiptReviewCard = steadyStateDutyReceiptReview
     ? {
         key: "steady_state_duty_receipt_review",
         title: "Steady-State Duty Receipt Review",
         summary: steadyStateDutyReceiptReview.nextAction
           || "Review the latest steady-state duty receipt before handing the lane to stable operations.",
+        operatorOrder: steadyStateDutyReceiptReviewOperatorOrder,
         tags: [
           {
             label: "status",
@@ -16490,7 +16506,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         details: [
           `Audit: ${steadyStateDutyReceiptReview.auditLogId || "-"}`,
           `Action: ${steadyStateDutyReceiptReview.action || "-"}`,
-          `Launch duty record index: ${steadyStateDutyReceiptReview.launchDutyRecordIndexPath || "-"}`
+          `Launch duty record index: ${steadyStateDutyReceiptReview.launchDutyRecordIndexPath || "-"}`,
+          ...steadyStateDutyReceiptReviewOperatorOrder.map((item) => `Operator order: ${item}`)
         ],
         controls: [
           steadyStateDutyReceiptReview.recommendedDownload ? ensureLaunchMainlineControlHrefs({
@@ -18364,6 +18381,15 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push(`- source=${steadyStateHandoffLanding.source || "-"} | launchDutyRecordIndex=${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`);
     lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(steadyStateHandoffLanding.recommendedDownload, { fileSeparator: " | " })}`);
     lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
+    const operatorOrder = Array.isArray(steadyStateHandoffLanding.operatorOrder)
+      ? steadyStateHandoffLanding.operatorOrder
+      : [];
+    if (operatorOrder.length) {
+      lines.push("Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
   }
   const steadyStateDutyReceiptReview = mainlineSummary.steadyStateDutyReceiptReview || null;
   if (steadyStateDutyReceiptReview) {
@@ -19326,6 +19352,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   lines.push("Operator Order:");
   lines.push("- Use this route map when reviewing the Launch Mainline zip offline.");
   lines.push("- Prefer the href values here over reconstructing download URLs from source and format names.");
+  const steadyStateHandoffLandingOperatorOrder = Array.isArray(steadyStateHandoffLanding?.operatorOrder)
+    ? steadyStateHandoffLanding.operatorOrder
+    : [];
+  for (const item of steadyStateHandoffLandingOperatorOrder) {
+    lines.push(`- ${item}`);
+  }
   if (steadyStateDutyReceiptReview) {
     lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
   }
@@ -21100,6 +21132,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   lines.push("- Open operations-handoff first to verify monitoring, alert, and shift handover coverage.");
   lines.push("- Use post-launch-sweep-handoff for first-wave runtime sweep evidence.");
   lines.push("- Use closeout-handoff after first-wave sweep is captured.");
+  const steadyStateHandoffLandingOperatorOrder = Array.isArray(steadyStateHandoffLanding?.operatorOrder)
+    ? steadyStateHandoffLanding.operatorOrder
+    : [];
+  for (const item of steadyStateHandoffLandingOperatorOrder) {
+    lines.push(`- ${item}`);
+  }
   if (steadyStateDutyReceiptReview) {
     lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
   }
@@ -30124,6 +30162,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
         launchDutyRecordIndexPath
       }
     : null;
+  const launchDutySteadyStateHandoffOperatorOrder = [
+    "Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations."
+  ];
   const launchDutySteadyStateHandoffLanding = launchDutyRecordIndexReceiptSelection?.selectedComplete === true
     && launchDutyPacketReviewReceiptSelection?.selectedComplete === true
       ? {
@@ -30143,7 +30184,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
           ),
           source: "developer-ops-launch-duty-handoff-landing",
           launchDutyRecordIndexPath,
-          nextAction: "Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations."
+          operatorOrder: launchDutySteadyStateHandoffOperatorOrder,
+          nextAction: launchDutySteadyStateHandoffOperatorOrder[0]
         }
       : null;
   const launchDutySteadyStateHandoffDownload = launchDutySteadyStateHandoffLanding
@@ -40515,6 +40557,15 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | href=${launchDutySteadyStateHandoffLanding.href || "-"}`
     );
     lines.push(`Landing Next: ${launchDutySteadyStateHandoffLanding.nextAction || "-"}`);
+    const operatorOrder = Array.isArray(launchDutySteadyStateHandoffLanding.operatorOrder)
+      ? launchDutySteadyStateHandoffLanding.operatorOrder
+      : [];
+    if (operatorOrder.length) {
+      lines.push("Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
     lines.push("");
   }
   const launchDutyHandoffAction = entry.launchDutyHandoffAction || null;

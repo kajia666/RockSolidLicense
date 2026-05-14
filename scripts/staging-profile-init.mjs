@@ -239,6 +239,24 @@ function buildPostSmokeBackfillCommands({ closeoutInputFile, readinessActionQueu
   }));
 }
 
+function buildFullTestSignoffBackfillCommand({ closeoutInputFile, readinessActionQueueFile, fullTestOutputFile }) {
+  return [
+    "npm.cmd run staging:signoff:backfill --",
+    "--input-file",
+    commandValue(closeoutInputFile),
+    "--condition-key",
+    "full_test_window_passed",
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(fullTestOutputFile),
+    "--decision",
+    "ready-for-production-signoff",
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
 function buildProfile(options) {
   const productCode = sanitizeArtifactSegment(options.productCode, "product");
   const channel = sanitizeArtifactSegment(options.channel || "stable", "stable");
@@ -292,6 +310,11 @@ function buildOperatorNextCommands({
   smokePreflightCommand,
   launchSmokeStagingCommand,
   postSmokeBackfillCommands,
+  postSmokeReadinessStatusCommand,
+  fullTestCommand,
+  fullTestOutputFile,
+  fullTestSignoffBackfillCommand,
+  postFullTestReadinessStatusCommand,
   routeMapGateDryRunFile,
   routeMapGateOutputFile
 }) {
@@ -401,6 +424,36 @@ function buildOperatorNextCommands({
       targetKey: postSmokeBackfillCommands[3].key,
       receiptIds: postSmokeBackfillCommands[3].receiptIds,
       nextAction: "Backfill receipt_visibility_review after the Launch Review, Launch Smoke, Developer Ops, and Launch Mainline receipt queue is visible."
+    },
+    {
+      key: "post_smoke_readiness_status",
+      status: "blocked_after_post_smoke_backfills",
+      command: postSmokeReadinessStatusCommand,
+      artifactPath: readinessActionQueueFile,
+      nextAction: "Refresh readiness after post-smoke closeout backfills before entering the full-test window."
+    },
+    {
+      key: "run_full_test_window",
+      status: "blocked_after_post_smoke_readiness_status",
+      command: fullTestCommand,
+      artifactPath: fullTestOutputFile,
+      nextAction: "Run the deferred full-test window only after post-smoke closeout evidence is backfilled."
+    },
+    {
+      key: "backfill_full_test_window_passed",
+      status: "blocked_after_full_test_window",
+      command: fullTestSignoffBackfillCommand,
+      artifactPath: fullTestOutputFile,
+      targetKey: "full_test_window_passed",
+      nextAction: "Backfill full_test_window_passed with the redacted full-test result."
+    },
+    {
+      key: "post_full_test_readiness_status",
+      status: "blocked_after_full_test_window_passed",
+      command: postFullTestReadinessStatusCommand,
+      artifactPath: readinessActionQueueFile,
+      targetKey: "production_signoff",
+      nextAction: "Refresh readiness after full_test_window_passed backfill to confirm production sign-off blockers."
     }
   ];
 }
@@ -417,7 +470,8 @@ function buildLaunchLaneFiles({
   launchSmokeOutputFile,
   launchSmokeHandoffFile,
   launchMainlineEvidenceReceiptsFile,
-  receiptVisibilityReviewFile
+  receiptVisibilityReviewFile,
+  fullTestOutputFile
 }) {
   return {
     archiveRoot,
@@ -432,10 +486,11 @@ function buildLaunchLaneFiles({
     launchSmokeHandoffFile,
     launchMainlineEvidenceReceiptsFile,
     receiptVisibilityReviewFile,
+    fullTestOutputFile,
     handoffFile: profile.handoffFile,
     launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
-    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, and launch smoke closeout backfills."
+    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, and full-test signoff."
   };
 }
 
@@ -469,6 +524,10 @@ function writeResult(result, json) {
     const smokePreflight = result.operatorNextCommands?.find((item) => item.key === "staging_smoke_preflight");
     const launchSmokeStaging = result.operatorNextCommands?.find((item) => item.key === "run_launch_smoke_staging");
     const postSmokeBackfills = (result.operatorNextCommands || []).filter((item) => item.key?.startsWith("backfill_post_smoke_"));
+    const postSmokeReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_smoke_readiness_status");
+    const fullTestWindow = result.operatorNextCommands?.find((item) => item.key === "run_full_test_window");
+    const fullTestSignoffBackfill = result.operatorNextCommands?.find((item) => item.key === "backfill_full_test_window_passed");
+    const postFullTestReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_full_test_readiness_status");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
     } else {
@@ -513,6 +572,18 @@ function writeResult(result, json) {
         console.log(`Post-smoke backfill ${index + 1}. ${item.targetKey}: ${item.status} -> ${item.command}`);
       });
     }
+    if (postSmokeReadinessStatus) {
+      console.log(`Post-smoke readiness status: ${postSmokeReadinessStatus.command}`);
+    }
+    if (fullTestWindow) {
+      console.log(`Full-test window: ${fullTestWindow.command}`);
+    }
+    if (fullTestSignoffBackfill) {
+      console.log(`Full-test signoff backfill: ${fullTestSignoffBackfill.command}`);
+    }
+    if (postFullTestReadinessStatus) {
+      console.log(`Post-full-test readiness status: ${postFullTestReadinessStatus.command}`);
+    }
     console.log(`Next action: ${result.nextAction}`);
     return;
   }
@@ -534,6 +605,7 @@ function main() {
     const launchSmokeHandoffFile = path.posix.join(archiveRoot, "launch-smoke-handoff.json");
     const launchMainlineEvidenceReceiptsFile = path.posix.join(archiveRoot, "launch-mainline-evidence-receipts.json");
     const receiptVisibilityReviewFile = path.posix.join(archiveRoot, "receipt-visibility-review.txt");
+    const fullTestOutputFile = path.posix.join(archiveRoot, "full-test-output.txt");
     const outputFile = options.outputFile
       ? path.resolve(options.outputFile)
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
@@ -580,6 +652,14 @@ function main() {
         receiptVisibilityReviewFile
       }
     });
+    const postSmokeReadinessStatusCommand = postCloseoutInitStatusCommand;
+    const fullTestCommand = "npm.cmd test";
+    const fullTestSignoffBackfillCommand = buildFullTestSignoffBackfillCommand({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      fullTestOutputFile
+    });
+    const postFullTestReadinessStatusCommand = postCloseoutInitStatusCommand;
     const launchLaneFiles = buildLaunchLaneFiles({
       archiveRoot,
       outputFile,
@@ -592,7 +672,8 @@ function main() {
       launchSmokeOutputFile,
       launchSmokeHandoffFile,
       launchMainlineEvidenceReceiptsFile,
-      receiptVisibilityReviewFile
+      receiptVisibilityReviewFile,
+      fullTestOutputFile
     });
     writeResult({
       status: "written",
@@ -618,6 +699,11 @@ function main() {
       smokePreflightCommand,
       launchSmokeStagingCommand,
       postSmokeBackfillCommands,
+      postSmokeReadinessStatusCommand,
+      fullTestCommand,
+      fullTestOutputFile,
+      fullTestSignoffBackfillCommand,
+      postFullTestReadinessStatusCommand,
       operatorNextCommands: buildOperatorNextCommands({
         outputFile,
         closeoutInputFile,
@@ -634,10 +720,15 @@ function main() {
         smokePreflightCommand,
         launchSmokeStagingCommand,
         postSmokeBackfillCommands,
+        postSmokeReadinessStatusCommand,
+        fullTestCommand,
+        fullTestOutputFile,
+        fullTestSignoffBackfillCommand,
+        postFullTestReadinessStatusCommand,
         routeMapGateDryRunFile,
         routeMapGateOutputFile
       }),
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, and post-smoke closeout backfills."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, signoff backfill, and production-signoff readiness refresh."
     }, options.json);
   } catch (error) {
     writeResult({

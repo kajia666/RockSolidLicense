@@ -22420,6 +22420,44 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyPacketReviewSnapshot.summaryText,
       /Offline Execution Plan Steady-State Handoff Landing: status=ready_for_steady_state_handoff \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
+    const launchDutyPacketReviewOperatorEntry = launchDutyPacketReviewSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry;
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.status,
+      "ready_for_steady_state_handoff"
+    );
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.actionKey,
+      "open_steady_state_handoff_brief"
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.href,
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.ok(launchDutyPacketReviewOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "ops_steady_state_handoff_brief"
+      && item.source === "developer-ops-launch-duty-handoff-landing"
+      && item.fileName === "developer-ops-steady-state-handoff-brief.txt"
+      && item.format === "steady-state-handoff-brief"
+      && /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/.test(item.href || "")
+    )));
+    assert.match(
+      launchDutyPacketReviewOperatorEntry.operatorSummary,
+      /launchDutySteadyStateLanding=ready_for_steady_state_handoff/
+    );
+    const launchDutyPacketReviewOperatorEntryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
+      ownerSession.token
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntryDownload.body,
+      /Launch Duty Steady-State Handoff Landing:[\s\S]*status=ready_for_steady_state_handoff \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntryDownload.body,
+      /Quick Access Downloads:[\s\S]*key=ops_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

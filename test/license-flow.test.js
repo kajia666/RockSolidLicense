@@ -19992,6 +19992,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.launchDutyRecordIndexPath,
       expectedSteadyStateLaunchDutyRecordIndexPath
     );
+    assert.deepEqual(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.operatorOrder,
+      ["Review the steady-state duty receipt review route before stable operations handoff."]
+    );
     assert.equal(
       launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload.key,
       "ops_latest_steady_state_duty_receipt_asset"
@@ -21424,6 +21428,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchMainlineSummarySelectionDownload.body, /Post-Launch Handoff Traceability:/);
     assert.match(launchMainlineSummarySelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(launchMainlineSummarySelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsOperatorEntryDownload = await getText(
       baseUrl,

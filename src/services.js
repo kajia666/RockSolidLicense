@@ -14775,6 +14775,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         failureRecovery: latestSteadyStateDutyPlanReceipt.receiptVisibility?.failureRecovery || null,
         recommendedDownload: steadyStateDutyReceiptDownload,
         workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Steady-State Duty Receipt", params),
+        operatorOrder: [
+          "Review the steady-state duty receipt review route before stable operations handoff."
+        ],
         nextAction: "Review the recorded steady-state duty receipt from Launch Mainline and keep it attached to the first stable operations handoff."
       }
     : null;
@@ -18380,6 +18383,15 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     );
     lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(steadyStateDutyReceiptReview.recommendedDownload, { fileSeparator: " | " })}`);
     lines.push(`- nextAction=${steadyStateDutyReceiptReview.nextAction || "-"}`);
+    const operatorOrder = Array.isArray(steadyStateDutyReceiptReview.operatorOrder)
+      ? steadyStateDutyReceiptReview.operatorOrder
+      : [];
+    if (operatorOrder.length) {
+      lines.push("Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
   }
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
   lines.push(`Mainline Recommended Download: ${formatLaunchHandoffDownloadText(mainlineSummary.recommendedDownload, { fileSeparator: " | " })}`);

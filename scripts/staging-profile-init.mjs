@@ -257,6 +257,105 @@ function buildFullTestSignoffBackfillCommand({ closeoutInputFile, readinessActio
   ].join(" ");
 }
 
+function buildLaunchDutyRecordCommand({
+  closeoutInputFile,
+  readinessActionQueueFile,
+  launchDutyRecordIndexFile,
+  key,
+  artifactPath,
+  receiptIds = [],
+  sourceRecords = []
+}) {
+  const receiptArgs = receiptIds.flatMap((receiptId) => ["--receipt-id", receiptId]);
+  const sourceRecordArgs = sourceRecords.flatMap((record) => [
+    "--source-record",
+    commandValue(`${record.key}=${record.artifactPath}`)
+  ]);
+  return [
+    "npm.cmd run staging:launch-duty:record --",
+    "--closeout-input-file",
+    commandValue(closeoutInputFile),
+    "--key",
+    key,
+    "--artifact-path",
+    commandValue(artifactPath),
+    "--value-json",
+    "<redacted-json>",
+    ...receiptArgs,
+    ...sourceRecordArgs,
+    "--record-index-file",
+    commandValue(launchDutyRecordIndexFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
+function buildStabilizationRecordCommands({
+  closeoutInputFile,
+  readinessActionQueueFile,
+  launchDutyRecordIndexFile,
+  artifactPaths
+}) {
+  const closeoutSourceRecords = [
+    { key: "first_wave_incident_log", artifactPath: artifactPaths.firstWaveIncidentLogFile },
+    { key: "rollback_signal_review", artifactPath: artifactPaths.rollbackSignalReviewFile },
+    { key: "stabilization_owner_handoff", artifactPath: artifactPaths.stabilizationOwnerHandoffFile }
+  ];
+  return [
+    {
+      key: "receipt_visibility_snapshot",
+      status: "blocked_after_launch_day_watch_summary",
+      artifactPath: artifactPaths.receiptVisibilitySnapshotFile,
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+      sourceRecords: [],
+      nextAction: "Save receipt visibility snapshots before incident and rollback review records."
+    },
+    {
+      key: "first_wave_incident_log",
+      status: "blocked_after_receipt_visibility_snapshot",
+      artifactPath: artifactPaths.firstWaveIncidentLogFile,
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+      sourceRecords: [],
+      nextAction: "Record first-wave incident notes, even when the entry confirms no incidents."
+    },
+    {
+      key: "rollback_signal_review",
+      status: "blocked_after_first_wave_incident_log",
+      artifactPath: artifactPaths.rollbackSignalReviewFile,
+      receiptIds: ["<record_rollback_walkthrough-receipt-id>", "<record_launch_stabilization_review-receipt-id>"],
+      sourceRecords: [],
+      nextAction: "Record rollback signal review before handing off stabilization ownership."
+    },
+    {
+      key: "stabilization_owner_handoff",
+      status: "blocked_after_rollback_signal_review",
+      artifactPath: artifactPaths.stabilizationOwnerHandoffFile,
+      receiptIds: ["<record_launch_stabilization_review-receipt-id>"],
+      sourceRecords: [],
+      nextAction: "Record the stabilization owner handoff before first-wave closeout."
+    },
+    {
+      key: "first_wave_closeout",
+      status: "blocked_until_source_records",
+      artifactPath: artifactPaths.firstWaveCloseoutFile,
+      receiptIds: ["<record_launch_closeout_review-receipt-id>"],
+      sourceRecords: closeoutSourceRecords,
+      nextAction: "Record first-wave closeout after the incident, rollback, and stabilization handoff source records exist."
+    }
+  ].map((item) => ({
+    ...item,
+    command: buildLaunchDutyRecordCommand({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      launchDutyRecordIndexFile,
+      key: item.key,
+      artifactPath: item.artifactPath,
+      receiptIds: item.receiptIds,
+      sourceRecords: item.sourceRecords
+    })
+  }));
+}
+
 function buildProfile(options) {
   const productCode = sanitizeArtifactSegment(options.productCode, "product");
   const channel = sanitizeArtifactSegment(options.channel || "stable", "stable");
@@ -315,9 +414,24 @@ function buildOperatorNextCommands({
   fullTestOutputFile,
   fullTestSignoffBackfillCommand,
   postFullTestReadinessStatusCommand,
+  launchDutyRecordIndexFile,
+  launchDayWatchRecordCommand,
+  launchDayWatchSummaryFile,
+  stabilizationRecordCommands,
   routeMapGateDryRunFile,
   routeMapGateOutputFile
 }) {
+  const stabilizationOperatorCommands = stabilizationRecordCommands.map((item) => ({
+    key: `record_stabilization_${item.key}`,
+    status: item.status,
+    command: item.command,
+    artifactPath: item.artifactPath,
+    targetKey: item.key,
+    receiptIds: item.receiptIds,
+    sourceRecords: item.sourceRecords,
+    recordIndexFile: launchDutyRecordIndexFile,
+    nextAction: item.nextAction
+  }));
   return [
     {
       key: "profile_rehearsal",
@@ -454,7 +568,18 @@ function buildOperatorNextCommands({
       artifactPath: readinessActionQueueFile,
       targetKey: "production_signoff",
       nextAction: "Refresh readiness after full_test_window_passed backfill to confirm production sign-off blockers."
-    }
+    },
+    {
+      key: "record_launch_day_watch_summary",
+      status: "blocked_after_post_full_test_readiness_status",
+      command: launchDayWatchRecordCommand,
+      artifactPath: launchDayWatchSummaryFile,
+      targetKey: "launch_day_watch_summary",
+      receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"],
+      recordIndexFile: launchDutyRecordIndexFile,
+      nextAction: "Record launch-day watch summary after production sign-off readiness refresh clears."
+    },
+    ...stabilizationOperatorCommands
   ];
 }
 
@@ -471,7 +596,14 @@ function buildLaunchLaneFiles({
   launchSmokeHandoffFile,
   launchMainlineEvidenceReceiptsFile,
   receiptVisibilityReviewFile,
-  fullTestOutputFile
+  fullTestOutputFile,
+  launchDayWatchSummaryFile,
+  receiptVisibilitySnapshotFile,
+  firstWaveIncidentLogFile,
+  rollbackSignalReviewFile,
+  stabilizationOwnerHandoffFile,
+  firstWaveCloseoutFile,
+  launchDutyRecordIndexFile
 }) {
   return {
     archiveRoot,
@@ -487,10 +619,16 @@ function buildLaunchLaneFiles({
     launchMainlineEvidenceReceiptsFile,
     receiptVisibilityReviewFile,
     fullTestOutputFile,
+    launchDayWatchSummaryFile,
+    receiptVisibilitySnapshotFile,
+    firstWaveIncidentLogFile,
+    rollbackSignalReviewFile,
+    stabilizationOwnerHandoffFile,
+    firstWaveCloseoutFile,
     handoffFile: profile.handoffFile,
     launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
-    launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
-    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, and full-test signoff."
+    launchDutyRecordIndexFile,
+    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, and first-wave closeout."
   };
 }
 
@@ -528,6 +666,8 @@ function writeResult(result, json) {
     const fullTestWindow = result.operatorNextCommands?.find((item) => item.key === "run_full_test_window");
     const fullTestSignoffBackfill = result.operatorNextCommands?.find((item) => item.key === "backfill_full_test_window_passed");
     const postFullTestReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_full_test_readiness_status");
+    const launchDayWatchRecord = result.operatorNextCommands?.find((item) => item.key === "record_launch_day_watch_summary");
+    const stabilizationRecords = (result.operatorNextCommands || []).filter((item) => item.key?.startsWith("record_stabilization_"));
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
     } else {
@@ -584,6 +724,14 @@ function writeResult(result, json) {
     if (postFullTestReadinessStatus) {
       console.log(`Post-full-test readiness status: ${postFullTestReadinessStatus.command}`);
     }
+    if (launchDayWatchRecord) {
+      console.log(`Launch-day watch record: ${launchDayWatchRecord.command}`);
+    }
+    if (stabilizationRecords.length) {
+      stabilizationRecords.forEach((item, index) => {
+        console.log(`Stabilization record ${index + 1}. ${item.targetKey}: ${item.status} -> ${item.command}`);
+      });
+    }
     console.log(`Next action: ${result.nextAction}`);
     return;
   }
@@ -606,6 +754,13 @@ function main() {
     const launchMainlineEvidenceReceiptsFile = path.posix.join(archiveRoot, "launch-mainline-evidence-receipts.json");
     const receiptVisibilityReviewFile = path.posix.join(archiveRoot, "receipt-visibility-review.txt");
     const fullTestOutputFile = path.posix.join(archiveRoot, "full-test-output.txt");
+    const launchDutyRecordIndexFile = path.posix.join(archiveRoot, "launch-duty-record-index.json");
+    const launchDayWatchSummaryFile = path.posix.join(archiveRoot, "launch-day-watch-summary.md");
+    const receiptVisibilitySnapshotFile = path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt");
+    const firstWaveIncidentLogFile = path.posix.join(archiveRoot, "first-wave-incident-log.md");
+    const rollbackSignalReviewFile = path.posix.join(archiveRoot, "rollback-signal-review.md");
+    const stabilizationOwnerHandoffFile = path.posix.join(archiveRoot, "stabilization-owner-handoff.md");
+    const firstWaveCloseoutFile = path.posix.join(archiveRoot, "first-wave-closeout.md");
     const outputFile = options.outputFile
       ? path.resolve(options.outputFile)
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
@@ -660,6 +815,26 @@ function main() {
       fullTestOutputFile
     });
     const postFullTestReadinessStatusCommand = postCloseoutInitStatusCommand;
+    const launchDayWatchRecordCommand = buildLaunchDutyRecordCommand({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      launchDutyRecordIndexFile,
+      key: "launch_day_watch_summary",
+      artifactPath: launchDayWatchSummaryFile,
+      receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
+    });
+    const stabilizationRecordCommands = buildStabilizationRecordCommands({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      launchDutyRecordIndexFile,
+      artifactPaths: {
+        receiptVisibilitySnapshotFile,
+        firstWaveIncidentLogFile,
+        rollbackSignalReviewFile,
+        stabilizationOwnerHandoffFile,
+        firstWaveCloseoutFile
+      }
+    });
     const launchLaneFiles = buildLaunchLaneFiles({
       archiveRoot,
       outputFile,
@@ -673,7 +848,14 @@ function main() {
       launchSmokeHandoffFile,
       launchMainlineEvidenceReceiptsFile,
       receiptVisibilityReviewFile,
-      fullTestOutputFile
+      fullTestOutputFile,
+      launchDayWatchSummaryFile,
+      receiptVisibilitySnapshotFile,
+      firstWaveIncidentLogFile,
+      rollbackSignalReviewFile,
+      stabilizationOwnerHandoffFile,
+      firstWaveCloseoutFile,
+      launchDutyRecordIndexFile
     });
     writeResult({
       status: "written",
@@ -704,6 +886,8 @@ function main() {
       fullTestOutputFile,
       fullTestSignoffBackfillCommand,
       postFullTestReadinessStatusCommand,
+      launchDayWatchRecordCommand,
+      stabilizationRecordCommands,
       operatorNextCommands: buildOperatorNextCommands({
         outputFile,
         closeoutInputFile,
@@ -725,10 +909,14 @@ function main() {
         fullTestOutputFile,
         fullTestSignoffBackfillCommand,
         postFullTestReadinessStatusCommand,
+        launchDutyRecordIndexFile,
+        launchDayWatchRecordCommand,
+        launchDayWatchSummaryFile,
+        stabilizationRecordCommands,
         routeMapGateDryRunFile,
         routeMapGateOutputFile
       }),
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, signoff backfill, and production-signoff readiness refresh."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, signoff backfill, production-signoff readiness refresh, launch-day watch summary, stabilization records, and first-wave closeout."
     }, options.json);
   } catch (error) {
     writeResult({

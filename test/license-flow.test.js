@@ -22384,6 +22384,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyPacketReviewActionOrder.offlineExecutionPlan.handoffReadinessCheck.nextCheckKey,
       "handoff_checks_ready"
     );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.steadyStateHandoffLanding.status,
+      "ready_for_steady_state_handoff"
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.steadyStateHandoffLanding.actionKey,
+      "open_steady_state_handoff_brief"
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.steadyStateHandoffLanding.fileName,
+      "developer-ops-steady-state-handoff-brief.txt"
+    );
+    assert.equal(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.steadyStateHandoffLanding.format,
+      "steady-state-handoff-brief"
+    );
+    assert.match(
+      launchDutyPacketReviewActionOrder.offlineExecutionPlan.steadyStateHandoffLanding.href,
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
     assert.match(
       launchDutyPacketReviewSnapshot.summaryText,
       /Offline Execution Plan Cursor: packetCurrent=-\.- \| packetNext=-\.- \| recordCurrent=-\.- \| recordNext=-\.- \| handoffCurrent=review_staging_packet_results/
@@ -22395,6 +22415,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyPacketReviewSnapshot.summaryText,
       /Offline Execution Plan Handoff Readiness: status=ready_for_handoff_checks \| packetReady=yes \| recordReady=yes \| handoffReady=yes \| blockedBy=- \| nextCheck=handoff_checks_ready/
+    );
+    assert.match(
+      launchDutyPacketReviewSnapshot.summaryText,
+      /Offline Execution Plan Steady-State Handoff Landing: status=ready_for_steady_state_handoff \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
 
     const forbiddenExport = await getJsonExpectError(

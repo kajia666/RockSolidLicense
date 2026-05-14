@@ -23762,6 +23762,33 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
         ? "verify_launch_duty_record_writes"
         : "handoff_checks_ready"
   };
+  const landingProductCode = launchDutyPacketReviewReceiptSelection?.productCode
+    || launchDutyRecordIndexReceiptSelection?.productCode
+    || stagingLaunchDutyArchive.projectCode
+    || "";
+  const landingChannel = launchDutyPacketReviewReceiptSelection?.channel
+    || launchDutyRecordIndexReceiptSelection?.channel
+    || stagingLaunchDutyArchive.channel
+    || "stable";
+  const steadyStateHandoffLanding = handoffReadinessCheck.handoffReady === true
+    ? {
+        mode: "developer-ops-staging-launch-duty-steady-state-handoff-landing",
+        status: "ready_for_steady_state_handoff",
+        actionKey: "open_steady_state_handoff_brief",
+        fileName: "developer-ops-steady-state-handoff-brief.txt",
+        format: "steady-state-handoff-brief",
+        href: buildLaunchWorkflowDownloadHref(
+          "developer-ops",
+          "steady-state-handoff-brief",
+          {
+            productCode: landingProductCode,
+            channel: landingChannel,
+            limit: 80
+          }
+        ),
+        nextAction: "Open the steady-state handoff brief and transfer the completed launch-duty packet and record readbacks into stable operations."
+      }
+    : null;
   return {
     mode: "developer-ops-staging-launch-duty-offline-execution-plan",
     status: "awaiting_operator_execution",
@@ -23809,6 +23836,7 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     currentExecutionCursor,
     cursorAdvanceBasis,
     handoffReadinessCheck,
+    steadyStateHandoffLanding,
     firstHandoffCheck,
     nextAction: recordCursorComplete
       ? "Launch-duty record writes are complete from the selected record-index readback; continue packet result review and handoff checks before steady-state handoff."
@@ -24156,6 +24184,16 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         + ` | handoffReady=${handoffReadiness.handoffReady === true ? "yes" : "no"}`
         + ` | blockedBy=${blockedBy}`
         + ` | nextCheck=${handoffReadiness.nextCheckKey || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.steadyStateHandoffLanding) {
+      const landing = offlineExecutionPlan.steadyStateHandoffLanding;
+      lines.push(
+        `- Offline Execution Plan Steady-State Handoff Landing: status=${landing.status || "-"}`
+        + ` | action=${landing.actionKey || "-"}`
+        + ` | file=${landing.fileName || "-"}`
+        + ` | format=${landing.format || "-"}`
+        + ` | href=${landing.href || "-"}`
       );
     }
     if (offlineExecutionPlan.firstHandoffCheck) {

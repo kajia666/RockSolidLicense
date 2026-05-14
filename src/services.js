@@ -4277,7 +4277,8 @@ function createLaunchWorkflowActionPlanStep({
   recommendedDownload = null,
   bootstrapAction = null,
   setupAction = null,
-  context = null
+  context = null,
+  operatorOrder = []
 } = {}) {
   if (!key) {
     return null;
@@ -4292,6 +4293,9 @@ function createLaunchWorkflowActionPlanStep({
     recommendedDownload: recommendedDownload || null,
     bootstrapAction: bootstrapAction || null,
     setupAction: setupAction || null,
+    operatorOrder: Array.isArray(operatorOrder)
+      ? operatorOrder.filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim())
+      : [],
     context: normalizeLaunchWorkflowActionContext(context)
   };
 }
@@ -16166,7 +16170,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       status: "pass",
       priority: "secondary",
       workspaceAction: steadyStateHandoffLanding.workspaceAction,
-      recommendedDownload: steadyStateHandoffLanding.recommendedDownload
+      recommendedDownload: steadyStateHandoffLanding.recommendedDownload,
+      operatorOrder: steadyStateHandoffLandingOperatorOrder
     });
     actionPlan.push({
       ...steadyStateStep,
@@ -16180,6 +16185,34 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           kind: "workspace",
           label: steadyStateStep.workspaceAction.label || "Open Steady-State Ops Workspace",
           workspaceAction: steadyStateStep.workspaceAction
+        }, params) : null
+      ].filter(Boolean)
+    });
+  }
+  if (steadyStateDutyReceiptReview) {
+    const steadyStateDutyReceiptStep = createLaunchWorkflowActionPlanStep({
+      key: "launch_mainline_steady_state_duty_receipt_review",
+      title: "Review steady-state duty receipt",
+      summary: steadyStateDutyReceiptReview.nextAction
+        || "Review the recorded steady-state duty receipt before stable operations handoff.",
+      status: "pass",
+      priority: "secondary",
+      workspaceAction: steadyStateDutyReceiptReview.workspaceAction,
+      recommendedDownload: steadyStateDutyReceiptReview.recommendedDownload,
+      operatorOrder: steadyStateDutyReceiptReview.operatorOrder
+    });
+    actionPlan.push({
+      ...steadyStateDutyReceiptStep,
+      controls: [
+        steadyStateDutyReceiptStep.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+          kind: "download",
+          label: "Review Steady-State Duty Receipt",
+          recommendedDownload: steadyStateDutyReceiptStep.recommendedDownload
+        }, params) : null,
+        steadyStateDutyReceiptStep.workspaceAction ? ensureLaunchMainlineControlHrefs({
+          kind: "workspace",
+          label: steadyStateDutyReceiptStep.workspaceAction.label || "Open Steady-State Duty Receipt",
+          workspaceAction: steadyStateDutyReceiptStep.workspaceAction
         }, params) : null
       ].filter(Boolean)
     });
@@ -18705,6 +18738,18 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       const contextText = formatLaunchWorkflowActionContextText(item.context);
       if (contextText) {
         lines.push(`  ${contextText}`);
+      }
+      const operatorOrder = Array.isArray(item.operatorOrder) && item.operatorOrder.length
+        ? item.operatorOrder
+        : (item.key === "launch_mainline_steady_state_handoff_landing"
+            && Array.isArray(mainlineSummary.steadyStateHandoffLanding?.operatorOrder)
+              ? mainlineSummary.steadyStateHandoffLanding.operatorOrder
+              : []);
+      if (operatorOrder.length) {
+        lines.push("  Operator Order:");
+        for (const orderItem of operatorOrder) {
+          lines.push(`  - ${orderItem}`);
+        }
       }
     }
   }

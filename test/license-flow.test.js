@@ -20011,6 +20011,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       item.label === "Review Steady-State Duty Receipt"
       && item.recommendedDownload?.key === "ops_latest_steady_state_duty_receipt_asset"
     )));
+    const steadyStateDutyReceiptReviewActionStep = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.actionPlan.find((item) => (
+      item.key === "launch_mainline_steady_state_duty_receipt_review"
+    ));
+    assert.ok(steadyStateDutyReceiptReviewActionStep);
+    assert.deepEqual(
+      steadyStateDutyReceiptReviewActionStep.operatorOrder,
+      expectedSteadyStateDutyReceiptOperatorOrder
+    );
+    assert.ok(steadyStateDutyReceiptReviewActionStep.controls.some((control) => (
+      control.recommendedDownload?.key === "ops_latest_steady_state_duty_receipt_asset"
+    )));
     assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.overviewCards.some((item) => (
       item.key === "steady_state_duty_receipt_review"
       && item.controls?.some((control) => control.recommendedDownload?.key === "ops_latest_steady_state_duty_receipt_asset")
@@ -20045,6 +20056,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       new RegExp(`Launch Mainline Steady-State Duty Receipt Review:[\\s\\S]*status=recorded \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Mainline Action Plan:[\s\S]*Review steady-state duty receipt[\s\S]*Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./
     );
     const launchOperationsEvidenceChain = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsEvidenceChain;
     assert.ok(launchOperationsEvidenceChain);
@@ -22621,6 +22636,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       item.label === "Open Steady-State Handoff Brief"
       && item.recommendedDownload?.key === "ops_steady_state_handoff_brief"
     )));
+    const steadyStateHandoffActionStep = launchMainlineSteadyStateHandoff.mainlineSummary.actionPlan.find((item) => (
+      item.key === "launch_mainline_steady_state_handoff_landing"
+    ));
+    assert.ok(steadyStateHandoffActionStep);
+    assert.deepEqual(
+      steadyStateHandoffActionStep.operatorOrder,
+      expectedSteadyStateHandoffOperatorOrder
+    );
+    assert.ok(steadyStateHandoffActionStep.controls.some((control) => (
+      control.recommendedDownload?.key === "ops_steady_state_handoff_brief"
+    )));
     assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.overviewCards.some((item) => (
       item.key === "steady_state_handoff_landing"
       && item.controls?.some((control) => control.recommendedDownload?.key === "ops_steady_state_handoff_brief")
@@ -22659,6 +22685,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Steady-State Handoff Landing:[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Mainline Action Plan:[\s\S]*Open steady-state handoff brief[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
     );
     const launchMainlineSteadyStateRoutesDownload = await getText(
       baseUrl,

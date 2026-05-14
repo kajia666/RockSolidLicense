@@ -38544,9 +38544,45 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
     "stabilization_owner_handoff",
     "first_wave_closeout"
   ];
-  const buildLaunchDutyRecordCommand = (key) => common.launchDutyRecordIndex
-    ? `npm.cmd run staging:launch-duty:record -- --record-index-file ${common.launchDutyRecordIndex} --key ${key}`
-    : null;
+  const launchDutyRecordFileNames = {
+    launch_day_watch_summary: "launch-day-watch-summary.md",
+    receipt_visibility_snapshot: "receipt-visibility-snapshot.txt",
+    first_wave_incident_log: "first-wave-incident-log.md",
+    rollback_signal_review: "rollback-signal-review.md",
+    stabilization_owner_handoff: "stabilization-owner-handoff.md",
+    first_wave_closeout: "first-wave-closeout.md"
+  };
+  const buildLaunchDutyRecordArtifactPath = (key) => {
+    const fileName = launchDutyRecordFileNames[key] || `${String(key || "record").replaceAll("_", "-")}.md`;
+    return common.archiveRoot ? `${common.archiveRoot}/${fileName}` : fileName;
+  };
+  const buildLaunchDutyRecordCommand = (key) => {
+    if (!common.launchDutyRecordIndex) {
+      return null;
+    }
+    return "npm.cmd run staging:launch-duty:record -- "
+      + `--record-index-file ${common.launchDutyRecordIndex} `
+      + `--key ${key} `
+      + `--artifact-path ${buildLaunchDutyRecordArtifactPath(key)} `
+      + "--value-json <redacted-json>";
+  };
+  const buildLaunchDutyRecordResultCheck = (key, order) => ({
+    mode: "developer-ops-staging-launch-duty-record-result-check",
+    status: "awaiting_record_write_confirmation",
+    order,
+    key,
+    expectedRecordArtifactPath: buildLaunchDutyRecordArtifactPath(key),
+    launchDutyRecordIndexPath: common.launchDutyRecordIndex,
+    nextAction: "Confirm the record artifact exists and the launch-duty record index includes this key before handing off."
+  });
+  const buildLaunchDutyRecordBackfillTarget = (key, order) => ({
+    mode: "developer-ops-staging-launch-duty-record-backfill-target",
+    order,
+    key,
+    expectedRecordArtifactPath: buildLaunchDutyRecordArtifactPath(key),
+    archiveIndexPath: common.launchDutyArchiveIndex,
+    launchDutyRecordIndexPath: common.launchDutyRecordIndex
+  });
   const packetOperatorActions = {
     run_record_index: "operator_review_run_record_index",
     artifact_manifest: "operator_review_artifact_manifest",
@@ -38597,6 +38633,8 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
         key,
         command: buildLaunchDutyRecordCommand(key)
       })),
+      recordResultChecks: launchDutyRecordKeys.map((key, index) => buildLaunchDutyRecordResultCheck(key, index + 1)),
+      recordBackfillTargets: launchDutyRecordKeys.map((key, index) => buildLaunchDutyRecordBackfillTarget(key, index + 1)),
       writeCommand: buildLaunchDutyRecordCommand(launchDutyRecordKeys[0])
     }
   });

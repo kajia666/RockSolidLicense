@@ -22062,6 +22062,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewZipText, /recordCommands/);
     assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-launch-duty-record-command/);
     assert.match(launchMainlineRouteReviewZipText, /--key launch_day_watch_summary/);
+    assert.match(launchMainlineRouteReviewZipText, /--artifact-path artifacts\/staging\/EXPORT_ALPHA\/beta\/launch-day-watch-summary\.md/);
     assert.match(launchMainlineRouteReviewZipText, /--key first_wave_closeout/);
     assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-packet-reference/);
     assert.match(launchMainlineRouteReviewZipText, /packetOperatorAction/);
@@ -22073,6 +22074,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewZipText, /expectedArtifactPath/);
     assert.match(launchMainlineRouteReviewZipText, /packetBackfillTarget/);
     assert.match(launchMainlineRouteReviewZipText, /awaiting_operator_result_check/);
+    assert.match(launchMainlineRouteReviewZipText, /recordResultChecks/);
+    assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-launch-duty-record-result-check/);
+    assert.match(launchMainlineRouteReviewZipText, /expectedRecordArtifactPath/);
+    assert.match(launchMainlineRouteReviewZipText, /artifacts\/staging\/EXPORT_ALPHA\/beta\/launch-day-watch-summary\.md/);
+    assert.match(launchMainlineRouteReviewZipText, /artifacts\/staging\/EXPORT_ALPHA\/beta\/first-wave-closeout\.md/);
+    assert.match(launchMainlineRouteReviewZipText, /recordBackfillTargets/);
+    assert.match(launchMainlineRouteReviewZipText, /awaiting_record_write_confirmation/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

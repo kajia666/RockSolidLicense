@@ -444,12 +444,23 @@ function buildLaunchSwitchWatchHandoff() {
   const readinessActionQueueFile = options.actionsFile || defaultReadinessActionQueueFile();
   const launchDutyRecordIndexPath = defaultLaunchDutyRecordIndexFile();
   const credentialEnv = [
+    "RSL_SMOKE_ADMIN_USERNAME",
+    "RSL_SMOKE_ADMIN_PASSWORD",
     "RSL_SMOKE_DEVELOPER_USERNAME",
     "RSL_SMOKE_DEVELOPER_PASSWORD"
   ];
   const closeoutBackfill = buildRouteMapCloseoutBackfill();
   const receiptVisibilityQueue = buildLaunchSmokeReceiptVisibilityQueue();
   const currentCommand = buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQueueFile);
+  const smokePreflightCommand = [
+    "npm.cmd run staging:preflight --",
+    "--base-url",
+    commandValue(options.stagingBaseUrl),
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel)
+  ].join(" ");
   const launchSmokeCommand = [
     "npm.cmd run launch:smoke:staging --",
     "--base-url",
@@ -522,14 +533,24 @@ function buildLaunchSwitchWatchHandoff() {
       nextAction: "Confirm the action queue sees route_map_gate_result before live-write smoke."
     },
     {
+      key: "run_staging_smoke_preflight",
+      label: "Run staging smoke no-write preflight",
+      status: "blocked_after_readiness_refresh",
+      kind: "command",
+      command: smokePreflightCommand,
+      targetKey: "staging_smoke_preflight",
+      launchDutyRecordIndexPath,
+      nextAction: "Confirm HTTPS, non-default smoke credentials, explicit product/channel, and no-write readiness before live-write smoke."
+    },
+    {
       key: "run_launch_smoke_staging",
       label: "Run staging Launch Smoke live-write preflight",
-      status: "blocked_after_readiness_refresh",
+      status: "blocked_after_smoke_preflight",
       kind: "command",
       command: launchSmokeCommand,
       targetKey: "live_write_smoke_result",
       launchDutyRecordIndexPath,
-      nextAction: "Run with smoke credential env vars set, then use the smoke closeout-backfill handoff."
+      nextAction: "Run only after staging:preflight passes, then use the smoke closeout-backfill handoff."
     },
     {
       key: "refresh_staging_readiness_after_launch_smoke",
@@ -562,9 +583,11 @@ function buildLaunchSwitchWatchHandoff() {
     requireHttps: true,
     allowLiveWrites: true,
     credentialEnv,
+    smokePreflightCommand,
+    launchSmokeCommand,
     filledCloseoutInputFile,
     readinessActionQueueFile,
-    nextAction: "Set smoke credential env vars, confirm the HTTPS staging base URL, then run launchSmokeCommand."
+    nextAction: "Set smoke credential env vars, run smokePreflightCommand, then run launchSmokeCommand only after the no-write preflight passes."
   };
   const postSmokeCloseoutChecks = {
     status: "ready_for_post_smoke_closeout_confirmation",
@@ -810,7 +833,9 @@ function buildLaunchSwitchWatchHandoff() {
     status: "ready_for_staging_readiness_and_launch_smoke_switch",
     currentActionKey: "refresh_staging_readiness",
     currentCommand,
-    nextActionKey: "run_launch_smoke_staging",
+    nextActionKey: "run_staging_smoke_preflight",
+    smokePreflightCommand,
+    liveWriteActionKey: "run_launch_smoke_staging",
     launchSmokeCommand,
     credentialEnv,
     smokePrerequisites,
@@ -880,7 +905,8 @@ if (dryRun) {
     console.log(`Route-map readiness status: ${closeoutBackfill.statusCommand}`);
     console.log(`Launch switch watch handoff: ${launchSwitchWatchHandoff.status}`);
     console.log(`Launch switch current: ${launchSwitchWatchHandoff.currentActionKey} -> ${launchSwitchWatchHandoff.currentCommand}`);
-    console.log(`Launch switch next: ${launchSwitchWatchHandoff.nextActionKey} -> ${launchSwitchWatchHandoff.launchSmokeCommand}`);
+    console.log(`Launch switch next: ${launchSwitchWatchHandoff.nextActionKey} -> ${launchSwitchWatchHandoff.smokePreflightCommand}`);
+    console.log(`Launch switch live-write smoke: ${launchSwitchWatchHandoff.liveWriteActionKey} -> ${launchSwitchWatchHandoff.launchSmokeCommand}`);
     console.log(`Launch switch evidence sequence: ${launchSwitchWatchHandoff.backfillSequence.map((item) => item.key).join(" -> ")}`);
     console.log(`Launch switch credential env: ${launchSwitchWatchHandoff.credentialEnv.join(", ")}`);
     console.log(
@@ -888,6 +914,7 @@ if (dryRun) {
       + ` | https=${launchSwitchWatchHandoff.smokePrerequisites.requireHttps ? "yes" : "no"}`
       + ` | allowLiveWrites=${launchSwitchWatchHandoff.smokePrerequisites.allowLiveWrites ? "yes" : "no"}`
       + ` | baseUrl=${launchSwitchWatchHandoff.smokePrerequisites.stagingBaseUrl}`
+      + ` | preflight=${launchSwitchWatchHandoff.smokePrerequisites.smokePreflightCommand}`
     );
     console.log(
       `Launch switch post-smoke checks: ${launchSwitchWatchHandoff.postSmokeCloseoutChecks.status}`

@@ -18828,6 +18828,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const recommendedDownloads = Array.isArray(mainlineSummary.recommendedDownloads)
     ? mainlineSummary.recommendedDownloads
     : [];
+  const steadyStateHandoffLanding = mainlineSummary.steadyStateHandoffLanding
+    && typeof mainlineSummary.steadyStateHandoffLanding === "object"
+      ? mainlineSummary.steadyStateHandoffLanding
+      : null;
+  const steadyStateHandoffLandingDownload = steadyStateHandoffLanding?.recommendedDownload
+    && typeof steadyStateHandoffLanding.recommendedDownload === "object"
+      ? steadyStateHandoffLanding.recommendedDownload
+      : null;
   const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
     ? payload.opsSnapshot.scope
     : {};
@@ -19102,6 +19110,25 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       `- productionSignoffPacket=${launchOpsOverviewProductionSignoffPacket || "-"}`
       + ` | launchDayWatchEntry=${launchOpsOverviewWatchEntry || "-"}`
     );
+  }
+  if (steadyStateHandoffLanding) {
+    lines.push("");
+    lines.push("Steady-State Handoff Landing Route:");
+    lines.push(
+      `- status=${steadyStateHandoffLanding.status || "-"}`
+      + ` | action=${steadyStateHandoffLanding.actionKey || "-"}`
+      + ` | file=${steadyStateHandoffLanding.fileName || steadyStateHandoffLandingDownload?.fileName || "-"}`
+      + ` | format=${steadyStateHandoffLanding.format || steadyStateHandoffLandingDownload?.format || "-"}`
+      + ` | href=${steadyStateHandoffLanding.href || steadyStateHandoffLandingDownload?.href || "-"}`
+    );
+    lines.push(
+      `- steady-state-handoff-landing: ${steadyStateHandoffLandingDownload?.fileName || steadyStateHandoffLanding.fileName || "ops/steady-state-handoff-brief.txt"}`
+      + ` | key=${steadyStateHandoffLandingDownload?.key || "ops_steady_state_handoff_brief"}`
+      + ` | label=${steadyStateHandoffLandingDownload?.label || "Launch duty steady-state handoff"}`
+      + ` | source=${steadyStateHandoffLandingDownload?.source || steadyStateHandoffLanding.source || "-"}`
+      + ` | launchDutyRecordIndex=${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
   }
 
   appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(lines, launchDutyRecordIndexSelectionChecklistStep);
@@ -20667,6 +20694,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     channel: opsScope.channel || filters.channel || manifest.channel || "stable"
   });
   const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
+  const steadyStateHandoffLanding = mainlineSummary.steadyStateHandoffLanding
+    && typeof mainlineSummary.steadyStateHandoffLanding === "object"
+      ? mainlineSummary.steadyStateHandoffLanding
+      : null;
+  const steadyStateHandoffLandingDownload = steadyStateHandoffLanding?.recommendedDownload
+    && typeof steadyStateHandoffLanding.recommendedDownload === "object"
+      ? steadyStateHandoffLanding.recommendedDownload
+      : null;
   const handoffFiles = [
     ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
     ["Post-launch sweep handoff", payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt"],
@@ -20680,6 +20715,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
     ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
   ];
+  if (steadyStateHandoffLanding) {
+    handoffFiles.push([
+      "Steady-state handoff landing",
+      "ops/steady-state-handoff-brief.txt"
+    ]);
+  }
   const lines = [
     "RockSolid Developer Launch Mainline Post-Launch Handoff Index",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -20788,6 +20829,24 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   appendInitialLaunchOperatorHeadlineTextLines(lines, traceability.initialLaunchOperatorHeadline || null);
   appendInitialLaunchOperatorNextActionTextLines(lines, traceability.initialLaunchOperatorNextAction || null);
   appendInitialLaunchOperatorActionManifestTextLines(lines, traceability.initialLaunchOperatorActionManifest || null);
+
+  if (steadyStateHandoffLanding) {
+    lines.push("");
+    lines.push("Steady-State Handoff Landing:");
+    lines.push(
+      `- status=${steadyStateHandoffLanding.status || "-"}`
+      + ` | action=${steadyStateHandoffLanding.actionKey || "-"}`
+      + ` | file=${steadyStateHandoffLanding.fileName || steadyStateHandoffLandingDownload?.fileName || "-"}`
+      + ` | format=${steadyStateHandoffLanding.format || steadyStateHandoffLandingDownload?.format || "-"}`
+      + ` | href=${steadyStateHandoffLanding.href || steadyStateHandoffLandingDownload?.href || "-"}`
+    );
+    lines.push(
+      `- key=${steadyStateHandoffLandingDownload?.key || "ops_steady_state_handoff_brief"}`
+      + ` | source=${steadyStateHandoffLandingDownload?.source || steadyStateHandoffLanding.source || "-"}`
+      + ` | launchDutyRecordIndex=${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
+  }
 
   lines.push("");
   lines.push("Receipt Visibility Summary Downloads:");

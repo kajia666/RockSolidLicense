@@ -22500,6 +22500,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Steady-State Handoff Landing:[\s\S]*status=ready_for_steady_state_handoff \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
     );
+    const launchMainlineSteadyStateRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /Steady-State Handoff Landing Route:[\s\S]*status=ready_for_steady_state_handoff \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
+    );
+    const launchMainlineSteadyStatePostLaunchIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Steady-State Handoff Landing:[\s\S]*status=ready_for_steady_state_handoff \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Steady-state handoff landing: ops\/steady-state-handoff-brief\.txt/
+    );
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

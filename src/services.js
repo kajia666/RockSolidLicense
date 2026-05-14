@@ -14679,6 +14679,51 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       }
     : null;
   const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
+  const launchOperationsOperatorEntry = initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+    && typeof initialLaunchOpsReadiness.launchOperationsOperatorEntry === "object"
+      ? initialLaunchOpsReadiness.launchOperationsOperatorEntry
+      : null;
+  const launchDutySteadyStateHandoffLandingSource = launchOperationsOperatorEntry?.launchDutySteadyStateHandoffLanding
+    || launchDutyActionOrder?.offlineExecutionPlan?.steadyStateHandoffLanding
+    || null;
+  const launchDutySteadyStateHandoffQuickDownload = Array.isArray(launchOperationsOperatorEntry?.quickAccessDownloads)
+    ? launchOperationsOperatorEntry.quickAccessDownloads.find((item) =>
+        item?.key === "ops_steady_state_handoff_brief"
+        || item?.format === "steady-state-handoff-brief"
+        || item?.fileName === "developer-ops-steady-state-handoff-brief.txt"
+      ) || null
+    : null;
+  const launchDutySteadyStateHandoffDownload = launchDutySteadyStateHandoffLandingSource
+    ? ensureLaunchWorkflowDownloadHref(
+        launchDutySteadyStateHandoffQuickDownload || {
+          key: "ops_steady_state_handoff_brief",
+          label: "Launch duty steady-state handoff",
+          fileName: launchDutySteadyStateHandoffLandingSource.fileName || "developer-ops-steady-state-handoff-brief.txt",
+          format: launchDutySteadyStateHandoffLandingSource.format || "steady-state-handoff-brief",
+          href: launchDutySteadyStateHandoffLandingSource.href || null,
+          source: launchDutySteadyStateHandoffLandingSource.source || "developer-ops-launch-duty-handoff-landing"
+        },
+        params
+      )
+    : null;
+  const steadyStateHandoffLanding = launchDutySteadyStateHandoffLandingSource
+    ? {
+        mode: "developer-launch-mainline-steady-state-handoff-landing",
+        status: launchDutySteadyStateHandoffLandingSource.status || "ready_for_steady_state_handoff",
+        actionKey: launchDutySteadyStateHandoffLandingSource.actionKey || "open_steady_state_handoff_brief",
+        source: launchDutySteadyStateHandoffLandingSource.source || "developer-ops-launch-duty-handoff-landing",
+        fileName: launchDutySteadyStateHandoffLandingSource.fileName || "developer-ops-steady-state-handoff-brief.txt",
+        format: launchDutySteadyStateHandoffLandingSource.format || "steady-state-handoff-brief",
+        href: launchDutySteadyStateHandoffLandingSource.href || launchDutySteadyStateHandoffDownload?.href || null,
+        launchDutyRecordIndexPath: launchDutySteadyStateHandoffLandingSource.launchDutyRecordIndexPath
+          || launchOperationsOperatorEntry?.launchDutyRecordIndexPath
+          || null,
+        nextAction: launchDutySteadyStateHandoffLandingSource.nextAction
+          || "Open the steady-state handoff brief before handing launch duty into stable operations.",
+        recommendedDownload: launchDutySteadyStateHandoffDownload,
+        workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Steady-State Ops Workspace", params)
+      }
+    : null;
   const stagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations
     || (Array.isArray(launchDutyActionOrder?.steps)
       ? launchDutyActionOrder.steps.find((item) => item?.key === "staging_archive")?.nextOperations
@@ -15903,10 +15948,25 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
+  const steadyStateHandoffHeroControls = steadyStateHandoffLanding
+    ? [
+        steadyStateHandoffLanding.recommendedDownload ? {
+          kind: "download",
+          label: "Open Steady-State Handoff Brief",
+          recommendedDownload: steadyStateHandoffLanding.recommendedDownload
+        } : null,
+        steadyStateHandoffLanding.workspaceAction ? {
+          kind: "workspace",
+          label: "Open Steady-State Ops Workspace",
+          workspaceAction: steadyStateHandoffLanding.workspaceAction
+        } : null
+      ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+    : [];
   const heroControls = [
     ...confirmedFirstWaveHeroControls,
     ...firstWaveHeroControls,
     ...firstWaveRuntimeEvidenceHeroControls,
+    ...steadyStateHandoffHeroControls,
     ...launchRunwayHeroControls,
     ...workspaceActions.map((item) => ({
       kind: "workspace",
@@ -16015,6 +16075,33 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ].filter(Boolean)
     });
   }
+  if (steadyStateHandoffLanding) {
+    const steadyStateStep = createLaunchWorkflowActionPlanStep({
+      key: "launch_mainline_steady_state_handoff_landing",
+      title: "Open steady-state handoff brief",
+      summary: steadyStateHandoffLanding.nextAction
+        || "Open the steady-state handoff brief before handing launch duty into stable operations.",
+      status: "pass",
+      priority: "secondary",
+      workspaceAction: steadyStateHandoffLanding.workspaceAction,
+      recommendedDownload: steadyStateHandoffLanding.recommendedDownload
+    });
+    actionPlan.push({
+      ...steadyStateStep,
+      controls: [
+        steadyStateStep.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+          kind: "download",
+          label: "Open Steady-State Handoff Brief",
+          recommendedDownload: steadyStateStep.recommendedDownload
+        }, params) : null,
+        steadyStateStep.workspaceAction ? ensureLaunchMainlineControlHrefs({
+          kind: "workspace",
+          label: steadyStateStep.workspaceAction.label || "Open Steady-State Ops Workspace",
+          workspaceAction: steadyStateStep.workspaceAction
+        }, params) : null
+      ].filter(Boolean)
+    });
+  }
   const recommendedDownloads = [];
   const recommendedDownloadKeys = new Set();
   const pushRecommendedDownload = (item) => {
@@ -16037,6 +16124,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstLaunchHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(initialLaunchOpsOverviewStatusDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateHandoffLanding?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(closeoutHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(stabilizationHandoffDownload, params));
@@ -16258,7 +16346,49 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             label: "Download Launch Readiness Next Gate",
             recommendedDownload: launchReadinessNextGateDownload
           }, params) : null
-        ].filter((item) => item?.recommendedDownload?.key)
+      ].filter((item) => item?.recommendedDownload?.key)
+    }
+    : null;
+  const steadyStateHandoffLandingCard = steadyStateHandoffLanding
+    ? {
+        key: "steady_state_handoff_landing",
+        title: "Steady-State Handoff Landing",
+        summary: steadyStateHandoffLanding.nextAction
+          || "Open the steady-state handoff brief before handing launch duty into stable operations.",
+        tags: [
+          {
+            label: "status",
+            value: steadyStateHandoffLanding.status || "unknown",
+            strong: true
+          },
+          {
+            label: "action",
+            value: steadyStateHandoffLanding.actionKey || "-",
+            strong: false
+          },
+          {
+            label: "source",
+            value: steadyStateHandoffLanding.source || "-",
+            strong: false
+          }
+        ],
+        details: [
+          `File: ${steadyStateHandoffLanding.fileName || "-"}`,
+          `Format: ${steadyStateHandoffLanding.format || "-"}`,
+          `Launch duty record index: ${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`
+        ],
+        controls: [
+          steadyStateHandoffLanding.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open Steady-State Handoff Brief",
+            recommendedDownload: steadyStateHandoffLanding.recommendedDownload
+          }, params) : null,
+          steadyStateHandoffLanding.workspaceAction ? ensureLaunchMainlineControlHrefs({
+            kind: "workspace",
+            label: "Open Steady-State Ops Workspace",
+            workspaceAction: steadyStateHandoffLanding.workspaceAction
+          }, params) : null
+        ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
   const overviewCards = [
@@ -16347,6 +16477,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveHandoffConfirmationCard,
     firstWaveRuntimeEvidenceCard,
     launchReadinessNextGateCard,
+    steadyStateHandoffLandingCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -16866,6 +16997,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: postLaunchLifecycleCards
     },
     {
+      key: "steady_state_handoff_landing",
+      title: "Steady-State Handoff Landing",
+      emptyState: "Complete launch-duty packet and record readbacks to expose the steady-state handoff landing here.",
+      cards: overviewCards.filter((item) => item?.key === "steady_state_handoff_landing")
+    },
+    {
       key: "workspace_path",
       title: "Workspace Path",
       emptyState: "Generate a launch mainline package to inspect the routed workspace path here.",
@@ -17251,6 +17388,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveRuntimeEvidence,
     initialLaunchOpsOverviewStatus,
     launchDutyActionOrder,
+    steadyStateHandoffLanding,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -18088,6 +18226,21 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Mainline Launch Duty Action Order:"
     });
+  }
+  const steadyStateHandoffLanding = mainlineSummary.steadyStateHandoffLanding || null;
+  if (steadyStateHandoffLanding) {
+    lines.push("");
+    lines.push("Launch Mainline Steady-State Handoff Landing:");
+    lines.push(
+      `- status=${steadyStateHandoffLanding.status || "-"}`
+      + ` | action=${steadyStateHandoffLanding.actionKey || "-"}`
+      + ` | file=${steadyStateHandoffLanding.fileName || "-"}`
+      + ` | format=${steadyStateHandoffLanding.format || "-"}`
+      + ` | href=${steadyStateHandoffLanding.href || steadyStateHandoffLanding.recommendedDownload?.href || "-"}`
+    );
+    lines.push(`- source=${steadyStateHandoffLanding.source || "-"} | launchDutyRecordIndex=${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`);
+    lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(steadyStateHandoffLanding.recommendedDownload, { fileSeparator: " | " })}`);
+    lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
   }
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
   lines.push(`Mainline Recommended Download: ${formatLaunchHandoffDownloadText(mainlineSummary.recommendedDownload, { fileSeparator: " | " })}`);

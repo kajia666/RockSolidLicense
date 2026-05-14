@@ -22458,6 +22458,48 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyPacketReviewOperatorEntryDownload.body,
       /Quick Access Downloads:[\s\S]*key=ops_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
     );
+    const launchMainlineSteadyStateHandoff = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.status,
+      "ready_for_steady_state_handoff"
+    );
+    assert.equal(
+      launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.actionKey,
+      "open_steady_state_handoff_brief"
+    );
+    assert.equal(
+      launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.recommendedDownload.key,
+      "ops_steady_state_handoff_brief"
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.recommendedDownload.href,
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.recommendedDownloads.some((item) => (
+      item.key === "ops_steady_state_handoff_brief"
+      && item.source === "developer-ops-launch-duty-handoff-landing"
+      && item.format === "steady-state-handoff-brief"
+    )));
+    assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.heroControls.some((item) => (
+      item.label === "Open Steady-State Handoff Brief"
+      && item.recommendedDownload?.key === "ops_steady_state_handoff_brief"
+    )));
+    assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.overviewCards.some((item) => (
+      item.key === "steady_state_handoff_landing"
+      && item.controls?.some((control) => control.recommendedDownload?.key === "ops_steady_state_handoff_brief")
+    )));
+    assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.sections.some((item) => (
+      item.key === "steady_state_handoff_landing"
+      && item.cards?.some((card) => card.key === "steady_state_handoff_landing")
+    )));
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Steady-State Handoff Landing:[\s\S]*status=ready_for_steady_state_handoff \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

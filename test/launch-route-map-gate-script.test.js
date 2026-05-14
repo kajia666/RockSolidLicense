@@ -77,6 +77,24 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     readinessActionQueueFile: "artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
     nextAction: "Set smoke credential env vars, confirm the HTTPS staging base URL, then run launchSmokeCommand."
   });
+  assert.equal(output.launchSwitchWatchHandoff.postSmokeCloseoutChecks.status, "ready_for_post_smoke_closeout_confirmation");
+  assert.equal(
+    output.launchSwitchWatchHandoff.postSmokeCloseoutChecks.statusCommand,
+    "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md"
+  );
+  assert.deepEqual(
+    output.launchSwitchWatchHandoff.postSmokeCloseoutChecks.evidenceChecks.map((item) => [item.order, item.key, item.status, item.artifactPath]),
+    [
+      [1, "live_write_smoke_result", "expected_after_launch_smoke", "artifacts/staging/ROUTE_MAP_GATE/stable/live-write-smoke-output.json"],
+      [2, "launch_smoke_handoff", "expected_after_launch_smoke", "artifacts/staging/ROUTE_MAP_GATE/stable/launch-smoke-handoff.json"],
+      [3, "launch_mainline_evidence_receipts", "expected_after_launch_smoke", "artifacts/staging/ROUTE_MAP_GATE/stable/launch-mainline-evidence-receipts.json"],
+      [4, "receipt_visibility_review", "expected_after_receipt_visibility_review", "artifacts/staging/ROUTE_MAP_GATE/stable/receipt-visibility-review.txt"]
+    ]
+  );
+  assert.equal(
+    output.launchSwitchWatchHandoff.postSmokeCloseoutChecks.evidenceChecks[3].receiptVisibilityQueue[0].target,
+    output.launchSmokeReceiptVisibilityQueue[0].target
+  );
   assert.equal(output.launchSwitchWatchHandoff.launchDutyRecordIndexPath, "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json");
   assert.deepEqual(
     output.launchSwitchWatchHandoff.operatorNextCommands.map((item) => [item.order, item.key, item.status, item.kind]),
@@ -268,6 +286,9 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /Launch switch evidence sequence: route_map_gate_result -> live_write_smoke_result -> launch_smoke_handoff -> launch_mainline_evidence_receipts -> receipt_visibility_review/);
   assert.match(result.stdout, /Launch switch credential env: RSL_SMOKE_DEVELOPER_USERNAME, RSL_SMOKE_DEVELOPER_PASSWORD/);
   assert.match(result.stdout, /Launch switch smoke prerequisites: ready_for_staging_launch_smoke_command \| https=yes \| allowLiveWrites=yes \| baseUrl=https:\/\/staging\.example\.com/);
+  assert.match(result.stdout, /Launch switch post-smoke checks: ready_for_post_smoke_closeout_confirmation \| statusCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Post-smoke check 1\. live_write_smoke_result: expected_after_launch_smoke -> artifacts\/staging\/PILOT_ALPHA\/stable\/live-write-smoke-output\.json/);
+  assert.match(result.stdout, /Post-smoke check 4\. receipt_visibility_review: expected_after_receipt_visibility_review -> artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-review\.txt \| queue=5/);
   assert.match(result.stdout, /Launch switch record index: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /Launch switch operator queue:/);
   assert.match(result.stdout, /1\. backfill_route_map_gate_result: current command -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);

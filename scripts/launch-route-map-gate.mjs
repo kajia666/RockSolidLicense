@@ -403,6 +403,7 @@ function buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQue
 }
 
 function buildLaunchSwitchWatchHandoff() {
+  const artifactRoot = defaultArtifactRoot();
   const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile();
   const readinessActionQueueFile = options.actionsFile || defaultReadinessActionQueueFile();
   const launchDutyRecordIndexPath = defaultLaunchDutyRecordIndexFile();
@@ -529,6 +530,53 @@ function buildLaunchSwitchWatchHandoff() {
     readinessActionQueueFile,
     nextAction: "Set smoke credential env vars, confirm the HTTPS staging base URL, then run launchSmokeCommand."
   };
+  const postSmokeCloseoutChecks = {
+    status: "ready_for_post_smoke_closeout_confirmation",
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    statusCommand: currentCommand,
+    actionQueueFile: readinessActionQueueFile,
+    evidenceChecks: [
+      {
+        key: "live_write_smoke_result",
+        label: "Confirm live-write smoke result was backfilled",
+        status: "expected_after_launch_smoke",
+        artifactPath: `${artifactRoot}/live-write-smoke-output.json`,
+        statusCommand: currentCommand,
+        nextAction: "Confirm the smoke output artifact path and live_write_smoke_result closeout value are present."
+      },
+      {
+        key: "launch_smoke_handoff",
+        label: "Confirm Launch Smoke handoff was archived",
+        status: "expected_after_launch_smoke",
+        artifactPath: `${artifactRoot}/launch-smoke-handoff.json`,
+        statusCommand: currentCommand,
+        nextAction: "Confirm the launch smoke handoff JSON is saved with secrets redacted."
+      },
+      {
+        key: "launch_mainline_evidence_receipts",
+        label: "Confirm Launch Mainline evidence receipts were captured",
+        status: "expected_after_launch_smoke",
+        artifactPath: `${artifactRoot}/launch-mainline-evidence-receipts.json`,
+        statusCommand: currentCommand,
+        nextAction: "Confirm Launch Mainline receipt IDs or handoff file names are backfilled."
+      },
+      {
+        key: "receipt_visibility_review",
+        label: "Confirm receipt visibility review was completed",
+        status: "expected_after_receipt_visibility_review",
+        artifactPath: `${artifactRoot}/receipt-visibility-review.txt`,
+        statusCommand: currentCommand,
+        receiptVisibilityQueue,
+        nextAction: "Verify the receipt-visibility download queue in order, then refresh staging readiness."
+      }
+    ].map((item, index) => ({
+      order: index + 1,
+      launchDutyRecordIndexPath,
+      ...item
+    })),
+    nextAction: "After launch smoke, verify these four closeout evidence records before entering full-test or production sign-off."
+  };
   return {
     version: "launch-route-map-gate-switch-watch-handoff/v1",
     status: "ready_for_staging_readiness_and_launch_smoke_switch",
@@ -538,6 +586,7 @@ function buildLaunchSwitchWatchHandoff() {
     launchSmokeCommand,
     credentialEnv,
     smokePrerequisites,
+    postSmokeCloseoutChecks,
     filledCloseoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexPath,
@@ -610,6 +659,14 @@ if (dryRun) {
       + ` | allowLiveWrites=${launchSwitchWatchHandoff.smokePrerequisites.allowLiveWrites ? "yes" : "no"}`
       + ` | baseUrl=${launchSwitchWatchHandoff.smokePrerequisites.stagingBaseUrl}`
     );
+    console.log(
+      `Launch switch post-smoke checks: ${launchSwitchWatchHandoff.postSmokeCloseoutChecks.status}`
+      + ` | statusCommand=${launchSwitchWatchHandoff.postSmokeCloseoutChecks.statusCommand}`
+    );
+    for (const item of launchSwitchWatchHandoff.postSmokeCloseoutChecks.evidenceChecks) {
+      const queueText = item.receiptVisibilityQueue ? ` | queue=${item.receiptVisibilityQueue.length}` : "";
+      console.log(`Post-smoke check ${item.order}. ${item.key}: ${item.status} -> ${item.artifactPath}${queueText}`);
+    }
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
     console.log("Launch switch operator queue:");
     for (const item of launchSwitchWatchHandoff.operatorNextCommands) {

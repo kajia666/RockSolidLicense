@@ -151,6 +151,36 @@ function buildRouteMapGateCommand({ options, closeoutInputFile, readinessActionQ
   return parts.join(" ");
 }
 
+function buildRouteMapGateBackfillCommand({ closeoutInputFile, readinessActionQueueFile, routeMapGateOutputFile }) {
+  return [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    commandValue(closeoutInputFile),
+    "--key",
+    "route_map_gate_result",
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(routeMapGateOutputFile),
+    "--receipt-id",
+    "<route-map-gate-receipt-id>",
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
+function buildStagingSmokePreflightCommand(options) {
+  return [
+    "npm.cmd run staging:preflight --",
+    "--base-url",
+    commandValue(options.baseUrl),
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel || "stable")
+  ].join(" ");
+}
+
 function buildProfile(options) {
   const productCode = sanitizeArtifactSegment(options.productCode, "product");
   const channel = sanitizeArtifactSegment(options.channel || "stable", "stable");
@@ -199,6 +229,9 @@ function buildOperatorNextCommands({
   recoveryPreflightCommand,
   routeMapGateDryRunCommand,
   routeMapGateCommand,
+  routeMapGateBackfillCommand,
+  postRouteMapReadinessStatusCommand,
+  smokePreflightCommand,
   routeMapGateDryRunFile,
   routeMapGateOutputFile
 }) {
@@ -244,6 +277,27 @@ function buildOperatorNextCommands({
       command: routeMapGateCommand,
       artifactPath: routeMapGateOutputFile,
       nextAction: "Run the targeted route-map gate, save its output, then follow the route-map operator queue from route_map_gate_result backfill onward."
+    },
+    {
+      key: "route_map_gate_result_backfill",
+      status: "blocked_after_route_map_gate",
+      command: routeMapGateBackfillCommand,
+      artifactPath: routeMapGateOutputFile,
+      nextAction: "Backfill route_map_gate_result after the targeted route-map gate passes."
+    },
+    {
+      key: "post_route_map_readiness_status",
+      status: "blocked_after_route_map_gate_result_backfill",
+      command: postRouteMapReadinessStatusCommand,
+      artifactPath: readinessActionQueueFile,
+      nextAction: "Refresh readiness so the action queue reflects route_map_gate_result before smoke preflight."
+    },
+    {
+      key: "staging_smoke_preflight",
+      status: "blocked_after_post_route_map_readiness_status",
+      command: smokePreflightCommand,
+      artifactPath: null,
+      nextAction: "Run no-write smoke preflight before any launch:smoke:staging live-write command."
     }
   ];
 }
@@ -299,6 +353,9 @@ function writeResult(result, json) {
     const recoveryPreflight = result.operatorNextCommands?.find((item) => item.key === "recovery_preflight");
     const routeMapGateDryRun = result.operatorNextCommands?.find((item) => item.key === "route_map_gate_dry_run");
     const routeMapGate = result.operatorNextCommands?.find((item) => item.key === "route_map_gate");
+    const routeMapGateBackfill = result.operatorNextCommands?.find((item) => item.key === "route_map_gate_result_backfill");
+    const postRouteMapReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_route_map_readiness_status");
+    const smokePreflight = result.operatorNextCommands?.find((item) => item.key === "staging_smoke_preflight");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
     } else {
@@ -325,6 +382,15 @@ function writeResult(result, json) {
     }
     if (routeMapGate) {
       console.log(`Route-map gate: ${routeMapGate.command}`);
+    }
+    if (routeMapGateBackfill) {
+      console.log(`Route-map result backfill: ${routeMapGateBackfill.command}`);
+    }
+    if (postRouteMapReadinessStatus) {
+      console.log(`Post-route-map readiness status: ${postRouteMapReadinessStatus.command}`);
+    }
+    if (smokePreflight) {
+      console.log(`Staging smoke preflight: ${smokePreflight.command}`);
     }
     console.log(`Next action: ${result.nextAction}`);
     return;
@@ -367,6 +433,13 @@ function main() {
       closeoutInputFile,
       readinessActionQueueFile
     });
+    const routeMapGateBackfillCommand = buildRouteMapGateBackfillCommand({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      routeMapGateOutputFile
+    });
+    const postRouteMapReadinessStatusCommand = postCloseoutInitStatusCommand;
+    const smokePreflightCommand = buildStagingSmokePreflightCommand(options);
     const launchLaneFiles = buildLaunchLaneFiles({
       archiveRoot,
       outputFile,
@@ -396,6 +469,9 @@ function main() {
       recoveryPreflightCommand,
       routeMapGateDryRunCommand,
       routeMapGateCommand,
+      routeMapGateBackfillCommand,
+      postRouteMapReadinessStatusCommand,
+      smokePreflightCommand,
       operatorNextCommands: buildOperatorNextCommands({
         outputFile,
         closeoutInputFile,
@@ -407,10 +483,13 @@ function main() {
         recoveryPreflightCommand,
         routeMapGateDryRunCommand,
         routeMapGateCommand,
+        routeMapGateBackfillCommand,
+        postRouteMapReadinessStatusCommand,
+        smokePreflightCommand,
         routeMapGateDryRunFile,
         routeMapGateOutputFile
       }),
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate dry run, and route-map gate."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, and smoke preflight."
     }, options.json);
   } catch (error) {
     writeResult({

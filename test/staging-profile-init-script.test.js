@@ -79,6 +79,9 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     const recoveryPreflightCommand = "npm.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/staging.env --app-backup-dir /var/lib/rocksolid/backups --postgres-backup-dir /var/lib/rocksolid/postgres-backups --base-url https://staging.example.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const routeMapGateDryRunCommand = "npm.cmd run launch:route-map-gate -- --dry-run --json --product-code PILOT_ALPHA --channel beta --staging-base-url https://staging.example.com --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const routeMapGateCommand = "npm.cmd run launch:route-map-gate -- --product-code PILOT_ALPHA --channel beta --staging-base-url https://staging.example.com --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
+    const routeMapGateBackfillCommand = "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
+    const postRouteMapReadinessStatusCommand = "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
+    const smokePreflightCommand = "npm.cmd run staging:preflight -- --base-url https://staging.example.com --product-code PILOT_ALPHA --channel beta";
     assert.deepEqual(output, {
       status: "written",
       mode: "staging-profile-init",
@@ -111,6 +114,9 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       recoveryPreflightCommand,
       routeMapGateDryRunCommand,
       routeMapGateCommand,
+      routeMapGateBackfillCommand,
+      postRouteMapReadinessStatusCommand,
+      smokePreflightCommand,
       operatorNextCommands: [
         {
           key: "profile_rehearsal",
@@ -153,9 +159,30 @@ test("staging profile init writes a secret-free profile with launch-duty output 
           command: routeMapGateCommand,
           artifactPath: "artifacts/staging/PILOT_ALPHA/beta/route-map-gate-output.txt",
           nextAction: "Run the targeted route-map gate, save its output, then follow the route-map operator queue from route_map_gate_result backfill onward."
+        },
+        {
+          key: "route_map_gate_result_backfill",
+          status: "blocked_after_route_map_gate",
+          command: routeMapGateBackfillCommand,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/route-map-gate-output.txt",
+          nextAction: "Backfill route_map_gate_result after the targeted route-map gate passes."
+        },
+        {
+          key: "post_route_map_readiness_status",
+          status: "blocked_after_route_map_gate_result_backfill",
+          command: postRouteMapReadinessStatusCommand,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+          nextAction: "Refresh readiness so the action queue reflects route_map_gate_result before smoke preflight."
+        },
+        {
+          key: "staging_smoke_preflight",
+          status: "blocked_after_post_route_map_readiness_status",
+          command: smokePreflightCommand,
+          artifactPath: null,
+          nextAction: "Run no-write smoke preflight before any launch:smoke:staging live-write command."
         }
       ],
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate dry run, and route-map gate."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, and smoke preflight."
     });
     assert.deepEqual(profile, {
       baseUrl: "https://staging.example.com",
@@ -262,7 +289,10 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Recovery preflight: npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file \/etc\/rocksolidlicense\/staging\.env --app-backup-dir \/var\/lib\/rocksolid\/backups --postgres-backup-dir \/var\/lib\/rocksolid\/postgres-backups --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Route-map gate dry run: npm\.cmd run launch:route-map-gate -- --dry-run --json --product-code PILOT_ALPHA --channel beta --staging-base-url https:\/\/staging\.example\.com --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Route-map gate: npm\.cmd run launch:route-map-gate -- --product-code PILOT_ALPHA --channel beta --staging-base-url https:\/\/staging\.example\.com --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
-    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate dry run, and route-map gate\./);
+    assert.match(result.stdout, /Route-map result backfill: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Post-route-map readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Staging smoke preflight: npm\.cmd run staging:preflight -- --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel beta/);
+    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, and smoke preflight\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

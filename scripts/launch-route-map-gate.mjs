@@ -402,6 +402,42 @@ function buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQue
   ].join(" ");
 }
 
+function buildLaunchDutyRecordCommand({
+  filledCloseoutInputFile,
+  key,
+  artifactPath,
+  receiptOperations = [],
+  sourceRecords = [],
+  launchDutyRecordIndexPath,
+  readinessActionQueueFile
+}) {
+  const receiptArgs = receiptOperations.flatMap((operation) => [
+    "--receipt-id",
+    `<${operation}-receipt-id>`
+  ]);
+  const sourceRecordArgs = sourceRecords.flatMap((record) => [
+    "--source-record",
+    commandValue(`${record.key}=${record.artifactPath}`)
+  ]);
+  return [
+    "npm.cmd run staging:launch-duty:record --",
+    "--closeout-input-file",
+    commandValue(filledCloseoutInputFile),
+    "--key",
+    key,
+    "--artifact-path",
+    commandValue(artifactPath),
+    "--value-json",
+    "<redacted-json>",
+    ...receiptArgs,
+    ...sourceRecordArgs,
+    "--record-index-file",
+    commandValue(launchDutyRecordIndexPath),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
 function buildLaunchSwitchWatchHandoff() {
   const artifactRoot = defaultArtifactRoot();
   const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile();
@@ -632,6 +668,10 @@ function buildLaunchSwitchWatchHandoff() {
   const productionSignoffPacketPath = `${artifactRoot}/staging-production-signoff-packet.json`;
   const archiveIndexPath = `${artifactRoot}/staging-launch-duty-archive-index.json`;
   const launchDayWatchSummaryPath = `${artifactRoot}/launch-day-watch-summary.md`;
+  const receiptVisibilitySnapshotPath = `${artifactRoot}/receipt-visibility-snapshot.txt`;
+  const firstWaveIncidentLogPath = `${artifactRoot}/first-wave-incident-log.md`;
+  const rollbackSignalReviewPath = `${artifactRoot}/rollback-signal-review.md`;
+  const stabilizationOwnerHandoffPath = `${artifactRoot}/stabilization-owner-handoff.md`;
   const firstWaveCloseoutPath = `${artifactRoot}/first-wave-closeout.md`;
   const launchDayWatchCommand = [
     "npm.cmd run staging:launch-duty:record --",
@@ -669,6 +709,67 @@ function buildLaunchSwitchWatchHandoff() {
     "--actions-file",
     commandValue(readinessActionQueueFile)
   ].join(" ");
+  const closeoutSourceRecords = [
+    { key: "first_wave_incident_log", artifactPath: firstWaveIncidentLogPath },
+    { key: "rollback_signal_review", artifactPath: rollbackSignalReviewPath },
+    { key: "stabilization_owner_handoff", artifactPath: stabilizationOwnerHandoffPath }
+  ];
+  const stabilizationRecordQueue = [
+    {
+      key: "receipt_visibility_snapshot",
+      status: "blocked_after_launch_day_watch_summary",
+      artifactPath: receiptVisibilitySnapshotPath,
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      sourceRecordKeys: [],
+      nextAction: "Save receipt visibility snapshots before incident and rollback review records."
+    },
+    {
+      key: "first_wave_incident_log",
+      status: "blocked_after_receipt_visibility_snapshot",
+      artifactPath: firstWaveIncidentLogPath,
+      receiptOperations: ["record_post_launch_ops_sweep"],
+      sourceRecordKeys: [],
+      nextAction: "Record first-wave incidents, impact, mitigation, owner, and status."
+    },
+    {
+      key: "rollback_signal_review",
+      status: "blocked_after_first_wave_incident_log",
+      artifactPath: rollbackSignalReviewPath,
+      receiptOperations: ["record_rollback_walkthrough", "record_launch_stabilization_review"],
+      sourceRecordKeys: [],
+      nextAction: "Record whether rollback signals were observed, dismissed, or escalated."
+    },
+    {
+      key: "stabilization_owner_handoff",
+      status: "blocked_after_rollback_signal_review",
+      artifactPath: stabilizationOwnerHandoffPath,
+      receiptOperations: ["record_launch_stabilization_review"],
+      sourceRecordKeys: [],
+      nextAction: "Record stabilization owner, unresolved items, and next-duty follow-up."
+    },
+    {
+      key: "first_wave_closeout",
+      status: "blocked_until_source_records",
+      artifactPath: firstWaveCloseoutPath,
+      receiptOperations: ["record_launch_closeout_review"],
+      sourceRecordKeys: closeoutSourceRecords.map((record) => record.key),
+      sourceRecords: closeoutSourceRecords,
+      nextAction: "Close first-wave only after incident, rollback, and stabilization owner records are attached."
+    }
+  ].map((item, index) => ({
+    order: index + 1,
+    ...item,
+    recordIndexFile: launchDutyRecordIndexPath,
+    command: buildLaunchDutyRecordCommand({
+      filledCloseoutInputFile,
+      key: item.key,
+      artifactPath: item.artifactPath,
+      receiptOperations: item.receiptOperations,
+      sourceRecords: item.sourceRecords || [],
+      launchDutyRecordIndexPath,
+      readinessActionQueueFile
+    })
+  }));
   const productionSignoffLaunchDayWatch = {
     status: "ready_for_launch_day_watch_after_production_signoff",
     currentGate: "production_signoff",
@@ -677,6 +778,8 @@ function buildLaunchSwitchWatchHandoff() {
     archiveIndexPath,
     recordIndexFile: launchDutyRecordIndexPath,
     statusCommand: currentCommand,
+    stabilizationRecordQueueStatus: "ready_after_launch_day_watch_summary",
+    stabilizationCloseoutKey: "first_wave_closeout",
     recordCommands: [
       {
         order: 1,
@@ -699,7 +802,8 @@ function buildLaunchSwitchWatchHandoff() {
         nextAction: "Close first wave only after incident, rollback, and stabilization owner source records are attached."
       }
     ],
-    nextAction: "After production sign-off, record launch_day_watch_summary first, then close the first wave with required source records."
+    stabilizationRecordQueue,
+    nextAction: "After production sign-off, record launch_day_watch_summary first, then write stabilization records and close the first wave with required source records."
   };
   return {
     version: "launch-route-map-gate-switch-watch-handoff/v1",
@@ -809,6 +913,15 @@ if (dryRun) {
     for (const item of launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.recordCommands) {
       const sourceText = item.sourceRecordKeys?.length ? ` | sources=${item.sourceRecordKeys.join(", ")}` : "";
       console.log(`Launch-day watch ${item.order}. ${item.key}: ${item.status} -> ${item.command}${sourceText}`);
+    }
+    console.log(
+      `Launch switch stabilization record queue: ${launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.stabilizationRecordQueueStatus}`
+      + ` | records=${launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.stabilizationRecordQueue.length}`
+      + ` | closeout=${launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.stabilizationCloseoutKey}`
+    );
+    for (const item of launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.stabilizationRecordQueue) {
+      const sourceText = item.sourceRecordKeys?.length ? ` | sources=${item.sourceRecordKeys.join(", ")}` : "";
+      console.log(`Stabilization record ${item.order}. ${item.key}: ${item.status} -> ${item.command}${sourceText}`);
     }
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
     console.log("Launch switch operator queue:");

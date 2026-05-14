@@ -577,6 +577,58 @@ function buildLaunchSwitchWatchHandoff() {
     })),
     nextAction: "After launch smoke, verify these four closeout evidence records before entering full-test or production sign-off."
   };
+  const fullTestCommand = "npm.cmd test";
+  const fullTestResultArtifactPath = `${artifactRoot}/full-test-output.txt`;
+  const signoffBackfillCommand = [
+    "npm.cmd run staging:signoff:backfill --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--condition-key",
+    "full_test_window_passed",
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(fullTestResultArtifactPath),
+    "--decision",
+    "ready-for-production-signoff",
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+  const postSmokeReadinessGate = {
+    status: "ready_for_readiness_gate_after_post_smoke",
+    statusCommand: currentCommand,
+    actionQueueFile: readinessActionQueueFile,
+    fullTestCommand,
+    fullTestResultArtifactPath,
+    signoffBackfillCommand,
+    expectedGateProgression: [
+      {
+        order: 1,
+        gate: "full_test_window",
+        status: "current_after_post_smoke_closeout_confirmed",
+        command: fullTestCommand,
+        artifactPath: fullTestResultArtifactPath,
+        nextAction: "Run the full test window only after post-smoke closeout checks are confirmed."
+      },
+      {
+        order: 2,
+        gate: "production_signoff",
+        status: "blocked_after_full_test_window",
+        command: signoffBackfillCommand,
+        artifactPath: fullTestResultArtifactPath,
+        nextAction: "Backfill full_test_window_passed with the redacted full-test result, then refresh readiness."
+      },
+      {
+        order: 3,
+        gate: "launch_day_watch",
+        status: "blocked_after_production_signoff",
+        command: currentCommand,
+        artifactPath: null,
+        nextAction: "After production sign-off evidence and receipt visibility are complete, refresh readiness for launch-day watch."
+      }
+    ],
+    nextAction: "Use staging:readiness:status to confirm the gate before moving from post-smoke closeout into the full-test window."
+  };
   return {
     version: "launch-route-map-gate-switch-watch-handoff/v1",
     status: "ready_for_staging_readiness_and_launch_smoke_switch",
@@ -587,6 +639,7 @@ function buildLaunchSwitchWatchHandoff() {
     credentialEnv,
     smokePrerequisites,
     postSmokeCloseoutChecks,
+    postSmokeReadinessGate,
     filledCloseoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexPath,
@@ -666,6 +719,14 @@ if (dryRun) {
     for (const item of launchSwitchWatchHandoff.postSmokeCloseoutChecks.evidenceChecks) {
       const queueText = item.receiptVisibilityQueue ? ` | queue=${item.receiptVisibilityQueue.length}` : "";
       console.log(`Post-smoke check ${item.order}. ${item.key}: ${item.status} -> ${item.artifactPath}${queueText}`);
+    }
+    console.log(
+      `Launch switch readiness gate: ${launchSwitchWatchHandoff.postSmokeReadinessGate.status}`
+      + ` | statusCommand=${launchSwitchWatchHandoff.postSmokeReadinessGate.statusCommand}`
+    );
+    for (const item of launchSwitchWatchHandoff.postSmokeReadinessGate.expectedGateProgression) {
+      const artifactText = item.artifactPath ? ` | artifact=${item.artifactPath}` : "";
+      console.log(`Readiness gate ${item.order}. ${item.gate}: ${item.status} -> ${item.command}${artifactText}`);
     }
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
     console.log("Launch switch operator queue:");

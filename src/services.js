@@ -38561,6 +38561,23 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
     }
     return archive.commands?.profileDrivenDryRun || archive.commands?.closeoutReload || null;
   };
+  const buildPacketResultCheck = (packet = {}) => ({
+    mode: "developer-ops-staging-packet-result-check",
+    status: packet?.path ? "awaiting_operator_result_check" : "missing_packet_path",
+    expectedArtifactPath: packet?.path || null,
+    archiveIndexPath: common.launchDutyArchiveIndex,
+    launchDutyRecordIndexPath: common.launchDutyRecordIndex,
+    nextAction: packet?.path
+      ? "Confirm the packet artifact exists, then keep the launch-duty archive index and record index in the same offline handoff."
+      : "Fill the missing packet path before staging rehearsal closeout."
+  });
+  const buildPacketBackfillTarget = (packet = {}) => ({
+    mode: "developer-ops-staging-packet-backfill-target",
+    packetKey: packet?.key || null,
+    packetPath: packet?.path || null,
+    archiveIndexPath: common.launchDutyArchiveIndex,
+    launchDutyRecordIndexPath: common.launchDutyRecordIndex
+  });
   pushJsonFile(files.launchDutyArchiveIndex, {
     mode: "developer-ops-staging-launch-duty-archive-index",
     ...common,
@@ -38592,7 +38609,9 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
       packetPath: packet?.path || null,
       packetStatus: packet?.path ? "listed_for_staging_rehearsal" : "missing_path",
       packetOperatorAction: packetOperatorActions[packet?.key] || "operator_review_staging_packet",
-      packetCommand: buildPacketCommand(packet?.key)
+      packetCommand: buildPacketCommand(packet?.key),
+      packetResultCheck: buildPacketResultCheck(packet),
+      packetBackfillTarget: buildPacketBackfillTarget(packet)
     });
   }
   return artifactFiles;

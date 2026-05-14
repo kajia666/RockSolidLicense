@@ -629,6 +629,78 @@ function buildLaunchSwitchWatchHandoff() {
     ],
     nextAction: "Use staging:readiness:status to confirm the gate before moving from post-smoke closeout into the full-test window."
   };
+  const productionSignoffPacketPath = `${artifactRoot}/staging-production-signoff-packet.json`;
+  const archiveIndexPath = `${artifactRoot}/staging-launch-duty-archive-index.json`;
+  const launchDayWatchSummaryPath = `${artifactRoot}/launch-day-watch-summary.md`;
+  const firstWaveCloseoutPath = `${artifactRoot}/first-wave-closeout.md`;
+  const launchDayWatchCommand = [
+    "npm.cmd run staging:launch-duty:record --",
+    "--closeout-input-file",
+    commandValue(filledCloseoutInputFile),
+    "--key",
+    "launch_day_watch_summary",
+    "--artifact-path",
+    commandValue(launchDayWatchSummaryPath),
+    "--value-json",
+    "<redacted-json>",
+    "--receipt-id",
+    "<record_cutover_walkthrough-receipt-id>",
+    "--receipt-id",
+    "<record_launch_day_readiness_review-receipt-id>",
+    "--record-index-file",
+    commandValue(launchDutyRecordIndexPath),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+  const firstWaveCloseoutCommand = [
+    "npm.cmd run staging:launch-duty:record --",
+    "--closeout-input-file",
+    commandValue(filledCloseoutInputFile),
+    "--key",
+    "first_wave_closeout",
+    "--artifact-path",
+    commandValue(firstWaveCloseoutPath),
+    "--value-json",
+    "<redacted-json>",
+    "--receipt-id",
+    "<record_launch_closeout_review-receipt-id>",
+    "--record-index-file",
+    commandValue(launchDutyRecordIndexPath),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+  const productionSignoffLaunchDayWatch = {
+    status: "ready_for_launch_day_watch_after_production_signoff",
+    currentGate: "production_signoff",
+    nextGate: "launch_day_watch",
+    productionSignoffPacketPath,
+    archiveIndexPath,
+    recordIndexFile: launchDutyRecordIndexPath,
+    statusCommand: currentCommand,
+    recordCommands: [
+      {
+        order: 1,
+        key: "launch_day_watch_summary",
+        status: "current_after_production_signoff",
+        artifactPath: launchDayWatchSummaryPath,
+        command: launchDayWatchCommand,
+        receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+        sourceRecordKeys: [],
+        nextAction: "Record launch-day watch summary after production sign-off is confirmed."
+      },
+      {
+        order: 2,
+        key: "first_wave_closeout",
+        status: "blocked_after_launch_day_watch_summary",
+        artifactPath: firstWaveCloseoutPath,
+        command: firstWaveCloseoutCommand,
+        receiptOperations: ["record_launch_closeout_review"],
+        sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"],
+        nextAction: "Close first wave only after incident, rollback, and stabilization owner source records are attached."
+      }
+    ],
+    nextAction: "After production sign-off, record launch_day_watch_summary first, then close the first wave with required source records."
+  };
   return {
     version: "launch-route-map-gate-switch-watch-handoff/v1",
     status: "ready_for_staging_readiness_and_launch_smoke_switch",
@@ -640,6 +712,7 @@ function buildLaunchSwitchWatchHandoff() {
     smokePrerequisites,
     postSmokeCloseoutChecks,
     postSmokeReadinessGate,
+    productionSignoffLaunchDayWatch,
     filledCloseoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexPath,
@@ -727,6 +800,15 @@ if (dryRun) {
     for (const item of launchSwitchWatchHandoff.postSmokeReadinessGate.expectedGateProgression) {
       const artifactText = item.artifactPath ? ` | artifact=${item.artifactPath}` : "";
       console.log(`Readiness gate ${item.order}. ${item.gate}: ${item.status} -> ${item.command}${artifactText}`);
+    }
+    console.log(
+      `Launch switch launch-day watch: ${launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.status}`
+      + ` | packet=${launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.productionSignoffPacketPath}`
+      + ` | recordIndex=${launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.recordIndexFile}`
+    );
+    for (const item of launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.recordCommands) {
+      const sourceText = item.sourceRecordKeys?.length ? ` | sources=${item.sourceRecordKeys.join(", ")}` : "";
+      console.log(`Launch-day watch ${item.order}. ${item.key}: ${item.status} -> ${item.command}${sourceText}`);
     }
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
     console.log("Launch switch operator queue:");

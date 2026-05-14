@@ -127,6 +127,33 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
       ]
     ]
   );
+  assert.equal(
+    output.launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.status,
+    "ready_for_launch_day_watch_after_production_signoff"
+  );
+  assert.equal(
+    output.launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.productionSignoffPacketPath,
+    "artifacts/staging/ROUTE_MAP_GATE/stable/staging-production-signoff-packet.json"
+  );
+  assert.equal(
+    output.launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.archiveIndexPath,
+    "artifacts/staging/ROUTE_MAP_GATE/stable/staging-launch-duty-archive-index.json"
+  );
+  assert.deepEqual(
+    output.launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.recordCommands.map((item) => [item.order, item.key, item.status, item.artifactPath]),
+    [
+      [1, "launch_day_watch_summary", "current_after_production_signoff", "artifacts/staging/ROUTE_MAP_GATE/stable/launch-day-watch-summary.md"],
+      [2, "first_wave_closeout", "blocked_after_launch_day_watch_summary", "artifacts/staging/ROUTE_MAP_GATE/stable/first-wave-closeout.md"]
+    ]
+  );
+  assert.equal(
+    output.launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.recordCommands[0].command,
+    "npm.cmd run staging:launch-duty:record -- --closeout-input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --key launch_day_watch_summary --artifact-path artifacts/staging/ROUTE_MAP_GATE/stable/launch-day-watch-summary.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md"
+  );
+  assert.deepEqual(
+    output.launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.recordCommands[1].sourceRecordKeys,
+    ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+  );
   assert.equal(output.launchSwitchWatchHandoff.launchDutyRecordIndexPath, "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json");
   assert.deepEqual(
     output.launchSwitchWatchHandoff.operatorNextCommands.map((item) => [item.order, item.key, item.status, item.kind]),
@@ -325,6 +352,9 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /Readiness gate 1\. full_test_window: current_after_post_smoke_closeout_confirmed -> npm\.cmd test \| artifact=artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt/);
   assert.match(result.stdout, /Readiness gate 2\. production_signoff: blocked_after_full_test_window -> npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt --decision ready-for-production-signoff --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /Readiness gate 3\. launch_day_watch: blocked_after_production_signoff -> npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch switch launch-day watch: ready_for_launch_day_watch_after_production_signoff \| packet=artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
+  assert.match(result.stdout, /Launch-day watch 1\. launch_day_watch_summary: current_after_production_signoff -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch-day watch 2\. first_wave_closeout: blocked_after_launch_day_watch_summary -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key first_wave_closeout --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md --value-json <redacted-json> --receipt-id <record_launch_closeout_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md \| sources=first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
   assert.match(result.stdout, /Launch switch record index: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /Launch switch operator queue:/);
   assert.match(result.stdout, /1\. backfill_route_map_gate_result: current command -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);

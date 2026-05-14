@@ -38577,6 +38577,11 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   }
   lines.push("");
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
+  if (readiness.latestSteadyStateDutyPlanReceipt) {
+    lines.push("");
+    lines.push("Operator Order:");
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   return lines.join("\n");
 }
 
@@ -38719,6 +38724,11 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   }
   lines.push("");
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
+  if (readiness.latestSteadyStateDutyPlanReceipt || dailyBrief?.receiptVisibilitySummary?.status === "visible") {
+    lines.push("");
+    lines.push("Operator Order:");
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   return lines.join("\n");
 }
 
@@ -38934,6 +38944,11 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   }
   lines.push("");
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
+  if (readiness.latestSteadyStateDutyPlanReceipt || actionPlan?.receiptVisibilitySummary?.status === "visible") {
+    lines.push("");
+    lines.push("Operator Order:");
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   return lines.join("\n");
 }
 
@@ -39060,6 +39075,11 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
   }
   lines.push("");
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
+  if (readiness.latestSteadyStateDutyPlanReceipt || overview?.canRecoverReceipt === true || receiptRecoveryPayload.action) {
+    lines.push("");
+    lines.push("Operator Order:");
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   return lines.join("\n");
 }
 
@@ -40001,6 +40021,9 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklistText(payload = {}) {
   }
   lines.push("");
   lines.push("Operator Order:");
+  if (readiness.latestSteadyStateDutyPlanReceipt || checklist.receiptVisibilityStatus === "visible") {
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   lines.push("- Open the four Launch Operations files first, then verify Launch Review and Launch Smoke receipt visibility with the same launch-duty record index.");
   lines.push("- Keep the Launch Mainline handoff routes open as the cross-surface route map for recovery or reviewer handoff.");
   return lines.join("\n");

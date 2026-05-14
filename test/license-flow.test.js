@@ -20163,6 +20163,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
     assert.match(launchOperationsHandoffDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(launchOperationsHandoffDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsDailyBrief = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsDailyBrief;
     assert.ok(launchOperationsDailyBrief);
@@ -20254,6 +20255,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
     assert.match(launchOperationsDailyBriefDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsDailyBriefDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(launchOperationsDailyBriefDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsShiftActionPlan = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsShiftActionPlan;
     assert.ok(launchOperationsShiftActionPlan);
@@ -20437,6 +20439,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsShiftActionPlanDownload.body, /Receipt Plans:[\s\S]*launchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /\/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsShiftActionPlanDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(launchOperationsShiftActionPlanDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status/);
     assert.match(launchOperationsShiftActionPlanDownload.body, /Supporting Downloads:[\s\S]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
@@ -21199,6 +21202,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:[\s\S]*launchReadinessNextGateStatus=/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:[\s\S]*launchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsOverviewStatusDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(launchOperationsOverviewStatusDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:[\s\S]*launch_operations_shift_action_plan[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
 
@@ -21300,6 +21304,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorChecklistDownload.body, /6\. review_launch_smoke_receipt_visibility_summary[^\n]*launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /7\. open_launch_mainline_handoff_routes[^\n]*developer-ops-launch-mainline-handoff-routes\.txt/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /8\. continue_launch_duty_record_index_selection_handoff[^\n]*developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsMainlineHandoffRoutesDownload = await getText(
       baseUrl,

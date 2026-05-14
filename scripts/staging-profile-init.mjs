@@ -131,6 +131,26 @@ function buildRecoveryPreflightCommand({ options, closeoutInputFile, readinessAc
   return parts.join(" ");
 }
 
+function buildRouteMapGateCommand({ options, closeoutInputFile, readinessActionQueueFile, dryRun = false }) {
+  const parts = ["npm.cmd run launch:route-map-gate --"];
+  if (dryRun) {
+    parts.push("--dry-run", "--json");
+  }
+  parts.push(
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel || "stable"),
+    "--staging-base-url",
+    commandValue(options.baseUrl),
+    "--closeout-input-file",
+    commandValue(closeoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  );
+  return parts.join(" ");
+}
+
 function buildProfile(options) {
   const productCode = sanitizeArtifactSegment(options.productCode, "product");
   const channel = sanitizeArtifactSegment(options.channel || "stable", "stable");
@@ -176,7 +196,11 @@ function buildOperatorNextCommands({
   nextCommand,
   closeoutInitCommand,
   postCloseoutInitStatusCommand,
-  recoveryPreflightCommand
+  recoveryPreflightCommand,
+  routeMapGateDryRunCommand,
+  routeMapGateCommand,
+  routeMapGateDryRunFile,
+  routeMapGateOutputFile
 }) {
   return [
     {
@@ -206,6 +230,20 @@ function buildOperatorNextCommands({
       command: recoveryPreflightCommand,
       artifactPath: backupRestoreArtifactFile,
       nextAction: "Run recovery preflight to print backup/restore commands and the backup_restore_drill_result closeout backfill handoff."
+    },
+    {
+      key: "route_map_gate_dry_run",
+      status: "blocked_after_recovery_preflight",
+      command: routeMapGateDryRunCommand,
+      artifactPath: routeMapGateDryRunFile,
+      nextAction: "Review the route-map gate dry-run queue before running the targeted gate."
+    },
+    {
+      key: "route_map_gate",
+      status: "blocked_after_route_map_gate_dry_run",
+      command: routeMapGateCommand,
+      artifactPath: routeMapGateOutputFile,
+      nextAction: "Run the targeted route-map gate, save its output, then follow the route-map operator queue from route_map_gate_result backfill onward."
     }
   ];
 }
@@ -216,7 +254,9 @@ function buildLaunchLaneFiles({
   profile,
   closeoutInputFile,
   readinessActionQueueFile,
-  backupRestoreArtifactFile
+  backupRestoreArtifactFile,
+  routeMapGateDryRunFile,
+  routeMapGateOutputFile
 }) {
   return {
     archiveRoot,
@@ -225,10 +265,12 @@ function buildLaunchLaneFiles({
     closeoutInputFile,
     readinessActionQueueFile,
     backupRestoreArtifactFile,
+    routeMapGateDryRunFile,
+    routeMapGateOutputFile,
     handoffFile: profile.handoffFile,
     launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
-    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, and backup/restore evidence backfill."
+    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, and route-map gate handoff."
   };
 }
 
@@ -247,12 +289,16 @@ function writeResult(result, json) {
       console.log(`Launch lane closeout input: ${files.closeoutInputFile}`);
       console.log(`Launch lane action queue: ${files.readinessActionQueueFile}`);
       console.log(`Launch lane backup/restore artifact: ${files.backupRestoreArtifactFile}`);
+      console.log(`Launch lane route-map dry run: ${files.routeMapGateDryRunFile}`);
+      console.log(`Launch lane route-map output: ${files.routeMapGateOutputFile}`);
       console.log(`Launch lane record index: ${files.launchDutyRecordIndexFile}`);
     }
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const closeoutInit = result.operatorNextCommands?.find((item) => item.key === "closeout_init");
     const readinessStatus = result.operatorNextCommands?.find((item) => item.key === "readiness_status");
     const recoveryPreflight = result.operatorNextCommands?.find((item) => item.key === "recovery_preflight");
+    const routeMapGateDryRun = result.operatorNextCommands?.find((item) => item.key === "route_map_gate_dry_run");
+    const routeMapGate = result.operatorNextCommands?.find((item) => item.key === "route_map_gate");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
     } else {
@@ -274,6 +320,12 @@ function writeResult(result, json) {
     if (recoveryPreflight) {
       console.log(`Recovery preflight: ${recoveryPreflight.command}`);
     }
+    if (routeMapGateDryRun) {
+      console.log(`Route-map gate dry run: ${routeMapGateDryRun.command}`);
+    }
+    if (routeMapGate) {
+      console.log(`Route-map gate: ${routeMapGate.command}`);
+    }
     console.log(`Next action: ${result.nextAction}`);
     return;
   }
@@ -289,6 +341,8 @@ function main() {
     const closeoutInputFile = path.posix.join(archiveRoot, "filled-closeout-input.json");
     const readinessActionQueueFile = profile.readinessActionQueueFile;
     const backupRestoreArtifactFile = path.posix.join(archiveRoot, "backup-restore-drill.txt");
+    const routeMapGateDryRunFile = path.posix.join(archiveRoot, "route-map-gate-dry-run.json");
+    const routeMapGateOutputFile = path.posix.join(archiveRoot, "route-map-gate-output.txt");
     const outputFile = options.outputFile
       ? path.resolve(options.outputFile)
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
@@ -302,13 +356,26 @@ function main() {
       closeoutInputFile,
       readinessActionQueueFile
     });
+    const routeMapGateDryRunCommand = buildRouteMapGateCommand({
+      options,
+      closeoutInputFile,
+      readinessActionQueueFile,
+      dryRun: true
+    });
+    const routeMapGateCommand = buildRouteMapGateCommand({
+      options,
+      closeoutInputFile,
+      readinessActionQueueFile
+    });
     const launchLaneFiles = buildLaunchLaneFiles({
       archiveRoot,
       outputFile,
       profile,
       closeoutInputFile,
       readinessActionQueueFile,
-      backupRestoreArtifactFile
+      backupRestoreArtifactFile,
+      routeMapGateDryRunFile,
+      routeMapGateOutputFile
     });
     writeResult({
       status: "written",
@@ -327,6 +394,8 @@ function main() {
       closeoutInitCommand,
       postCloseoutInitStatusCommand,
       recoveryPreflightCommand,
+      routeMapGateDryRunCommand,
+      routeMapGateCommand,
       operatorNextCommands: buildOperatorNextCommands({
         outputFile,
         closeoutInputFile,
@@ -335,9 +404,13 @@ function main() {
         nextCommand,
         closeoutInitCommand,
         postCloseoutInitStatusCommand,
-        recoveryPreflightCommand
+        recoveryPreflightCommand,
+        routeMapGateDryRunCommand,
+        routeMapGateCommand,
+        routeMapGateDryRunFile,
+        routeMapGateOutputFile
       }),
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then run closeoutInitCommand and recoveryPreflightCommand after the draft is written."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate dry run, and route-map gate."
     }, options.json);
   } catch (error) {
     writeResult({

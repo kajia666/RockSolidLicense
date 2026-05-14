@@ -23461,6 +23461,19 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     recordNextKey: nextRecordWriteAfterCurrent?.key || null,
     handoffCurrentKey: firstHandoffCheck
   };
+  const cursorAdvanceBasis = {
+    mode: "developer-ops-staging-launch-duty-offline-cursor-advance-basis",
+    packetCurrentStatus: firstPacketResultCheck?.status || null,
+    packetAdvanceWhen: "expected_artifact_exists_and_result_check_confirmed",
+    packetNextOrder: nextPacketReviewAfterCurrent?.order || null,
+    packetNextKey: nextPacketReviewAfterCurrent?.key || null,
+    recordCurrentStatus: firstRecordResultCheck?.status || null,
+    recordAdvanceWhen: "record_artifact_exists_and_index_includes_key",
+    recordNextOrder: nextRecordWriteAfterCurrent?.order || null,
+    recordNextKey: nextRecordWriteAfterCurrent?.key || null,
+    handoffCurrentKey: firstHandoffCheck,
+    handoffAdvanceWhen: "packet_and_record_checks_confirmed"
+  };
   return {
     mode: "developer-ops-staging-launch-duty-offline-execution-plan",
     status: "awaiting_operator_execution",
@@ -23502,6 +23515,7 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     currentRecordWriteStep,
     nextRecordWriteAfterCurrent,
     currentExecutionCursor,
+    cursorAdvanceBasis,
     firstHandoffCheck,
     nextAction: "Open the archive index first, review packet results, write launch-duty records, then verify record writes before handoff."
   };
@@ -23793,6 +23807,18 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         + ` | key=${nextRecord.key || "-"}`
         + ` | artifact=${nextRecord.expectedRecordArtifactPath || "-"}`
         + ` | command=${nextRecord.command || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.cursorAdvanceBasis) {
+      const basis = offlineExecutionPlan.cursorAdvanceBasis;
+      lines.push(
+        `- Offline Execution Plan Cursor Advance Basis: packetStatus=${basis.packetCurrentStatus || "-"}`
+        + ` | packetAdvanceWhen=${basis.packetAdvanceWhen || "-"}`
+        + ` | packetNext=${basis.packetNextOrder || "-"}.${basis.packetNextKey || "-"}`
+        + ` | recordStatus=${basis.recordCurrentStatus || "-"}`
+        + ` | recordAdvanceWhen=${basis.recordAdvanceWhen || "-"}`
+        + ` | recordNext=${basis.recordNextOrder || "-"}.${basis.recordNextKey || "-"}`
+        + ` | handoffAdvanceWhen=${basis.handoffAdvanceWhen || "-"}`
       );
     }
     if (offlineExecutionPlan.firstHandoffCheck) {

@@ -17538,6 +17538,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyActionOrder.offlineExecutionPlan.nextPacketReviewAfterCurrent.packetPath,
       "artifacts/staging/EXPORT_ALPHA/stable/staging-artifact-manifest.json"
     );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.cursorAdvanceBasis.mode,
+      "developer-ops-staging-launch-duty-offline-cursor-advance-basis"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.cursorAdvanceBasis.packetCurrentStatus,
+      "awaiting_operator_result_check"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.cursorAdvanceBasis.packetAdvanceWhen,
+      "expected_artifact_exists_and_result_check_confirmed"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.cursorAdvanceBasis.packetNextKey,
+      "artifact_manifest"
+    );
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.key, "launch_day_watch_summary");
     assert.equal(
       launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.expectedRecordArtifactPath,
@@ -17587,10 +17603,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyActionOrder.offlineExecutionPlan.nextRecordWriteAfterCurrent.expectedRecordArtifactPath,
       "artifacts/staging/EXPORT_ALPHA/stable/receipt-visibility-snapshot.txt"
     );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.cursorAdvanceBasis.recordCurrentStatus,
+      "awaiting_record_write_confirmation"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.cursorAdvanceBasis.recordAdvanceWhen,
+      "record_artifact_exists_and_index_includes_key"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.cursorAdvanceBasis.recordNextKey,
+      "receipt_visibility_snapshot"
+    );
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstHandoffCheck, "review_staging_packet_results");
     assert.equal(
       launchDutyActionOrder.offlineExecutionPlan.currentExecutionCursor.handoffCurrentKey,
       "review_staging_packet_results"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.cursorAdvanceBasis.handoffAdvanceWhen,
+      "packet_and_record_checks_confirmed"
     );
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
@@ -18643,6 +18675,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Cursor Advance Basis: packetStatus=awaiting_operator_result_check \| packetAdvanceWhen=expected_artifact_exists_and_result_check_confirmed \| packetNext=2\.artifact_manifest \| recordStatus=awaiting_record_write_confirmation \| recordAdvanceWhen=record_artifact_exists_and_index_includes_key \| recordNext=2\.receipt_visibility_snapshot \| handoffAdvanceWhen=packet_and_record_checks_confirmed/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
       /Offline Execution Plan First Handoff Check: review_staging_packet_results/
     );
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
@@ -19263,6 +19299,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       /Offline Execution Plan Next Record: order=2 \| key=receipt_visibility_snapshot \| artifact=artifacts\/staging\/EXPORT_ALPHA\/stable\/receipt-visibility-snapshot\.txt \| command=npm\.cmd run staging:launch-duty:record/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Cursor Advance Basis: packetStatus=awaiting_operator_result_check \| packetAdvanceWhen=expected_artifact_exists_and_result_check_confirmed \| packetNext=2\.artifact_manifest \| recordStatus=awaiting_record_write_confirmation \| recordAdvanceWhen=record_artifact_exists_and_index_includes_key \| recordNext=2\.receipt_visibility_snapshot \| handoffAdvanceWhen=packet_and_record_checks_confirmed/
     );
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,

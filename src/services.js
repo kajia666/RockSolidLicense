@@ -36568,6 +36568,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | recovery=${latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery?.method || "-"} ${latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery?.route || "-"}`
         );
       }
+      lines.push("Operator Order:");
+      lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
     }
     const launchDutyRecordIndexReceiptSelection = initialLaunchOpsReadiness.launchDutyRecordIndexReceiptSelection || null;
     if (launchDutyRecordIndexReceiptSelection) {
@@ -37476,6 +37478,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | recovery=${latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery?.method || "-"} ${latestSteadyStateDutyPlanReceipt.receiptVisibility.failureRecovery?.route || "-"}`
       );
     }
+    lines.push("Operator Order:");
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
     lines.push("");
   }
   const launchDutyRecordIndexReceiptSelection = readiness.launchDutyRecordIndexReceiptSelection || null;
@@ -40695,6 +40699,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
   }
   lines.push("");
   lines.push("Operator Order:");
+  if (entry.receiptConfirmation || entry.receiptRecoveryAction || readiness.latestSteadyStateDutyPlanReceipt) {
+    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+  }
   lines.push("- Start from this file during launch operations handoff; it links the checklist, overview status, Launch Review, Launch Smoke, and Launch Mainline route map.");
   lines.push("- Keep the launch-duty record index attached to every review handoff so reviewers confirm the same evidence chain.");
   return lines.join("\n");

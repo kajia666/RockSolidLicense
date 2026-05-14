@@ -20128,6 +20128,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const latestLaunchDutySelectionChecklistStepPattern = /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-launch-operations-operator-entry\.txt \| format=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/;
     const steadyStateDutyReceiptOperatorOrderPattern = /Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./;
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsHandoffDownload = await getText(
       baseUrl,
@@ -21171,6 +21172,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     assert.match(launchOperationsInitialReadinessDownload.body, /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-launch-operations-operator-entry\.txt \| format=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsInitialReadinessDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsOverviewStatusDownload = await getText(
       baseUrl,
@@ -21517,6 +21519,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsChecksumsDownload = await getText(
       baseUrl,

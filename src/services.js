@@ -38614,10 +38614,50 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
     archiveIndexPath: common.launchDutyArchiveIndex,
     launchDutyRecordIndexPath: common.launchDutyRecordIndex
   });
+  const packetFiles = Array.isArray(archive.packetFiles) ? archive.packetFiles : [];
+  const buildOfflineExecutionPlan = () => ({
+    mode: "developer-ops-staging-launch-duty-offline-execution-plan",
+    status: "awaiting_operator_execution",
+    entrypoint: common.launchDutyArchiveIndex,
+    archiveIndexPath: common.launchDutyArchiveIndex,
+    launchDutyRecordIndexPath: common.launchDutyRecordIndex,
+    packetReviewSteps: packetFiles.map((packet, index) => ({
+      mode: "developer-ops-staging-launch-duty-offline-packet-step",
+      order: index + 1,
+      packetKey: packet?.key || null,
+      packetPath: packet?.path || null,
+      operatorAction: packetOperatorActions[packet?.key] || "operator_review_staging_packet",
+      command: buildPacketCommand(packet?.key),
+      resultCheck: buildPacketResultCheck(packet),
+      backfillTarget: buildPacketBackfillTarget(packet)
+    })),
+    recordWriteSteps: launchDutyRecordKeys.map((key, index) => ({
+      mode: "developer-ops-staging-launch-duty-offline-record-step",
+      order: index + 1,
+      key,
+      command: buildLaunchDutyRecordCommand(key),
+      resultCheck: buildLaunchDutyRecordResultCheck(key, index + 1),
+      backfillTarget: buildLaunchDutyRecordBackfillTarget(key, index + 1)
+    })),
+    handoffChecks: [
+      {
+        key: "review_staging_packet_results",
+        status: "awaiting_operator_result_check",
+        archiveIndexPath: common.launchDutyArchiveIndex
+      },
+      {
+        key: "verify_launch_duty_record_writes",
+        status: "awaiting_record_write_confirmation",
+        launchDutyRecordIndexPath: common.launchDutyRecordIndex
+      }
+    ],
+    nextAction: "Run packet review steps, write the launch-duty records, then confirm packet and record result checks before handoff."
+  });
   pushJsonFile(files.launchDutyArchiveIndex, {
     mode: "developer-ops-staging-launch-duty-archive-index",
     ...common,
-    archive
+    archive,
+    offlineExecutionPlan: buildOfflineExecutionPlan()
   });
   pushJsonFile(common.launchDutyRecordIndex, {
     mode: "developer-ops-staging-launch-duty-record-index",
@@ -38638,7 +38678,6 @@ function buildDeveloperOpsStagingArtifactMirrorFiles(payload = {}) {
       writeCommand: buildLaunchDutyRecordCommand(launchDutyRecordKeys[0])
     }
   });
-  const packetFiles = Array.isArray(archive.packetFiles) ? archive.packetFiles : [];
   for (const packet of packetFiles) {
     pushJsonFile(packet?.path, {
       mode: "developer-ops-staging-packet-reference",

@@ -22081,6 +22081,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewZipText, /artifacts\/staging\/EXPORT_ALPHA\/beta\/first-wave-closeout\.md/);
     assert.match(launchMainlineRouteReviewZipText, /recordBackfillTargets/);
     assert.match(launchMainlineRouteReviewZipText, /awaiting_record_write_confirmation/);
+    assert.match(launchMainlineRouteReviewZipText, /offlineExecutionPlan/);
+    assert.match(launchMainlineRouteReviewZipText, /developer-ops-staging-launch-duty-offline-execution-plan/);
+    assert.match(launchMainlineRouteReviewZipText, /packetReviewSteps/);
+    assert.match(launchMainlineRouteReviewZipText, /recordWriteSteps/);
+    assert.match(launchMainlineRouteReviewZipText, /review_staging_packet_results/);
+    assert.match(launchMainlineRouteReviewZipText, /verify_launch_duty_record_writes/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

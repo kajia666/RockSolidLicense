@@ -23444,6 +23444,23 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     launchDutyRecordIndexPath,
     command: buildRecordCommand(key)
   }));
+  const currentPacketReviewStep = packetReviewQueue[0] || null;
+  const nextPacketReviewAfterCurrent = packetReviewQueue[1] || null;
+  const currentRecordWriteStep = recordWriteQueue[0] || null;
+  const nextRecordWriteAfterCurrent = recordWriteQueue[1] || null;
+  const firstHandoffCheck = "review_staging_packet_results";
+  const currentExecutionCursor = {
+    mode: "developer-ops-staging-launch-duty-offline-execution-cursor",
+    packetCurrentOrder: currentPacketReviewStep?.order || null,
+    packetCurrentKey: currentPacketReviewStep?.key || null,
+    packetNextOrder: nextPacketReviewAfterCurrent?.order || null,
+    packetNextKey: nextPacketReviewAfterCurrent?.key || null,
+    recordCurrentOrder: currentRecordWriteStep?.order || null,
+    recordCurrentKey: currentRecordWriteStep?.key || null,
+    recordNextOrder: nextRecordWriteAfterCurrent?.order || null,
+    recordNextKey: nextRecordWriteAfterCurrent?.key || null,
+    handoffCurrentKey: firstHandoffCheck
+  };
   return {
     mode: "developer-ops-staging-launch-duty-offline-execution-plan",
     status: "awaiting_operator_execution",
@@ -23468,6 +23485,8 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     firstPacketResultCheck,
     packetReviewQueue,
     remainingPacketReviewCount: Math.max(0, packetReviewQueue.length - 1),
+    currentPacketReviewStep,
+    nextPacketReviewAfterCurrent,
     firstRecordWriteStep: firstRecordKey
       ? {
           order: 1,
@@ -23480,7 +23499,10 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     firstRecordResultCheck,
     recordWriteQueue,
     remainingRecordWriteCount: Math.max(0, recordWriteQueue.length - 1),
-    firstHandoffCheck: "review_staging_packet_results",
+    currentRecordWriteStep,
+    nextRecordWriteAfterCurrent,
+    currentExecutionCursor,
+    firstHandoffCheck,
     nextAction: "Open the archive index first, review packet results, write launch-duty records, then verify record writes before handoff."
   };
 }
@@ -23742,6 +23764,35 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
       lines.push(
         `- Offline Execution Plan Remaining Counts: packetReviewAfterFirst=${offlineExecutionPlan.remainingPacketReviewCount ?? Math.max(0, packetReviewQueue.length - 1)}`
         + ` | recordWriteAfterFirst=${offlineExecutionPlan.remainingRecordWriteCount ?? Math.max(0, recordWriteQueue.length - 1)}`
+      );
+    }
+    if (offlineExecutionPlan.currentExecutionCursor) {
+      const cursor = offlineExecutionPlan.currentExecutionCursor;
+      lines.push(
+        `- Offline Execution Plan Cursor: packetCurrent=${cursor.packetCurrentOrder || "-"}.${cursor.packetCurrentKey || "-"}`
+        + ` | packetNext=${cursor.packetNextOrder || "-"}.${cursor.packetNextKey || "-"}`
+        + ` | recordCurrent=${cursor.recordCurrentOrder || "-"}.${cursor.recordCurrentKey || "-"}`
+        + ` | recordNext=${cursor.recordNextOrder || "-"}.${cursor.recordNextKey || "-"}`
+        + ` | handoffCurrent=${cursor.handoffCurrentKey || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.nextPacketReviewAfterCurrent) {
+      const nextPacket = offlineExecutionPlan.nextPacketReviewAfterCurrent;
+      lines.push(
+        `- Offline Execution Plan Next Packet: order=${nextPacket.order || "-"}`
+        + ` | key=${nextPacket.key || "-"}`
+        + ` | action=${nextPacket.operatorAction || "-"}`
+        + ` | path=${nextPacket.packetPath || "-"}`
+        + ` | command=${nextPacket.command || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.nextRecordWriteAfterCurrent) {
+      const nextRecord = offlineExecutionPlan.nextRecordWriteAfterCurrent;
+      lines.push(
+        `- Offline Execution Plan Next Record: order=${nextRecord.order || "-"}`
+        + ` | key=${nextRecord.key || "-"}`
+        + ` | artifact=${nextRecord.expectedRecordArtifactPath || "-"}`
+        + ` | command=${nextRecord.command || "-"}`
       );
     }
     if (offlineExecutionPlan.firstHandoffCheck) {

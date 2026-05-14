@@ -17531,6 +17531,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "artifacts/staging/EXPORT_ALPHA/stable/staging-artifact-manifest.json"
     );
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.remainingPacketReviewCount, 5);
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.currentExecutionCursor.packetCurrentKey, "run_record_index");
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.currentExecutionCursor.packetNextKey, "artifact_manifest");
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.nextPacketReviewAfterCurrent.key, "artifact_manifest");
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.nextPacketReviewAfterCurrent.packetPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/staging-artifact-manifest.json"
+    );
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.key, "launch_day_watch_summary");
     assert.equal(
       launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.expectedRecordArtifactPath,
@@ -17573,7 +17580,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "artifacts/staging/EXPORT_ALPHA/stable/receipt-visibility-snapshot.txt"
     );
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.remainingRecordWriteCount, 5);
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.currentExecutionCursor.recordCurrentKey, "launch_day_watch_summary");
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.currentExecutionCursor.recordNextKey, "receipt_visibility_snapshot");
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.nextRecordWriteAfterCurrent.key, "receipt_visibility_snapshot");
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.nextRecordWriteAfterCurrent.expectedRecordArtifactPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/receipt-visibility-snapshot.txt"
+    );
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstHandoffCheck, "review_staging_packet_results");
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.currentExecutionCursor.handoffCurrentKey,
+      "review_staging_packet_results"
+    );
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key, "ops_launch_receipt_next_follow_up");
@@ -18613,6 +18631,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Cursor: packetCurrent=1\.run_record_index \| packetNext=2\.artifact_manifest \| recordCurrent=1\.launch_day_watch_summary \| recordNext=2\.receipt_visibility_snapshot \| handoffCurrent=review_staging_packet_results/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Next Packet: order=2 \| key=artifact_manifest \| action=operator_review_artifact_manifest \| path=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-artifact-manifest\.json \| command=npm\.cmd run staging:rehearsal/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Next Record: order=2 \| key=receipt_visibility_snapshot \| artifact=artifacts\/staging\/EXPORT_ALPHA\/stable\/receipt-visibility-snapshot\.txt \| command=npm\.cmd run staging:launch-duty:record/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
       /Offline Execution Plan First Handoff Check: review_staging_packet_results/
     );
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
@@ -19221,6 +19251,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       /Offline Execution Plan Remaining Counts: packetReviewAfterFirst=5 \| recordWriteAfterFirst=5/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Cursor: packetCurrent=1\.run_record_index \| packetNext=2\.artifact_manifest \| recordCurrent=1\.launch_day_watch_summary \| recordNext=2\.receipt_visibility_snapshot \| handoffCurrent=review_staging_packet_results/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Next Packet: order=2 \| key=artifact_manifest \| action=operator_review_artifact_manifest \| path=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-artifact-manifest\.json \| command=npm\.cmd run staging:rehearsal/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Next Record: order=2 \| key=receipt_visibility_snapshot \| artifact=artifacts\/staging\/EXPORT_ALPHA\/stable\/receipt-visibility-snapshot\.txt \| command=npm\.cmd run staging:launch-duty:record/
     );
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,

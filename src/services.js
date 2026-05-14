@@ -16510,12 +16510,14 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           steadyStateHandoffLanding.recommendedDownload ? ensureLaunchMainlineControlHrefs({
             kind: "download",
             label: "Open Steady-State Handoff Brief",
-            recommendedDownload: steadyStateHandoffLanding.recommendedDownload
+            recommendedDownload: steadyStateHandoffLanding.recommendedDownload,
+            operatorOrder: steadyStateHandoffLandingOperatorOrder
           }, params) : null,
           steadyStateHandoffLanding.workspaceAction ? ensureLaunchMainlineControlHrefs({
             kind: "workspace",
             label: "Open Steady-State Ops Workspace",
-            workspaceAction: steadyStateHandoffLanding.workspaceAction
+            workspaceAction: steadyStateHandoffLanding.workspaceAction,
+            operatorOrder: steadyStateHandoffLandingOperatorOrder
           }, params) : null
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
@@ -16554,12 +16556,14 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           steadyStateDutyReceiptReview.recommendedDownload ? ensureLaunchMainlineControlHrefs({
             kind: "download",
             label: "Review Steady-State Duty Receipt",
-            recommendedDownload: steadyStateDutyReceiptReview.recommendedDownload
+            recommendedDownload: steadyStateDutyReceiptReview.recommendedDownload,
+            operatorOrder: steadyStateDutyReceiptReviewOperatorOrder
           }, params) : null,
           steadyStateDutyReceiptReview.workspaceAction ? ensureLaunchMainlineControlHrefs({
             kind: "workspace",
             label: "Open Steady-State Duty Receipt",
-            workspaceAction: steadyStateDutyReceiptReview.workspaceAction
+            workspaceAction: steadyStateDutyReceiptReview.workspaceAction,
+            operatorOrder: steadyStateDutyReceiptReviewOperatorOrder
           }, params) : null
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
@@ -18480,6 +18484,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       lines.push(`- ${item?.title || item?.key || "Overview"} | ${item?.summary || "-"}`);
       if (Array.isArray(item?.tags) && item.tags.length) {
         lines.push(`  tags: ${item.tags.map((tag) => `${tag?.label || "tag"}=${tag?.value ?? "-"}`).join(", ")}`);
+      }
+      const operatorOrder = Array.isArray(item?.operatorOrder) ? item.operatorOrder : [];
+      if (operatorOrder.length) {
+        lines.push("  Operator Order:");
+        for (const orderItem of operatorOrder) {
+          lines.push(`  - ${orderItem}`);
+        }
       }
       if (Array.isArray(item?.controls) && item.controls.length) {
         for (const control of item.controls) {

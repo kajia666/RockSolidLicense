@@ -17514,6 +17514,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyActionOrder.offlineExecutionPlan.firstPacketResultCheck.archiveIndexPath,
       "artifacts/staging/EXPORT_ALPHA/stable/staging-launch-duty-archive-index.json"
     );
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.packetReviewQueue.length, 6);
+    assert.deepEqual(
+      launchDutyActionOrder.offlineExecutionPlan.packetReviewQueue.map((item) => item.key),
+      [
+        "run_record_index",
+        "artifact_manifest",
+        "backup_restore_packet",
+        "closeout_reload_packet",
+        "readiness_review_packet",
+        "production_signoff_packet"
+      ]
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.packetReviewQueue[1].packetPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/staging-artifact-manifest.json"
+    );
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.remainingPacketReviewCount, 5);
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.key, "launch_day_watch_summary");
     assert.equal(
       launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.expectedRecordArtifactPath,
@@ -17539,6 +17556,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyActionOrder.offlineExecutionPlan.firstRecordResultCheck.launchDutyRecordIndexPath,
       "artifacts/staging/EXPORT_ALPHA/stable/launch-duty-record-index.json"
     );
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.recordWriteQueue.length, 6);
+    assert.deepEqual(
+      launchDutyActionOrder.offlineExecutionPlan.recordWriteQueue.map((item) => item.key),
+      [
+        "launch_day_watch_summary",
+        "receipt_visibility_snapshot",
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff",
+        "first_wave_closeout"
+      ]
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.recordWriteQueue[1].expectedRecordArtifactPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/receipt-visibility-snapshot.txt"
+    );
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.remainingRecordWriteCount, 5);
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstHandoffCheck, "review_staging_packet_results");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
@@ -18567,6 +18601,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Packet Queue: 1\.run_record_index=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json -> 2\.artifact_manifest=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-artifact-manifest\.json -> 3\.backup_restore_packet=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-backup-restore-drill-packet\.json -> 4\.closeout_reload_packet=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-closeout-reload-packet\.json -> 5\.readiness_review_packet=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-readiness-review-packet\.json -> 6\.production_signoff_packet=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Record Queue: 1\.launch_day_watch_summary=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md -> 2\.receipt_visibility_snapshot=artifacts\/staging\/EXPORT_ALPHA\/stable\/receipt-visibility-snapshot\.txt -> 3\.first_wave_incident_log=artifacts\/staging\/EXPORT_ALPHA\/stable\/first-wave-incident-log\.md -> 4\.rollback_signal_review=artifacts\/staging\/EXPORT_ALPHA\/stable\/rollback-signal-review\.md -> 5\.stabilization_owner_handoff=artifacts\/staging\/EXPORT_ALPHA\/stable\/stabilization-owner-handoff\.md -> 6\.first_wave_closeout=artifacts\/staging\/EXPORT_ALPHA\/stable\/first-wave-closeout\.md/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Remaining Counts: packetReviewAfterFirst=5 \| recordWriteAfterFirst=5/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
       /Offline Execution Plan First Handoff Check: review_staging_packet_results/
     );
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
@@ -19163,6 +19209,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       /Offline Execution Plan First Record Result Check: status=awaiting_record_write_confirmation \| expected=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Packet Queue: 1\.run_record_index=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json -> 2\.artifact_manifest=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-artifact-manifest\.json -> 3\.backup_restore_packet=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-backup-restore-drill-packet\.json -> 4\.closeout_reload_packet=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-closeout-reload-packet\.json -> 5\.readiness_review_packet=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-readiness-review-packet\.json -> 6\.production_signoff_packet=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-production-signoff-packet\.json/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Record Queue: 1\.launch_day_watch_summary=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md -> 2\.receipt_visibility_snapshot=artifacts\/staging\/EXPORT_ALPHA\/stable\/receipt-visibility-snapshot\.txt -> 3\.first_wave_incident_log=artifacts\/staging\/EXPORT_ALPHA\/stable\/first-wave-incident-log\.md -> 4\.rollback_signal_review=artifacts\/staging\/EXPORT_ALPHA\/stable\/rollback-signal-review\.md -> 5\.stabilization_owner_handoff=artifacts\/staging\/EXPORT_ALPHA\/stable\/stabilization-owner-handoff\.md -> 6\.first_wave_closeout=artifacts\/staging\/EXPORT_ALPHA\/stable\/first-wave-closeout\.md/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Remaining Counts: packetReviewAfterFirst=5 \| recordWriteAfterFirst=5/
     );
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,

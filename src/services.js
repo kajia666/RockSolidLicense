@@ -23368,16 +23368,34 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
   const firstPacket = packetFiles[0] || null;
   const firstRecordKey = LAUNCH_DUTY_RECORD_INDEX_SEQUENCE[0] || null;
   const archiveRoot = String(stagingLaunchDutyArchive.archiveRoot || "").trim();
-  const firstRecordArtifactPath = firstRecordKey
-    ? `${archiveRoot ? `${archiveRoot}/` : ""}${String(firstRecordKey).replaceAll("_", "-")}.md`
-    : null;
-  const firstRecordCommand = launchDutyRecordIndexPath && firstRecordKey && firstRecordArtifactPath
-    ? "npm.cmd run staging:launch-duty:record -- "
+  const launchDutyRecordFileNames = {
+    launch_day_watch_summary: "launch-day-watch-summary.md",
+    receipt_visibility_snapshot: "receipt-visibility-snapshot.txt",
+    first_wave_incident_log: "first-wave-incident-log.md",
+    rollback_signal_review: "rollback-signal-review.md",
+    stabilization_owner_handoff: "stabilization-owner-handoff.md",
+    first_wave_closeout: "first-wave-closeout.md"
+  };
+  const buildRecordArtifactPath = (key = "") => {
+    if (!key) {
+      return null;
+    }
+    const fileName = launchDutyRecordFileNames[key] || `${String(key).replaceAll("_", "-")}.md`;
+    return `${archiveRoot ? `${archiveRoot}/` : ""}${fileName}`;
+  };
+  const buildRecordCommand = (key = "") => {
+    const artifactPath = buildRecordArtifactPath(key);
+    if (!launchDutyRecordIndexPath || !key || !artifactPath) {
+      return null;
+    }
+    return "npm.cmd run staging:launch-duty:record -- "
       + `--record-index-file ${launchDutyRecordIndexPath} `
-      + `--key ${firstRecordKey} `
-      + `--artifact-path ${firstRecordArtifactPath} `
-      + "--value-json <redacted-json>"
-    : null;
+      + `--key ${key} `
+      + `--artifact-path ${artifactPath} `
+      + "--value-json <redacted-json>";
+  };
+  const firstRecordArtifactPath = buildRecordArtifactPath(firstRecordKey);
+  const firstRecordCommand = buildRecordCommand(firstRecordKey);
   const buildPacketCommand = (packet = null) => {
     const packetKey = packet?.key || null;
     if (packetKey === "closeout_reload_packet") {
@@ -23412,6 +23430,20 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
         nextAction: "Confirm the record artifact exists and the launch-duty record index includes this key before handing off."
       }
     : null;
+  const packetReviewQueue = packetFiles.map((packet, index) => ({
+    order: index + 1,
+    key: packet?.key || null,
+    packetPath: packet?.path || null,
+    operatorAction: packetOperatorActions[packet?.key] || "operator_review_staging_packet",
+    command: buildPacketCommand(packet)
+  }));
+  const recordWriteQueue = LAUNCH_DUTY_RECORD_INDEX_SEQUENCE.map((key, index) => ({
+    order: index + 1,
+    key,
+    expectedRecordArtifactPath: buildRecordArtifactPath(key),
+    launchDutyRecordIndexPath,
+    command: buildRecordCommand(key)
+  }));
   return {
     mode: "developer-ops-staging-launch-duty-offline-execution-plan",
     status: "awaiting_operator_execution",
@@ -23434,6 +23466,8 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
         }
       : null,
     firstPacketResultCheck,
+    packetReviewQueue,
+    remainingPacketReviewCount: Math.max(0, packetReviewQueue.length - 1),
     firstRecordWriteStep: firstRecordKey
       ? {
           order: 1,
@@ -23444,6 +23478,8 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
         }
       : null,
     firstRecordResultCheck,
+    recordWriteQueue,
+    remainingRecordWriteCount: Math.max(0, recordWriteQueue.length - 1),
     firstHandoffCheck: "review_staging_packet_results",
     nextAction: "Open the archive index first, review packet results, write launch-duty records, then verify record writes before handoff."
   };
@@ -23682,6 +23718,30 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         `- Offline Execution Plan First Record Result Check: status=${recordResultCheck.status || "-"}`
         + ` | expected=${recordResultCheck.expectedRecordArtifactPath || "-"}`
         + ` | launchDutyRecordIndex=${recordResultCheck.launchDutyRecordIndexPath || "-"}`
+      );
+    }
+    const packetReviewQueue = Array.isArray(offlineExecutionPlan.packetReviewQueue)
+      ? offlineExecutionPlan.packetReviewQueue
+      : [];
+    if (packetReviewQueue.length) {
+      lines.push(
+        "- Offline Execution Plan Packet Queue: "
+        + packetReviewQueue.map((item) => `${item.order || "-"}.${item.key || "-"}=${item.packetPath || "-"}`).join(" -> ")
+      );
+    }
+    const recordWriteQueue = Array.isArray(offlineExecutionPlan.recordWriteQueue)
+      ? offlineExecutionPlan.recordWriteQueue
+      : [];
+    if (recordWriteQueue.length) {
+      lines.push(
+        "- Offline Execution Plan Record Queue: "
+        + recordWriteQueue.map((item) => `${item.order || "-"}.${item.key || "-"}=${item.expectedRecordArtifactPath || "-"}`).join(" -> ")
+      );
+    }
+    if (packetReviewQueue.length || recordWriteQueue.length) {
+      lines.push(
+        `- Offline Execution Plan Remaining Counts: packetReviewAfterFirst=${offlineExecutionPlan.remainingPacketReviewCount ?? Math.max(0, packetReviewQueue.length - 1)}`
+        + ` | recordWriteAfterFirst=${offlineExecutionPlan.remainingRecordWriteCount ?? Math.max(0, recordWriteQueue.length - 1)}`
       );
     }
     if (offlineExecutionPlan.firstHandoffCheck) {

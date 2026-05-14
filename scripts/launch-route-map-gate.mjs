@@ -391,6 +391,8 @@ function buildLaunchSwitchWatchHandoff() {
   const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile();
   const readinessActionQueueFile = options.actionsFile || defaultReadinessActionQueueFile();
   const launchDutyRecordIndexPath = defaultLaunchDutyRecordIndexFile();
+  const closeoutBackfill = buildRouteMapCloseoutBackfill();
+  const receiptVisibilityQueue = buildLaunchSmokeReceiptVisibilityQueue();
   const currentCommand = buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQueueFile);
   const launchSmokeCommand = [
     "npm.cmd run launch:smoke:staging --",
@@ -442,6 +444,62 @@ function buildLaunchSwitchWatchHandoff() {
     ...item,
     launchDutyRecordIndexPath
   }));
+  const operatorNextCommands = [
+    {
+      key: "backfill_route_map_gate_result",
+      label: "Backfill route-map gate result",
+      status: "current",
+      kind: "command",
+      command: closeoutBackfill.command,
+      targetKey: "route_map_gate_result",
+      launchDutyRecordIndexPath,
+      nextAction: "Run this after the route-map targeted gate passes, then refresh staging readiness."
+    },
+    {
+      key: "refresh_staging_readiness_after_route_map",
+      label: "Refresh staging readiness after route-map backfill",
+      status: "blocked_after_route_map_backfill",
+      kind: "command",
+      command: currentCommand,
+      targetKey: "staging_readiness_status",
+      launchDutyRecordIndexPath,
+      nextAction: "Confirm the action queue sees route_map_gate_result before live-write smoke."
+    },
+    {
+      key: "run_launch_smoke_staging",
+      label: "Run staging Launch Smoke live-write preflight",
+      status: "blocked_after_readiness_refresh",
+      kind: "command",
+      command: launchSmokeCommand,
+      targetKey: "live_write_smoke_result",
+      launchDutyRecordIndexPath,
+      nextAction: "Run with smoke credential env vars set, then use the smoke closeout-backfill handoff."
+    },
+    {
+      key: "refresh_staging_readiness_after_launch_smoke",
+      label: "Refresh staging readiness after Launch Smoke evidence",
+      status: "blocked_after_launch_smoke",
+      kind: "command",
+      command: currentCommand,
+      targetKey: "staging_readiness_status",
+      launchDutyRecordIndexPath,
+      nextAction: "Confirm live-write smoke, handoff, evidence receipts, and receipt visibility are reflected in readiness."
+    },
+    {
+      key: "verify_receipt_visibility_queue",
+      label: "Verify Launch Smoke receipt visibility queue",
+      status: "blocked_after_launch_smoke",
+      kind: "download_queue",
+      target: receiptVisibilityQueue[0]?.target || null,
+      queue: receiptVisibilityQueue,
+      targetKey: "receipt_visibility_review",
+      launchDutyRecordIndexPath,
+      nextAction: "Open the queue in order before entering production sign-off or launch-day watch."
+    }
+  ].map((item, index) => ({
+    order: index + 1,
+    ...item
+  }));
   return {
     version: "launch-route-map-gate-switch-watch-handoff/v1",
     status: "ready_for_staging_readiness_and_launch_smoke_switch",
@@ -457,6 +515,7 @@ function buildLaunchSwitchWatchHandoff() {
     readinessActionQueueFile,
     launchDutyRecordIndexPath,
     backfillSequence,
+    operatorNextCommands,
     nextAction: "Refresh staging readiness after route_map_gate_result is backfilled, then run launchSmokeCommand with staging smoke credentials to produce the remaining closeout and receipt-visibility evidence."
   };
 }
@@ -519,6 +578,17 @@ if (dryRun) {
     console.log(`Launch switch evidence sequence: ${launchSwitchWatchHandoff.backfillSequence.map((item) => item.key).join(" -> ")}`);
     console.log(`Launch switch credential env: ${launchSwitchWatchHandoff.credentialEnv.join(", ")}`);
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
+    console.log("Launch switch operator queue:");
+    for (const item of launchSwitchWatchHandoff.operatorNextCommands) {
+      if (item.kind === "download_queue") {
+        console.log(
+          `${item.order}. ${item.key}: ${item.status} ${item.kind} -> first=${item.target || "-"}`
+          + ` | count=${item.queue?.length || 0}`
+        );
+      } else {
+        console.log(`${item.order}. ${item.key}: ${item.status} ${item.kind} -> ${item.command || "-"}`);
+      }
+    }
     console.log("Launch Smoke receipt visibility queue:");
     for (const item of launchSmokeReceiptVisibilityQueue) {
       console.log(

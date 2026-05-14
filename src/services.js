@@ -14724,6 +14724,60 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Steady-State Ops Workspace", params)
       }
     : null;
+  const latestSteadyStateDutyPlanReceipt = buildSteadyStateDutyPlanReceiptPayload(
+    initialLaunchOpsReadiness?.latestSteadyStateDutyPlanReceipt
+    || (Array.isArray(opsOverview.latestSteadyStateDutyPlanReceipts)
+      ? opsOverview.latestSteadyStateDutyPlanReceipts[0]
+      : null)
+    || null
+  );
+  const steadyStateDutyReceiptDownload = latestSteadyStateDutyPlanReceipt?.href
+    || latestSteadyStateDutyPlanReceipt?.fileName
+    || latestSteadyStateDutyPlanReceipt?.format
+      ? ensureLaunchWorkflowDownloadHref({
+          key: "ops_latest_steady_state_duty_receipt_asset",
+          label: "Latest steady-state duty receipt asset",
+          fileName: latestSteadyStateDutyPlanReceipt.fileName || null,
+          format: latestSteadyStateDutyPlanReceipt.format || null,
+          href: latestSteadyStateDutyPlanReceipt.href || null,
+          source: "developer-ops-steady-state-duty-plan-receipt"
+        }, params)
+      : null;
+  const steadyStateDutyReceiptReview = latestSteadyStateDutyPlanReceipt
+    ? {
+        mode: "developer-launch-mainline-steady-state-duty-receipt-review",
+        status: latestSteadyStateDutyPlanReceipt.status || "recorded",
+        auditLogId: latestSteadyStateDutyPlanReceipt.auditLogId || null,
+        productCode: latestSteadyStateDutyPlanReceipt.productCode || params.productCode || null,
+        channel: latestSteadyStateDutyPlanReceipt.channel || params.channel || "stable",
+        action: latestSteadyStateDutyPlanReceipt.action || null,
+        intent: latestSteadyStateDutyPlanReceipt.intent || null,
+        planKind: latestSteadyStateDutyPlanReceipt.planKind || null,
+        planMode: latestSteadyStateDutyPlanReceipt.planMode || null,
+        targetType: latestSteadyStateDutyPlanReceipt.targetType || null,
+        fileName: latestSteadyStateDutyPlanReceipt.fileName || null,
+        format: latestSteadyStateDutyPlanReceipt.format || null,
+        href: latestSteadyStateDutyPlanReceipt.href || null,
+        recordedAt: latestSteadyStateDutyPlanReceipt.recordedAt || latestSteadyStateDutyPlanReceipt.createdAt || null,
+        recordedBy: latestSteadyStateDutyPlanReceipt.recordedBy || null,
+        receiptVisibilityStatus: latestSteadyStateDutyPlanReceipt.receiptVisibility?.status || null,
+        visibleInCount: Array.isArray(latestSteadyStateDutyPlanReceipt.receiptVisibility?.visibleIn)
+          ? latestSteadyStateDutyPlanReceipt.receiptVisibility.visibleIn.length
+          : 0,
+        launchDutyRecordIndexPath: latestSteadyStateDutyPlanReceipt.receiptVisibility?.launchDutyRecordIndexPath
+          || latestSteadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath
+          || latestSteadyStateDutyPlanReceipt.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || null,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath:
+          latestSteadyStateDutyPlanReceipt.receiptVisibility?.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || latestSteadyStateDutyPlanReceipt.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || null,
+        failureRecovery: latestSteadyStateDutyPlanReceipt.receiptVisibility?.failureRecovery || null,
+        recommendedDownload: steadyStateDutyReceiptDownload,
+        workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open Steady-State Duty Receipt", params),
+        nextAction: "Review the recorded steady-state duty receipt from Launch Mainline and keep it attached to the first stable operations handoff."
+      }
+    : null;
   const stagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations
     || (Array.isArray(launchDutyActionOrder?.steps)
       ? launchDutyActionOrder.steps.find((item) => item?.key === "staging_archive")?.nextOperations
@@ -15962,11 +16016,26 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
+  const steadyStateDutyReceiptHeroControls = steadyStateDutyReceiptReview
+    ? [
+        steadyStateDutyReceiptReview.recommendedDownload ? {
+          kind: "download",
+          label: "Review Steady-State Duty Receipt",
+          recommendedDownload: steadyStateDutyReceiptReview.recommendedDownload
+        } : null,
+        steadyStateDutyReceiptReview.workspaceAction ? {
+          kind: "workspace",
+          label: "Open Steady-State Duty Receipt",
+          workspaceAction: steadyStateDutyReceiptReview.workspaceAction
+        } : null
+      ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+    : [];
   const heroControls = [
     ...confirmedFirstWaveHeroControls,
     ...firstWaveHeroControls,
     ...firstWaveRuntimeEvidenceHeroControls,
     ...steadyStateHandoffHeroControls,
+    ...steadyStateDutyReceiptHeroControls,
     ...launchRunwayHeroControls,
     ...workspaceActions.map((item) => ({
       kind: "workspace",
@@ -16125,6 +16194,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstLaunchHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(initialLaunchOpsOverviewStatusDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateHandoffLanding?.recommendedDownload || null, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateDutyReceiptReview?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(closeoutHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(stabilizationHandoffDownload, params));
@@ -16391,6 +16461,48 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
+  const steadyStateDutyReceiptReviewCard = steadyStateDutyReceiptReview
+    ? {
+        key: "steady_state_duty_receipt_review",
+        title: "Steady-State Duty Receipt Review",
+        summary: steadyStateDutyReceiptReview.nextAction
+          || "Review the latest steady-state duty receipt before handing the lane to stable operations.",
+        tags: [
+          {
+            label: "status",
+            value: steadyStateDutyReceiptReview.status || "unknown",
+            strong: true
+          },
+          {
+            label: "visibility",
+            value: steadyStateDutyReceiptReview.receiptVisibilityStatus || "unknown",
+            strong: steadyStateDutyReceiptReview.receiptVisibilityStatus === "visible"
+          },
+          {
+            label: "format",
+            value: steadyStateDutyReceiptReview.format || "-",
+            strong: false
+          }
+        ],
+        details: [
+          `Audit: ${steadyStateDutyReceiptReview.auditLogId || "-"}`,
+          `Action: ${steadyStateDutyReceiptReview.action || "-"}`,
+          `Launch duty record index: ${steadyStateDutyReceiptReview.launchDutyRecordIndexPath || "-"}`
+        ],
+        controls: [
+          steadyStateDutyReceiptReview.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Review Steady-State Duty Receipt",
+            recommendedDownload: steadyStateDutyReceiptReview.recommendedDownload
+          }, params) : null,
+          steadyStateDutyReceiptReview.workspaceAction ? ensureLaunchMainlineControlHrefs({
+            kind: "workspace",
+            label: "Open Steady-State Duty Receipt",
+            workspaceAction: steadyStateDutyReceiptReview.workspaceAction
+          }, params) : null
+        ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -16478,6 +16590,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveRuntimeEvidenceCard,
     launchReadinessNextGateCard,
     steadyStateHandoffLandingCard,
+    steadyStateDutyReceiptReviewCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -17003,6 +17116,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: overviewCards.filter((item) => item?.key === "steady_state_handoff_landing")
     },
     {
+      key: "steady_state_duty_receipt_review",
+      title: "Steady-State Duty Receipt Review",
+      emptyState: "Record the first steady-state duty receipt to expose the post-launch duty review here.",
+      cards: overviewCards.filter((item) => item?.key === "steady_state_duty_receipt_review")
+    },
+    {
       key: "workspace_path",
       title: "Workspace Path",
       emptyState: "Generate a launch mainline package to inspect the routed workspace path here.",
@@ -17389,6 +17508,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsOverviewStatus,
     launchDutyActionOrder,
     steadyStateHandoffLanding,
+    steadyStateDutyReceiptReview,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -18241,6 +18361,25 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push(`- source=${steadyStateHandoffLanding.source || "-"} | launchDutyRecordIndex=${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`);
     lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(steadyStateHandoffLanding.recommendedDownload, { fileSeparator: " | " })}`);
     lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
+  }
+  const steadyStateDutyReceiptReview = mainlineSummary.steadyStateDutyReceiptReview || null;
+  if (steadyStateDutyReceiptReview) {
+    lines.push("");
+    lines.push("Launch Mainline Steady-State Duty Receipt Review:");
+    lines.push(
+      `- status=${steadyStateDutyReceiptReview.status || "-"}`
+      + ` | audit=${steadyStateDutyReceiptReview.auditLogId || "-"}`
+      + ` | action=${steadyStateDutyReceiptReview.action || "-"}`
+      + ` | format=${steadyStateDutyReceiptReview.format || "-"}`
+      + ` | visibility=${steadyStateDutyReceiptReview.receiptVisibilityStatus || "-"}`
+    );
+    lines.push(
+      `- file=${steadyStateDutyReceiptReview.fileName || "-"}`
+      + ` | href=${steadyStateDutyReceiptReview.href || steadyStateDutyReceiptReview.recommendedDownload?.href || "-"}`
+      + ` | launchDutyRecordIndex=${steadyStateDutyReceiptReview.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(steadyStateDutyReceiptReview.recommendedDownload, { fileSeparator: " | " })}`);
+    lines.push(`- nextAction=${steadyStateDutyReceiptReview.nextAction || "-"}`);
   }
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
   lines.push(`Mainline Recommended Download: ${formatLaunchHandoffDownloadText(mainlineSummary.recommendedDownload, { fileSeparator: " | " })}`);

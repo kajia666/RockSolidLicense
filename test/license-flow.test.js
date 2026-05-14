@@ -19967,6 +19967,55 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.latestSteadyStateDutyPlanReceipt.auditLogId,
       steadyStateDutyPlanReceipt.auditLogId
     );
+    const launchMainlineSteadyStateDutyReceiptReview = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.status,
+      "recorded"
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.auditLogId,
+      steadyStateDutyPlanReceipt.auditLogId
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.receiptVisibilityStatus,
+      "visible"
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.format,
+      "steady-state-duty-board"
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload.key,
+      "ops_latest_steady_state_duty_receipt_asset"
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload.href,
+      /\/api\/developer\/ops\/export\/download\?[^ ]*productCode=EXPORT_CLOSEOUT_READY[^ ]*format=steady-state-duty-board/
+    );
+    assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.heroControls.some((item) => (
+      item.label === "Review Steady-State Duty Receipt"
+      && item.recommendedDownload?.key === "ops_latest_steady_state_duty_receipt_asset"
+    )));
+    assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.overviewCards.some((item) => (
+      item.key === "steady_state_duty_receipt_review"
+      && item.controls?.some((control) => control.recommendedDownload?.key === "ops_latest_steady_state_duty_receipt_asset")
+    )));
+    assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.sections.some((item) => (
+      item.key === "steady_state_duty_receipt_review"
+      && item.cards?.some((card) => card.key === "steady_state_duty_receipt_review")
+    )));
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      new RegExp(`Launch Mainline Steady-State Duty Receipt Review:[\\s\\S]*status=recorded \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| format=steady-state-duty-board`)
+    );
     const launchOperationsEvidenceChain = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsEvidenceChain;
     assert.ok(launchOperationsEvidenceChain);
     assert.equal(launchOperationsEvidenceChain.version, "developer-ops-launch-operations-evidence-chain/v1");

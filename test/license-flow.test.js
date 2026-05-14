@@ -21973,6 +21973,40 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchDutyCloseoutRecordedQueue.closeoutExecutionState.status, "recorded");
     assert.equal(launchDutyCloseoutRecordedQueue.closeoutExecutionState.readyForCloseoutWrite, false);
     assert.equal(launchDutyCloseoutRecordedQueue.closeoutExecutionState.recorded, true);
+    const launchDutyCloseoutRecordedActionOrder = launchDutyCloseoutRecordedSnapshot.summary.initialLaunchOpsReadiness
+      .launchDutyActionOrder;
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.currentExecutionCursor.recordCursorSource,
+      "selected_launch_duty_record_index_readback"
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.currentExecutionCursor.recordProgress,
+      "6/6"
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.currentExecutionCursor.recordCurrentOrder,
+      null
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.currentExecutionCursor.recordNextOrder,
+      null
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.remainingRecordWriteCount,
+      0
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.cursorAdvanceBasis.recordCurrentStatus,
+      "record_index_complete"
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.cursorAdvanceBasis.recordAdvanceWhen,
+      "selected_record_index_complete"
+    );
+    assert.match(
+      launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.nextAction,
+      /Launch-duty record writes are complete/
+    );
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationQueue=complete/
@@ -21988,6 +22022,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationCloseoutStatus=recorded/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Offline Execution Plan Cursor Advance Basis: [^\n]*recordStatus=record_index_complete \| recordAdvanceWhen=selected_record_index_complete \| recordNext=-\.-/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Offline Execution Plan Cursor Receipt Source: recordSource=selected_launch_duty_record_index_readback \| selection=selected_latest_readback \| selectedProgress=6\/6 \| selectedNext=-/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Offline Execution Plan Next Action: Launch-duty record writes are complete/
     );
     const launchDutyCloseoutRecordedOperatorEntryDownload = await getText(
       baseUrl,

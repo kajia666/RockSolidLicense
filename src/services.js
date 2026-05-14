@@ -23477,6 +23477,13 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     : "default_offline_plan_start";
   const recordReadbackStatus = launchDutyRecordIndexReceiptSelection?.status || null;
   const recordReadbackSelectedProgress = launchDutyRecordIndexReceiptSelection?.selectedProgress || null;
+  const recordCursorComplete = launchDutyRecordIndexReceiptSelection?.selectedComplete === true;
+  const recordCurrentStatus = recordCursorComplete
+    ? "record_index_complete"
+    : firstRecordResultCheck?.status || null;
+  const recordAdvanceWhen = recordCursorComplete
+    ? "selected_record_index_complete"
+    : "record_artifact_exists_and_index_includes_key";
   const firstHandoffCheck = "review_staging_packet_results";
   const currentExecutionCursor = {
     mode: "developer-ops-staging-launch-duty-offline-execution-cursor",
@@ -23499,8 +23506,8 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     packetAdvanceWhen: "expected_artifact_exists_and_result_check_confirmed",
     packetNextOrder: nextPacketReviewAfterCurrent?.order || null,
     packetNextKey: nextPacketReviewAfterCurrent?.key || null,
-    recordCurrentStatus: firstRecordResultCheck?.status || null,
-    recordAdvanceWhen: "record_artifact_exists_and_index_includes_key",
+    recordCurrentStatus,
+    recordAdvanceWhen,
     recordNextOrder: nextRecordWriteAfterCurrent?.order || null,
     recordNextKey: nextRecordWriteAfterCurrent?.key || null,
     recordCursorSource,
@@ -23555,7 +23562,9 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     currentExecutionCursor,
     cursorAdvanceBasis,
     firstHandoffCheck,
-    nextAction: "Open the archive index first, review packet results, write launch-duty records, then verify record writes before handoff."
+    nextAction: recordCursorComplete
+      ? "Launch-duty record writes are complete from the selected record-index readback; continue packet result review and handoff checks before steady-state handoff."
+      : "Open the archive index first, review packet results, write launch-duty records, then verify record writes before handoff."
   };
 }
 

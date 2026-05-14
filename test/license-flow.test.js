@@ -20003,9 +20003,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload.key,
       "ops_latest_steady_state_duty_receipt_asset"
     );
+    assert.deepEqual(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload.operatorOrder,
+      expectedSteadyStateDutyReceiptOperatorOrder
+    );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload.href,
       /\/api\/developer\/ops\/export\/download\?[^ ]*productCode=EXPORT_CLOSEOUT_READY[^ ]*format=steady-state-duty-board/
+    );
+    const steadyStateDutyReceiptRecommendedDownload = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.recommendedDownloads.find((item) => (
+      item.key === "ops_latest_steady_state_duty_receipt_asset"
+    ));
+    assert.ok(steadyStateDutyReceiptRecommendedDownload);
+    assert.deepEqual(
+      steadyStateDutyReceiptRecommendedDownload.operatorOrder,
+      expectedSteadyStateDutyReceiptOperatorOrder
     );
     assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.heroControls.some((item) => (
       item.label === "Review Steady-State Duty Receipt"
@@ -20118,6 +20130,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Mainline Overview Cards:[\s\S]*Steady-State Duty Receipt Review[\s\S]*Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./
+    );
+    const steadyStateDutyReceiptRecommendedDownloadsCard = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.overviewCards.find((item) => (
+      item.key === "recommended_downloads"
+    ));
+    assert.ok(steadyStateDutyReceiptRecommendedDownloadsCard);
+    const steadyStateDutyReceiptRecommendedDownloadControl = steadyStateDutyReceiptRecommendedDownloadsCard.controls.find((control) => (
+      control.recommendedDownload?.key === "ops_latest_steady_state_duty_receipt_asset"
+    ));
+    assert.ok(steadyStateDutyReceiptRecommendedDownloadControl);
+    assert.deepEqual(
+      steadyStateDutyReceiptRecommendedDownloadControl.operatorOrder,
+      expectedSteadyStateDutyReceiptOperatorOrder
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Mainline Recommended Downloads:[\s\S]*Latest steady-state duty receipt asset[\s\S]*Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./
     );
     const launchOperationsEvidenceChain = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsEvidenceChain;
     assert.ok(launchOperationsEvidenceChain);
@@ -22678,6 +22706,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "ops_steady_state_handoff_brief"
     );
     assert.deepEqual(
+      launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.recommendedDownload.operatorOrder,
+      expectedSteadyStateHandoffOperatorOrder
+    );
+    assert.deepEqual(
       launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.operatorOrder,
       expectedSteadyStateHandoffOperatorOrder
     );
@@ -22690,6 +22722,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.source === "developer-ops-launch-duty-handoff-landing"
       && item.format === "steady-state-handoff-brief"
     )));
+    const steadyStateHandoffRecommendedDownload = launchMainlineSteadyStateHandoff.mainlineSummary.recommendedDownloads.find((item) => (
+      item.key === "ops_steady_state_handoff_brief"
+    ));
+    assert.ok(steadyStateHandoffRecommendedDownload);
+    assert.deepEqual(
+      steadyStateHandoffRecommendedDownload.operatorOrder,
+      expectedSteadyStateHandoffOperatorOrder
+    );
     assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.heroControls.some((item) => (
       item.label === "Open Steady-State Handoff Brief"
       && item.recommendedDownload?.key === "ops_steady_state_handoff_brief"
@@ -22805,6 +22845,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Mainline Overview Cards:[\s\S]*Steady-State Handoff Landing[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
+    );
+    const steadyStateHandoffRecommendedDownloadsCard = launchMainlineSteadyStateHandoff.mainlineSummary.overviewCards.find((item) => (
+      item.key === "recommended_downloads"
+    ));
+    assert.ok(steadyStateHandoffRecommendedDownloadsCard);
+    const steadyStateHandoffRecommendedDownloadControl = steadyStateHandoffRecommendedDownloadsCard.controls.find((control) => (
+      control.recommendedDownload?.key === "ops_steady_state_handoff_brief"
+    ));
+    assert.ok(steadyStateHandoffRecommendedDownloadControl);
+    assert.deepEqual(
+      steadyStateHandoffRecommendedDownloadControl.operatorOrder,
+      expectedSteadyStateHandoffOperatorOrder
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Mainline Recommended Downloads:[\s\S]*Launch duty steady-state handoff[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
     );
     const launchMainlineSteadyStateRoutesDownload = await getText(
       baseUrl,

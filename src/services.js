@@ -38348,6 +38348,21 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     channel: overviewStatusScope.channel || "stable",
     launchDutyRecordIndexPath: receiptVisibilitySummaryRecordIndexPath
   });
+  const latestSteadyStateDutyPlanReceipt = buildSteadyStateDutyPlanReceiptPayload(readiness.latestSteadyStateDutyPlanReceipt);
+  const steadyStateDutyBoardDownload = latestSteadyStateDutyPlanReceipt
+    ? buildDeveloperOpsSteadyStateDutyBoardDownload(overviewStatusScope)
+    : null;
+  const steadyStateDutyReceiptReviewDownload = latestSteadyStateDutyPlanReceipt
+    ? {
+        ...(steadyStateDutyBoardDownload || {}),
+        key: "ops_latest_steady_state_duty_receipt_asset",
+        label: "Latest steady-state duty receipt asset",
+        fileName: latestSteadyStateDutyPlanReceipt.fileName || steadyStateDutyBoardDownload?.fileName || "developer-ops-steady-state-duty-board.txt",
+        format: latestSteadyStateDutyPlanReceipt.format || steadyStateDutyBoardDownload?.format || "steady-state-duty-board",
+        href: latestSteadyStateDutyPlanReceipt.href || steadyStateDutyBoardDownload?.href || null,
+        source: "developer-ops-steady-state-duty-plan-receipt"
+      }
+    : null;
   if (receiptVisibilitySummaryDownloads.launchReviewSummary) {
     downloads.push([
       "launch-review-receipt-visibility-summary",
@@ -38380,6 +38395,29 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     lines.push(
       `- download=${formatLaunchHandoffDownloadText(launchOpsOverviewDownload, { fileSeparator: " | " })}`
       + formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads)
+    );
+  }
+  if (latestSteadyStateDutyPlanReceipt) {
+    lines.push("");
+    lines.push("Steady-State Duty Receipt Review Route:");
+    lines.push(
+      `- status=${latestSteadyStateDutyPlanReceipt.status || "recorded"}`
+      + ` | audit=${latestSteadyStateDutyPlanReceipt.auditLogId || "-"}`
+      + ` | action=${latestSteadyStateDutyPlanReceipt.action || "-"}`
+      + ` | file=${latestSteadyStateDutyPlanReceipt.fileName || steadyStateDutyReceiptReviewDownload?.fileName || "-"}`
+      + ` | format=${latestSteadyStateDutyPlanReceipt.format || steadyStateDutyReceiptReviewDownload?.format || "-"}`
+      + ` | href=${latestSteadyStateDutyPlanReceipt.href || steadyStateDutyReceiptReviewDownload?.href || "-"}`
+    );
+    lines.push(
+      `- steady-state-duty-receipt-review: ${steadyStateDutyReceiptReviewDownload?.fileName || latestSteadyStateDutyPlanReceipt.fileName || "developer-ops-steady-state-duty-board.txt"}`
+      + ` | key=${steadyStateDutyReceiptReviewDownload?.key || "ops_latest_steady_state_duty_receipt_asset"}`
+      + ` | label=${steadyStateDutyReceiptReviewDownload?.label || "Latest steady-state duty receipt asset"}`
+      + ` | source=${steadyStateDutyReceiptReviewDownload?.source || "developer-ops-steady-state-duty-plan-receipt"}`
+      + ` | visibility=${latestSteadyStateDutyPlanReceipt.receiptVisibility?.status || "-"}`
+      + ` | launchDutyRecordIndex=${latestSteadyStateDutyPlanReceipt.receiptVisibility?.launchDutyRecordIndexPath
+        || latestSteadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath
+        || latestSteadyStateDutyPlanReceipt.launchOpsOverviewContextLaunchDutyRecordIndexPath
+        || "-"}`
     );
   }
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);

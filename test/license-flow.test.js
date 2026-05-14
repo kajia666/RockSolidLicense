@@ -21304,6 +21304,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      new RegExp(`Steady-State Duty Receipt Review Route:[\\s\\S]*status=recorded \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchMainlineHandoffDownloadRoutesSelectionDownload = await getText(
       baseUrl,

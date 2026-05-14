@@ -22478,6 +22478,8 @@ function buildLaunchDutyRecordIndexReceiptSelectionState(receipts = [], selected
     [0] || selected || null;
   const selectedScore = getLaunchDutyRecordIndexStateProgressScore(selected);
   const latestScore = getLaunchDutyRecordIndexStateProgressScore(latest);
+  const selectedState = normalizeLaunchDutyRecordIndexState(selected?.launchDutyRecordIndexState);
+  const latestState = normalizeLaunchDutyRecordIndexState(latest?.launchDutyRecordIndexState);
   const ignoredLatestReceipt = Boolean(
     selected
     && latest
@@ -22551,12 +22553,18 @@ function buildLaunchDutyRecordIndexReceiptSelectionState(receipts = [], selected
     selectedProgress: formatLaunchDutyRecordIndexStateProgress(selectedScore),
     selectedRecordedCount: selectedScore.hasState ? selectedScore.recordedCount : null,
     selectedPendingCount: selectedScore.hasState ? selectedScore.pendingCount : null,
+    selectedRecordedKeys: selectedState?.recordedKeys || [],
+    selectedPendingKeys: selectedState?.pendingKeys || [],
+    selectedNextRecordKey: selectedState?.nextRecordKey || null,
     selectedComplete: selectedScore.complete === true,
     latestAuditLogId: latest?.auditLogId || null,
     latestRecordedAt: latest?.recordedAt || latest?.createdAt || null,
     latestProgress: formatLaunchDutyRecordIndexStateProgress(latestScore),
     latestRecordedCount: latestScore.hasState ? latestScore.recordedCount : null,
     latestPendingCount: latestScore.hasState ? latestScore.pendingCount : null,
+    latestRecordedKeys: latestState?.recordedKeys || [],
+    latestPendingKeys: latestState?.pendingKeys || [],
+    latestNextRecordKey: latestState?.nextRecordKey || null,
     latestComplete: latestScore.complete === true,
     ignoredLatestReceipt,
     candidateCount: candidates.length,
@@ -23334,10 +23342,14 @@ function appendDeveloperOpsStagingLaunchDutyArchiveLines(lines = [], archive = n
   lines.push(`- Next Action: ${archive.nextAction || "-"}`);
 }
 
-function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDutyArchive = null) {
+function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDutyArchive = null, options = {}) {
   if (!stagingLaunchDutyArchive || typeof stagingLaunchDutyArchive !== "object") {
     return null;
   }
+  const launchDutyRecordIndexReceiptSelection = options?.launchDutyRecordIndexReceiptSelection
+    && typeof options.launchDutyRecordIndexReceiptSelection === "object"
+      ? options.launchDutyRecordIndexReceiptSelection
+      : null;
   const files = stagingLaunchDutyArchive.files && typeof stagingLaunchDutyArchive.files === "object"
     ? stagingLaunchDutyArchive.files
     : {};
@@ -23446,8 +23458,25 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
   }));
   const currentPacketReviewStep = packetReviewQueue[0] || null;
   const nextPacketReviewAfterCurrent = packetReviewQueue[1] || null;
-  const currentRecordWriteStep = recordWriteQueue[0] || null;
-  const nextRecordWriteAfterCurrent = recordWriteQueue[1] || null;
+  const selectedNextRecordKey = normalizeLaunchDutyRecordIndexKey(
+    launchDutyRecordIndexReceiptSelection?.selectedNextRecordKey
+  );
+  const selectedRecordCursorIndex = selectedNextRecordKey
+    ? recordWriteQueue.findIndex((item) => item.key === selectedNextRecordKey)
+    : -1;
+  const currentRecordWriteStep = launchDutyRecordIndexReceiptSelection?.selectedComplete === true
+    ? null
+    : selectedRecordCursorIndex >= 0
+      ? recordWriteQueue[selectedRecordCursorIndex]
+      : recordWriteQueue[0] || null;
+  const nextRecordWriteAfterCurrent = currentRecordWriteStep
+    ? recordWriteQueue[currentRecordWriteStep.order] || null
+    : null;
+  const recordCursorSource = launchDutyRecordIndexReceiptSelection
+    ? "selected_launch_duty_record_index_readback"
+    : "default_offline_plan_start";
+  const recordReadbackStatus = launchDutyRecordIndexReceiptSelection?.status || null;
+  const recordReadbackSelectedProgress = launchDutyRecordIndexReceiptSelection?.selectedProgress || null;
   const firstHandoffCheck = "review_staging_packet_results";
   const currentExecutionCursor = {
     mode: "developer-ops-staging-launch-duty-offline-execution-cursor",
@@ -23459,6 +23488,9 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     recordCurrentKey: currentRecordWriteStep?.key || null,
     recordNextOrder: nextRecordWriteAfterCurrent?.order || null,
     recordNextKey: nextRecordWriteAfterCurrent?.key || null,
+    recordCursorSource,
+    recordProgress: recordReadbackSelectedProgress,
+    recordReadbackStatus,
     handoffCurrentKey: firstHandoffCheck
   };
   const cursorAdvanceBasis = {
@@ -23471,6 +23503,10 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
     recordAdvanceWhen: "record_artifact_exists_and_index_includes_key",
     recordNextOrder: nextRecordWriteAfterCurrent?.order || null,
     recordNextKey: nextRecordWriteAfterCurrent?.key || null,
+    recordCursorSource,
+    recordReadbackStatus,
+    recordReadbackSelectedProgress,
+    recordReadbackSelectedAuditLogId: launchDutyRecordIndexReceiptSelection?.selectedAuditLogId || null,
     handoffCurrentKey: firstHandoffCheck,
     handoffAdvanceWhen: "packet_and_record_checks_confirmed"
   };
@@ -23511,7 +23547,9 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
       : null,
     firstRecordResultCheck,
     recordWriteQueue,
-    remainingRecordWriteCount: Math.max(0, recordWriteQueue.length - 1),
+    remainingRecordWriteCount: currentRecordWriteStep
+      ? Math.max(0, recordWriteQueue.length - currentRecordWriteStep.order)
+      : 0,
     currentRecordWriteStep,
     nextRecordWriteAfterCurrent,
     currentExecutionCursor,
@@ -23530,7 +23568,8 @@ function buildDeveloperOpsLaunchDutyActionOrder({
   primaryDownload = null,
   nextFollowUpDownload = null,
   primaryWorkspaceAction = null,
-  launchReadinessNextGate = null
+  launchReadinessNextGate = null,
+  launchDutyRecordIndexReceiptSelection = null
 } = {}) {
   const normalizedStatus = String(status || "unknown").trim().toLowerCase() || "unknown";
   const nextFollowUpStatus = launchReceiptNextFollowUp
@@ -23584,7 +23623,10 @@ function buildDeveloperOpsLaunchDutyActionOrder({
           : "Run closeout reload with the filled closeout input, then reserve the guarded full-test-window and review production sign-off."
       }
     : null;
-  const offlineExecutionPlan = buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDutyArchive);
+  const offlineExecutionPlan = buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(
+    stagingLaunchDutyArchive,
+    { launchDutyRecordIndexReceiptSelection }
+  );
   const steps = [
     {
       stepNumber: 1,
@@ -23819,6 +23861,16 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         + ` | recordAdvanceWhen=${basis.recordAdvanceWhen || "-"}`
         + ` | recordNext=${basis.recordNextOrder || "-"}.${basis.recordNextKey || "-"}`
         + ` | handoffAdvanceWhen=${basis.handoffAdvanceWhen || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.currentExecutionCursor?.recordCursorSource) {
+      const cursor = offlineExecutionPlan.currentExecutionCursor;
+      const basis = offlineExecutionPlan.cursorAdvanceBasis || {};
+      lines.push(
+        `- Offline Execution Plan Cursor Receipt Source: recordSource=${cursor.recordCursorSource || "-"}`
+        + ` | selection=${basis.recordReadbackStatus || cursor.recordReadbackStatus || "-"}`
+        + ` | selectedProgress=${cursor.recordProgress || basis.recordReadbackSelectedProgress || "-"}`
+        + ` | selectedNext=${cursor.recordCurrentKey || "-"}`
       );
     }
     if (offlineExecutionPlan.firstHandoffCheck) {
@@ -30191,7 +30243,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     primaryDownload,
     nextFollowUpDownload,
     primaryWorkspaceAction,
-    launchReadinessNextGate
+    launchReadinessNextGate,
+    launchDutyRecordIndexReceiptSelection
   });
   const currentFirstWaveReadinessBridge = firstWaveReadinessBridge && firstLaunchOperatingChain
     ? {

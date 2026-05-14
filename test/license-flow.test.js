@@ -21714,6 +21714,52 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyRecordIndexReadbackSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationBlockedBy=stabilization_owner_handoff/
     );
+    const launchDutyRecordIndexReadbackActionOrder = launchDutyRecordIndexReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchDutyActionOrder;
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.currentExecutionCursor.recordCursorSource,
+      "selected_launch_duty_record_index_readback"
+    );
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.currentExecutionCursor.recordProgress,
+      "4/6"
+    );
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.currentExecutionCursor.recordCurrentOrder,
+      5
+    );
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.currentExecutionCursor.recordCurrentKey,
+      "stabilization_owner_handoff"
+    );
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.currentExecutionCursor.recordNextOrder,
+      6
+    );
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.currentExecutionCursor.recordNextKey,
+      "first_wave_closeout"
+    );
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.remainingRecordWriteCount,
+      1
+    );
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.cursorAdvanceBasis.recordCursorSource,
+      "selected_launch_duty_record_index_readback"
+    );
+    assert.equal(
+      launchDutyRecordIndexReadbackActionOrder.offlineExecutionPlan.cursorAdvanceBasis.recordReadbackStatus,
+      "selected_latest_readback"
+    );
+    assert.match(
+      launchDutyRecordIndexReadbackSnapshot.summaryText,
+      /Offline Execution Plan Cursor: [^\n]*recordCurrent=5\.stabilization_owner_handoff \| recordNext=6\.first_wave_closeout/
+    );
+    assert.match(
+      launchDutyRecordIndexReadbackSnapshot.summaryText,
+      /Offline Execution Plan Cursor Receipt Source: recordSource=selected_launch_duty_record_index_readback \| selection=selected_latest_readback \| selectedProgress=4\/6 \| selectedNext=stabilization_owner_handoff/
+    );
 
     const launchDutyCloseoutReadyReceipt = await postJson(
       baseUrl,

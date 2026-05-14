@@ -113,6 +113,19 @@ test("launch smoke script runs the first-wave operations preflight", () => {
   assert.equal(output.handoff.downloads.launchReviewSummary.route, "/api/developer/launch-review/download?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary");
   assert.equal(output.handoff.downloads.launchSmokeSummary.route, "/api/developer/launch-smoke-kit/download?productCode=SMOKE_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary");
   assert.deepEqual(
+    output.handoff.receiptVisibilityOperatorQueue.map((item) => [item.order, item.key, item.status, item.kind]),
+    [
+      [1, "verify_launch_review_receipt_visibility", "current", "download"],
+      [2, "verify_launch_smoke_receipt_visibility", "next", "download"],
+      [3, "verify_launch_ops_overview_status", "next", "download"],
+      [4, "verify_mainline_route_map_overview_evidence", "next", "download"],
+      [5, "download_ops_handoff_index", "next", "download"]
+    ]
+  );
+  assert.equal(output.handoff.receiptVisibilityOperatorQueue[0].target, output.handoff.downloads.launchReviewSummary.route);
+  assert.equal(output.handoff.receiptVisibilityOperatorQueue[0].launchDutyRecordIndexPath, "artifacts/staging/SMOKE_ALPHA/stable/launch-duty-record-index.json");
+  assert.equal(output.handoff.receiptVisibilityOperatorQueue[4].target, output.handoff.downloads.opsHandoffIndex.route);
+  assert.deepEqual(
     output.handoff.operatorChecklist.map((item) => item.key),
     [
       "open_launch_review",
@@ -175,6 +188,17 @@ test("launch smoke script runs the first-wave operations preflight", () => {
     channel: "stable",
     handoffStatus: "ready_for_launch_review"
   });
+  assert.equal(output.handoff.closeoutBackfill.commands[3].valueJson.launchDutyRecordIndexPath, "artifacts/staging/SMOKE_ALPHA/stable/launch-duty-record-index.json");
+  assert.deepEqual(
+    output.handoff.closeoutBackfill.commands[3].valueJson.operatorQueue.map((item) => [item.order, item.key, item.target]),
+    [
+      [1, "verify_launch_review_receipt_visibility", output.handoff.downloads.launchReviewSummary.route],
+      [2, "verify_launch_smoke_receipt_visibility", output.handoff.downloads.launchSmokeSummary.route],
+      [3, "verify_launch_ops_overview_status", output.handoff.downloads.launchOpsOverviewStatus.route],
+      [4, "verify_mainline_route_map_overview_evidence", output.handoff.downloads.launchMainlineRouteMap.route],
+      [5, "download_ops_handoff_index", output.handoff.downloads.opsHandoffIndex.route]
+    ]
+  );
 
   const checkNames = output.checks.map((item) => item.name);
   assert.deepEqual(checkNames, [
@@ -215,6 +239,9 @@ test("launch smoke plain output prints the ordered launch-duty handoff queue", (
   assert.match(result.stdout, /4\. verify_launch_ops_overview_status: next download -> \/api\/developer\/ops\/export\/download\?productCode=SMOKE_PLAIN_ALPHA&format=launch-operations-overview-status&limit=20/);
   assert.match(result.stdout, /5\. verify_first_wave_confirmation: next evidence -> auditLogId=/);
   assert.match(result.stdout, /8\. verify_mainline_route_map_overview_evidence: next download -> \/api\/developer\/launch-mainline\/download\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=handoff-download-routes/);
+  assert.match(result.stdout, /Receipt visibility operator queue:/);
+  assert.match(result.stdout, /1\. verify_launch_review_receipt_visibility: current download -> \/api\/developer\/launch-review\/download\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary \| recordIndex=artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/launch-duty-record-index\.json/);
+  assert.match(result.stdout, /5\. download_ops_handoff_index: next download -> \/api\/developer\/ops\/export\/download\?productCode=SMOKE_PLAIN_ALPHA&format=handoff-index&limit=20 \| recordIndex=artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /Closeout backfill current: live_write_smoke_result/);
   assert.match(result.stdout, /Closeout backfill command: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json --key live_write_smoke_result --value-json/);
   assert.match(result.stdout, /Closeout readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/readiness-action-queue\.md/);
@@ -347,6 +374,18 @@ test("launch smoke script can run the first-wave preflight against an existing A
     assert.equal(output.handoff.downloads.launchMainlineRouteMap.href, `${baseUrl}/api/developer/launch-mainline/download?productCode=LIVE_SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=handoff-download-routes`);
     assert.equal(output.handoff.downloads.launchReviewSummary.href, `${baseUrl}/api/developer/launch-review/download?productCode=LIVE_SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary`);
     assert.equal(output.handoff.downloads.launchSmokeSummary.href, `${baseUrl}/api/developer/launch-smoke-kit/download?productCode=LIVE_SMOKE_ALPHA&channel=stable&operation=record_post_launch_ops_sweep&downloadKey=launch_smoke_summary&format=summary`);
+    assert.deepEqual(
+      output.handoff.receiptVisibilityOperatorQueue.map((item) => [item.key, item.status, item.kind]),
+      [
+        ["verify_launch_review_receipt_visibility", "current", "download"],
+        ["verify_launch_smoke_receipt_visibility", "next", "download"],
+        ["verify_launch_ops_overview_status", "next", "download"],
+        ["verify_mainline_route_map_overview_evidence", "next", "download"],
+        ["download_ops_handoff_index", "next", "download"]
+      ]
+    );
+    assert.equal(output.handoff.receiptVisibilityOperatorQueue[0].target, output.handoff.downloads.launchReviewSummary.href);
+    assert.equal(output.handoff.receiptVisibilityOperatorQueue[0].launchDutyRecordIndexPath, "artifacts/staging/LIVE_SMOKE_ALPHA/stable/launch-duty-record-index.json");
     assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_review_receipt_visibility"));
     assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_smoke_receipt_visibility"));
     assert.ok(output.handoff.operatorChecklist.some((item) => item.key === "verify_launch_ops_overview_status"));

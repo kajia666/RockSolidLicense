@@ -248,6 +248,10 @@ function defaultReadinessActionQueueFile(options) {
   return path.posix.join(defaultStagingArtifactRoot(options), "readiness-action-queue.md");
 }
 
+function defaultLaunchDutyRecordIndexFile(options) {
+  return path.posix.join(defaultStagingArtifactRoot(options), "launch-duty-record-index.json");
+}
+
 function buildReadinessStatusCommand({ filledCloseoutInputFile, readinessActionQueueFile }) {
   return [
     "npm.cmd run staging:readiness:status --",
@@ -307,6 +311,10 @@ function launchDutyHandoffTarget(item) {
   return item.fileName || "-";
 }
 
+function launchSmokeDownloadTarget(item = null) {
+  return item?.href || item?.route || "-";
+}
+
 function buildLaunchDutyOperatorNextCommands(operatorChecklist = []) {
   return operatorChecklist.map((item, index) => ({
     order: index + 1,
@@ -323,10 +331,57 @@ function buildLaunchDutyOperatorNextCommands(operatorChecklist = []) {
   }));
 }
 
+function buildLaunchSmokeReceiptVisibilityOperatorQueue({ options, handoff }) {
+  const launchDutyRecordIndexPath = defaultLaunchDutyRecordIndexFile(options);
+  return [
+    {
+      key: "verify_launch_review_receipt_visibility",
+      label: "Verify Launch Review receipt visibility",
+      download: handoff.downloads.launchReviewSummary
+    },
+    {
+      key: "verify_launch_smoke_receipt_visibility",
+      label: "Verify Launch Smoke receipt visibility",
+      download: handoff.downloads.launchSmokeSummary
+    },
+    {
+      key: "verify_launch_ops_overview_status",
+      label: "Verify Launch Ops overview status",
+      download: handoff.downloads.launchOpsOverviewStatus
+    },
+    {
+      key: "verify_mainline_route_map_overview_evidence",
+      label: "Verify Mainline route map overview evidence",
+      download: handoff.downloads.launchMainlineRouteMap
+    },
+    {
+      key: "download_ops_handoff_index",
+      label: "Download Ops handoff index",
+      download: handoff.downloads.opsHandoffIndex
+    }
+  ].map((item, index) => ({
+    order: index + 1,
+    key: item.key,
+    label: item.label,
+    status: index === 0 ? "current" : "next",
+    kind: "download",
+    target: launchSmokeDownloadTarget(item.download),
+    route: item.download?.route || null,
+    href: item.download?.href || null,
+    fileName: item.download?.fileName || null,
+    downloadKey: item.download?.key || null,
+    launchDutyRecordIndexPath
+  }));
+}
+
 function buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed }) {
   const artifactRoot = defaultStagingArtifactRoot(options);
   const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile(options);
   const readinessActionQueueFile = options.actionsFile || defaultReadinessActionQueueFile(options);
+  const launchDutyRecordIndexPath = defaultLaunchDutyRecordIndexFile(options);
+  const receiptVisibilityOperatorQueue = Array.isArray(handoff.receiptVisibilityOperatorQueue)
+    ? handoff.receiptVisibilityOperatorQueue
+    : [];
   const statusCommand = buildReadinessStatusCommand({
     filledCloseoutInputFile,
     readinessActionQueueFile
@@ -353,7 +408,9 @@ function buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed }) {
       valueJson: {
         status: handoff.status,
         nextWorkspace: handoff.nextWorkspace.href || handoff.nextWorkspace.route,
-        operatorNextCommandCount: handoff.operatorNextCommands.length
+        operatorNextCommandCount: handoff.operatorNextCommands.length,
+        receiptVisibilityOperatorQueueCount: receiptVisibilityOperatorQueue.length,
+        launchDutyRecordIndexPath
       }
     },
     {
@@ -374,7 +431,16 @@ function buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed }) {
         status: "pending_operator_review",
         launchReviewSummary: handoff.downloads.launchReviewSummary.href || handoff.downloads.launchReviewSummary.route,
         launchSmokeSummary: handoff.downloads.launchSmokeSummary.href || handoff.downloads.launchSmokeSummary.route,
-        launchOpsOverviewStatus: handoff.downloads.launchOpsOverviewStatus.href || handoff.downloads.launchOpsOverviewStatus.route
+        launchOpsOverviewStatus: handoff.downloads.launchOpsOverviewStatus.href || handoff.downloads.launchOpsOverviewStatus.route,
+        launchDutyRecordIndexPath,
+        operatorQueue: receiptVisibilityOperatorQueue.map((item) => ({
+          order: item.order,
+          key: item.key,
+          status: item.status,
+          kind: item.kind,
+          target: item.target,
+          launchDutyRecordIndexPath: item.launchDutyRecordIndexPath || launchDutyRecordIndexPath
+        }))
       }
     }
   ];
@@ -667,6 +733,7 @@ function buildLaunchDutyHandoff({
     ]
   };
   handoff.operatorNextCommands = buildLaunchDutyOperatorNextCommands(handoff.operatorChecklist);
+  handoff.receiptVisibilityOperatorQueue = buildLaunchSmokeReceiptVisibilityOperatorQueue({ options, handoff });
   handoff.closeoutBackfill = buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed });
   return handoff;
 }
@@ -1105,6 +1172,16 @@ function writeResult(result, json) {
         console.log("Launch-duty handoff queue:");
         for (const item of operatorNextCommands) {
           console.log(`${item.order}. ${item.key}: ${item.status} ${item.kind} -> ${item.target}`);
+        }
+      }
+      const receiptVisibilityOperatorQueue = result.handoff.receiptVisibilityOperatorQueue || [];
+      if (receiptVisibilityOperatorQueue.length) {
+        console.log("Receipt visibility operator queue:");
+        for (const item of receiptVisibilityOperatorQueue) {
+          console.log(
+            `${item.order}. ${item.key}: ${item.status} ${item.kind} -> ${item.target}`
+            + `${item.launchDutyRecordIndexPath ? ` | recordIndex=${item.launchDutyRecordIndexPath}` : ""}`
+          );
         }
       }
       const closeoutBackfill = result.handoff.closeoutBackfill || null;

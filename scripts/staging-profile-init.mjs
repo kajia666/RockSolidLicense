@@ -181,6 +181,64 @@ function buildStagingSmokePreflightCommand(options) {
   ].join(" ");
 }
 
+function buildLaunchSmokeStagingCommand({ options, closeoutInputFile, readinessActionQueueFile }) {
+  return [
+    "npm.cmd run launch:smoke:staging --",
+    "--base-url",
+    commandValue(options.baseUrl),
+    "--allow-live-writes",
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel || "stable"),
+    "--closeout-input-file",
+    commandValue(closeoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
+function buildPostSmokeBackfillCommands({ closeoutInputFile, readinessActionQueueFile, artifactPaths }) {
+  return [
+    {
+      key: "live_write_smoke_result",
+      artifactPath: artifactPaths.launchSmokeOutputFile,
+      receiptIds: ["<record_launch_rehearsal_run-receipt-id>"]
+    },
+    {
+      key: "launch_smoke_handoff",
+      artifactPath: artifactPaths.launchSmokeHandoffFile,
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    },
+    {
+      key: "launch_mainline_evidence_receipts",
+      artifactPath: artifactPaths.launchMainlineEvidenceReceiptsFile,
+      receiptIds: ["<record_launch_rehearsal_run-receipt-id>"]
+    },
+    {
+      key: "receipt_visibility_review",
+      artifactPath: artifactPaths.receiptVisibilityReviewFile,
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    }
+  ].map((item) => ({
+    ...item,
+    command: [
+      "npm.cmd run staging:closeout:backfill --",
+      "--input-file",
+      commandValue(closeoutInputFile),
+      "--key",
+      item.key,
+      "--value-json",
+      "<redacted-json>",
+      "--artifact-path",
+      commandValue(item.artifactPath),
+      ...item.receiptIds.flatMap((receiptId) => ["--receipt-id", receiptId]),
+      "--actions-file",
+      commandValue(readinessActionQueueFile)
+    ].join(" ")
+  }));
+}
+
 function buildProfile(options) {
   const productCode = sanitizeArtifactSegment(options.productCode, "product");
   const channel = sanitizeArtifactSegment(options.channel || "stable", "stable");
@@ -232,6 +290,8 @@ function buildOperatorNextCommands({
   routeMapGateBackfillCommand,
   postRouteMapReadinessStatusCommand,
   smokePreflightCommand,
+  launchSmokeStagingCommand,
+  postSmokeBackfillCommands,
   routeMapGateDryRunFile,
   routeMapGateOutputFile
 }) {
@@ -298,6 +358,49 @@ function buildOperatorNextCommands({
       command: smokePreflightCommand,
       artifactPath: null,
       nextAction: "Run no-write smoke preflight before any launch:smoke:staging live-write command."
+    },
+    {
+      key: "run_launch_smoke_staging",
+      status: "blocked_after_staging_smoke_preflight",
+      command: launchSmokeStagingCommand,
+      artifactPath: postSmokeBackfillCommands[0].artifactPath,
+      nextAction: "Run live-write smoke only after the no-write preflight passes and smoke credentials are loaded."
+    },
+    {
+      key: "backfill_post_smoke_live_write_smoke_result",
+      status: "blocked_after_launch_smoke_staging",
+      command: postSmokeBackfillCommands[0].command,
+      artifactPath: postSmokeBackfillCommands[0].artifactPath,
+      targetKey: postSmokeBackfillCommands[0].key,
+      receiptIds: postSmokeBackfillCommands[0].receiptIds,
+      nextAction: "Backfill the live_write_smoke_result closeout evidence after Launch Smoke writes the output artifact."
+    },
+    {
+      key: "backfill_post_smoke_launch_smoke_handoff",
+      status: "blocked_after_live_write_smoke_result",
+      command: postSmokeBackfillCommands[1].command,
+      artifactPath: postSmokeBackfillCommands[1].artifactPath,
+      targetKey: postSmokeBackfillCommands[1].key,
+      receiptIds: postSmokeBackfillCommands[1].receiptIds,
+      nextAction: "Backfill the launch_smoke_handoff evidence after saving the smoke handoff JSON."
+    },
+    {
+      key: "backfill_post_smoke_launch_mainline_evidence_receipts",
+      status: "blocked_after_launch_smoke_handoff",
+      command: postSmokeBackfillCommands[2].command,
+      artifactPath: postSmokeBackfillCommands[2].artifactPath,
+      targetKey: postSmokeBackfillCommands[2].key,
+      receiptIds: postSmokeBackfillCommands[2].receiptIds,
+      nextAction: "Backfill Launch Mainline evidence receipts after recording the first-wave evidence chain."
+    },
+    {
+      key: "backfill_post_smoke_receipt_visibility_review",
+      status: "blocked_after_launch_mainline_evidence_receipts",
+      command: postSmokeBackfillCommands[3].command,
+      artifactPath: postSmokeBackfillCommands[3].artifactPath,
+      targetKey: postSmokeBackfillCommands[3].key,
+      receiptIds: postSmokeBackfillCommands[3].receiptIds,
+      nextAction: "Backfill receipt_visibility_review after the Launch Review, Launch Smoke, Developer Ops, and Launch Mainline receipt queue is visible."
     }
   ];
 }
@@ -310,7 +413,11 @@ function buildLaunchLaneFiles({
   readinessActionQueueFile,
   backupRestoreArtifactFile,
   routeMapGateDryRunFile,
-  routeMapGateOutputFile
+  routeMapGateOutputFile,
+  launchSmokeOutputFile,
+  launchSmokeHandoffFile,
+  launchMainlineEvidenceReceiptsFile,
+  receiptVisibilityReviewFile
 }) {
   return {
     archiveRoot,
@@ -321,10 +428,14 @@ function buildLaunchLaneFiles({
     backupRestoreArtifactFile,
     routeMapGateDryRunFile,
     routeMapGateOutputFile,
+    launchSmokeOutputFile,
+    launchSmokeHandoffFile,
+    launchMainlineEvidenceReceiptsFile,
+    receiptVisibilityReviewFile,
     handoffFile: profile.handoffFile,
     launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
-    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, and route-map gate handoff."
+    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, and launch smoke closeout backfills."
   };
 }
 
@@ -356,6 +467,8 @@ function writeResult(result, json) {
     const routeMapGateBackfill = result.operatorNextCommands?.find((item) => item.key === "route_map_gate_result_backfill");
     const postRouteMapReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_route_map_readiness_status");
     const smokePreflight = result.operatorNextCommands?.find((item) => item.key === "staging_smoke_preflight");
+    const launchSmokeStaging = result.operatorNextCommands?.find((item) => item.key === "run_launch_smoke_staging");
+    const postSmokeBackfills = (result.operatorNextCommands || []).filter((item) => item.key?.startsWith("backfill_post_smoke_"));
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
     } else {
@@ -392,6 +505,14 @@ function writeResult(result, json) {
     if (smokePreflight) {
       console.log(`Staging smoke preflight: ${smokePreflight.command}`);
     }
+    if (launchSmokeStaging) {
+      console.log(`Launch smoke staging: ${launchSmokeStaging.command}`);
+    }
+    if (postSmokeBackfills.length) {
+      postSmokeBackfills.forEach((item, index) => {
+        console.log(`Post-smoke backfill ${index + 1}. ${item.targetKey}: ${item.status} -> ${item.command}`);
+      });
+    }
     console.log(`Next action: ${result.nextAction}`);
     return;
   }
@@ -409,6 +530,10 @@ function main() {
     const backupRestoreArtifactFile = path.posix.join(archiveRoot, "backup-restore-drill.txt");
     const routeMapGateDryRunFile = path.posix.join(archiveRoot, "route-map-gate-dry-run.json");
     const routeMapGateOutputFile = path.posix.join(archiveRoot, "route-map-gate-output.txt");
+    const launchSmokeOutputFile = path.posix.join(archiveRoot, "live-write-smoke-output.json");
+    const launchSmokeHandoffFile = path.posix.join(archiveRoot, "launch-smoke-handoff.json");
+    const launchMainlineEvidenceReceiptsFile = path.posix.join(archiveRoot, "launch-mainline-evidence-receipts.json");
+    const receiptVisibilityReviewFile = path.posix.join(archiveRoot, "receipt-visibility-review.txt");
     const outputFile = options.outputFile
       ? path.resolve(options.outputFile)
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
@@ -440,6 +565,21 @@ function main() {
     });
     const postRouteMapReadinessStatusCommand = postCloseoutInitStatusCommand;
     const smokePreflightCommand = buildStagingSmokePreflightCommand(options);
+    const launchSmokeStagingCommand = buildLaunchSmokeStagingCommand({
+      options,
+      closeoutInputFile,
+      readinessActionQueueFile
+    });
+    const postSmokeBackfillCommands = buildPostSmokeBackfillCommands({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      artifactPaths: {
+        launchSmokeOutputFile,
+        launchSmokeHandoffFile,
+        launchMainlineEvidenceReceiptsFile,
+        receiptVisibilityReviewFile
+      }
+    });
     const launchLaneFiles = buildLaunchLaneFiles({
       archiveRoot,
       outputFile,
@@ -448,7 +588,11 @@ function main() {
       readinessActionQueueFile,
       backupRestoreArtifactFile,
       routeMapGateDryRunFile,
-      routeMapGateOutputFile
+      routeMapGateOutputFile,
+      launchSmokeOutputFile,
+      launchSmokeHandoffFile,
+      launchMainlineEvidenceReceiptsFile,
+      receiptVisibilityReviewFile
     });
     writeResult({
       status: "written",
@@ -472,6 +616,8 @@ function main() {
       routeMapGateBackfillCommand,
       postRouteMapReadinessStatusCommand,
       smokePreflightCommand,
+      launchSmokeStagingCommand,
+      postSmokeBackfillCommands,
       operatorNextCommands: buildOperatorNextCommands({
         outputFile,
         closeoutInputFile,
@@ -486,10 +632,12 @@ function main() {
         routeMapGateBackfillCommand,
         postRouteMapReadinessStatusCommand,
         smokePreflightCommand,
+        launchSmokeStagingCommand,
+        postSmokeBackfillCommands,
         routeMapGateDryRunFile,
         routeMapGateOutputFile
       }),
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, and smoke preflight."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, and post-smoke closeout backfills."
     }, options.json);
   } catch (error) {
     writeResult({

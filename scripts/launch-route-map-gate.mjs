@@ -414,6 +414,33 @@ function buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQue
   ].join(" ");
 }
 
+function buildCloseoutBackfillCommand({
+  filledCloseoutInputFile,
+  key,
+  artifactPath,
+  receiptIds = [],
+  readinessActionQueueFile
+}) {
+  const receiptArgs = receiptIds.flatMap((receiptId) => [
+    "--receipt-id",
+    receiptId
+  ]);
+  return [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    commandValue(filledCloseoutInputFile),
+    "--key",
+    key,
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(artifactPath),
+    ...receiptArgs,
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
 function buildLaunchDutyRecordCommand({
   filledCloseoutInputFile,
   key,
@@ -613,6 +640,7 @@ function buildLaunchSwitchWatchHandoff() {
         label: "Confirm live-write smoke result was backfilled",
         status: "expected_after_launch_smoke",
         artifactPath: `${artifactRoot}/live-write-smoke-output.json`,
+        receiptIds: ["<record_launch_rehearsal_run-receipt-id>"],
         statusCommand: currentCommand,
         nextAction: "Confirm the smoke output artifact path and live_write_smoke_result closeout value are present."
       },
@@ -621,6 +649,7 @@ function buildLaunchSwitchWatchHandoff() {
         label: "Confirm Launch Smoke handoff was archived",
         status: "expected_after_launch_smoke",
         artifactPath: `${artifactRoot}/launch-smoke-handoff.json`,
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
         statusCommand: currentCommand,
         nextAction: "Confirm the launch smoke handoff JSON is saved with secrets redacted."
       },
@@ -629,6 +658,7 @@ function buildLaunchSwitchWatchHandoff() {
         label: "Confirm Launch Mainline evidence receipts were captured",
         status: "expected_after_launch_smoke",
         artifactPath: `${artifactRoot}/launch-mainline-evidence-receipts.json`,
+        receiptIds: ["<record_launch_rehearsal_run-receipt-id>"],
         statusCommand: currentCommand,
         nextAction: "Confirm Launch Mainline receipt IDs or handoff file names are backfilled."
       },
@@ -637,6 +667,7 @@ function buildLaunchSwitchWatchHandoff() {
         label: "Confirm receipt visibility review was completed",
         status: "expected_after_receipt_visibility_review",
         artifactPath: `${artifactRoot}/receipt-visibility-review.txt`,
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
         statusCommand: currentCommand,
         receiptVisibilityQueue,
         nextAction: "Verify the receipt-visibility download queue in order, then refresh staging readiness."
@@ -644,7 +675,14 @@ function buildLaunchSwitchWatchHandoff() {
     ].map((item, index) => ({
       order: index + 1,
       launchDutyRecordIndexPath,
-      ...item
+      ...item,
+      command: buildCloseoutBackfillCommand({
+        filledCloseoutInputFile,
+        key: item.key,
+        artifactPath: item.artifactPath,
+        receiptIds: item.receiptIds,
+        readinessActionQueueFile
+      })
     })),
     nextAction: "After launch smoke, verify these four closeout evidence records before entering full-test or production sign-off."
   };
@@ -935,6 +973,10 @@ if (dryRun) {
     for (const item of launchSwitchWatchHandoff.postSmokeCloseoutChecks.evidenceChecks) {
       const queueText = item.receiptVisibilityQueue ? ` | queue=${item.receiptVisibilityQueue.length}` : "";
       console.log(`Post-smoke check ${item.order}. ${item.key}: ${item.status} -> ${item.artifactPath}${queueText}`);
+    }
+    for (const item of launchSwitchWatchHandoff.postSmokeCloseoutChecks.evidenceChecks) {
+      const queueText = item.receiptVisibilityQueue ? ` | queue=${item.receiptVisibilityQueue.length}` : "";
+      console.log(`Post-smoke backfill ${item.order}. ${item.key}: ${item.status} -> ${item.command}${queueText}`);
     }
     console.log(
       `Launch switch readiness gate: ${launchSwitchWatchHandoff.postSmokeReadinessGate.status}`

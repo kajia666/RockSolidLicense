@@ -64,6 +64,19 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     "RSL_SMOKE_DEVELOPER_USERNAME",
     "RSL_SMOKE_DEVELOPER_PASSWORD"
   ]);
+  assert.deepEqual(output.launchSwitchWatchHandoff.smokePrerequisites, {
+    status: "ready_for_staging_launch_smoke_command",
+    stagingBaseUrl: "https://staging.example.com",
+    requireHttps: true,
+    allowLiveWrites: true,
+    credentialEnv: [
+      "RSL_SMOKE_DEVELOPER_USERNAME",
+      "RSL_SMOKE_DEVELOPER_PASSWORD"
+    ],
+    filledCloseoutInputFile: "artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json",
+    readinessActionQueueFile: "artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
+    nextAction: "Set smoke credential env vars, confirm the HTTPS staging base URL, then run launchSmokeCommand."
+  });
   assert.equal(output.launchSwitchWatchHandoff.launchDutyRecordIndexPath, "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json");
   assert.deepEqual(
     output.launchSwitchWatchHandoff.operatorNextCommands.map((item) => [item.order, item.key, item.status, item.kind]),
@@ -254,6 +267,7 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /Launch switch next: run_launch_smoke_staging -> npm\.cmd run launch:smoke:staging -- --base-url https:\/\/staging\.example\.com --allow-live-writes --product-code PILOT_ALPHA --channel stable --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /Launch switch evidence sequence: route_map_gate_result -> live_write_smoke_result -> launch_smoke_handoff -> launch_mainline_evidence_receipts -> receipt_visibility_review/);
   assert.match(result.stdout, /Launch switch credential env: RSL_SMOKE_DEVELOPER_USERNAME, RSL_SMOKE_DEVELOPER_PASSWORD/);
+  assert.match(result.stdout, /Launch switch smoke prerequisites: ready_for_staging_launch_smoke_command \| https=yes \| allowLiveWrites=yes \| baseUrl=https:\/\/staging\.example\.com/);
   assert.match(result.stdout, /Launch switch record index: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /Launch switch operator queue:/);
   assert.match(result.stdout, /1\. backfill_route_map_gate_result: current command -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
@@ -262,4 +276,49 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /Launch Smoke receipt visibility queue:/);
   assert.match(result.stdout, /1\. verify_launch_review_receipt_visibility: current download -> \/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /5\. download_ops_handoff_index: next download -> \/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=handoff-index&limit=20 \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
+});
+
+test("launch route map gate validates staging smoke base URL before printing handoff commands", () => {
+  const customResult = spawnSync(
+    process.execPath,
+    [
+      "scripts/launch-route-map-gate.mjs",
+      "--dry-run",
+      "--json",
+      "--product-code",
+      "PILOT_ALPHA",
+      "--staging-base-url",
+      "https://pilot-staging.example.com"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 60_000
+    }
+  );
+
+  assert.equal(customResult.status, 0, customResult.stderr || customResult.stdout);
+  const customOutput = JSON.parse(customResult.stdout);
+  assert.equal(customOutput.launchSwitchWatchHandoff.smokePrerequisites.stagingBaseUrl, "https://pilot-staging.example.com");
+  assert.match(customOutput.launchSwitchWatchHandoff.launchSmokeCommand, /--base-url https:\/\/pilot-staging\.example\.com/);
+
+  const unsafeResult = spawnSync(
+    process.execPath,
+    [
+      "scripts/launch-route-map-gate.mjs",
+      "--dry-run",
+      "--json",
+      "--staging-base-url",
+      "http://staging.example.com"
+    ],
+    {
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 60_000
+    }
+  );
+
+  assert.equal(unsafeResult.status, 1);
+  assert.equal(unsafeResult.stdout, "");
+  assert.match(unsafeResult.stderr, /--staging-base-url must use https:\/\/ for launch:smoke:staging handoff/);
 });

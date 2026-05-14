@@ -53,6 +53,7 @@ function parseOptions(argv) {
       index += 1;
     }
   }
+  options.stagingBaseUrl = normalizeStagingBaseUrl(options.stagingBaseUrl);
   return options;
 }
 
@@ -285,6 +286,20 @@ function commandValue(value) {
   return text;
 }
 
+function normalizeStagingBaseUrl(value) {
+  const text = String(value || "").trim().replace(/\/+$/, "");
+  let parsed = null;
+  try {
+    parsed = new URL(text);
+  } catch {
+    throw new Error("--staging-base-url must be a valid https:// URL for launch:smoke:staging handoff.");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("--staging-base-url must use https:// for launch:smoke:staging handoff.");
+  }
+  return text;
+}
+
 function defaultArtifactRoot() {
   return `artifacts/staging/${options.productCode}/${options.channel}`;
 }
@@ -391,6 +406,10 @@ function buildLaunchSwitchWatchHandoff() {
   const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile();
   const readinessActionQueueFile = options.actionsFile || defaultReadinessActionQueueFile();
   const launchDutyRecordIndexPath = defaultLaunchDutyRecordIndexFile();
+  const credentialEnv = [
+    "RSL_SMOKE_DEVELOPER_USERNAME",
+    "RSL_SMOKE_DEVELOPER_PASSWORD"
+  ];
   const closeoutBackfill = buildRouteMapCloseoutBackfill();
   const receiptVisibilityQueue = buildLaunchSmokeReceiptVisibilityQueue();
   const currentCommand = buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQueueFile);
@@ -500,6 +519,16 @@ function buildLaunchSwitchWatchHandoff() {
     order: index + 1,
     ...item
   }));
+  const smokePrerequisites = {
+    status: "ready_for_staging_launch_smoke_command",
+    stagingBaseUrl: options.stagingBaseUrl,
+    requireHttps: true,
+    allowLiveWrites: true,
+    credentialEnv,
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    nextAction: "Set smoke credential env vars, confirm the HTTPS staging base URL, then run launchSmokeCommand."
+  };
   return {
     version: "launch-route-map-gate-switch-watch-handoff/v1",
     status: "ready_for_staging_readiness_and_launch_smoke_switch",
@@ -507,10 +536,8 @@ function buildLaunchSwitchWatchHandoff() {
     currentCommand,
     nextActionKey: "run_launch_smoke_staging",
     launchSmokeCommand,
-    credentialEnv: [
-      "RSL_SMOKE_DEVELOPER_USERNAME",
-      "RSL_SMOKE_DEVELOPER_PASSWORD"
-    ],
+    credentialEnv,
+    smokePrerequisites,
     filledCloseoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexPath,
@@ -577,6 +604,12 @@ if (dryRun) {
     console.log(`Launch switch next: ${launchSwitchWatchHandoff.nextActionKey} -> ${launchSwitchWatchHandoff.launchSmokeCommand}`);
     console.log(`Launch switch evidence sequence: ${launchSwitchWatchHandoff.backfillSequence.map((item) => item.key).join(" -> ")}`);
     console.log(`Launch switch credential env: ${launchSwitchWatchHandoff.credentialEnv.join(", ")}`);
+    console.log(
+      `Launch switch smoke prerequisites: ${launchSwitchWatchHandoff.smokePrerequisites.status}`
+      + ` | https=${launchSwitchWatchHandoff.smokePrerequisites.requireHttps ? "yes" : "no"}`
+      + ` | allowLiveWrites=${launchSwitchWatchHandoff.smokePrerequisites.allowLiveWrites ? "yes" : "no"}`
+      + ` | baseUrl=${launchSwitchWatchHandoff.smokePrerequisites.stagingBaseUrl}`
+    );
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
     console.log("Launch switch operator queue:");
     for (const item of launchSwitchWatchHandoff.operatorNextCommands) {

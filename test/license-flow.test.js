@@ -17471,6 +17471,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.equal(launchDutyActionOrder.stagingArchiveNextOperations.launchRunway.currentGate, "ready_for_closeout_reload");
     assert.equal(launchDutyActionOrder.stagingArchiveNextOperations.launchRunway.launchDayWatchEntry, "enter_after_production_signoff");
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.mode,
+      "developer-ops-staging-launch-duty-offline-execution-plan"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.entrypoint,
+      "artifacts/staging/EXPORT_ALPHA/stable/staging-launch-duty-archive-index.json"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.launchDutyRecordIndexPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/launch-duty-record-index.json"
+    );
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.packetReviewStepCount, 6);
+    assert.equal(launchDutyActionOrder.offlineExecutionPlan.recordWriteStepCount, 6);
+    assert.deepEqual(
+      launchDutyActionOrder.offlineExecutionPlan.handoffChecks,
+      ["review_staging_packet_results", "verify_launch_duty_record_writes"]
+    );
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.params.operation, latestLaunchReceipt.productionEvidenceNextOperation);
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryDownload.key, "ops_launch_receipt_next_follow_up");
@@ -18468,6 +18486,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Launch Runway: closeout_reload -> full_test_window -> production_signoff -> launch_day_watch/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Runway Current Gate: ready_for_closeout_reload/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Staging Archive Launch-Day Watch Entry: enter_after_production_signoff/);
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Staging Archive Offline Execution Plan: developer-ops-staging-launch-duty-offline-execution-plan/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Entry: status=awaiting_operator_execution \| entrypoint=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan Counts: packetReviewSteps=6 \| recordWriteSteps=6 \| handoffChecks=review_staging_packet_results, verify_launch_duty_record_writes/
+    );
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill: [1-9]\d*/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Status: USED/);
     assert.match(launchMainlineHandoffRoutesDownload.body, /Launch Receipt Audit Backfill Source: launch-mainline-action-audit-backfill/);
@@ -19034,6 +19064,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Ops Handoff Index: ops\/handoff-index\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Initial Launch Ops Readiness: ops\/initial-launch-ops-readiness\.txt/);
     assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt/);
+    assert.match(launchMainlineTraceabilitySummaryDownload.body, /Launch Mainline Launch Duty Action Order:/);
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Staging Archive Offline Execution Plan: developer-ops-staging-launch-duty-offline-execution-plan/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Entry: status=awaiting_operator_execution \| entrypoint=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan Counts: packetReviewSteps=6 \| recordWriteSteps=6 \| handoffChecks=review_staging_packet_results, verify_launch_duty_record_writes/
+    );
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
       /Launch Operations Overview Status: ops\/launch-operations-overview-status\.txt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/

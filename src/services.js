@@ -17250,6 +17250,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveConfirmationChain,
     firstWaveRuntimeEvidence,
     initialLaunchOpsOverviewStatus,
+    launchDutyActionOrder,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -18005,6 +18006,10 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const project = manifest.project || {};
   const filters = payload.filters || {};
   const mainlineSummary = payload.mainlineSummary || {};
+  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const launchDutyActionOrder = mainlineSummary.launchDutyActionOrder
+    || initialLaunchOpsReadiness?.launchDutyActionOrder
+    || null;
   const launchReceiptAuditBackfill = Number(payload.opsSnapshot?.auditLogs?.filters?.launchReceiptBackfill || 0);
   const launchReceiptAuditBackfillStatus = payload.postLaunchHandoffTraceability?.launchReceiptAuditBackfillStatus
     || payload.opsSnapshot?.summary?.launchReceiptAuditBackfillStatus
@@ -18076,6 +18081,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, mainlineSummary.initialLaunchOpsOverviewStatus, {
       title: "Launch Mainline Launch Ops Overview:"
+    });
+  }
+  if (launchDutyActionOrder) {
+    lines.push("");
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
+      title: "Launch Mainline Launch Duty Action Order:"
     });
   }
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
@@ -23323,6 +23334,45 @@ function appendDeveloperOpsStagingLaunchDutyArchiveLines(lines = [], archive = n
   lines.push(`- Next Action: ${archive.nextAction || "-"}`);
 }
 
+function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDutyArchive = null) {
+  if (!stagingLaunchDutyArchive || typeof stagingLaunchDutyArchive !== "object") {
+    return null;
+  }
+  const files = stagingLaunchDutyArchive.files && typeof stagingLaunchDutyArchive.files === "object"
+    ? stagingLaunchDutyArchive.files
+    : {};
+  const packetFiles = Array.isArray(stagingLaunchDutyArchive.packetFiles)
+    ? stagingLaunchDutyArchive.packetFiles.filter((item) => item && typeof item === "object")
+    : [];
+  const packetCompleteness = stagingLaunchDutyArchive.packetCompleteness
+    && typeof stagingLaunchDutyArchive.packetCompleteness === "object"
+    ? stagingLaunchDutyArchive.packetCompleteness
+    : null;
+  const packetReviewStepCount = packetFiles.length
+    || (Number.isFinite(Number(packetCompleteness?.expectedCount)) ? Number(packetCompleteness.expectedCount) : 0);
+  const archiveIndexPath = files.launchDutyArchiveIndex || stagingLaunchDutyArchive.indexFile || null;
+  const launchDutyRecordIndexPath = files.launchDutyRecordIndex
+    || stagingLaunchDutyArchive.launchDutyRecordIndexPath
+    || null;
+  if (!archiveIndexPath && !launchDutyRecordIndexPath && !packetReviewStepCount) {
+    return null;
+  }
+  return {
+    mode: "developer-ops-staging-launch-duty-offline-execution-plan",
+    status: "awaiting_operator_execution",
+    entrypoint: archiveIndexPath || launchDutyRecordIndexPath || null,
+    archiveIndexPath,
+    launchDutyRecordIndexPath,
+    packetReviewStepCount,
+    recordWriteStepCount: LAUNCH_DUTY_RECORD_INDEX_SEQUENCE.length,
+    handoffChecks: [
+      "review_staging_packet_results",
+      "verify_launch_duty_record_writes"
+    ],
+    nextAction: "Open the archive index first, review packet results, write launch-duty records, then verify record writes before handoff."
+  };
+}
+
 function buildDeveloperOpsLaunchDutyActionOrder({
   status = "unknown",
   stagingLaunchDutyArchive = null,
@@ -23386,6 +23436,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
           : "Run closeout reload with the filled closeout input, then reserve the guarded full-test-window and review production sign-off."
       }
     : null;
+  const offlineExecutionPlan = buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDutyArchive);
   const steps = [
     {
       stepNumber: 1,
@@ -23423,6 +23474,7 @@ function buildDeveloperOpsLaunchDutyActionOrder({
     ...launchReadinessNextGateCarry,
     stagingArchivePacketCompleteness: stagingLaunchDutyArchive?.packetCompleteness || null,
     stagingArchiveNextOperations,
+    offlineExecutionPlan,
     primaryStepKey: steps[0].key,
     finalStepKey: steps[steps.length - 1].key,
     stepCount: steps.length,
@@ -23488,6 +23540,39 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
       lines.push(`- Staging Archive Launch Duty Record Index: ${launchRunway.launchDutyRecordIndexPath || launchRunway.launchDutyRecordIndexFile || "-"}`);
     }
     lines.push(`- Staging Archive Next Readiness Step: ${stagingArchiveNextOperations.nextAction || "-"}`);
+  }
+  const offlineExecutionPlan = actionOrder.offlineExecutionPlan
+    && typeof actionOrder.offlineExecutionPlan === "object"
+    ? actionOrder.offlineExecutionPlan
+    : null;
+  if (offlineExecutionPlan) {
+    const packetReviewStepCount = Number.isFinite(Number(offlineExecutionPlan.packetReviewStepCount))
+      ? Number(offlineExecutionPlan.packetReviewStepCount)
+      : Array.isArray(offlineExecutionPlan.packetReviewSteps)
+        ? offlineExecutionPlan.packetReviewSteps.length
+        : 0;
+    const recordWriteStepCount = Number.isFinite(Number(offlineExecutionPlan.recordWriteStepCount))
+      ? Number(offlineExecutionPlan.recordWriteStepCount)
+      : Array.isArray(offlineExecutionPlan.recordWriteSteps)
+        ? offlineExecutionPlan.recordWriteSteps.length
+        : 0;
+    const handoffChecks = Array.isArray(offlineExecutionPlan.handoffChecks)
+      ? offlineExecutionPlan.handoffChecks
+          .map((item) => (typeof item === "string" ? item : item?.key || ""))
+          .filter(Boolean)
+      : [];
+    lines.push(`- Staging Archive Offline Execution Plan: ${offlineExecutionPlan.mode || "-"}`);
+    lines.push(
+      `- Offline Execution Plan Entry: status=${offlineExecutionPlan.status || "-"}`
+      + ` | entrypoint=${offlineExecutionPlan.entrypoint || offlineExecutionPlan.archiveIndexPath || "-"}`
+      + ` | launchDutyRecordIndex=${offlineExecutionPlan.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(
+      `- Offline Execution Plan Counts: packetReviewSteps=${packetReviewStepCount}`
+      + ` | recordWriteSteps=${recordWriteStepCount}`
+      + ` | handoffChecks=${handoffChecks.length ? handoffChecks.join(", ") : "-"}`
+    );
+    lines.push(`- Offline Execution Plan Next Action: ${offlineExecutionPlan.nextAction || "-"}`);
   }
   lines.push("- Steps:");
   if (!steps.length) {

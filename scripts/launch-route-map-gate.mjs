@@ -550,7 +550,7 @@ function buildLaunchSwitchWatchHandoff() {
     ...item,
     launchDutyRecordIndexPath
   }));
-  const operatorNextCommands = [
+  const preSmokeOperatorCommands = [
     {
       key: "backfill_route_map_gate_result",
       label: "Backfill route-map gate result",
@@ -590,27 +590,6 @@ function buildLaunchSwitchWatchHandoff() {
       targetKey: "live_write_smoke_result",
       launchDutyRecordIndexPath,
       nextAction: "Run only after staging:preflight passes, then use the smoke closeout-backfill handoff."
-    },
-    {
-      key: "refresh_staging_readiness_after_launch_smoke",
-      label: "Refresh staging readiness after Launch Smoke evidence",
-      status: "blocked_after_launch_smoke",
-      kind: "command",
-      command: currentCommand,
-      targetKey: "staging_readiness_status",
-      launchDutyRecordIndexPath,
-      nextAction: "Confirm live-write smoke, handoff, evidence receipts, and receipt visibility are reflected in readiness."
-    },
-    {
-      key: "verify_receipt_visibility_queue",
-      label: "Verify Launch Smoke receipt visibility queue",
-      status: "blocked_after_launch_smoke",
-      kind: "download_queue",
-      target: receiptVisibilityQueue[0]?.target || null,
-      queue: receiptVisibilityQueue,
-      targetKey: "receipt_visibility_review",
-      launchDutyRecordIndexPath,
-      nextAction: "Open the queue in order before entering production sign-off or launch-day watch."
     }
   ].map((item, index) => ({
     order: index + 1,
@@ -686,6 +665,51 @@ function buildLaunchSwitchWatchHandoff() {
     })),
     nextAction: "After launch smoke, verify these four closeout evidence records before entering full-test or production sign-off."
   };
+  const postSmokeBackfillOperatorCommands = postSmokeCloseoutChecks.evidenceChecks.map((item, index) => {
+    const blockedAfter = index === 0
+      ? "launch_smoke"
+      : postSmokeCloseoutChecks.evidenceChecks[index - 1].key;
+    return {
+      key: `backfill_post_smoke_${item.key}`,
+      label: `Backfill post-smoke ${item.key}`,
+      status: `blocked_after_${blockedAfter}`,
+      kind: "command",
+      command: item.command,
+      targetKey: item.key,
+      launchDutyRecordIndexPath,
+      receiptIds: item.receiptIds,
+      artifactPath: item.artifactPath,
+      nextAction: item.nextAction
+    };
+  });
+  const operatorNextCommands = [
+    ...preSmokeOperatorCommands,
+    ...postSmokeBackfillOperatorCommands,
+    {
+      key: "refresh_staging_readiness_after_post_smoke_backfill",
+      label: "Refresh staging readiness after post-smoke backfill",
+      status: "blocked_after_post_smoke_backfill",
+      kind: "command",
+      command: currentCommand,
+      targetKey: "staging_readiness_status",
+      launchDutyRecordIndexPath,
+      nextAction: "Confirm post-smoke backfills are reflected before full-test, production sign-off, or launch-day watch."
+    },
+    {
+      key: "verify_receipt_visibility_queue",
+      label: "Verify Launch Smoke receipt visibility queue",
+      status: "blocked_after_post_smoke_backfill",
+      kind: "download_queue",
+      target: receiptVisibilityQueue[0]?.target || null,
+      queue: receiptVisibilityQueue,
+      targetKey: "receipt_visibility_review",
+      launchDutyRecordIndexPath,
+      nextAction: "Open the queue in order after receipt visibility is backfilled."
+    }
+  ].map((item, index) => ({
+    order: index + 1,
+    ...item
+  }));
   const fullTestCommand = "npm.cmd test";
   const fullTestResultArtifactPath = `${artifactRoot}/full-test-output.txt`;
   const signoffBackfillCommand = [

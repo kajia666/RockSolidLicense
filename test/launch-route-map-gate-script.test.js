@@ -207,8 +207,12 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
       [2, "refresh_staging_readiness_after_route_map", "blocked_after_route_map_backfill", "command"],
       [3, "run_staging_smoke_preflight", "blocked_after_readiness_refresh", "command"],
       [4, "run_launch_smoke_staging", "blocked_after_smoke_preflight", "command"],
-      [5, "refresh_staging_readiness_after_launch_smoke", "blocked_after_launch_smoke", "command"],
-      [6, "verify_receipt_visibility_queue", "blocked_after_launch_smoke", "download_queue"]
+      [5, "backfill_post_smoke_live_write_smoke_result", "blocked_after_launch_smoke", "command"],
+      [6, "backfill_post_smoke_launch_smoke_handoff", "blocked_after_live_write_smoke_result", "command"],
+      [7, "backfill_post_smoke_launch_mainline_evidence_receipts", "blocked_after_launch_smoke_handoff", "command"],
+      [8, "backfill_post_smoke_receipt_visibility_review", "blocked_after_launch_mainline_evidence_receipts", "command"],
+      [9, "refresh_staging_readiness_after_post_smoke_backfill", "blocked_after_post_smoke_backfill", "command"],
+      [10, "verify_receipt_visibility_queue", "blocked_after_post_smoke_backfill", "download_queue"]
     ]
   );
   assert.equal(
@@ -220,7 +224,15 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     output.launchSwitchWatchHandoff.launchSmokeCommand
   );
   assert.equal(
-    output.launchSwitchWatchHandoff.operatorNextCommands[5].queue[0].target,
+    output.launchSwitchWatchHandoff.operatorNextCommands[4].command,
+    output.launchSwitchWatchHandoff.postSmokeCloseoutChecks.evidenceChecks[0].command
+  );
+  assert.equal(
+    output.launchSwitchWatchHandoff.operatorNextCommands[7].command,
+    output.launchSwitchWatchHandoff.postSmokeCloseoutChecks.evidenceChecks[3].command
+  );
+  assert.equal(
+    output.launchSwitchWatchHandoff.operatorNextCommands[9].queue[0].target,
     output.launchSmokeReceiptVisibilityQueue[0].target
   );
   assert.deepEqual(
@@ -422,7 +434,9 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /1\. backfill_route_map_gate_result: current command -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /3\. run_staging_smoke_preflight: blocked_after_readiness_refresh command -> npm\.cmd run staging:preflight -- --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel stable/);
   assert.match(result.stdout, /4\. run_launch_smoke_staging: blocked_after_smoke_preflight command -> npm\.cmd run launch:smoke:staging -- --base-url https:\/\/staging\.example\.com --allow-live-writes --product-code PILOT_ALPHA --channel stable --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
-  assert.match(result.stdout, /6\. verify_receipt_visibility_queue: blocked_after_launch_smoke download_queue -> first=\/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary \| count=5/);
+  assert.match(result.stdout, /5\. backfill_post_smoke_live_write_smoke_result: blocked_after_launch_smoke command -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key live_write_smoke_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/live-write-smoke-output\.json --receipt-id <record_launch_rehearsal_run-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /8\. backfill_post_smoke_receipt_visibility_review: blocked_after_launch_mainline_evidence_receipts command -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key receipt_visibility_review --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/receipt-visibility-review\.txt --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /10\. verify_receipt_visibility_queue: blocked_after_post_smoke_backfill download_queue -> first=\/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary \| count=5/);
   assert.match(result.stdout, /Launch Smoke receipt visibility queue:/);
   assert.match(result.stdout, /1\. verify_launch_review_receipt_visibility: current download -> \/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /5\. download_ops_handoff_index: next download -> \/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=handoff-index&limit=20 \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);

@@ -18975,6 +18975,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     && typeof steadyStateHandoffLanding.recommendedDownload === "object"
       ? steadyStateHandoffLanding.recommendedDownload
       : null;
+  const steadyStateDutyReceiptReview = mainlineSummary.steadyStateDutyReceiptReview
+    && typeof mainlineSummary.steadyStateDutyReceiptReview === "object"
+      ? mainlineSummary.steadyStateDutyReceiptReview
+      : null;
+  const steadyStateDutyReceiptReviewDownload = steadyStateDutyReceiptReview?.recommendedDownload
+    && typeof steadyStateDutyReceiptReview.recommendedDownload === "object"
+      ? steadyStateDutyReceiptReview.recommendedDownload
+      : null;
   const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
     ? payload.opsSnapshot.scope
     : {};
@@ -19268,6 +19276,27 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | launchDutyRecordIndex=${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`
     );
     lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
+  }
+  if (steadyStateDutyReceiptReview) {
+    lines.push("");
+    lines.push("Steady-State Duty Receipt Review Route:");
+    lines.push(
+      `- status=${steadyStateDutyReceiptReview.status || "-"}`
+      + ` | audit=${steadyStateDutyReceiptReview.auditLogId || "-"}`
+      + ` | action=${steadyStateDutyReceiptReview.action || "-"}`
+      + ` | file=${steadyStateDutyReceiptReview.fileName || steadyStateDutyReceiptReviewDownload?.fileName || "-"}`
+      + ` | format=${steadyStateDutyReceiptReview.format || steadyStateDutyReceiptReviewDownload?.format || "-"}`
+      + ` | href=${steadyStateDutyReceiptReview.href || steadyStateDutyReceiptReviewDownload?.href || "-"}`
+    );
+    lines.push(
+      `- steady-state-duty-receipt-review: ${steadyStateDutyReceiptReviewDownload?.fileName || steadyStateDutyReceiptReview.fileName || "ops/steady-state-duty-board.txt"}`
+      + ` | key=${steadyStateDutyReceiptReviewDownload?.key || "ops_latest_steady_state_duty_receipt_asset"}`
+      + ` | label=${steadyStateDutyReceiptReviewDownload?.label || "Latest steady-state duty receipt asset"}`
+      + ` | source=${steadyStateDutyReceiptReviewDownload?.source || "developer-ops-steady-state-duty-plan-receipt"}`
+      + ` | visibility=${steadyStateDutyReceiptReview.receiptVisibilityStatus || "-"}`
+      + ` | launchDutyRecordIndex=${steadyStateDutyReceiptReview.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`- nextAction=${steadyStateDutyReceiptReview.nextAction || "-"}`);
   }
 
   appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(lines, launchDutyRecordIndexSelectionChecklistStep);
@@ -20841,6 +20870,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     && typeof steadyStateHandoffLanding.recommendedDownload === "object"
       ? steadyStateHandoffLanding.recommendedDownload
       : null;
+  const steadyStateDutyReceiptReview = mainlineSummary.steadyStateDutyReceiptReview
+    && typeof mainlineSummary.steadyStateDutyReceiptReview === "object"
+      ? mainlineSummary.steadyStateDutyReceiptReview
+      : null;
+  const steadyStateDutyReceiptReviewDownload = steadyStateDutyReceiptReview?.recommendedDownload
+    && typeof steadyStateDutyReceiptReview.recommendedDownload === "object"
+      ? steadyStateDutyReceiptReview.recommendedDownload
+      : null;
   const handoffFiles = [
     ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
     ["Post-launch sweep handoff", payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt"],
@@ -20858,6 +20895,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Steady-state handoff landing",
       "ops/steady-state-handoff-brief.txt"
+    ]);
+  }
+  if (steadyStateDutyReceiptReview) {
+    handoffFiles.push([
+      "Steady-state duty receipt review",
+      "ops/steady-state-duty-board.txt"
     ]);
   }
   const lines = [
@@ -20985,6 +21028,25 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | launchDutyRecordIndex=${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`
     );
     lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
+  }
+  if (steadyStateDutyReceiptReview) {
+    lines.push("");
+    lines.push("Steady-State Duty Receipt Review:");
+    lines.push(
+      `- status=${steadyStateDutyReceiptReview.status || "-"}`
+      + ` | audit=${steadyStateDutyReceiptReview.auditLogId || "-"}`
+      + ` | action=${steadyStateDutyReceiptReview.action || "-"}`
+      + ` | file=${steadyStateDutyReceiptReview.fileName || steadyStateDutyReceiptReviewDownload?.fileName || "-"}`
+      + ` | format=${steadyStateDutyReceiptReview.format || steadyStateDutyReceiptReviewDownload?.format || "-"}`
+      + ` | href=${steadyStateDutyReceiptReview.href || steadyStateDutyReceiptReviewDownload?.href || "-"}`
+    );
+    lines.push(
+      `- key=${steadyStateDutyReceiptReviewDownload?.key || "ops_latest_steady_state_duty_receipt_asset"}`
+      + ` | source=${steadyStateDutyReceiptReviewDownload?.source || "developer-ops-steady-state-duty-plan-receipt"}`
+      + ` | visibility=${steadyStateDutyReceiptReview.receiptVisibilityStatus || "-"}`
+      + ` | launchDutyRecordIndex=${steadyStateDutyReceiptReview.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`- nextAction=${steadyStateDutyReceiptReview.nextAction || "-"}`);
   }
 
   lines.push("");

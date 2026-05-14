@@ -21312,6 +21312,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      new RegExp(`Steady-State Duty Receipt Review Route:[\\s\\S]*status=recorded \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchMainlineOpsRouteMirrorChecksumsDownload = await getText(
       baseUrl,
@@ -21379,6 +21387,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, /RockSolid Developer Launch Mainline Post-Launch Handoff Index/);
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      new RegExp(`Steady-State Duty Receipt Review:[\\s\\S]*status=recorded \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Steady-state duty receipt review: ops\/steady-state-duty-board\.txt/
+    );
 
     const launchMainlineSummarySelectionDownload = await getText(
       baseUrl,

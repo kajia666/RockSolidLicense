@@ -17502,6 +17502,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyActionOrder.offlineExecutionPlan.firstPacketReviewStep.command,
       /npm\.cmd run staging:rehearsal/
     );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstPacketResultCheck.status,
+      "awaiting_operator_result_check"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstPacketResultCheck.expectedArtifactPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/staging-run-record-index.json"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstPacketResultCheck.archiveIndexPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/staging-launch-duty-archive-index.json"
+    );
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.key, "launch_day_watch_summary");
     assert.equal(
       launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.expectedRecordArtifactPath,
@@ -17514,6 +17526,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyActionOrder.offlineExecutionPlan.firstRecordWriteStep.command,
       /--key launch_day_watch_summary --artifact-path artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md/
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstRecordResultCheck.status,
+      "awaiting_record_write_confirmation"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstRecordResultCheck.expectedRecordArtifactPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/launch-day-watch-summary.md"
+    );
+    assert.equal(
+      launchDutyActionOrder.offlineExecutionPlan.firstRecordResultCheck.launchDutyRecordIndexPath,
+      "artifacts/staging/EXPORT_ALPHA/stable/launch-duty-record-index.json"
     );
     assert.equal(launchDutyActionOrder.offlineExecutionPlan.firstHandoffCheck, "review_staging_packet_results");
     assert.equal(launchReceiptSnapshot.summary.initialLaunchOpsReadiness.primaryWorkspaceAction.key, "launch-mainline");
@@ -18531,7 +18555,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan First Packet Result Check: status=awaiting_operator_result_check \| expected=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json \| archiveIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
       /Offline Execution Plan First Record: order=1 \| key=launch_day_watch_summary \| artifact=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md \| command=npm\.cmd run staging:launch-duty:record/
+    );
+    assert.match(
+      launchMainlineHandoffRoutesDownload.body,
+      /Offline Execution Plan First Record Result Check: status=awaiting_record_write_confirmation \| expected=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineHandoffRoutesDownload.body,
@@ -19122,7 +19154,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan First Packet Result Check: status=awaiting_operator_result_check \| expected=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-run-record-index\.json \| archiveIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/staging-launch-duty-archive-index\.json \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
       /Offline Execution Plan First Record: order=1 \| key=launch_day_watch_summary \| artifact=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md \| command=npm\.cmd run staging:launch-duty:record/
+    );
+    assert.match(
+      launchMainlineTraceabilitySummaryDownload.body,
+      /Offline Execution Plan First Record Result Check: status=awaiting_record_write_confirmation \| expected=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-day-watch-summary\.md \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineTraceabilitySummaryDownload.body,

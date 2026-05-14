@@ -23389,6 +23389,29 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
       || stagingLaunchDutyArchive.commands?.closeoutReload
       || null;
   };
+  const firstPacketResultCheck = firstPacket
+    ? {
+        mode: "developer-ops-staging-packet-result-check",
+        status: firstPacket.path ? "awaiting_operator_result_check" : "missing_packet_path",
+        expectedArtifactPath: firstPacket.path || null,
+        archiveIndexPath,
+        launchDutyRecordIndexPath,
+        nextAction: firstPacket.path
+          ? "Confirm the packet artifact exists, then keep the launch-duty archive index and record index in the same offline handoff."
+          : "Fill the missing packet path before staging rehearsal closeout."
+      }
+    : null;
+  const firstRecordResultCheck = firstRecordKey
+    ? {
+        mode: "developer-ops-staging-launch-duty-record-result-check",
+        status: "awaiting_record_write_confirmation",
+        order: 1,
+        key: firstRecordKey,
+        expectedRecordArtifactPath: firstRecordArtifactPath,
+        launchDutyRecordIndexPath,
+        nextAction: "Confirm the record artifact exists and the launch-duty record index includes this key before handing off."
+      }
+    : null;
   return {
     mode: "developer-ops-staging-launch-duty-offline-execution-plan",
     status: "awaiting_operator_execution",
@@ -23410,6 +23433,7 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
           command: buildPacketCommand(firstPacket)
         }
       : null,
+    firstPacketResultCheck,
     firstRecordWriteStep: firstRecordKey
       ? {
           order: 1,
@@ -23419,6 +23443,7 @@ function buildDeveloperOpsLaunchDutyOfflineExecutionPlanSummary(stagingLaunchDut
           command: firstRecordCommand
         }
       : null,
+    firstRecordResultCheck,
     firstHandoffCheck: "review_staging_packet_results",
     nextAction: "Open the archive index first, review packet results, write launch-duty records, then verify record writes before handoff."
   };
@@ -23633,6 +23658,15 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         + ` | command=${firstPacket.command || "-"}`
       );
     }
+    if (offlineExecutionPlan.firstPacketResultCheck) {
+      const packetResultCheck = offlineExecutionPlan.firstPacketResultCheck;
+      lines.push(
+        `- Offline Execution Plan First Packet Result Check: status=${packetResultCheck.status || "-"}`
+        + ` | expected=${packetResultCheck.expectedArtifactPath || "-"}`
+        + ` | archiveIndex=${packetResultCheck.archiveIndexPath || "-"}`
+        + ` | launchDutyRecordIndex=${packetResultCheck.launchDutyRecordIndexPath || "-"}`
+      );
+    }
     if (offlineExecutionPlan.firstRecordWriteStep) {
       const firstRecord = offlineExecutionPlan.firstRecordWriteStep;
       lines.push(
@@ -23640,6 +23674,14 @@ function appendDeveloperOpsLaunchDutyActionOrderLines(lines = [], actionOrder = 
         + ` | key=${firstRecord.key || "-"}`
         + ` | artifact=${firstRecord.expectedRecordArtifactPath || "-"}`
         + ` | command=${firstRecord.command || "-"}`
+      );
+    }
+    if (offlineExecutionPlan.firstRecordResultCheck) {
+      const recordResultCheck = offlineExecutionPlan.firstRecordResultCheck;
+      lines.push(
+        `- Offline Execution Plan First Record Result Check: status=${recordResultCheck.status || "-"}`
+        + ` | expected=${recordResultCheck.expectedRecordArtifactPath || "-"}`
+        + ` | launchDutyRecordIndex=${recordResultCheck.launchDutyRecordIndexPath || "-"}`
       );
     }
     if (offlineExecutionPlan.firstHandoffCheck) {

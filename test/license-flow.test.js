@@ -23140,6 +23140,46 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       }
     );
     assert.deepEqual(
+      launchDutyCloseoutRecordedQueue.stableOperationsHandoffTail.readinessReloadReadbackPacket,
+      {
+        version: "developer-ops-launch-operations-operator-stable-operations-readiness-reload-readback-packet/v1",
+        status: "awaiting_readiness_and_rehearsal_readback",
+        readyForReadback: true,
+        sourceRecordKey: "first_wave_closeout",
+        recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+        firstWaveCloseoutArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+        commands: {
+          readinessStatus: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          rehearsalReload: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
+        },
+        expectedReadinessResult: {
+          currentGate: "stable_operations_handoff",
+          launchStatus: "ready_for_stabilization_handoff",
+          nextStepKey: "reload_rehearsal_for_stabilization_handoff",
+          actionQueueKeys: [
+            "reload_rehearsal_for_stabilization_handoff",
+            "stable_operations_handoff"
+          ]
+        },
+        expectedRehearsalResult: {
+          finalRehearsalPacketStatus: "ready_for_stable_operations_handoff",
+          executionSummaryStatus: "ready_for_stable_operations_handoff",
+          launchDutyCurrentActionKey: "stable_operations_handoff",
+          launchDutyCurrentActionStage: "stable_operations_handoff",
+          sourceFocus: "launchDutyCompletionHandoff",
+          requiredConfirmationPoints: [
+            "launch_duty_record_index",
+            "first_wave_closeout"
+          ]
+        },
+        handoffArtifacts: [
+          expectedSteadyStateLaunchDutyRecordIndexPath,
+          "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md"
+        ],
+        nextAction: "Run readiness status, confirm stable_operations_handoff, reload rehearsal, then open the steady-state handoff brief once packet and record readbacks are complete."
+      }
+    );
+    assert.deepEqual(
       launchDutyCloseoutRecordedQueue.stableOperationsHandoffTail.actions.map((item) => [item.key, item.status, item.command]),
       [
         [
@@ -23260,6 +23300,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStableOperationsReadback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
       /Offline Execution Plan Cursor Advance Basis: [^\n]*recordStatus=record_index_complete \| recordAdvanceWhen=selected_record_index_complete \| recordNext=-\.-/
     );
     assert.match(
@@ -23294,6 +23338,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Current Stable Operations Handoff Packet:[\s\S]*command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Stable Operations Readiness\/Rehearsal Readback Packet:[\s\S]*status=awaiting_readiness_and_rehearsal_readback \| readinessGate=stable_operations_handoff \| rehearsalStatus=ready_for_stable_operations_handoff \| currentAction=stable_operations_handoff/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Stable Operations Readiness\/Rehearsal Readback Packet:[\s\S]*readinessCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Stable Operations Readiness\/Rehearsal Readback Packet:[\s\S]*rehearsalCommand=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json/
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,

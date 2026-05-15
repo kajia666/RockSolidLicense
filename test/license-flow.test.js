@@ -21302,6 +21302,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(receiptVisibilityConfirmationQueue.operatorHandoffPacket?.currentActionKey, "confirm_first_wave_handoff");
     assert.equal(receiptVisibilityConfirmationQueue.operatorHandoffPacket?.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
     assert.ok(Array.isArray(receiptVisibilityConfirmationQueue.operatorHandoffPacket?.evidenceItems));
+    assert.equal(receiptVisibilityConfirmationQueue.supportInspectionReady, true);
+    assert.equal(receiptVisibilityConfirmationQueue.supportInspectionStatus, "ready_for_support_inspection");
+    assert.equal(
+      receiptVisibilityConfirmationQueue.supportInspectionAuditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.supportInspectionConfirmation?.auditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
+    const receiptQueueSupportInspectionEvidence = receiptVisibilityConfirmationQueue.operatorHandoffPacket?.evidenceItems
+      ?.find((item) => item?.key === "support_inspection_confirmation");
+    assert.ok(receiptQueueSupportInspectionEvidence);
+    assert.equal(receiptQueueSupportInspectionEvidence.status, "confirmed");
+    assert.equal(receiptQueueSupportInspectionEvidence.ready, true);
+    assert.equal(
+      receiptQueueSupportInspectionEvidence.auditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
     assert.equal(receiptVisibilityConfirmationQueue.currentStepKey, "review_launch_review_summary");
     assert.equal(receiptVisibilityConfirmationQueue.nextStepKey, "review_launch_smoke_summary");
     assert.equal(
@@ -21348,6 +21367,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchDutyHandoffAction.status, "awaiting_first_wave_confirmation");
     assert.equal(launchDutyHandoffAction.ready, false);
     assert.equal(launchDutyHandoffAction.currentActionKey, "confirm_first_wave_handoff");
+    assert.equal(launchDutyHandoffAction.supportInspectionReady, true);
+    assert.equal(launchDutyHandoffAction.supportInspectionStatus, "ready_for_support_inspection");
+    assert.equal(
+      launchDutyHandoffAction.supportInspectionAuditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
+    assert.equal(
+      launchDutyHandoffAction.supportInspectionConfirmation?.auditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
+    const launchDutySupportInspectionEvidence = launchDutyHandoffAction.evidenceItems
+      .find((item) => item?.key === "support_inspection_confirmation");
+    assert.ok(launchDutySupportInspectionEvidence);
+    assert.equal(launchDutySupportInspectionEvidence.status, "confirmed");
+    assert.equal(launchDutySupportInspectionEvidence.ready, true);
+    assert.equal(
+      launchDutySupportInspectionEvidence.auditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
     assert.equal(launchDutyHandoffAction.nextLaunchDutyPhaseKey, "archive_signoff_packet");
     assert.equal(launchDutyHandoffAction.nextLaunchDutyActionKey, "archive_production_signoff_packet");
     assert.equal(
@@ -21544,8 +21582,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueRefreshReady=false/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueHandoffPacket=awaiting_first_wave_confirmation/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueHandoffReady=false/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueSupportInspection=confirmed/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueSupportReady=true/);
+    assert.match(
+      steadyStateDutyReceiptSnapshot.summaryText,
+      new RegExp(`Launch Operations Operator Entry:[\\s\\S]*receiptQueueSupportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`)
+    );
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffAction=awaiting_first_wave_confirmation/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffReady=false/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffSupportInspection=confirmed/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffSupportReady=true/);
+    assert.match(
+      steadyStateDutyReceiptSnapshot.summaryText,
+      new RegExp(`Launch Operations Operator Entry:[\\s\\S]*launchDutyHandoffSupportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`)
+    );
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffNextAction=archive_production_signoff_packet/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffFirstReceipt=record_launch_day_watch/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffFirstReceiptOps=record_cutover_walkthrough,record_launch_day_readiness_review/);
@@ -21652,8 +21702,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueRefreshReady=false/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueHandoffPacket=awaiting_first_wave_confirmation/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueHandoffReady=false/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueSupportInspection=confirmed/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueSupportReady=true/);
+    assert.match(
+      launchOperationsHandoffIndexDownload.body,
+      new RegExp(`Launch Operations Operator Entry: [^\\n]*receiptQueueSupportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`)
+    );
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffAction=awaiting_first_wave_confirmation/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffReady=false/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffSupportInspection=confirmed/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffSupportReady=true/);
+    assert.match(
+      launchOperationsHandoffIndexDownload.body,
+      new RegExp(`Launch Operations Operator Entry: [^\\n]*launchDutyHandoffSupportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`)
+    );
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffNextAction=archive_production_signoff_packet/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffFirstReceipt=record_launch_day_watch/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*launchDutyHandoffFirstReceiptOps=record_cutover_walkthrough,record_launch_day_readiness_review/);
@@ -21890,10 +21952,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*handoffConfirmed=false/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*checkpoint=open_pending_handoff_confirmation \| checkpointClosed=false/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*refreshAction=pending_confirmation_receipt \| refreshReady=false/);
-    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*handoffPacket=awaiting_first_wave_confirmation \| handoffReady=false/);
-    assert.match(launchOperationsOperatorEntryDownload.body, /Handoff Packet Evidence: receipt_visibility_parity=ready; first_wave_handoff_confirmation=pending; developer_ops_overview_refresh=pending_confirmation_receipt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*handoffPacket=awaiting_first_wave_confirmation \| handoffReady=false \| supportInspection=confirmed \| supportReady=true/);
+    assert.match(launchOperationsOperatorEntryDownload.body, new RegExp(`Receipt Visibility Confirmation Queue:[\\s\\S]*supportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`));
+    assert.match(launchOperationsOperatorEntryDownload.body, /Handoff Packet Evidence: receipt_visibility_parity=ready; first_wave_handoff_confirmation=pending; support_inspection_confirmation=confirmed; developer_ops_overview_refresh=pending_confirmation_receipt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:/);
-    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*status=awaiting_first_wave_confirmation \| ready=no \| currentAction=confirm_first_wave_handoff \| nextLaunchDutyPhase=archive_signoff_packet \| nextLaunchDutyAction=archive_production_signoff_packet/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*status=awaiting_first_wave_confirmation \| ready=no \| currentAction=confirm_first_wave_handoff[\s\S]*\| nextLaunchDutyPhase=archive_signoff_packet \| nextLaunchDutyAction=archive_production_signoff_packet/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*supportInspection=confirmed \| supportReady=yes/);
+    assert.match(launchOperationsOperatorEntryDownload.body, new RegExp(`Launch Duty Handoff Action:[\\s\\S]*supportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`));
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*nextArtifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*nextAcceptance=Signed production packet is archived beside the launch-duty archive index before cutover watch starts\./);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*firstReceiptWrite=record_launch_day_watch \| action=record_launch_day_watch_summary \| status=blocked_until_signoff_archive \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md \| receipts=record_cutover_walkthrough,record_launch_day_readiness_review/);
@@ -21989,6 +22054,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       [
         ["receipt_visibility_parity", "aligned", true],
         ["first_wave_handoff_confirmation", "confirmed", true],
+        ["support_inspection_confirmation", "confirmed", true],
         ["developer_ops_overview_refresh", "current", true]
       ]
     );

@@ -20023,6 +20023,28 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewContextLaunchDutyRecordIndexPath,
       expectedSteadyStateLaunchDutyRecordIndexPath
     );
+    const launchOperationsSupportInspectionConfirmation = await postJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/support-inspection/confirm",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        decision: "confirmed",
+        note: "launch operations operator reviewed support inspection evidence",
+        supportInspectionStatus: "ready_for_support_inspection",
+        inspectedTargetKeys: ["accounts", "entitlements", "sessions", "cards", "devices", "audit_logs"],
+        targetCount: 6,
+        readyTargetCount: 6,
+        runtimeEvidenceFormat: "first-wave-runtime-evidence",
+        evidenceFileName: "developer-ops-first-wave-runtime-evidence.txt"
+      },
+      ownerSession.token
+    );
+    assert.equal(launchOperationsSupportInspectionConfirmation.status, "confirmed");
+    assert.equal(launchOperationsSupportInspectionConfirmation.supportInspectionStatus, "ready_for_support_inspection");
+    assert.equal(launchOperationsSupportInspectionConfirmation.allTargetsConfirmed, true);
+    assert.ok(launchOperationsSupportInspectionConfirmation.auditLogId);
+
     const steadyStateDutyPlanReceipt = await postJson(
       baseUrl,
       "/api/developer/ops/steady-state-duty-plan/receipt",
@@ -21168,6 +21190,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const expectedFirstLaunchOperatingChain = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain;
     assert.ok(expectedFirstLaunchOperatingChain);
+    assert.equal(expectedFirstLaunchOperatingChain.supportInspectionReady, true);
+    assert.equal(
+      expectedFirstLaunchOperatingChain.supportInspectionConfirmation?.auditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
     const firstLaunchConfirmationDoorway = launchOperationsOperatorEntry.firstLaunchConfirmationDoorway;
     assert.ok(firstLaunchConfirmationDoorway);
     assert.equal(
@@ -21178,6 +21205,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(firstLaunchConfirmationDoorway.currentPhaseKey, expectedFirstLaunchOperatingChain.currentPhaseKey);
     assert.equal(firstLaunchConfirmationDoorway.phaseCount, expectedFirstLaunchOperatingChain.phaseCount);
     assert.equal(firstLaunchConfirmationDoorway.readyPhaseCount, expectedFirstLaunchOperatingChain.readyPhaseCount);
+    assert.equal(firstLaunchConfirmationDoorway.supportInspectionReady, true);
+    assert.equal(firstLaunchConfirmationDoorway.supportInspectionStatus, "ready_for_support_inspection");
+    assert.equal(
+      firstLaunchConfirmationDoorway.supportInspectionAuditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
+    assert.equal(
+      firstLaunchConfirmationDoorway.supportInspectionConfirmation?.auditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
+    );
     assert.equal(
       firstLaunchConfirmationDoorway.launchDutyRecordIndexPath,
       expectedSteadyStateLaunchDutyRecordIndexPath
@@ -21192,6 +21229,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         "first_wave_handoff_confirmation",
         "first_user_runtime_validation"
       ]
+    );
+    const firstLaunchDoorwayRuntimeValidationSegment = firstLaunchConfirmationDoorway.segments
+      .find((item) => item?.key === "first_user_runtime_validation");
+    assert.equal(firstLaunchDoorwayRuntimeValidationSegment?.supportInspectionReady, true);
+    assert.equal(
+      firstLaunchDoorwayRuntimeValidationSegment?.supportInspectionAuditLogId,
+      launchOperationsSupportInspectionConfirmation.auditLogId
     );
     assert.equal(firstLaunchConfirmationDoorway.nextActionKey, expectedFirstLaunchOperatingChain.nextAction?.key || null);
     assert.equal(firstLaunchConfirmationDoorway.nextActionStage, expectedFirstLaunchOperatingChain.nextAction?.stage || null);
@@ -21487,6 +21531,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*switchCurrentCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*firstLaunchDoorway=/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*firstLaunchDoorwayConfirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*firstLaunchDoorwaySupportInspection=confirmed/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, new RegExp(`firstLaunchDoorwaySupportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`));
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptParity=aligned/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptParityReady=2\/2/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptConfirmationQueue=/);
@@ -21828,11 +21874,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*4\. review_production_signoff_packet \| status=blocked_until_full_test \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /First-Launch Confirmation Doorway:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /First-Launch Confirmation Doorway:[\s\S]*confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /First-Launch Confirmation Doorway:[\s\S]*supportInspection=confirmed \| supportReady=true \| support=ready_for_support_inspection/);
+    assert.match(launchOperationsOperatorEntryDownload.body, new RegExp(`First-Launch Confirmation Doorway:[\\s\\S]*supportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`));
     assert.match(launchOperationsOperatorEntryDownload.body, /Doorway Segments:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /1\. first_batch_inventory \| status=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /2\. first_card_delivery_export \| status=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /3\. first_wave_handoff_confirmation \| status=/);
-    assert.match(launchOperationsOperatorEntryDownload.body, /4\. first_user_runtime_validation \| status=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /4\. first_user_runtime_validation \| status=[^\n]*supportInspection=confirmed \| supportReady=true/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Parity Check:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Parity Check:[\s\S]*status=aligned \| aligned=2\/2 \| mismatches=0/);
     assert.match(launchOperationsOperatorEntryDownload.body, /1\. launch_review_summary \| status=aligned \| file=launch-review\.txt \| format=summary \| recordIndexAligned=yes \| routeIndexAligned=yes/);

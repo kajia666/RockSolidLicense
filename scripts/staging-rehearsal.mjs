@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -467,6 +467,51 @@ function buildReadinessStatusCommand({ filledCloseoutInputFile, readinessActionQ
   ].join(" ");
 }
 
+function buildRehearsalReloadCommand(closeoutInputFile) {
+  if (!closeoutInputFile) {
+    return null;
+  }
+  return `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(closeoutInputFile)}`;
+}
+
+function loadLaunchDutyCompletionHandoff({ closeoutInputFile, readinessActionQueueFile }) {
+  if (!closeoutInputFile) {
+    return null;
+  }
+  const resolvedCloseoutInputFile = path.resolve(repoRoot, closeoutInputFile);
+  const recordIndexFile = path.join(path.dirname(resolvedCloseoutInputFile), "launch-duty-record-index.json");
+  if (!existsSync(recordIndexFile)) {
+    return null;
+  }
+  const recordIndex = JSON.parse(readFileSync(recordIndexFile, "utf8"));
+  if (recordIndex?.status !== "complete" || !recordIndex.completionHandoff) {
+    return null;
+  }
+  const handoff = recordIndex.completionHandoff;
+  const actionsFile = handoff.actionsFile || readinessActionQueueFile || null;
+  const closeoutPath = handoff.closeoutInputFile || resolvedCloseoutInputFile;
+  const normalized = {
+    ...handoff,
+    closeoutInputFile: closeoutPath,
+    actionsFile,
+    recordIndexFile: handoff.recordIndexFile || recordIndex.recordIndexFile || recordIndexFile,
+    recordedCount: recordIndex.recordedCount ?? handoff.recordedCount ?? 0,
+    pendingCount: recordIndex.pendingCount ?? handoff.pendingCount ?? 0,
+    completedRecordKeys: recordIndex.recordedKeys || handoff.completedRecordKeys || [],
+    statusCommand: handoff.statusCommand || buildReadinessStatusCommand({
+      filledCloseoutInputFile: closeoutPath,
+      readinessActionQueueFile: actionsFile
+    }),
+    rehearsalReloadCommand: handoff.rehearsalReloadCommand || buildRehearsalReloadCommand(closeoutPath)
+  };
+  return {
+    ...normalized,
+    handoffArtifacts: Array.isArray(normalized.handoffArtifacts) && normalized.handoffArtifacts.length
+      ? normalized.handoffArtifacts
+      : [normalized.recordIndexFile, normalized.firstWaveCloseoutArtifactPath].filter(Boolean)
+  };
+}
+
 function buildSignoffConditionBackfillCommand({
   filledCloseoutInputFile,
   key,
@@ -838,7 +883,9 @@ function buildStagingRehearsalExecutionSummary(result) {
     finalPacket: finalPacket.status || "not_available"
   };
   let status = sourceStatuses.readinessTransition || "not_available";
-  if (sourceStatuses.readinessTransition === "ready_for_launch_day_watch") {
+  if (result.launchDutyCompletionHandoff) {
+    status = "ready_for_stable_operations_handoff";
+  } else if (sourceStatuses.readinessTransition === "ready_for_launch_day_watch") {
     status = "ready_for_launch_day_watch";
   } else if (sourceStatuses.readinessTransition === "ready_for_full_test_window") {
     status = "ready_for_full_test_window";
@@ -916,7 +963,8 @@ function buildStagingRehearsalExecutionSummary(result) {
       closeoutBackfillFocus,
       fullTestSignoffFocus,
       launchDutyPacketFocus,
-      launchDutyCurrentAction
+      launchDutyCurrentAction,
+      launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
     });
   return {
     mode: "staging-rehearsal-execution-summary",
@@ -1936,7 +1984,8 @@ function buildStagingCloseoutReloadPacket(result) {
       realStagingRunFocus: buildRealStagingRunFocus(result),
       closeoutBackfillFocus,
       fullTestSignoffFocus: buildFullTestSignoffFocus(result),
-      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null
+      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null,
+      launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
     });
   let status = "awaiting_closeout_backfill";
   if (result.closeoutInput?.readyForFullTestWindow === true) {
@@ -2076,7 +2125,8 @@ function buildStagingReadinessReviewPacket(result) {
       realStagingRunFocus: buildRealStagingRunFocus(result),
       closeoutBackfillFocus: buildCloseoutBackfillFocus(result),
       fullTestSignoffFocus: buildFullTestSignoffFocus(result),
-      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null
+      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null,
+      launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
     });
   let status = "blocked_until_closeout_reload";
   if (stabilizationHandoff.canStartStabilizationHandoff === true) {
@@ -2599,6 +2649,19 @@ function buildLaunchDutyOperatorFocus(result, { status = null, finalPacket = nul
   const blockedPostSignoffActionCount = checklist.filter((item) => String(item.status || "").startsWith("blocked_")).length;
   const pendingWatchArtifactCount = watchRecords.filter((item) => item.status === "pending_operator_entry").length;
   const blockedWatchArtifactCount = watchRecords.filter((item) => String(item.status || "").startsWith("blocked_")).length;
+  if (result.launchDutyCompletionHandoff) {
+    return {
+      status: "ready_for_stable_operations_handoff",
+      postSignoffActionCount: checklist.length,
+      blockedPostSignoffActionCount: 0,
+      readyPostSignoffActionCount: checklist.length,
+      watchArtifactCount: watchRecords.length,
+      pendingWatchArtifactCount: 0,
+      blockedWatchArtifactCount: 0,
+      firstPostSignoffAction: "stable_operations_handoff",
+      nextAction: result.launchDutyCompletionHandoff.nextAction || "Hand off the completed launch-duty record index and first-wave closeout artifact to stable operations."
+    };
+  }
   let focusStatus = "blocked_until_signoff_ready";
   if (status === "ready_for_launch_day_watch" || result.launchDayWatchPlan?.canStartCutoverWatch === true) {
     focusStatus = "ready_for_cutover_watch";
@@ -2779,7 +2842,8 @@ function buildStagingProductionSignoffPacket(result) {
       realStagingRunFocus: buildRealStagingRunFocus(result),
       closeoutBackfillFocus: buildCloseoutBackfillFocus(result),
       fullTestSignoffFocus: buildFullTestSignoffFocus(result),
-      launchDutyCurrentAction: result.finalRehearsalPacket?.launchDutyCurrentAction || null
+      launchDutyCurrentAction: result.finalRehearsalPacket?.launchDutyCurrentAction || null,
+      launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
     });
   const launchDutyArchiveIndexPath = result.launchDutyArchiveIndexFile?.path
     || bindingFiles.get("launch_duty_archive_index")?.path
@@ -3233,7 +3297,8 @@ function buildStagingLaunchDutyArchiveIndex(result) {
       realStagingRunFocus: buildRealStagingRunFocus(result),
       closeoutBackfillFocus: buildCloseoutBackfillFocus(result),
       fullTestSignoffFocus: buildFullTestSignoffFocus(result),
-      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null
+      launchDutyCurrentAction: finalPacket.launchDutyCurrentAction || null,
+      launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
     });
   return {
     mode: "staging-launch-duty-archive-index",
@@ -5030,7 +5095,8 @@ function buildGoLiveExecutionEntry({
   closeoutBackfillFocus = null,
   fullTestSignoffFocus = null,
   launchDutyPacketFocus = null,
-  launchDutyCurrentAction = null
+  launchDutyCurrentAction = null,
+  launchDutyCompletionHandoff = null
 } = {}) {
   const uniq = (items = []) => [...new Set((Array.isArray(items) ? items : []).filter(Boolean))];
   const fullTestCommand = fullTestSignoffFocus?.commands?.fullTestWindow
@@ -5107,7 +5173,14 @@ function buildGoLiveExecutionEntry({
     || launchDutyCurrentAction?.nextAction
     || null;
 
-  if (canSignoffProduction) {
+  if (launchDutyCompletionHandoff) {
+    currentPhase = "stable_operations_handoff";
+    sourceFocus = "launchDutyCompletionHandoff";
+    currentActionKey = "stable_operations_handoff";
+    status = launchDutyCompletionHandoff.status || "ready_for_stabilization_handoff";
+    currentCommand = null;
+    nextAction = launchDutyCompletionHandoff.nextAction || launchDutyCurrentAction?.nextAction || null;
+  } else if (canSignoffProduction) {
     currentPhase = "launch_watch_and_stabilization";
     sourceFocus = "launchDutyPacketFocus";
     currentActionKey = launchDutyCurrentAction?.key || "archive_production_signoff";
@@ -5173,7 +5246,7 @@ function buildGoLiveExecutionEntry({
     : null;
   const stabilizationHandoffExecutionEntry = launchDutyPacketFocus?.stabilizationHandoffExecutionEntry || null;
   const firstWaveCloseoutExecutionEntry = launchDutyPacketFocus?.firstWaveCloseoutExecutionEntry || null;
-  const launchDayWatchEntry = canSignoffProduction || launchDutyCurrentAction?.stage === "launch_day_watch_entry"
+  const launchDayWatchEntry = !launchDutyCompletionHandoff && (canSignoffProduction || launchDutyCurrentAction?.stage === "launch_day_watch_entry")
     ? {
       status,
       stage: launchDutyCurrentAction?.stage || "launch_day_watch_entry",
@@ -5223,6 +5296,7 @@ function buildGoLiveExecutionEntry({
     },
     blockerSummary,
     launchDutyCurrentActionKey: launchDutyCurrentAction?.key || null,
+    ...(launchDutyCompletionHandoff ? { launchDutyCompletionHandoff } : {}),
     ...(launchDayWatchEntry ? { launchDayWatchEntry } : {}),
     nextAction
   };
@@ -5243,15 +5317,71 @@ function buildGoLiveExecutionEntryFromResult(result, { outputFiles = [], launchD
       closeoutBackfillFocus,
       fullTestSignoffFocus,
       launchDutyPacketFocus: packetFocus,
-      archiveContext: buildLaunchDutyArchiveTraceContext(result, { outputFiles, launchDutyPacketFocus: packetFocus })
+      archiveContext: buildLaunchDutyArchiveTraceContext(result, { outputFiles, launchDutyPacketFocus: packetFocus }),
+      launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
     });
   return buildGoLiveExecutionEntry({
     realStagingRunFocus,
     closeoutBackfillFocus,
     fullTestSignoffFocus,
     launchDutyPacketFocus: packetFocus,
-    launchDutyCurrentAction
+    launchDutyCurrentAction,
+    launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
   });
+}
+
+function buildLaunchDutyCompletionCurrentAction(completionHandoff, archiveContext = null) {
+  const sourceRecords = Array.isArray(completionHandoff.sourceRecords) ? completionHandoff.sourceRecords : [];
+  const recordIndexFile = completionHandoff.recordIndexFile || null;
+  const firstWaveCloseoutArtifactPath = completionHandoff.firstWaveCloseoutArtifactPath || null;
+  const evidenceInputs = [
+    {
+      key: "launch_duty_record_index",
+      kind: "record_index",
+      status: "complete",
+      path: recordIndexFile
+    },
+    {
+      key: "first_wave_closeout",
+      kind: "artifact",
+      status: "complete",
+      path: firstWaveCloseoutArtifactPath
+    },
+    ...sourceRecords.map((item) => ({
+      key: item.key || null,
+      kind: "source_record",
+      status: "recorded",
+      path: item.path || null
+    }))
+  ].filter((item) => item.key);
+  const confirmationPoints = (completionHandoff.handoffArtifacts || [])
+    .map((artifact, index) => ({
+      key: artifact === recordIndexFile
+        ? "launch_duty_record_index"
+        : artifact === firstWaveCloseoutArtifactPath
+          ? "first_wave_closeout"
+          : `handoff_artifact_${index + 1}`,
+      status: "complete",
+      path: artifact
+    }));
+  return attachLaunchDutyArchiveTrace({
+    mode: "launch-duty-current-action",
+    stage: "stable_operations_handoff",
+    sourceFocus: "launchDutyCompletionHandoff",
+    key: "stable_operations_handoff",
+    status: completionHandoff.status || "ready_for_stabilization_handoff",
+    command: null,
+    packetPath: firstWaveCloseoutArtifactPath || recordIndexFile,
+    artifactPath: firstWaveCloseoutArtifactPath || null,
+    recordIndexFile,
+    completedRecordKeys: completionHandoff.completedRecordKeys || [],
+    handoffArtifacts: completionHandoff.handoffArtifacts || [],
+    sourceRecords,
+    completionHandoff,
+    evidenceInputs,
+    confirmationPoints,
+    nextAction: completionHandoff.nextAction || "Hand off the completed launch-duty record index and first-wave closeout artifact to stable operations."
+  }, archiveContext);
 }
 
 function buildLaunchDutyCurrentAction({
@@ -5259,9 +5389,13 @@ function buildLaunchDutyCurrentAction({
   closeoutBackfillFocus = null,
   fullTestSignoffFocus = null,
   launchDutyPacketFocus = null,
-  archiveContext = null
+  archiveContext = null,
+  launchDutyCompletionHandoff = null
 } = {}) {
   const mode = "launch-duty-current-action";
+  if (launchDutyCompletionHandoff) {
+    return buildLaunchDutyCompletionCurrentAction(launchDutyCompletionHandoff, archiveContext);
+  }
   if (fullTestSignoffFocus?.canSignoffProduction === true) {
     const current = fullTestSignoffFocus.currentAction || {};
     const target = launchDutyPacketFocus?.currentPostSignoffTarget || {};
@@ -5552,7 +5686,8 @@ function buildLaunchDutyCurrentActionFromResult(result, { outputFiles = [], laun
     closeoutBackfillFocus,
     fullTestSignoffFocus,
     launchDutyPacketFocus: packetFocus,
-    archiveContext
+    archiveContext,
+    launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
   });
 }
 
@@ -5585,7 +5720,7 @@ function buildLaunchDutyArchiveTraceContext(result, { outputFiles = [], launchDu
 }
 
 function launchDutyRecordGroupKeyForStage(stage) {
-  if (stage === "launch_day_watch_entry") {
+  if (stage === "launch_day_watch_entry" || stage === "stable_operations_handoff") {
     return "launch_day_watch_and_stabilization";
   }
   if (stage === "full_test_signoff") {
@@ -7274,17 +7409,21 @@ function buildFinalRehearsalPacket(result) {
     closeoutBackfillFocus,
     fullTestSignoffFocus,
     launchDutyPacketFocus,
-    archiveContext: buildLaunchDutyArchiveTraceContext(result, { outputFiles: localFiles, launchDutyPacketFocus })
+    archiveContext: buildLaunchDutyArchiveTraceContext(result, { outputFiles: localFiles, launchDutyPacketFocus }),
+    launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
   });
   const goLiveExecutionEntry = buildGoLiveExecutionEntry({
     realStagingRunFocus,
     closeoutBackfillFocus,
     fullTestSignoffFocus,
     launchDutyPacketFocus,
-    launchDutyCurrentAction
+    launchDutyCurrentAction,
+    launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
   });
   return {
-    status: readyForLaunchDayWatch ? "ready_for_launch_day_watch" : "ready_for_operator_rehearsal",
+    status: result.launchDutyCompletionHandoff
+      ? "ready_for_stable_operations_handoff"
+      : readyForLaunchDayWatch ? "ready_for_launch_day_watch" : "ready_for_operator_rehearsal",
     willModifyData: false,
     environmentBindingStatus: result.stagingEnvironmentBinding?.status || null,
     executionRunbookStatus: result.stagingExecutionRunbook?.status || null,
@@ -7298,6 +7437,7 @@ function buildFinalRehearsalPacket(result) {
     goLiveActionQueue: goLiveProgress.operatorActionQueue,
     launchReadinessDistance: goLiveProgress.launchReadinessDistance,
     goLiveOperatorActionPlan: goLiveProgress.operatorActionPlan,
+    ...(result.launchDutyCompletionHandoff ? { launchDutyCompletionHandoff: result.launchDutyCompletionHandoff } : {}),
     launchDutyCurrentAction,
     goLiveExecutionEntry,
     commands: {
@@ -7312,7 +7452,9 @@ function buildFinalRehearsalPacket(result) {
     localFiles,
     postSignoffActionChecklist: buildPostSignoffActionChecklist(result, { archiveRoot }),
     orderedSteps,
-    nextAction: readyForLaunchDayWatch
+    nextAction: result.launchDutyCompletionHandoff
+      ? result.launchDutyCompletionHandoff.nextAction
+      : readyForLaunchDayWatch
       ? "Start launch-day watch and stabilization handoff with the packet artifacts open."
       : "Generate handoff and closeout files, run the ordered rehearsal steps, then reload the filled closeout input before the full test window."
   };
@@ -7621,7 +7763,8 @@ function buildStagingOperatorExecutionPlan(result) {
     closeoutBackfillFocus,
     fullTestSignoffFocus,
     launchDutyPacketFocus,
-    archiveContext: launchDutyArchiveContext
+    archiveContext: launchDutyArchiveContext,
+    launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
   });
   const outputWriteSummary = buildStagingOutputWriteSummary(result, { outputFiles });
   const goLiveExecutionEntry = buildGoLiveExecutionEntry({
@@ -7629,7 +7772,8 @@ function buildStagingOperatorExecutionPlan(result) {
     closeoutBackfillFocus,
     fullTestSignoffFocus,
     launchDutyPacketFocus,
-    launchDutyCurrentAction
+    launchDutyCurrentAction,
+    launchDutyCompletionHandoff: result.launchDutyCompletionHandoff || null
   });
   return {
     status: "ready_for_staging_execution",
@@ -7653,6 +7797,7 @@ function buildStagingOperatorExecutionPlan(result) {
     closeoutBackfillFocus,
     fullTestSignoffFocus,
     launchDutyPacketFocus,
+    ...(result.launchDutyCompletionHandoff ? { launchDutyCompletionHandoff: result.launchDutyCompletionHandoff } : {}),
     launchDutyCurrentAction,
     goLiveExecutionEntry,
     orderedSteps: [
@@ -8163,9 +8308,16 @@ function buildResult(options) {
     stagingAcceptanceCloseout: gatesPassed ? buildStagingAcceptanceCloseout(resultWithBackfill) : null
   };
   const closeoutInput = gatesPassed ? buildCloseoutInput(options.closeoutInputFile, resultWithCloseout.stagingAcceptanceCloseout) : null;
+  const launchDutyCompletionHandoff = gatesPassed && closeoutInput?.readyForProductionSignoff === true
+    ? loadLaunchDutyCompletionHandoff({
+      closeoutInputFile: options.closeoutInputFile,
+      readinessActionQueueFile: options.readinessActionQueueFile
+    })
+    : null;
   const resultWithCloseoutInput = {
     ...resultWithCloseout,
-    closeoutInput
+    closeoutInput,
+    ...(launchDutyCompletionHandoff ? { launchDutyCompletionHandoff } : {})
   };
   const resultWithCloseoutBackfillGuide = {
     ...resultWithCloseoutInput,
@@ -8929,6 +9081,22 @@ function renderLaunchDutyRecordUpdates(items = []) {
     .join("; ") || "-";
 }
 
+function appendLaunchDutyCompletionHandoff(lines, handoff = {}) {
+  if (!handoff?.status) {
+    return;
+  }
+  lines.push(`- Launch duty completion handoff: ${handoff.status || "-"}`);
+  lines.push(`- Launch duty completion record index: ${handoff.recordIndexFile || "-"}`);
+  lines.push(`- Launch duty completion progress: ${handoff.recordedCount ?? 0}/6 recorded, ${handoff.pendingCount ?? 0} pending`);
+  lines.push(`- Launch duty completion completed records: ${(handoff.completedRecordKeys || []).join(", ") || "-"}`);
+  lines.push(`- Launch duty completion first-wave closeout: ${handoff.firstWaveCloseoutArtifactPath || "-"}`);
+  lines.push(`- Launch duty completion handoff artifacts: ${(handoff.handoffArtifacts || []).join("; ") || "-"}`);
+  lines.push(`- Launch duty completion source records: ${(handoff.sourceRecords || []).map((item) => `${item.key || "-"}=${item.path || "-"}`).join("; ") || "-"}`);
+  lines.push(`- Launch duty completion status refresh: \`${handoff.statusCommand || "-"}\``);
+  lines.push(`- Launch duty completion rehearsal reload: \`${handoff.rehearsalReloadCommand || "-"}\``);
+  lines.push(`- Launch duty completion next action: ${handoff.nextAction || "-"}`);
+}
+
 function writeLaunchDutyCurrentActionPlain(action = {}) {
   if (!action?.key) {
     return;
@@ -8978,6 +9146,13 @@ function writeLaunchDutyCurrentActionPlain(action = {}) {
   }
   if (action.watchEvidenceNextAction) {
     console.log(`Launch duty watch evidence next action: ${action.watchEvidenceNextAction}`);
+  }
+  if (action.completionHandoff) {
+    const lines = [];
+    appendLaunchDutyCompletionHandoff(lines, action.completionHandoff);
+    for (const line of lines) {
+      console.log(line.replace(/^- /, ""));
+    }
   }
   console.log(`Launch duty next action: ${action.nextAction || "-"}`);
 }
@@ -9034,6 +9209,7 @@ function appendGoLiveExecutionEntry(lines, entry = {}) {
     lines.push(`- Go-live launch-day confirmation points: ${renderLaunchDutyActionConfirmationList(launchDayWatchEntry.confirmationPoints)}`);
     lines.push(`- Go-live launch-day archive trace: ${renderLaunchDutyArchiveTrace(launchDayWatchEntry.archiveTrace)}`);
   }
+  appendLaunchDutyCompletionHandoff(lines, entry.launchDutyCompletionHandoff);
   lines.push(`- Go-live execution next action: ${entry.nextAction || "-"}`);
 }
 
@@ -10676,9 +10852,10 @@ function renderFinalRehearsalPacket(packet) {
     `- Final packet launch-duty follow-up first-wave receipts: ${(launchDutyCurrentAction.followUpFirstWaveReceiptQueue || []).map((item) => `${item.key || "-"}=${item.operation || "-"}:${item.status || "-"}`).join(", ") || "-"}`,
     `- Final packet launch-duty stabilization next action: ${launchDutyCurrentAction.stabilizationHandoffNextAction || "-"}`,
     `- Final packet launch-duty first-wave closeout next action: ${launchDutyCurrentAction.firstWaveCloseoutNextAction || "-"}`,
-    `- Final packet launch-duty watch evidence next action: ${launchDutyCurrentAction.watchEvidenceNextAction || "-"}`,
-    `- Next action: ${packet.nextAction || "-"}`
+    `- Final packet launch-duty watch evidence next action: ${launchDutyCurrentAction.watchEvidenceNextAction || "-"}`
   ];
+  appendLaunchDutyCompletionHandoff(lines, packet.launchDutyCompletionHandoff || launchDutyCurrentAction.completionHandoff);
+  lines.push(`- Next action: ${packet.nextAction || "-"}`);
   appendGoLiveExecutionEntry(lines, goLiveExecutionEntry);
   if (Array.isArray(goLiveActionPlan.phaseSummary) && goLiveActionPlan.phaseSummary.length) {
     lines.push("- Final packet go-live operator phases:");

@@ -30864,7 +30864,18 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   const stabilizationCloseoutRecord = stabilizationReceiptWriteRecords.find((item) => (
     item.recordKey === "first_wave_closeout"
   )) || null;
-  const stabilizationQueueBaseStatus = !ready ? "blocked_until_first_wave_confirmation" : "blocked_until_receipt_visibility_snapshot";
+  const readyForStabilizationReceiptWrites = Boolean(
+    ready
+    && nextReceiptWriteRecorded
+    && stabilizationReceiptWriteRecords.some((record) => (
+      record.recordKey && !recordedRecordKeySet.has(record.recordKey)
+    ))
+  );
+  const stabilizationQueueBaseStatus = !ready
+    ? "blocked_until_first_wave_confirmation"
+    : readyForStabilizationReceiptWrites
+      ? "ready_for_stabilization_receipt_write"
+      : "blocked_until_receipt_visibility_snapshot";
   const stabilizationCloseoutSourceRecordKeys = Array.isArray(stabilizationCloseoutRecord?.sourceRecordKeys)
     ? stabilizationCloseoutRecord.sourceRecordKeys.filter(Boolean)
     : [];
@@ -30911,7 +30922,7 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     version: "developer-ops-launch-operations-operator-stabilization-receipt-completion-state/v1",
     status: stabilizationCompletionStatus,
     readyForHandoff: ready,
-    readyForReceiptWrites: false,
+    readyForReceiptWrites: readyForStabilizationReceiptWrites,
     recordedRecordKeys: stabilizationRecordedRecordKeys,
     pendingRecordKeys: stabilizationPendingRecordKeys,
     recordedRecordCount: stabilizationRecordedRecordKeys.length,
@@ -31005,7 +31016,7 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     version: "developer-ops-launch-operations-operator-stabilization-receipt-write-queue/v1",
     status: stabilizationCompletionStatus,
     readyForHandoff: ready,
-    readyForReceiptWrites: false,
+    readyForReceiptWrites: readyForStabilizationReceiptWrites,
     handoffComplete: stabilizationHandoffComplete,
     readyForSteadyStateHandoff: stabilizationHandoffComplete,
     dependsOnRecordKey: nextReceiptWriteRecord?.key || null,

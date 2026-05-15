@@ -22589,6 +22589,102 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Launch Operations Operator Entry:[\s\S]*launchDutyNextReceiptPacket=ready_for_receipt_write/
     );
 
+    const receiptVisibilitySnapshotReadbackReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        action: "record_index_readback",
+        intent: "receipt_visibility_snapshot_recorded",
+        planKind: "record_index",
+        planMode: "readback",
+        targetType: "launch-duty-record-index",
+        href: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        fileName: "launch-duty-record-index.json",
+        format: "launch-duty-record-index",
+        launchOpsOverviewContextKind: "launch_ops_overview_status",
+        launchOpsOverviewDownloadKey: "ops_launch_operations_overview_status",
+        launchOpsOverviewDownloadFileName: "developer-ops-launch-operations-overview-status.txt",
+        launchOpsOverviewDownloadFormat: "launch-operations-overview-status",
+        launchOpsOverviewDownloadHref: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        launchReadinessNextGateStatus: expectedSteadyStateGoLiveGate.status,
+        launchReadinessNextGateDecision: expectedSteadyStateGoLiveGate.decision,
+        launchReadinessNextGateCurrentGate: expectedSteadyStateGoLiveGate.currentGate,
+        launchReadinessNextGateCanEnterInitialLaunch: expectedSteadyStateGoLiveGate.canEnterInitialLaunch,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchDutyRecordIndexState: {
+          mode: "staging-launch-duty-record-index",
+          status: "in_progress",
+          recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+          recordedKeys: ["launch_day_watch_summary", "receipt_visibility_snapshot"],
+          pendingKeys: [
+            "first_wave_incident_log",
+            "rollback_signal_review",
+            "stabilization_owner_handoff",
+            "first_wave_closeout"
+          ],
+          nextRecordKey: "first_wave_incident_log",
+          records: {
+            launch_day_watch_summary: {
+              status: "recorded",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md",
+              recordedAt: "2026-05-14T09:10:00.000Z"
+            },
+            receipt_visibility_snapshot: {
+              status: "recorded",
+              actionKey: "record_receipt_visibility_snapshot",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/receipt-visibility-snapshot.txt",
+              receiptOperations: ["record_post_launch_ops_sweep"],
+              receiptIds: ["record-post-launch-ops-sweep-receipt"],
+              recordedAt: "2026-05-14T09:20:00.000Z"
+            }
+          }
+        },
+        note: "receipt visibility snapshot recorded; first-wave incident log is next"
+      },
+      ownerSession.token
+    );
+    assert.equal(receiptVisibilitySnapshotReadbackReceipt.launchDutyRecordIndexState.recordedCount, 2);
+    assert.equal(receiptVisibilitySnapshotReadbackReceipt.launchDutyRecordIndexState.pendingCount, 4);
+    assert.equal(receiptVisibilitySnapshotReadbackReceipt.launchDutyRecordIndexState.nextRecordKey, "first_wave_incident_log");
+
+    const receiptVisibilitySnapshotReadbackSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const receiptVisibilitySnapshotHandoffAction = receiptVisibilitySnapshotReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyHandoffAction;
+    const receiptVisibilitySnapshotStabilizationQueue = receiptVisibilitySnapshotHandoffAction?.stabilizationReceiptWriteQueue;
+    assert.ok(receiptVisibilitySnapshotHandoffAction);
+    assert.ok(receiptVisibilitySnapshotStabilizationQueue);
+    assert.equal(receiptVisibilitySnapshotHandoffAction.currentActionKey, "record_first_wave_incident_log");
+    assert.equal(receiptVisibilitySnapshotHandoffAction.nextReceiptWritePacket.status, "recorded");
+    assert.equal(receiptVisibilitySnapshotHandoffAction.nextReceiptWritePacket.readyForReceiptWrite, false);
+    assert.equal(receiptVisibilitySnapshotHandoffAction.nextReceiptWritePacket.recorded, true);
+    assert.equal(
+      receiptVisibilitySnapshotHandoffAction.nextReceiptWritePacket.recordedAt,
+      "2026-05-14T09:20:00.000Z"
+    );
+    assert.equal(receiptVisibilitySnapshotStabilizationQueue.status, "ready_for_stabilization_receipt_write");
+    assert.equal(receiptVisibilitySnapshotStabilizationQueue.readyForReceiptWrites, true);
+    assert.equal(receiptVisibilitySnapshotStabilizationQueue.currentRecordKey, "first_wave_incident_log");
+    assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.status, "ready_for_stabilization_receipt_write");
+    assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.readyForReceiptWrites, true);
+    assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.recordedRecordCount, 0);
+    assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.pendingRecordCount, 4);
+    assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.nextRecordKey, "first_wave_incident_log");
+    assert.match(
+      receiptVisibilitySnapshotReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyNextReceiptPacket=recorded/
+    );
+    assert.match(
+      receiptVisibilitySnapshotReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationQueue=ready_for_stabilization_receipt_write/
+    );
+
     const launchDutyRecordIndexReadbackReceipt = await postJson(
       baseUrl,
       "/api/developer/ops/steady-state-duty-plan/receipt",
@@ -22811,7 +22907,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     const launchDutyCloseoutReadyQueue = launchDutyCloseoutReadySnapshot.summary.initialLaunchOpsReadiness
       .launchOperationsOperatorEntry?.launchDutyHandoffAction?.stabilizationReceiptWriteQueue;
     assert.ok(launchDutyCloseoutReadyQueue);
+    assert.equal(launchDutyCloseoutReadyQueue.status, "ready_for_stabilization_receipt_write");
+    assert.equal(launchDutyCloseoutReadyQueue.readyForReceiptWrites, true);
     assert.equal(launchDutyCloseoutReadyQueue.currentRecordKey, "first_wave_closeout");
+    assert.equal(launchDutyCloseoutReadyQueue.completionState.status, "ready_for_stabilization_receipt_write");
+    assert.equal(launchDutyCloseoutReadyQueue.completionState.readyForReceiptWrites, true);
     assert.equal(launchDutyCloseoutReadyQueue.completionState.recordedRecordCount, 3);
     assert.equal(launchDutyCloseoutReadyQueue.completionState.pendingRecordCount, 1);
     assert.equal(launchDutyCloseoutReadyQueue.completionState.nextRecordKey, "first_wave_closeout");
@@ -22852,7 +22952,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutReadyOperatorEntryDownload.body,
-      /Stabilization Receipt Progress:[\s\S]*status=blocked_until_receipt_visibility_snapshot \| progress=3\/4 \| next=first_wave_closeout \| closeoutReady=yes \| blockedBy=-/
+      /Stabilization Receipt Progress:[\s\S]*status=ready_for_stabilization_receipt_write \| progress=3\/4 \| next=first_wave_closeout \| closeoutReady=yes \| blockedBy=-/
     );
     assert.match(
       launchDutyCloseoutReadyOperatorEntryDownload.body,

@@ -414,6 +414,10 @@ function buildReadinessStatusCommand(filledCloseoutInputFile, readinessActionQue
   ].join(" ");
 }
 
+function buildRehearsalReloadCommand(filledCloseoutInputFile) {
+  return `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(filledCloseoutInputFile)}`;
+}
+
 function buildCloseoutBackfillCommand({
   filledCloseoutInputFile,
   key,
@@ -874,6 +878,16 @@ function buildLaunchSwitchWatchHandoff() {
     stabilizationRecordQueue,
     nextAction: "After production sign-off, record launch_day_watch_summary first, then write stabilization records and close the first wave with required source records."
   };
+  const stableOperationsHandoff = {
+    status: "blocked_until_first_wave_closeout_recorded",
+    recordIndexFile: launchDutyRecordIndexPath,
+    firstWaveCloseoutArtifactPath: firstWaveCloseoutPath,
+    readinessStatusCommand: currentCommand,
+    rehearsalReloadCommand: buildRehearsalReloadCommand(filledCloseoutInputFile),
+    handoffArtifacts: [launchDutyRecordIndexPath, firstWaveCloseoutPath],
+    nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, then hand off the completed record index and first-wave closeout artifact to stable operations."
+  };
+  productionSignoffLaunchDayWatch.stableOperationsHandoff = stableOperationsHandoff;
   const launchDayWatchOperatorCommands = [
     {
       key: "record_launch_day_watch_summary",
@@ -901,7 +915,41 @@ function buildLaunchSwitchWatchHandoff() {
       sourceRecords: item.sourceRecords || [],
       artifactPath: item.artifactPath,
       nextAction: item.nextAction
-    }))
+    })),
+    {
+      key: "refresh_staging_readiness_after_first_wave_closeout",
+      label: "Refresh staging readiness after first-wave closeout",
+      status: "blocked_after_first_wave_closeout",
+      kind: "command",
+      command: stableOperationsHandoff.readinessStatusCommand,
+      targetKey: "stable_operations_handoff",
+      launchDutyRecordIndexPath,
+      artifactPath: readinessActionQueueFile,
+      nextAction: "Refresh readiness after first_wave_closeout so the completed launch-duty record index is recognized as stable_operations_handoff."
+    },
+    {
+      key: "reload_staging_rehearsal_for_stable_operations",
+      label: "Reload staging rehearsal for stable operations",
+      status: "blocked_after_stable_operations_readiness",
+      kind: "command",
+      command: stableOperationsHandoff.rehearsalReloadCommand,
+      targetKey: "stable_operations_handoff",
+      launchDutyRecordIndexPath,
+      artifactPath: firstWaveCloseoutPath,
+      nextAction: "Reload rehearsal so final packet, operator execution plan, and go-live entry show stable_operations_handoff."
+    },
+    {
+      key: "handoff_stable_operations",
+      label: "Hand off stable operations",
+      status: "blocked_after_rehearsal_reload",
+      kind: "handoff",
+      command: null,
+      targetKey: "stable_operations_handoff",
+      launchDutyRecordIndexPath,
+      artifactPath: firstWaveCloseoutPath,
+      handoffArtifacts: stableOperationsHandoff.handoffArtifacts,
+      nextAction: "Hand off the completed record index and first-wave closeout artifact to the stable-operations owner."
+    }
   ];
   const operatorNextCommands = [
     ...preSmokeOperatorCommands,
@@ -1090,6 +1138,12 @@ if (dryRun) {
       const sourceText = item.sourceRecordKeys?.length ? ` | sources=${item.sourceRecordKeys.join(", ")}` : "";
       console.log(`Stabilization record ${item.order}. ${item.key}: ${item.status} -> ${item.command}${sourceText}`);
     }
+    const stableOperationsHandoff = launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.stableOperationsHandoff;
+    console.log(
+      `Launch switch stable-operations handoff: ${stableOperationsHandoff.status}`
+      + ` | readiness=${stableOperationsHandoff.readinessStatusCommand}`
+      + ` | rehearsal=${stableOperationsHandoff.rehearsalReloadCommand}`
+    );
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
     console.log("Launch switch operator queue:");
     for (const item of launchSwitchWatchHandoff.operatorNextCommands) {

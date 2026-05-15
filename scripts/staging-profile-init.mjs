@@ -257,6 +257,15 @@ function buildFullTestSignoffBackfillCommand({ closeoutInputFile, readinessActio
   ].join(" ");
 }
 
+function buildRehearsalReloadCommand(closeoutInputFile) {
+  return `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(closeoutInputFile)}`;
+}
+
+function toPublicStableOperationsHandoff(handoff) {
+  const { rehearsalHandoffFile, ...publicHandoff } = handoff;
+  return publicHandoff;
+}
+
 function buildLaunchDutyRecordCommand({
   closeoutInputFile,
   readinessActionQueueFile,
@@ -414,6 +423,9 @@ function buildOperatorNextCommands({
   fullTestOutputFile,
   fullTestSignoffBackfillCommand,
   postFullTestReadinessStatusCommand,
+  postFirstWaveCloseoutReadinessStatusCommand,
+  postFirstWaveCloseoutRehearsalReloadCommand,
+  stableOperationsHandoff,
   launchDutyRecordIndexFile,
   launchDayWatchRecordCommand,
   launchDayWatchSummaryFile,
@@ -432,6 +444,36 @@ function buildOperatorNextCommands({
     recordIndexFile: launchDutyRecordIndexFile,
     nextAction: item.nextAction
   }));
+  const stableOperationsOperatorCommands = [
+    {
+      key: "post_first_wave_closeout_readiness_status",
+      status: "blocked_after_first_wave_closeout",
+      command: postFirstWaveCloseoutReadinessStatusCommand,
+      artifactPath: readinessActionQueueFile,
+      targetKey: "stable_operations_handoff",
+      recordIndexFile: launchDutyRecordIndexFile,
+      nextAction: "Refresh readiness after first_wave_closeout so the completed launch-duty record index is recognized as stable_operations_handoff."
+    },
+    {
+      key: "post_first_wave_closeout_rehearsal_reload",
+      status: "blocked_after_stable_operations_readiness",
+      command: postFirstWaveCloseoutRehearsalReloadCommand,
+      artifactPath: stableOperationsHandoff.rehearsalHandoffFile,
+      targetKey: "stable_operations_handoff",
+      recordIndexFile: launchDutyRecordIndexFile,
+      nextAction: "Reload rehearsal so the final packet, operator execution plan, and go-live entry surface the stable-operations handoff."
+    },
+    {
+      key: "handoff_stable_operations",
+      status: "blocked_after_rehearsal_reload",
+      command: null,
+      artifactPath: stableOperationsHandoff.firstWaveCloseoutArtifactPath,
+      targetKey: "stable_operations_handoff",
+      recordIndexFile: launchDutyRecordIndexFile,
+      handoffArtifacts: stableOperationsHandoff.handoffArtifacts,
+      nextAction: "Hand off the completed record index and first-wave closeout artifact to the stable-operations owner."
+    }
+  ];
   return [
     {
       key: "profile_rehearsal",
@@ -579,7 +621,8 @@ function buildOperatorNextCommands({
       recordIndexFile: launchDutyRecordIndexFile,
       nextAction: "Record launch-day watch summary after production sign-off readiness refresh clears."
     },
-    ...stabilizationOperatorCommands
+    ...stabilizationOperatorCommands,
+    ...stableOperationsOperatorCommands
   ];
 }
 
@@ -628,7 +671,8 @@ function buildLaunchLaneFiles({
     handoffFile: profile.handoffFile,
     launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
     launchDutyRecordIndexFile,
-    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, and first-wave closeout."
+    stableOperationsHandoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
+    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, and stable-operations handoff."
   };
 }
 
@@ -668,6 +712,9 @@ function writeResult(result, json) {
     const postFullTestReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_full_test_readiness_status");
     const launchDayWatchRecord = result.operatorNextCommands?.find((item) => item.key === "record_launch_day_watch_summary");
     const stabilizationRecords = (result.operatorNextCommands || []).filter((item) => item.key?.startsWith("record_stabilization_"));
+    const postFirstWaveCloseoutReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_first_wave_closeout_readiness_status");
+    const postFirstWaveCloseoutRehearsalReload = result.operatorNextCommands?.find((item) => item.key === "post_first_wave_closeout_rehearsal_reload");
+    const stableOperationsHandoff = result.operatorNextCommands?.find((item) => item.key === "handoff_stable_operations");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
     } else {
@@ -731,6 +778,15 @@ function writeResult(result, json) {
       stabilizationRecords.forEach((item, index) => {
         console.log(`Stabilization record ${index + 1}. ${item.targetKey}: ${item.status} -> ${item.command}`);
       });
+    }
+    if (postFirstWaveCloseoutReadinessStatus) {
+      console.log(`Post-first-wave closeout readiness status: ${postFirstWaveCloseoutReadinessStatus.command}`);
+    }
+    if (postFirstWaveCloseoutRehearsalReload) {
+      console.log(`Post-first-wave closeout rehearsal reload: ${postFirstWaveCloseoutRehearsalReload.command}`);
+    }
+    if (stableOperationsHandoff) {
+      console.log(`Stable-operations handoff: ${(stableOperationsHandoff.handoffArtifacts || []).join("; ") || "-"}`);
     }
     console.log(`Next action: ${result.nextAction}`);
     return;
@@ -815,6 +871,8 @@ function main() {
       fullTestOutputFile
     });
     const postFullTestReadinessStatusCommand = postCloseoutInitStatusCommand;
+    const postFirstWaveCloseoutReadinessStatusCommand = postCloseoutInitStatusCommand;
+    const postFirstWaveCloseoutRehearsalReloadCommand = buildRehearsalReloadCommand(closeoutInputFile);
     const launchDayWatchRecordCommand = buildLaunchDutyRecordCommand({
       closeoutInputFile,
       readinessActionQueueFile,
@@ -835,6 +893,16 @@ function main() {
         firstWaveCloseoutFile
       }
     });
+    const stableOperationsHandoff = {
+      status: "blocked_until_first_wave_closeout_recorded",
+      recordIndexFile: launchDutyRecordIndexFile,
+      firstWaveCloseoutArtifactPath: firstWaveCloseoutFile,
+      readinessStatusCommand: postFirstWaveCloseoutReadinessStatusCommand,
+      rehearsalReloadCommand: postFirstWaveCloseoutRehearsalReloadCommand,
+      rehearsalHandoffFile: profile.handoffFile,
+      handoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
+      nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, then hand off the completed record index and first-wave closeout artifact to stable operations."
+    };
     const launchLaneFiles = buildLaunchLaneFiles({
       archiveRoot,
       outputFile,
@@ -886,6 +954,9 @@ function main() {
       fullTestOutputFile,
       fullTestSignoffBackfillCommand,
       postFullTestReadinessStatusCommand,
+      postFirstWaveCloseoutReadinessStatusCommand,
+      postFirstWaveCloseoutRehearsalReloadCommand,
+      stableOperationsHandoff: toPublicStableOperationsHandoff(stableOperationsHandoff),
       launchDayWatchRecordCommand,
       stabilizationRecordCommands,
       operatorNextCommands: buildOperatorNextCommands({
@@ -909,6 +980,9 @@ function main() {
         fullTestOutputFile,
         fullTestSignoffBackfillCommand,
         postFullTestReadinessStatusCommand,
+        postFirstWaveCloseoutReadinessStatusCommand,
+        postFirstWaveCloseoutRehearsalReloadCommand,
+        stableOperationsHandoff,
         launchDutyRecordIndexFile,
         launchDayWatchRecordCommand,
         launchDayWatchSummaryFile,
@@ -916,7 +990,7 @@ function main() {
         routeMapGateDryRunFile,
         routeMapGateOutputFile
       }),
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, signoff backfill, production-signoff readiness refresh, launch-day watch summary, stabilization records, and first-wave closeout."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, signoff backfill, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff."
     }, options.json);
   } catch (error) {
     writeResult({

@@ -16193,8 +16193,22 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       supportConfirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveSupportInspectionConfirmation.auditLogId,
       supportInspectionConfirmation.auditLogId
     );
+    const supportConfirmedOperatingChain = supportConfirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain;
+    assert.equal(supportConfirmedOperatingChain?.supportInspectionReady, true);
+    assert.equal(
+      supportConfirmedOperatingChain?.supportInspectionConfirmation?.auditLogId,
+      supportInspectionConfirmation.auditLogId
+    );
+    const supportConfirmedValidationPhase = supportConfirmedOperatingChain?.phases
+      ?.find((item) => item?.key === "first_user_validation");
+    assert.equal(supportConfirmedValidationPhase?.supportInspectionReady, true);
+    assert.equal(
+      supportConfirmedValidationPhase?.supportInspectionConfirmation?.auditLogId,
+      supportInspectionConfirmation.auditLogId
+    );
     assert.match(supportConfirmedOpsSnapshot.summaryText, /First-Wave Support Inspection Confirmation:/);
     assert.match(supportConfirmedOpsSnapshot.summaryText, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(supportConfirmedOpsSnapshot.summaryText, /supportInspection=confirmed \| ready=true \| support=ready_for_support_inspection \| targets=6\/6/);
     assert.match(supportConfirmedOpsSnapshot.summaryText, /runtimeEvidence=developer-ops-first-wave-runtime-evidence\.txt \| format=first-wave-runtime-evidence/);
     assert.ok(supportConfirmedOpsSnapshot.overview.highlights.some((item) => item.includes("Latest first-wave support inspection confirmation")));
 
@@ -16282,7 +16296,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
         nextActionOperation: handoffConfirmation.firstLaunchOperatingChain?.nextAction?.operation,
         nextActionOwner: handoffConfirmation.firstLaunchOperatingChain?.nextAction?.ownerRole,
         primaryDownloadKey: handoffConfirmation.firstLaunchOperatingChain?.primaryDownload?.key,
-        handoffConfirmed: handoffConfirmation.firstLaunchOperatingChain?.handoffConfirmed
+        handoffConfirmed: handoffConfirmation.firstLaunchOperatingChain?.handoffConfirmed,
+        supportInspectionReady: handoffConfirmation.firstLaunchOperatingChain?.supportInspectionReady,
+        supportInspectionAuditLogId: handoffConfirmation.firstLaunchOperatingChain?.supportInspectionConfirmation?.auditLogId
       },
       {
         version: "developer-ops-first-launch-operating-chain/v1",
@@ -16295,8 +16311,17 @@ test("developer first-wave recommendations summarize launch inventory, card issu
         nextActionOperation: "record_launch_rehearsal_run",
         nextActionOwner: "support",
         primaryDownloadKey: "launch_mainline_first_launch_handoff",
-        handoffConfirmed: true
+        handoffConfirmed: true,
+        supportInspectionReady: true,
+        supportInspectionAuditLogId: supportInspectionConfirmation.auditLogId
       }
+    );
+    const handoffValidationPhase = handoffConfirmation.firstLaunchOperatingChain?.phases
+      ?.find((item) => item?.key === "first_user_validation");
+    assert.equal(handoffValidationPhase?.supportInspectionReady, true);
+    assert.equal(
+      handoffValidationPhase?.supportInspectionConfirmation?.auditLogId,
+      supportInspectionConfirmation.auditLogId
     );
 
     const handoffConfirmationAudit = await getJson(
@@ -16354,7 +16379,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
         nextActionStage: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.stage,
         nextActionOperation: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.nextAction?.operation,
         primaryDownloadKey: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.primaryDownload?.key,
-        handoffConfirmed: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.handoffConfirmed
+        handoffConfirmed: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.handoffConfirmed,
+        supportInspectionReady: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.supportInspectionReady,
+        supportInspectionAuditLogId: confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstLaunchOperatingChain?.supportInspectionConfirmation?.auditLogId
       },
       {
         status: "pending_first_user_validation",
@@ -16365,7 +16392,9 @@ test("developer first-wave recommendations summarize launch inventory, card issu
         nextActionStage: "first_sale_watch",
         nextActionOperation: "record_launch_rehearsal_run",
         primaryDownloadKey: "launch_mainline_first_launch_handoff",
-        handoffConfirmed: true
+        handoffConfirmed: true,
+        supportInspectionReady: true,
+        supportInspectionAuditLogId: supportInspectionConfirmation.auditLogId
       }
     );
     assert.equal(

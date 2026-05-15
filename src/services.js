@@ -31127,7 +31127,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     latestReceipt,
     followUpQueue,
     firstWaveReadinessBridge,
-    firstWaveConfirmationChain
+    firstWaveConfirmationChain,
+    firstWaveSupportInspectionConfirmation
   });
   const recommendedDownloads = [];
   const seenRecommendedDownloads = new Set();
@@ -32300,6 +32301,46 @@ function normalizeFirstLaunchOperatingChainDownload(download = null) {
   return normalizeDeveloperOpsFirstWavePostLaunchLifecycleDownload(download);
 }
 
+function buildFirstLaunchSupportInspectionConfirmationPayload(confirmation = null) {
+  const payload = buildFirstWaveSupportInspectionConfirmationPayload(confirmation);
+  if (!payload) {
+    return null;
+  }
+  const status = normalizeDeveloperOpsConfirmationToken(payload.status, "unknown");
+  const supportInspectionStatus = normalizeDeveloperOpsConfirmationToken(
+    payload.supportInspectionStatus,
+    "unknown"
+  );
+  return {
+    ...payload,
+    ready: status === "confirmed"
+      && supportInspectionStatus === "ready_for_support_inspection"
+      && payload.allTargetsConfirmed === true
+  };
+}
+
+function attachFirstWaveSupportInspectionToFirstUserValidationHandoff(
+  handoff = null,
+  confirmation = null
+) {
+  if (!handoff || typeof handoff !== "object") {
+    return handoff || null;
+  }
+  const supportInspectionConfirmation = buildFirstLaunchSupportInspectionConfirmationPayload(
+    confirmation || handoff.supportInspectionConfirmation || null
+  );
+  if (!supportInspectionConfirmation) {
+    return handoff;
+  }
+  return {
+    ...handoff,
+    supportInspectionReady: supportInspectionConfirmation.ready === true,
+    supportInspectionStatus: supportInspectionConfirmation.supportInspectionStatus || null,
+    supportInspectionAuditLogId: supportInspectionConfirmation.auditLogId || null,
+    supportInspectionConfirmation
+  };
+}
+
 function buildFirstLaunchOperatingChainAction(phase = null, {
   productCode = "",
   channel = "stable",
@@ -32365,12 +32406,19 @@ function buildFirstLaunchOperatingChainAction(phase = null, {
       ? firstUserValidationHandoff.nextAction
       : {};
     const download = normalizeFirstLaunchOperatingChainDownload(firstUserValidationHandoff?.primaryDownload);
+    const supportInspectionConfirmation = firstUserValidationHandoff?.supportInspectionConfirmation
+      || phase.supportInspectionConfirmation
+      || null;
     return {
       key: nextAction.key || "first_user_validation",
       stage: nextAction.stage || firstUserValidationHandoff?.stage || "first_user_validation",
       operation: nextAction.operation || "first_user_validation",
       label: firstUserValidationHandoff?.title || "Run First-User Validation",
       ownerRole: nextAction.ownerRole || null,
+      supportInspectionReady: firstUserValidationHandoff?.supportInspectionReady === true
+        || phase.supportInspectionReady === true,
+      supportInspectionAuditLogId: supportInspectionConfirmation?.auditLogId || null,
+      supportInspectionConfirmation,
       recommendedDownload: download
     };
   }
@@ -32555,7 +32603,8 @@ function buildDeveloperOpsFirstLaunchOperatingChainPayload({
   firstUserValidationHandoff = null,
   postLaunchLifecycleHandoff = null,
   launchReadinessBridge = null,
-  firstWaveConfirmationChain = null
+  firstWaveConfirmationChain = null,
+  firstWaveSupportInspectionConfirmation = null
 } = {}) {
   const inventoryStatus = normalizeDeveloperOpsConfirmationToken(inventory.status, "unknown");
   const inventoryReady = inventoryStatus === "ready" || inventoryStatus === "not_applicable";
@@ -32583,6 +32632,13 @@ function buildDeveloperOpsFirstLaunchOperatingChainPayload({
     : validationReady ? "review" : "blocked_by_validation";
   const lifecycleReady = lifecycleStatus === "ready"
     || postLaunchLifecycleHandoff?.closeoutReadiness?.canClose === true;
+  const supportInspectionConfirmation = buildFirstLaunchSupportInspectionConfirmationPayload(
+    firstWaveSupportInspectionConfirmation
+      || firstUserValidationHandoff?.supportInspectionConfirmation
+      || launchReadinessBridge?.supportInspectionConfirmation
+      || null
+  );
+  const supportInspectionReady = supportInspectionConfirmation?.ready === true;
 
   const phases = [
     {
@@ -32626,7 +32682,15 @@ function buildDeveloperOpsFirstLaunchOperatingChainPayload({
       operation: firstUserValidationHandoff?.nextAction?.operation || null,
       summary: firstUserValidationHandoff?.summary || null,
       remainingCount: Number(firstUserValidationHandoff?.remainingCount ?? 0),
-      download: normalizeFirstLaunchOperatingChainDownload(firstUserValidationHandoff?.primaryDownload)
+      download: normalizeFirstLaunchOperatingChainDownload(firstUserValidationHandoff?.primaryDownload),
+      ...(supportInspectionConfirmation
+        ? {
+            supportInspectionReady,
+            supportInspectionStatus: supportInspectionConfirmation.supportInspectionStatus || null,
+            supportInspectionAuditLogId: supportInspectionConfirmation.auditLogId || null,
+            supportInspectionConfirmation
+          }
+        : {})
     },
     {
       key: "post_launch_lifecycle",
@@ -32688,6 +32752,8 @@ function buildDeveloperOpsFirstLaunchOperatingChainPayload({
           allSegmentsConfirmed: firstWaveConfirmationChain.allSegmentsConfirmed === true
         }
       : null,
+    supportInspectionReady,
+    supportInspectionConfirmation,
     phases,
     summary: currentPhase
       ? `${currentPhase.label} is the current first-launch operating phase for ${productCode || "this project"}.`
@@ -32731,6 +32797,15 @@ function appendDeveloperOpsFirstLaunchOperatingChainLines(lines = [], chain = nu
       + ` | audit=${chain.handoffConfirmation.auditLogId || "-"}`
     );
   }
+  if (chain.supportInspectionConfirmation) {
+    lines.push(
+      `- supportInspection=${chain.supportInspectionConfirmation.status || "-"}`
+      + ` | ready=${chain.supportInspectionReady === true}`
+      + ` | support=${chain.supportInspectionConfirmation.supportInspectionStatus || "-"}`
+      + ` | targets=${chain.supportInspectionConfirmation.inspectedTargetCount ?? 0}/${chain.supportInspectionConfirmation.targetCount ?? 0}`
+      + ` | audit=${chain.supportInspectionConfirmation.auditLogId || "-"}`
+    );
+  }
   for (const phase of phases) {
     lines.push(
       `  - ${phase.key || "-"}`
@@ -32738,6 +32813,10 @@ function appendDeveloperOpsFirstLaunchOperatingChainLines(lines = [], chain = nu
       + ` | ready=${phase.ready === true ? "yes" : "no"}`
       + ` | operation=${phase.operation || "-"}`
       + ` | download=${phase.download?.key || "-"}`
+      + (phase.supportInspectionConfirmation
+        ? ` | supportInspection=${phase.supportInspectionConfirmation.status || "-"}`
+          + ` | supportReady=${phase.supportInspectionReady === true}`
+        : "")
     );
   }
 }
@@ -32838,7 +32917,8 @@ function buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
   latestReceipt = null,
   followUpQueue = [],
   firstWaveReadinessBridge = null,
-  firstWaveConfirmationChain = null
+  firstWaveConfirmationChain = null,
+  firstWaveSupportInspectionConfirmation = null
 } = {}) {
   if (!firstWaveReadinessBridge && !latestReceipt && !firstWaveConfirmationChain) {
     return null;
@@ -32901,7 +32981,11 @@ function buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
       : null);
   const validationPhase = bridgePhase("first_user_validation");
   const firstUserValidationHandoffFromFollowUps = buildFirstUserValidationHandoffFromFollowUps(followUpQueue, latestReceipt);
-  const firstUserValidationHandoff = firstUserValidationHandoffFromFollowUps
+  const supportInspectionConfirmation = firstWaveSupportInspectionConfirmation
+    || firstWaveReadinessBridge?.supportInspectionConfirmation
+    || bridgeOperatingChain?.supportInspectionConfirmation
+    || null;
+  const rawFirstUserValidationHandoff = firstUserValidationHandoffFromFollowUps
     || (validationPhase?.ready === true
       ? {
           status: validationPhase.status || "evidence_recorded",
@@ -32924,6 +33008,10 @@ function buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
           primaryDownload: normalizeFirstLaunchOperatingChainDownload(validationPhase?.download)
         }
       : null);
+  const firstUserValidationHandoff = attachFirstWaveSupportInspectionToFirstUserValidationHandoff(
+    rawFirstUserValidationHandoff,
+    supportInspectionConfirmation
+  );
   const latestPostLaunchLifecycleHandoff = buildDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
     latestLaunchReceipt: latestReceipt
   });
@@ -32941,7 +33029,8 @@ function buildDeveloperOpsFirstLaunchOperatingChainFromReadiness({
     firstUserValidationHandoff,
     postLaunchLifecycleHandoff,
     launchReadinessBridge: firstWaveReadinessBridge,
-    firstWaveConfirmationChain
+    firstWaveConfirmationChain,
+    firstWaveSupportInspectionConfirmation: supportInspectionConfirmation
   });
 }
 
@@ -33014,6 +33103,10 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
   const latestLaunchReceipt = Array.isArray(opsSnapshot?.overview?.latestLaunchReceipts)
     ? opsSnapshot.overview.latestLaunchReceipts[0] || null
     : null;
+  const firstWaveSupportInspectionConfirmation = readiness.firstWaveSupportInspectionConfirmation
+    || (Array.isArray(opsSnapshot?.overview?.latestFirstWaveSupportInspectionConfirmations)
+      ? opsSnapshot.overview.latestFirstWaveSupportInspectionConfirmations[0] || null
+      : null);
   const fallbackFirstRoundDownload = readiness.firstLaunchHandoffDownload
     || opsSnapshot?.mainlineHandoff?.downloads?.firstLaunchHandoff
     || null;
@@ -33155,7 +33248,7 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
           })
       }
     : null;
-  const firstUserValidationHandoff = firstUserValidationAction
+  const rawFirstUserValidationHandoff = firstUserValidationAction
     ? {
         status: firstUserValidationAction.firstUserValidationStatus || latestLaunchReceipt?.firstLaunchDutyFirstUserValidationStatus || "pending_validation",
         stage: firstUserValidationAction.stage,
@@ -33181,6 +33274,10 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
         primaryDownload: firstUserValidationDownload
       }
     : null;
+  const firstUserValidationHandoff = attachFirstWaveSupportInspectionToFirstUserValidationHandoff(
+    rawFirstUserValidationHandoff,
+    firstWaveSupportInspectionConfirmation
+  );
   const postLaunchLifecycleHandoff = buildDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload({
     opsSnapshot,
     readiness,
@@ -33284,7 +33381,8 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     firstUserValidationHandoff,
     postLaunchLifecycleHandoff,
     launchReadinessBridge: launchReadinessBridgeBase,
-    firstWaveConfirmationChain: readiness.firstWaveConfirmationChain || null
+    firstWaveConfirmationChain: readiness.firstWaveConfirmationChain || null,
+    firstWaveSupportInspectionConfirmation
   });
   const supportInspectionPlan = buildDeveloperOpsFirstWaveSupportInspectionPlan({
     productCode,
@@ -33298,7 +33396,8 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
   const launchReadinessBridge = {
     ...launchReadinessBridgeBase,
     operatingChain: firstLaunchOperatingChain,
-    supportInspectionPlan
+    supportInspectionPlan,
+    supportInspectionConfirmation: firstLaunchOperatingChain?.supportInspectionConfirmation || null
   };
 
   return {
@@ -33529,6 +33628,15 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
         + ` | ready=${firstUserValidationHandoff.runtimeEvidence.ready === true}`
         + ` | activeSessions=${firstUserValidationHandoff.runtimeEvidence.activeSessionCount ?? 0}`
         + ` | heartbeatSeen=${firstUserValidationHandoff.runtimeEvidence.heartbeatSeenCount ?? 0}`
+      );
+    }
+    if (firstUserValidationHandoff.supportInspectionConfirmation) {
+      lines.push(
+        `- supportInspection=${firstUserValidationHandoff.supportInspectionConfirmation.status || "-"}`
+        + ` | ready=${firstUserValidationHandoff.supportInspectionReady === true}`
+        + ` | support=${firstUserValidationHandoff.supportInspectionConfirmation.supportInspectionStatus || "-"}`
+        + ` | targets=${firstUserValidationHandoff.supportInspectionConfirmation.inspectedTargetCount ?? 0}/${firstUserValidationHandoff.supportInspectionConfirmation.targetCount ?? 0}`
+        + ` | audit=${firstUserValidationHandoff.supportInspectionConfirmation.auditLogId || "-"}`
       );
     }
     if (firstUserValidationHandoff.summary) {

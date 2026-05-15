@@ -16114,6 +16114,100 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineSummaryAfterRecommendation.body, /Open First-Wave Support Inspection \| workspace=Open First-Wave Accounts@accounts\?productCode=FIRSTWAVE,channel=stable,routeAction=review-accounts/);
     assert.match(mainlineSummaryAfterRecommendation.body, /Confirm First-Wave Handoff \| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
 
+    const supportInspectionConfirmation = await postJson(
+      baseUrl,
+      "/api/developer/ops/first-wave/support-inspection/confirm",
+      {
+        productCode: "FIRSTWAVE",
+        channel: "stable",
+        decision: "confirmed",
+        note: "support reviewed first-wave accounts and runtime evidence",
+        supportInspectionStatus: afterSetup.supportInspectionPlan.status,
+        inspectedTargetKeys: afterSetup.supportInspectionPlan.inspectionTargets.map((item) => item.key),
+        targetCount: afterSetup.supportInspectionPlan.targetCount,
+        readyTargetCount: afterSetup.supportInspectionPlan.readyTargetCount,
+        runtimeEvidenceFormat: "first-wave-runtime-evidence",
+        evidenceFileName: "developer-ops-first-wave-runtime-evidence.txt"
+      },
+      operatorSession.token
+    );
+    assert.equal(supportInspectionConfirmation.version, "developer-ops-first-wave-support-inspection-confirmation/v1");
+    assert.equal(supportInspectionConfirmation.status, "confirmed");
+    assert.equal(supportInspectionConfirmation.productCode, "FIRSTWAVE");
+    assert.equal(supportInspectionConfirmation.channel, "stable");
+    assert.equal(supportInspectionConfirmation.confirmedBy.username, "first.wave.operator");
+    assert.equal(supportInspectionConfirmation.supportInspectionStatus, "ready_for_support_inspection");
+    assert.equal(supportInspectionConfirmation.inspectedTargetCount, 6);
+    assert.equal(supportInspectionConfirmation.targetCount, 6);
+    assert.equal(supportInspectionConfirmation.allTargetsConfirmed, true);
+    assert.equal(supportInspectionConfirmation.runtimeEvidenceDownload.format, "first-wave-runtime-evidence");
+    assert.match(supportInspectionConfirmation.runtimeEvidenceDownload.href, /format=first-wave-runtime-evidence/);
+    assert.ok(supportInspectionConfirmation.auditLogId);
+
+    const supportInspectionAudit = await getJson(
+      baseUrl,
+      "/api/developer/audit-logs?productCode=FIRSTWAVE&eventType=developer.ops.first-wave.support-inspection.confirm&limit=5",
+      operatorSession.token
+    );
+    assert.ok(supportInspectionAudit.items.some((item) =>
+      item.id === supportInspectionConfirmation.auditLogId
+      && item.entity_type === "developer_ops_first_wave_support_inspection"
+      && item.metadata?.decision === "confirmed"
+      && item.metadata?.supportInspectionStatus === "ready_for_support_inspection"
+      && item.metadata?.inspectedTargetCount === 6
+      && item.metadata?.allTargetsConfirmed === true
+      && item.metadata?.runtimeEvidenceFormat === "first-wave-runtime-evidence"
+    ));
+
+    const supportConfirmedOpsSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTWAVE&channel=stable&limit=80",
+      operatorSession.token
+    );
+    const latestSupportInspectionConfirmation = supportConfirmedOpsSnapshot.overview.latestFirstWaveSupportInspectionConfirmations[0];
+    assert.ok(latestSupportInspectionConfirmation);
+    assert.equal(latestSupportInspectionConfirmation.auditLogId, supportInspectionConfirmation.auditLogId);
+    assert.equal(latestSupportInspectionConfirmation.status, "confirmed");
+    assert.equal(latestSupportInspectionConfirmation.supportInspectionStatus, "ready_for_support_inspection");
+    assert.equal(latestSupportInspectionConfirmation.inspectedTargetCount, 6);
+    assert.equal(latestSupportInspectionConfirmation.allTargetsConfirmed, true);
+    assert.equal(
+      supportConfirmedOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveSupportInspectionConfirmation.auditLogId,
+      supportInspectionConfirmation.auditLogId
+    );
+    assert.match(supportConfirmedOpsSnapshot.summaryText, /First-Wave Support Inspection Confirmation:/);
+    assert.match(supportConfirmedOpsSnapshot.summaryText, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(supportConfirmedOpsSnapshot.summaryText, /runtimeEvidence=developer-ops-first-wave-runtime-evidence\.txt \| format=first-wave-runtime-evidence/);
+    assert.ok(supportConfirmedOpsSnapshot.overview.highlights.some((item) => item.includes("Latest first-wave support inspection confirmation")));
+
+    const mainlineAfterSupportInspection = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=FIRSTWAVE&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      mainlineAfterSupportInspection.mainlineSummary.firstWaveSupportInspectionConfirmation?.auditLogId,
+      supportInspectionConfirmation.auditLogId
+    );
+    const mainlineSupportInspectionCard = mainlineAfterSupportInspection.mainlineSummary.overviewCards
+      .find((item) => item?.key === "first_wave_support_inspection_confirmation");
+    assert.ok(mainlineSupportInspectionCard);
+    assert.equal(mainlineSupportInspectionCard.title, "First-Wave Support Inspection Confirmation");
+    assert.ok(mainlineSupportInspectionCard.tags.some((item) => item.label === "status" && item.value === "confirmed"));
+    assert.ok(mainlineSupportInspectionCard.tags.some((item) => item.label === "targets" && item.value === "6/6"));
+    assert.ok(mainlineSupportInspectionCard.controls.some((item) =>
+      item.kind === "workspace"
+      && item.label === "Open Confirmed First-Wave Support Inspection"
+      && item.workspaceAction?.key === "ops"
+    ));
+    assert.ok(mainlineSupportInspectionCard.controls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download Confirmed Runtime Evidence"
+      && item.recommendedDownload?.format === "first-wave-runtime-evidence"
+    ));
+    assert.match(mainlineAfterSupportInspection.summaryText, /Launch Mainline First-Wave Support Inspection Confirmation:/);
+    assert.match(mainlineAfterSupportInspection.summaryText, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+
     const handoffConfirmation = await postJson(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations/confirm",

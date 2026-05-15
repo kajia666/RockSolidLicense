@@ -1945,6 +1945,15 @@ export function createApp(overrides = {}) {
         return;
       }
 
+      if (req.method === "POST" && url.pathname === "/api/developer/ops/first-wave/support-inspection/confirm") {
+        const { body } = await readJsonBody(req);
+        sendJson(res, 200, {
+          ok: true,
+          data: await services.developerConfirmFirstWaveSupportInspection(getBearerToken(req), body)
+        });
+        return;
+      }
+
       if (req.method === "POST" && url.pathname === "/api/developer/ops/steady-state-duty-plan/receipt") {
         const { body } = await readJsonBody(req);
         sendJson(res, 200, {

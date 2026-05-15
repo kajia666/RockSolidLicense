@@ -14745,6 +14745,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ? opsOverview.latestFirstWaveHandoffConfirmations[0]
       : null)
     || null;
+  const firstWaveSupportInspectionConfirmation = initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
+    || (Array.isArray(opsOverview.latestFirstWaveSupportInspectionConfirmations)
+      ? opsOverview.latestFirstWaveSupportInspectionConfirmations[0]
+      : null)
+    || null;
   const firstWaveConfirmationChain = initialLaunchOpsReadiness?.firstWaveConfirmationChain
     || initialLaunchOpsReadiness?.traceability?.firstWaveConfirmationChain
     || firstWaveHandoffConfirmation?.firstWaveConfirmationChain
@@ -16519,6 +16524,51 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
+  const firstWaveSupportInspectionConfirmationCard = firstWaveSupportInspectionConfirmation
+    ? {
+        key: "first_wave_support_inspection_confirmation",
+        title: "First-Wave Support Inspection Confirmation",
+        summary: `First-wave support inspection is ${firstWaveSupportInspectionConfirmation.status || "confirmed"} for ${firstWaveSupportInspectionConfirmation.productCode || params.productCode || "this lane"}.`,
+        tags: [
+          {
+            label: "status",
+            value: firstWaveSupportInspectionConfirmation.status || "confirmed",
+            strong: true
+          },
+          {
+            label: "support",
+            value: firstWaveSupportInspectionConfirmation.supportInspectionStatus || "unknown",
+            strong: false
+          },
+          {
+            label: "targets",
+            value: `${firstWaveSupportInspectionConfirmation.inspectedTargetCount ?? 0}/${firstWaveSupportInspectionConfirmation.targetCount ?? 0}`,
+            strong: false
+          }
+        ],
+        controls: [
+          {
+            kind: "workspace",
+            label: "Open Confirmed First-Wave Support Inspection",
+            workspaceAction: firstWaveSupportInspectionConfirmation.workspaceAction
+              || createLaunchWorkflowWorkspaceShortcut(
+                "ops",
+                "accounts",
+                "Open Confirmed First-Wave Support Inspection",
+                {
+                  ...params,
+                  routeAction: "review-accounts"
+                }
+              )
+          },
+          firstWaveSupportInspectionConfirmation.runtimeEvidenceDownload ? {
+            kind: "download",
+            label: "Download Confirmed Runtime Evidence",
+            recommendedDownload: firstWaveSupportInspectionConfirmation.runtimeEvidenceDownload
+          } : null
+        ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+      }
+    : null;
   const firstWaveRuntimeEvidenceCard = firstWaveRuntimeEvidence
     ? {
         key: "first_wave_runtime_evidence",
@@ -16813,6 +16863,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     },
     firstWaveReadinessBridgeCard,
     firstWaveHandoffConfirmationCard,
+    firstWaveSupportInspectionConfirmationCard,
     firstWaveRuntimeEvidenceCard,
     launchReadinessNextGateCard,
     steadyStateHandoffLandingCard,
@@ -17735,6 +17786,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsReadiness,
     firstWaveReadinessBridge,
     firstWaveHandoffConfirmation,
+    firstWaveSupportInspectionConfirmation,
     firstWaveConfirmationChain,
     firstWaveRuntimeEvidence,
     initialLaunchOpsOverviewStatus,
@@ -18553,6 +18605,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendFirstWaveHandoffConfirmationTextLines(lines, mainlineSummary.firstWaveHandoffConfirmation, {
       title: "Launch Mainline First-Wave Handoff Confirmation:"
+    });
+  }
+  if (mainlineSummary.firstWaveSupportInspectionConfirmation) {
+    lines.push("");
+    appendFirstWaveSupportInspectionConfirmationLines(lines, mainlineSummary.firstWaveSupportInspectionConfirmation, {
+      title: "Launch Mainline First-Wave Support Inspection Confirmation:"
     });
   }
   if (mainlineSummary.firstWaveConfirmationChain) {
@@ -22450,6 +22508,178 @@ function buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs = [], limit 
     .filter(Boolean)
     .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt))
     .slice(0, Math.max(1, Number(limit || 5)));
+}
+
+const FIRST_WAVE_SUPPORT_INSPECTION_TARGET_KEYS = [
+  "accounts",
+  "entitlements",
+  "sessions",
+  "cards",
+  "devices",
+  "audit_logs"
+];
+
+function normalizeFirstWaveSupportInspectionTargetKeys(value = null) {
+  const allowed = new Set(FIRST_WAVE_SUPPORT_INSPECTION_TARGET_KEYS);
+  return normalizeLaunchDutyRecordIndexKeyList(value).filter((key) => allowed.has(key));
+}
+
+function buildFirstWaveSupportInspectionRuntimeEvidenceDownload({
+  productCode = "",
+  channel = "stable",
+  fileName = "developer-ops-first-wave-runtime-evidence.txt"
+} = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "first_wave_support_runtime_evidence",
+    fileName || "developer-ops-first-wave-runtime-evidence.txt",
+    "First-wave runtime evidence",
+    {
+      source: "developer-ops",
+      format: "first-wave-runtime-evidence",
+      params: {
+        productCode,
+        channel
+      }
+    }
+  );
+}
+
+function buildFirstWaveSupportInspectionConfirmationPayload(item = null) {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+  const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const productCode = item.productCode || metadata.productCode || "";
+  const channel = normalizeChannel(item.channel || metadata.channel, "stable");
+  const inspectedTargetKeys = normalizeFirstWaveSupportInspectionTargetKeys(
+    item.inspectedTargetKeys || metadata.inspectedTargetKeys
+  );
+  const targetCount = Number(item.targetCount ?? metadata.targetCount ?? FIRST_WAVE_SUPPORT_INSPECTION_TARGET_KEYS.length);
+  const readyTargetCount = Number(item.readyTargetCount ?? metadata.readyTargetCount ?? targetCount);
+  const inspectedTargetCount = Number(item.inspectedTargetCount ?? metadata.inspectedTargetCount ?? inspectedTargetKeys.length);
+  const supportInspectionStatus = normalizeDeveloperOpsConfirmationToken(
+    item.supportInspectionStatus || metadata.supportInspectionStatus,
+    "unknown"
+  );
+  const evidenceFileName = normalizeDeveloperOpsConfirmationFileName(
+    item.evidenceFileName || metadata.evidenceFileName,
+    "developer-ops-first-wave-runtime-evidence.txt"
+  );
+  const confirmedBy = item.confirmedBy && typeof item.confirmedBy === "object"
+    ? item.confirmedBy
+    : {
+        actorType: item.actorType || null,
+        actorScope: metadata.actorType || null,
+        actorId: item.actorId || null,
+        username: metadata.actorUsername || null,
+        role: metadata.actorRole || null
+      };
+  const runtimeEvidenceDownload = buildFirstWaveSupportInspectionRuntimeEvidenceDownload({
+    productCode,
+    channel,
+    fileName: evidenceFileName
+  });
+  return {
+    version: "developer-ops-first-wave-support-inspection-confirmation/v1",
+    auditLogId: item.auditLogId || item.id || null,
+    eventType: item.eventType || "developer.ops.first-wave.support-inspection.confirm",
+    entityType: item.entityType || "developer_ops_first_wave_support_inspection",
+    entityId: item.entityId || null,
+    productCode,
+    channel,
+    status: item.status || metadata.status || "confirmed",
+    decision: item.decision || metadata.decision || "confirmed",
+    supportInspectionStatus,
+    inspectedTargetKeys,
+    inspectedTargetCount,
+    targetCount,
+    readyTargetCount,
+    allTargetsConfirmed: item.allTargetsConfirmed === true
+      || metadata.allTargetsConfirmed === true
+      || (targetCount > 0 && inspectedTargetCount >= targetCount),
+    runtimeEvidenceDownload,
+    evidenceFileName,
+    confirmedAt: item.confirmedAt || metadata.confirmedAt || item.createdAt || null,
+    confirmedBy,
+    note: item.note || metadata.note || "",
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+      "ops",
+      "accounts",
+      "Open First-Wave Support Inspection",
+      {
+        productCode,
+        channel,
+        routeAction: "review-accounts"
+      }
+    ),
+    createdAt: item.createdAt || null
+  };
+}
+
+function buildSnapshotLatestFirstWaveSupportInspectionConfirmations(auditLogs = [], limit = 5) {
+  return auditLogs
+    .map((item) => {
+      const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
+      const eventType = item?.eventType || item?.event_type || "";
+      const entityType = item?.entityType || item?.entity_type || "";
+      if (
+        eventType !== "developer.ops.first-wave.support-inspection.confirm"
+        && entityType !== "developer_ops_first_wave_support_inspection"
+      ) {
+        return null;
+      }
+      return buildFirstWaveSupportInspectionConfirmationPayload({
+        id: item.id || null,
+        eventType,
+        actorType: item.actorType || item.actor_type || null,
+        actorId: item.actorId || item.actor_id || null,
+        entityType,
+        entityId: item.entityId || item.entity_id || null,
+        metadata,
+        productCode: metadata.productCode || null,
+        channel: metadata.channel || "stable",
+        status: metadata.status || "confirmed",
+        decision: metadata.decision || "confirmed",
+        supportInspectionStatus: metadata.supportInspectionStatus || null,
+        inspectedTargetKeys: metadata.inspectedTargetKeys || null,
+        inspectedTargetCount: metadata.inspectedTargetCount ?? null,
+        targetCount: metadata.targetCount ?? null,
+        readyTargetCount: metadata.readyTargetCount ?? null,
+        evidenceFileName: metadata.evidenceFileName || null,
+        confirmedAt: metadata.confirmedAt || item.createdAt || item.created_at || null,
+        note: metadata.note || "",
+        createdAt: item.createdAt || item.created_at || null
+      });
+    })
+    .filter(Boolean)
+    .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt))
+    .slice(0, Math.max(1, Number(limit || 5)));
+}
+
+function appendFirstWaveSupportInspectionConfirmationLines(lines = [], confirmation = null, {
+  title = "First-Wave Support Inspection Confirmation:"
+} = {}) {
+  if (!Array.isArray(lines) || !confirmation || typeof confirmation !== "object") {
+    return;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${confirmation.status || "-"}`
+    + ` | support=${confirmation.supportInspectionStatus || "-"}`
+    + ` | targets=${confirmation.inspectedTargetCount ?? 0}/${confirmation.targetCount ?? 0}`
+    + ` | audit=${confirmation.auditLogId || "-"}`
+  );
+  lines.push(
+    `- runtimeEvidence=${confirmation.runtimeEvidenceDownload?.fileName || confirmation.evidenceFileName || "-"}`
+    + ` | format=${confirmation.runtimeEvidenceDownload?.format || "-"}`
+    + ` | href=${confirmation.runtimeEvidenceDownload?.href || "-"}`
+  );
+  lines.push(
+    `- confirmedBy=${confirmation.confirmedBy?.username || "-"}`
+    + ` | at=${confirmation.confirmedAt || "-"}`
+    + ` | allTargets=${confirmation.allTargetsConfirmed === true}`
+  );
+  lines.push(`- targets=${Array.isArray(confirmation.inspectedTargetKeys) ? confirmation.inspectedTargetKeys.join(",") : "-"}`);
 }
 
 function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
@@ -30707,6 +30937,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const firstWaveHandoffConfirmations = Array.isArray(overview.latestFirstWaveHandoffConfirmations)
     ? overview.latestFirstWaveHandoffConfirmations
     : [];
+  const firstWaveSupportInspectionConfirmations = Array.isArray(overview.latestFirstWaveSupportInspectionConfirmations)
+    ? overview.latestFirstWaveSupportInspectionConfirmations
+    : [];
   const firstWaveReadinessBridges = Array.isArray(overview.latestFirstWaveReadinessBridges)
     ? overview.latestFirstWaveReadinessBridges
     : [];
@@ -30731,6 +30964,16 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     const channelMatches = !targetChannel || item.channel === targetChannel;
     return productMatches && channelMatches;
   }) || firstWaveHandoffConfirmations[0] || null;
+  const firstWaveSupportInspectionConfirmation = firstWaveSupportInspectionConfirmations.find((item) => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    const targetProductCode = latestReceipt?.productCode || scope.productCode || "";
+    const targetChannel = latestReceipt?.channel || scope.channel || item.channel || "stable";
+    const productMatches = !targetProductCode || item.productCode === targetProductCode;
+    const channelMatches = !targetChannel || normalizeChannel(item.channel, "stable") === normalizeChannel(targetChannel, "stable");
+    return productMatches && channelMatches;
+  }) || firstWaveSupportInspectionConfirmations[0] || null;
   const firstWaveReadinessBridge = firstWaveReadinessBridges.find((item) => {
     if (!item || typeof item !== "object") {
       return false;
@@ -31517,6 +31760,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     firstLaunchOperatingChain,
     firstWaveReadinessBridge: currentFirstWaveReadinessBridge,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
+    firstWaveSupportInspectionConfirmation: buildFirstWaveSupportInspectionConfirmationPayload(firstWaveSupportInspectionConfirmation),
     firstWaveConfirmationChain,
     traceability,
     nextSteps
@@ -31731,6 +31975,29 @@ function buildDeveloperOpsFirstWaveSupportInspectionPlan({
     firstRoundOpsStatus: normalizedFirstRoundOpsStatus,
     inspectionTargets,
     downloads,
+    confirmation: {
+      endpoint: "/api/developer/ops/first-wave/support-inspection/confirm",
+      method: "POST",
+      requiredFields: [
+        "productCode",
+        "channel",
+        "decision",
+        "supportInspectionStatus",
+        "inspectedTargetKeys"
+      ],
+      payloadTemplate: {
+        productCode,
+        channel,
+        decision: "confirmed",
+        supportInspectionStatus: readyForSupportInspection ? "ready_for_support_inspection" : "blocked_until_first_cards",
+        inspectedTargetKeys: inspectionTargets.map((item) => item.key),
+        targetCount: inspectionTargets.length,
+        readyTargetCount: readyForSupportInspection ? inspectionTargets.length : 0,
+        runtimeEvidenceFormat: "first-wave-runtime-evidence",
+        evidenceFileName: "developer-ops-first-wave-runtime-evidence.txt"
+      },
+      operatorHint: "Record this after support reviews the first-wave accounts, entitlements, sessions, cards, devices, audit logs, and runtime evidence."
+    },
     nextAction: readyForSupportInspection
       ? "Support reviews accounts, entitlements, sessions, cards, devices, and audit logs before widening the first wave."
       : "Finish first-batch inventory and first-card issuance before support inspection."
@@ -31750,7 +32017,8 @@ function appendDeveloperOpsFirstWaveSupportInspectionPlanLines(lines = [], suppo
   lines.push(
     "First-Wave Support Inspection Plan:",
     `- status=${supportInspectionPlan.status || "-"} | owner=${supportInspectionPlan.ownerRole || "-"} | current=${supportInspectionPlan.currentTargetKey || "-"} | targets=${supportInspectionPlan.targetCount ?? inspectionTargets.length}`,
-    `- downloads=${supportDownloads.map((item) => `${item.key || "-"}:${item.format || "-"}`).join(", ") || "-"}`
+    `- downloads=${supportDownloads.map((item) => `${item.key || "-"}:${item.format || "-"}`).join(", ") || "-"}`,
+    `- confirm=${supportInspectionPlan.confirmation?.method || "POST"} ${supportInspectionPlan.confirmation?.endpoint || "-"}`
   );
   inspectionTargets.forEach((item, index) => {
     lines.push(
@@ -35196,6 +35464,7 @@ function buildSnapshotOverview({
   const latestLaunchReceipts = buildSnapshotLatestLaunchReceipts(auditLogs, 5, scope.channel || null);
   const latestStabilizationHandoffConfirmations = buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs, 5);
   const latestFirstWaveHandoffConfirmations = buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs, 5);
+  const latestFirstWaveSupportInspectionConfirmations = buildSnapshotLatestFirstWaveSupportInspectionConfirmations(auditLogs, 5);
   const latestFirstWaveReadinessBridges = buildSnapshotLatestFirstWaveReadinessBridges(auditLogs, 5, scope.channel || null);
   const latestSteadyStateDutyPlanReceipts = buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs, 5);
   const firstWaveRuntimeEvidence = buildSnapshotFirstWaveRuntimeEvidence({ sessions, auditLogs, scope });
@@ -35262,6 +35531,10 @@ function buildSnapshotOverview({
     const latest = latestFirstWaveHandoffConfirmations[0];
     highlights.push(`Latest first-wave handoff confirmation: ${latest.status || "confirmed"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
   }
+  if (latestFirstWaveSupportInspectionConfirmations.length) {
+    const latest = latestFirstWaveSupportInspectionConfirmations[0];
+    highlights.push(`Latest first-wave support inspection confirmation: ${latest.status || "confirmed"} with ${latest.inspectedTargetCount ?? 0}/${latest.targetCount ?? 0} targets for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
+  }
   if (latestFirstWaveReadinessBridges.length) {
     const latest = latestFirstWaveReadinessBridges[0];
     highlights.push(`Latest first-wave readiness bridge: ${latest.status || "unknown"} at ${latest.currentGate || "-"} for ${latest.productCode || "-"} (${latest.channel || "stable"}).`);
@@ -35309,6 +35582,7 @@ function buildSnapshotOverview({
     latestLaunchReceipts,
     latestStabilizationHandoffConfirmations,
     latestFirstWaveHandoffConfirmations,
+    latestFirstWaveSupportInspectionConfirmations,
     latestFirstWaveReadinessBridges,
     latestSteadyStateDutyPlanReceipts,
     launchReceiptFollowUps,
@@ -36799,6 +37073,10 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       lines.push("");
       appendDeveloperOpsFirstWaveReadinessBridgeLines(lines, initialLaunchOpsReadiness.firstWaveReadinessBridge);
     }
+    if (initialLaunchOpsReadiness.firstWaveSupportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, initialLaunchOpsReadiness.firstWaveSupportInspectionConfirmation);
+    }
     if (initialLaunchOpsReadiness.launchDutyActionOrder) {
       lines.push("");
       appendDeveloperOpsLaunchDutyActionOrderLines(lines, initialLaunchOpsReadiness.launchDutyActionOrder);
@@ -37506,6 +37784,12 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         lines.push(`- ${item.status || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | audit=${item.auditLogId || "-"} | file=${item.handoffFileName || "-"}`);
       }
     }
+    if (Array.isArray(overview.latestFirstWaveSupportInspectionConfirmations) && overview.latestFirstWaveSupportInspectionConfirmations.length) {
+      lines.push("Latest First-Wave Support Inspection Confirmations:");
+      for (const item of overview.latestFirstWaveSupportInspectionConfirmations) {
+        lines.push(`- ${item.status || "-"} | support=${item.supportInspectionStatus || "-"} | project=${item.productCode || "-"} | channel=${item.channel || "-"} | targets=${item.inspectedTargetCount ?? 0}/${item.targetCount ?? 0} | audit=${item.auditLogId || "-"}`);
+      }
+    }
     if (Array.isArray(overview.launchReceiptFollowUps) && overview.launchReceiptFollowUps.length) {
       lines.push("Launch Receipt Follow-ups:");
       for (const item of overview.launchReceiptFollowUps) {
@@ -37813,6 +38097,10 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
   }
   if (readiness.firstWaveReadinessBridge) {
     appendDeveloperOpsFirstWaveReadinessBridgeLines(lines, readiness.firstWaveReadinessBridge);
+    lines.push("");
+  }
+  if (readiness.firstWaveSupportInspectionConfirmation) {
+    appendFirstWaveSupportInspectionConfirmationLines(lines, readiness.firstWaveSupportInspectionConfirmation);
     lines.push("");
   }
   if (readiness.launchDutyActionOrder) {
@@ -54925,6 +55213,133 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         auditLogId,
         message: `First-wave handoff confirmed for ${product.code} (${channel}).`
       };
+    },
+
+    async developerConfirmFirstWaveSupportInspection(token, body = {}) {
+      const session = requireDeveloperSession(db, token);
+      requireDeveloperPermission(
+        session,
+        "ops.write",
+        "DEVELOPER_OPS_FORBIDDEN",
+        "You can only confirm first-wave support inspections for your assigned projects."
+      );
+      requireField(body, "productCode");
+
+      const productCode = readProductCodeInput(body);
+      const product = await requireDeveloperOwnedProductByCode(
+        db,
+        store,
+        session,
+        productCode,
+        "ops.write"
+      );
+      const channel = normalizeChannel(body.channel, "stable");
+      const decision = normalizeDeveloperOpsConfirmationToken(body.decision, "confirmed");
+      const confirmedAt = nowIso();
+      const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
+      const supportInspectionStatus = normalizeDeveloperOpsConfirmationToken(
+        body.supportInspectionStatus,
+        "ready_for_support_inspection"
+      );
+      const inspectedTargetKeys = normalizeFirstWaveSupportInspectionTargetKeys(body.inspectedTargetKeys);
+      if (!inspectedTargetKeys.length) {
+        throw new AppError(
+          400,
+          "FIRST_WAVE_SUPPORT_INSPECTION_TARGETS_REQUIRED",
+          "At least one first-wave support inspection target must be confirmed."
+        );
+      }
+      const targetCount = normalizeNonNegativeInteger(
+        body.targetCount,
+        "targetCount",
+        FIRST_WAVE_SUPPORT_INSPECTION_TARGET_KEYS.length,
+        100
+      );
+      const readyTargetCount = normalizeNonNegativeInteger(
+        body.readyTargetCount,
+        "readyTargetCount",
+        inspectedTargetKeys.length,
+        100
+      );
+      const inspectedTargetCount = inspectedTargetKeys.length;
+      const runtimeEvidenceFormat = normalizeDeveloperOpsConfirmationToken(
+        body.runtimeEvidenceFormat,
+        "first-wave-runtime-evidence"
+      );
+      const evidenceFileName = normalizeDeveloperOpsConfirmationFileName(
+        body.evidenceFileName,
+        "developer-ops-first-wave-runtime-evidence.txt"
+      );
+      const runtimeEvidenceDownload = buildFirstWaveSupportInspectionRuntimeEvidenceDownload({
+        productCode: product.code,
+        channel,
+        fileName: evidenceFileName
+      });
+      const confirmedBy = {
+        actorType: session.actor_scope === "member" ? "developer_member" : "developer",
+        actorScope: session.actor_scope,
+        actorId: session.actor_id,
+        username: session.username,
+        role: session.member_role ?? "owner"
+      };
+      const allTargetsConfirmed = targetCount > 0 && inspectedTargetCount >= targetCount;
+      const traceability = {
+        eventType: "developer.ops.first-wave.support-inspection.confirm",
+        entityType: "developer_ops_first_wave_support_inspection",
+        route: "/api/developer/ops/first-wave/recommendations",
+        confirmationRoute: "/api/developer/ops/first-wave/support-inspection/confirm",
+        downloadRoute: "/api/developer/ops/export/download"
+      };
+      const auditLogId = auditDeveloperSession(
+        db,
+        session,
+        traceability.eventType,
+        traceability.entityType,
+        product.id,
+        {
+          productCode: product.code,
+          productId: product.id,
+          channel,
+          status: "confirmed",
+          decision,
+          confirmedAt,
+          note,
+          supportInspectionStatus,
+          inspectedTargetKeys,
+          inspectedTargetCount,
+          targetCount,
+          readyTargetCount,
+          allTargetsConfirmed,
+          runtimeEvidenceFormat,
+          evidenceFileName,
+          runtimeEvidenceDownload,
+          confirmationRoute: traceability.confirmationRoute,
+          downloadRoute: traceability.downloadRoute
+        }
+      );
+
+      return buildFirstWaveSupportInspectionConfirmationPayload({
+        auditLogId,
+        eventType: traceability.eventType,
+        entityType: traceability.entityType,
+        entityId: product.id,
+        productCode: product.code,
+        channel,
+        status: "confirmed",
+        decision,
+        confirmedAt,
+        confirmedBy,
+        note,
+        supportInspectionStatus,
+        inspectedTargetKeys,
+        inspectedTargetCount,
+        targetCount,
+        readyTargetCount,
+        allTargetsConfirmed,
+        evidenceFileName,
+        runtimeEvidenceDownload,
+        traceability
+      });
     },
 
     async developerRecordSteadyStateDutyPlanReceipt(token, body = {}) {

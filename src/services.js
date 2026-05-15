@@ -22512,6 +22512,13 @@ function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
     recommendedCardCount: Number(metadata.recommendedCardCount ?? 0),
     issuedFreshCardCount: Number(metadata.issuedFreshCardCount ?? 0)
   };
+  const supportInspectionPlan = buildDeveloperOpsFirstWaveSupportInspectionPlan({
+    productCode,
+    channel,
+    inventoryStatus,
+    firstCardsStatus: firstCardStatus,
+    firstRoundOpsStatus
+  });
   return {
     version: "developer-ops-first-wave-readiness-bridge/v1",
     auditLogId: item.auditLogId || item.id || null,
@@ -22527,6 +22534,7 @@ function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
     pendingSegmentCount: Math.max(0, segmentCount - readySegmentCount),
     segments,
     operatingChain,
+    supportInspectionPlan,
     nextAction: nextActionKey
       ? {
           key: nextActionKey,
@@ -31525,6 +31533,180 @@ function buildDeveloperOpsFirstWaveAction({
   };
 }
 
+function buildDeveloperOpsFirstWaveSupportInspectionPlan({
+  productCode = "",
+  channel = "stable",
+  inventoryStatus = "unknown",
+  firstCardsStatus = "unknown",
+  firstRoundOpsStatus = "unknown",
+  cards = [],
+  opsSnapshot = null
+} = {}) {
+  const normalizedInventoryStatus = normalizeDeveloperOpsConfirmationToken(inventoryStatus, "unknown");
+  const normalizedFirstCardsStatus = normalizeDeveloperOpsConfirmationToken(firstCardsStatus, "unknown");
+  const normalizedFirstRoundOpsStatus = normalizeDeveloperOpsConfirmationToken(firstRoundOpsStatus, "unknown");
+  const readyForSupportInspection = normalizedInventoryStatus === "ready" && normalizedFirstCardsStatus === "ready";
+  const scopedParams = { productCode, channel };
+  const countItems = (items = []) => Array.isArray(items) ? items.length : 0;
+  const deviceCount = countItems(opsSnapshot?.bindings) + countItems(opsSnapshot?.blocks);
+  const targetStatus = readyForSupportInspection ? "ready" : "blocked_until_first_cards";
+  const buildTarget = ({
+    key,
+    label,
+    workspaceKey = "ops",
+    autofocus,
+    routeAction,
+    count = 0,
+    expectedSignal = ""
+  } = {}) => ({
+    key,
+    label,
+    ownerRole: "support",
+    status: targetStatus,
+    ready: readyForSupportInspection,
+    routeAction,
+    count: Number(count || 0),
+    expectedSignal,
+    workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+      workspaceKey,
+      autofocus,
+      label,
+      {
+        ...scopedParams,
+        routeAction
+      }
+    )
+  });
+  const inspectionTargets = [
+    buildTarget({
+      key: "accounts",
+      label: "Review First-Wave Accounts",
+      autofocus: "accounts",
+      routeAction: "review-accounts",
+      count: countItems(opsSnapshot?.accounts),
+      expectedSignal: "Starter and first-wave accounts are visible before support answers access questions."
+    }),
+    buildTarget({
+      key: "entitlements",
+      label: "Review First-Wave Entitlements",
+      autofocus: "entitlements",
+      routeAction: "review-entitlements",
+      count: countItems(opsSnapshot?.entitlements),
+      expectedSignal: "First-wave entitlement lifecycle windows match the launch handoff."
+    }),
+    buildTarget({
+      key: "sessions",
+      label: "Review First-Wave Sessions",
+      autofocus: "sessions",
+      routeAction: "review-sessions",
+      count: countItems(opsSnapshot?.sessions),
+      expectedSignal: "First sign-ins, heartbeat, and session churn are visible from Developer Ops."
+    }),
+    buildTarget({
+      key: "cards",
+      label: "Review First-Wave Cards",
+      workspaceKey: "licenses",
+      autofocus: "cards",
+      routeAction: "review-cards",
+      count: countItems(cards),
+      expectedSignal: "Unused first-wave cards and redeemed cards can be inspected before support handoff."
+    }),
+    buildTarget({
+      key: "devices",
+      label: "Review First-Wave Devices",
+      autofocus: "devices",
+      routeAction: "review-devices",
+      count: deviceCount,
+      expectedSignal: "Device bindings and blocks are visible before first-wave support escalation."
+    }),
+    buildTarget({
+      key: "audit_logs",
+      label: "Review First-Wave Audit Logs",
+      autofocus: "audit",
+      routeAction: "review-audit",
+      count: countItems(opsSnapshot?.auditLogs),
+      expectedSignal: "Launch confirmations, redemptions, sessions, and operator actions are auditable."
+    })
+  ];
+  const downloads = [
+    createLaunchWorkflowDownloadShortcut(
+      "first_wave_support_ops_summary",
+      "developer-ops-first-wave-support-summary.txt",
+      "First-wave support ops summary",
+      {
+        source: "developer-ops",
+        format: "summary",
+        params: scopedParams
+      }
+    ),
+    createLaunchWorkflowDownloadShortcut(
+      "first_wave_support_runtime_evidence",
+      "developer-ops-first-wave-runtime-evidence.txt",
+      "First-wave runtime evidence",
+      {
+        source: "developer-ops",
+        format: "first-wave-runtime-evidence",
+        params: scopedParams
+      }
+    ),
+    createLaunchWorkflowDownloadShortcut(
+      "first_wave_support_ops_zip",
+      "developer-ops-first-wave-support.zip",
+      "First-wave support ops zip",
+      {
+        source: "developer-ops",
+        format: "zip",
+        params: scopedParams
+      }
+    )
+  ].filter(Boolean);
+  return {
+    version: "developer-ops-first-wave-support-inspection-plan/v1",
+    status: readyForSupportInspection ? "ready_for_support_inspection" : "blocked_until_first_cards",
+    ready: readyForSupportInspection,
+    productCode,
+    channel,
+    ownerRole: "support",
+    currentTargetKey: readyForSupportInspection ? inspectionTargets[0]?.key || null : "first_batch_inventory",
+    targetCount: inspectionTargets.length,
+    readyTargetCount: readyForSupportInspection ? inspectionTargets.length : 0,
+    inventoryStatus: normalizedInventoryStatus,
+    firstCardsStatus: normalizedFirstCardsStatus,
+    firstRoundOpsStatus: normalizedFirstRoundOpsStatus,
+    inspectionTargets,
+    downloads,
+    nextAction: readyForSupportInspection
+      ? "Support reviews accounts, entitlements, sessions, cards, devices, and audit logs before widening the first wave."
+      : "Finish first-batch inventory and first-card issuance before support inspection."
+  };
+}
+
+function appendDeveloperOpsFirstWaveSupportInspectionPlanLines(lines = [], supportInspectionPlan = null) {
+  if (!Array.isArray(lines) || !supportInspectionPlan || typeof supportInspectionPlan !== "object") {
+    return;
+  }
+  const inspectionTargets = Array.isArray(supportInspectionPlan.inspectionTargets)
+    ? supportInspectionPlan.inspectionTargets
+    : [];
+  const supportDownloads = Array.isArray(supportInspectionPlan.downloads)
+    ? supportInspectionPlan.downloads
+    : [];
+  lines.push(
+    "First-Wave Support Inspection Plan:",
+    `- status=${supportInspectionPlan.status || "-"} | owner=${supportInspectionPlan.ownerRole || "-"} | current=${supportInspectionPlan.currentTargetKey || "-"} | targets=${supportInspectionPlan.targetCount ?? inspectionTargets.length}`,
+    `- downloads=${supportDownloads.map((item) => `${item.key || "-"}:${item.format || "-"}`).join(", ") || "-"}`
+  );
+  inspectionTargets.forEach((item, index) => {
+    lines.push(
+      `${index + 1}. ${item.key || "-"}`
+      + ` | status=${item.status || "-"}`
+      + ` | count=${item.count ?? 0}`
+      + ` | workspace=${item.workspaceAction?.href || "-"}`
+    );
+  });
+  lines.push(`Support Inspection Next: ${supportInspectionPlan.nextAction || "-"}`);
+}
+
 function buildDeveloperOpsFirstWaveInventoryStatePayload(item = {}) {
   return {
     key: item.key || null,
@@ -32763,9 +32945,19 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     launchReadinessBridge: launchReadinessBridgeBase,
     firstWaveConfirmationChain: readiness.firstWaveConfirmationChain || null
   });
+  const supportInspectionPlan = buildDeveloperOpsFirstWaveSupportInspectionPlan({
+    productCode,
+    channel,
+    inventoryStatus,
+    firstCardsStatus,
+    firstRoundOpsStatus: firstRoundStatus,
+    cards,
+    opsSnapshot
+  });
   const launchReadinessBridge = {
     ...launchReadinessBridgeBase,
-    operatingChain: firstLaunchOperatingChain
+    operatingChain: firstLaunchOperatingChain,
+    supportInspectionPlan
   };
 
   return {
@@ -32781,6 +32973,7 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     deliveryHandoff,
     firstUserValidationHandoff,
     firstLaunchOperatingChain,
+    supportInspectionPlan,
     postLaunchLifecycleHandoff,
     firstRoundOps: firstRoundOpsPayload,
     launchReadinessBridge,
@@ -33004,6 +33197,10 @@ function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
   if (payload.firstLaunchOperatingChain && typeof payload.firstLaunchOperatingChain === "object") {
     lines.push("");
     appendDeveloperOpsFirstLaunchOperatingChainLines(lines, payload.firstLaunchOperatingChain);
+  }
+  if (payload.supportInspectionPlan && typeof payload.supportInspectionPlan === "object") {
+    lines.push("");
+    appendDeveloperOpsFirstWaveSupportInspectionPlanLines(lines, payload.supportInspectionPlan);
   }
   if (payload.postLaunchLifecycleHandoff && typeof payload.postLaunchLifecycleHandoff === "object") {
     lines.push(
@@ -36437,6 +36634,10 @@ function appendDeveloperOpsFirstWaveReadinessBridgeLines(lines = [], bridge = nu
   );
   if (bridge.operatingChain) {
     appendDeveloperOpsFirstLaunchOperatingChainLines(lines, bridge.operatingChain);
+  }
+  if (bridge.supportInspectionPlan) {
+    lines.push("");
+    appendDeveloperOpsFirstWaveSupportInspectionPlanLines(lines, bridge.supportInspectionPlan);
   }
   for (const segment of segments) {
     lines.push(`  - ${segment.key || "-"} | status=${segment.status || "-"} | ready=${segment.ready === true ? "yes" : "no"}`);
@@ -54492,7 +54693,10 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           firstLaunchFirstUserValidationOperation: payload.firstUserValidationHandoff?.nextAction?.operation || null,
           firstLaunchPostLaunchLifecycleStatus: payload.postLaunchLifecycleHandoff?.status || null,
           firstLaunchPostLaunchLifecycleReady: payload.postLaunchLifecycleHandoff?.closeoutReadiness?.canClose === true,
-          firstLaunchPostLaunchLifecycleOperation: payload.postLaunchLifecycleHandoff?.nextAction?.operation || null
+          firstLaunchPostLaunchLifecycleOperation: payload.postLaunchLifecycleHandoff?.nextAction?.operation || null,
+          firstWaveSupportInspectionStatus: payload.supportInspectionPlan?.status || null,
+          firstWaveSupportInspectionCurrentTargetKey: payload.supportInspectionPlan?.currentTargetKey || null,
+          firstWaveSupportInspectionTargetCount: payload.supportInspectionPlan?.targetCount ?? null
         }
       );
 

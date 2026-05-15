@@ -30083,7 +30083,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
   const stepFourStatus = !parityAligned
     ? "blocked_by_receipt_parity"
     : handoffConfirmed
-      ? "current"
+      ? "completed"
       : "pending_confirmation_receipt";
   const overviewRefreshAction = {
     version: "developer-ops-launch-operations-operator-overview-refresh-action/v1",
@@ -30109,7 +30109,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
         : "awaiting_first_wave_confirmation",
     ready: operatorHandoffPacketReady,
     currentActionKey: operatorHandoffPacketReady
-      ? overviewRefreshAction.key
+      ? "handoff_launch_duty_to_post_signoff"
       : "confirm_first_wave_handoff",
     confirmationAuditLogId: confirmationReceipt?.auditLogId || null,
     overviewRefreshHref: overviewRefreshAction.href,
@@ -30149,7 +30149,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       }
     ],
     nextAction: operatorHandoffPacketReady
-      ? "Refresh Developer Ops overview and attach the confirmation audit plus launch-duty record index to the launch-duty handoff."
+      ? "Launch-duty handoff packet is ready; continue to post-signoff archive with the confirmation audit and launch-duty record index."
       : "Complete first-wave handoff confirmation before preparing launch-duty handoff."
   };
   const postConfirmationSwitchRequiredChecks = [
@@ -30311,11 +30311,13 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
   ];
   const status = !parityAligned
     ? "blocked_by_receipt_parity"
-    : handoffConfirmed
-      ? "confirmation_recorded_refresh_overview"
+    : postConfirmationSwitchReady
+      ? "ready_for_launch_duty_handoff"
+      : handoffConfirmed
+        ? "confirmation_recorded_refresh_overview"
       : "ready_for_first_wave_confirmation";
-  const currentStepKey = handoffConfirmed && parityAligned
-    ? "refresh_developer_ops_overview"
+  const currentStepKey = postConfirmationSwitchReady
+    ? "handoff_launch_duty_to_post_signoff"
     : "review_launch_review_summary";
   const nextStepKey = handoffConfirmed && parityAligned
     ? null
@@ -30352,8 +30354,10 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     steps,
     nextAction: !parityAligned
       ? "Repair receipt visibility parity first, then continue first-wave confirmation."
-      : handoffConfirmed
-        ? "Refresh Developer Ops overview to confirm first-wave confirmation visibility from the same record index context."
+      : postConfirmationSwitchReady
+        ? "First-wave confirmation switch is ready; continue launch-duty handoff into post-signoff archive."
+        : handoffConfirmed
+          ? "Refresh Developer Ops overview to confirm first-wave confirmation visibility from the same record index context."
         : "Review Launch Review/Smoke summaries, confirm first-wave handoff, then refresh Developer Ops overview."
   };
 }
@@ -30851,7 +30855,7 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     status,
     ready,
     currentActionKey: ready
-      ? refreshAction?.key || "refresh_developer_ops_overview"
+      ? nextLaunchDutyPhase?.actionKey || preflightNextActionTemplate?.actionKey || refreshAction?.key || "archive_production_signoff_packet"
       : packet?.currentActionKey || "confirm_first_wave_handoff",
     supportInspectionReady,
     supportInspectionStatus,
@@ -30886,7 +30890,7 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     launchDutyRecordIndexPath: launchDutyRecordIndexPath || packet?.launchDutyRecordIndexPath || queue.launchDutyRecordIndexPath || null,
     evidenceItems: Array.isArray(packet?.evidenceItems) ? packet.evidenceItems : [],
     nextAction: ready
-      ? "Refresh Developer Ops overview, then continue with the current launch-duty post-signoff phase."
+      ? "Launch-duty handoff is ready; continue with the current launch-duty post-signoff phase."
       : "Complete first-wave confirmation and refresh Developer Ops before handing launch duty to the post-signoff phase."
   };
 }

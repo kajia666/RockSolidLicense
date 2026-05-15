@@ -30525,6 +30525,26 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   ));
   const nextReceiptWriteReceiptPlaceholders = nextReceiptWriteOperations
     .map((operation) => `<${operation}-receipt-id>`);
+  const normalizedLaunchDutyRecordIndexState = normalizeLaunchDutyRecordIndexState(launchDutyRecordIndexState);
+  const recordedRecordKeySet = new Set(
+    Array.isArray(normalizedLaunchDutyRecordIndexState?.recordedKeys)
+      ? normalizedLaunchDutyRecordIndexState.recordedKeys
+      : []
+  );
+  const firstReceiptWriteRecordIndexEntry = firstReceiptWriteRecord?.key
+    ? normalizedLaunchDutyRecordIndexState?.records?.[firstReceiptWriteRecord.key] || null
+    : null;
+  const nextReceiptWriteRecordIndexEntry = nextReceiptWriteRecord?.key
+    ? normalizedLaunchDutyRecordIndexState?.records?.[nextReceiptWriteRecord.key] || null
+    : null;
+  const firstReceiptWriteRecorded = Boolean(
+    firstReceiptWriteRecord?.key
+    && recordedRecordKeySet.has(firstReceiptWriteRecord.key)
+  );
+  const nextReceiptWriteRecorded = Boolean(
+    nextReceiptWriteRecord?.key
+    && recordedRecordKeySet.has(nextReceiptWriteRecord.key)
+  );
   const ready = packet?.ready === true && refreshAction?.ready === true;
   const status = ready
     ? "ready_for_launch_duty_handoff"
@@ -30655,16 +30675,34 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
       ? "Preflight is complete; proceed to archive the production sign-off packet and begin launch-day watch receipt writes."
       : "Clear remaining confirmation/switch checks before handing launch duty to post-signoff execution."
   };
-  const readyForFirstReceiptWrite = ready && firstReceiptWritePhase?.status === "current";
+  const readyForFirstReceiptWrite = Boolean(
+    ready
+    && firstReceiptWritePhase?.status === "current"
+    && !firstReceiptWriteRecorded
+  );
+  const readyForNextReceiptWrite = Boolean(
+    ready
+    && firstReceiptWriteRecorded
+    && !nextReceiptWriteRecorded
+  );
   const firstReceiptWritePacket = firstReceiptWritePhase ? {
     version: "developer-ops-launch-operations-operator-first-receipt-write-packet/v1",
     status: !ready
       ? "blocked_until_first_wave_confirmation"
-      : readyForFirstReceiptWrite
+      : firstReceiptWriteRecorded
+        ? "recorded"
+        : readyForFirstReceiptWrite
         ? "ready_for_receipt_write"
         : "queued_after_signoff_archive",
     readyForHandoff: ready,
     readyForReceiptWrite: readyForFirstReceiptWrite,
+    recorded: firstReceiptWriteRecorded,
+    recordedAt: firstReceiptWriteRecordIndexEntry?.recordedAt || null,
+    recordIndexStatus: firstReceiptWriteRecordIndexEntry?.status || null,
+    recordIndexArtifactPath: firstReceiptWriteRecordIndexEntry?.artifactPath || null,
+    recordedReceiptIds: Array.isArray(firstReceiptWriteRecordIndexEntry?.receiptIds)
+      ? firstReceiptWriteRecordIndexEntry.receiptIds
+      : [],
     phaseKey: firstReceiptWritePhase.key || null,
     recordKey: firstReceiptWriteRecord?.key || null,
     actionKey: firstReceiptWritePhase.actionKey || firstReceiptWriteRecord?.actionKey || null,
@@ -30691,7 +30729,9 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   } : null;
   const postSignoffArchiveReady = ready && preflightReadyForPostSignoffArchive && !postSignoffArchiveRecorded;
   const postSignoffArchivePacketStatus = postSignoffArchiveRecorded
-    ? readyForFirstReceiptWrite
+    ? firstReceiptWriteRecorded
+      ? "archived_first_receipt_recorded"
+      : readyForFirstReceiptWrite
       ? "archived_ready_for_first_receipt_write"
       : "archived_pending_first_receipt_write"
     : postSignoffArchiveReady
@@ -30754,9 +30794,23 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   } : null;
   const nextReceiptWritePacket = nextReceiptWriteRecord ? {
     version: "developer-ops-launch-operations-operator-next-receipt-write-packet/v1",
-    status: !ready ? "blocked_until_first_wave_confirmation" : "blocked_until_first_receipt_write",
+    status: !ready
+      ? "blocked_until_first_wave_confirmation"
+      : nextReceiptWriteRecorded
+        ? "recorded"
+        : readyForNextReceiptWrite
+          ? "ready_for_receipt_write"
+          : "blocked_until_first_receipt_write",
     readyForHandoff: ready,
-    readyForReceiptWrite: false,
+    readyForReceiptWrite: readyForNextReceiptWrite,
+    dependsOnRecordRecorded: firstReceiptWriteRecorded,
+    recorded: nextReceiptWriteRecorded,
+    recordedAt: nextReceiptWriteRecordIndexEntry?.recordedAt || null,
+    recordIndexStatus: nextReceiptWriteRecordIndexEntry?.status || null,
+    recordIndexArtifactPath: nextReceiptWriteRecordIndexEntry?.artifactPath || null,
+    recordedReceiptIds: Array.isArray(nextReceiptWriteRecordIndexEntry?.receiptIds)
+      ? nextReceiptWriteRecordIndexEntry.receiptIds
+      : [],
     dependsOnPhaseKey: firstReceiptWritePhase?.key || null,
     dependsOnRecordKey: firstReceiptWriteRecord?.key || null,
     recordKey: nextReceiptWriteRecord.key || null,
@@ -30772,11 +30826,21 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     refreshAfterPreviousWrite: {
       method: "GET",
       href: refreshAction?.href || packet?.overviewRefreshHref || null,
-      status: ready ? "refresh_after_previous_receipt_write" : "blocked_until_first_wave_confirmation",
+      status: !ready
+        ? "blocked_until_first_wave_confirmation"
+        : nextReceiptWriteRecorded
+          ? "completed_refresh_after_receipt_write"
+          : readyForNextReceiptWrite
+            ? "refresh_after_receipt_write"
+            : "blocked_until_first_receipt_write",
       confirmationAuditLogId: packet?.confirmationAuditLogId || queue.confirmationReceipt?.auditLogId || null
     },
     nextAction: ready
-      ? "After launch_day_watch_summary is written and Developer Ops is refreshed, capture the receipt visibility snapshot."
+      ? nextReceiptWriteRecorded
+        ? "Receipt visibility snapshot is recorded; continue stabilization evidence capture."
+        : readyForNextReceiptWrite
+          ? "Run the receipt visibility snapshot write command, then refresh Developer Ops export."
+          : "After launch_day_watch_summary is written and Developer Ops is refreshed, capture the receipt visibility snapshot."
       : "Confirm first-wave handoff before preparing the next receipt visibility snapshot write."
   } : null;
   const stabilizationReceiptWriteRecords = stabilizationReceiptRecords.map((record) => {
@@ -30804,12 +30868,6 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   const stabilizationCloseoutSourceRecordKeys = Array.isArray(stabilizationCloseoutRecord?.sourceRecordKeys)
     ? stabilizationCloseoutRecord.sourceRecordKeys.filter(Boolean)
     : [];
-  const normalizedLaunchDutyRecordIndexState = normalizeLaunchDutyRecordIndexState(launchDutyRecordIndexState);
-  const recordedRecordKeySet = new Set(
-    Array.isArray(normalizedLaunchDutyRecordIndexState?.recordedKeys)
-      ? normalizedLaunchDutyRecordIndexState.recordedKeys
-      : []
-  );
   const stabilizationRecordKeys = stabilizationReceiptWriteRecords
     .map((record) => record.recordKey)
     .filter(Boolean);
@@ -30973,12 +31031,19 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
         : "After receipt_visibility_snapshot is written, capture incident, rollback, stabilization owner, and first-wave closeout receipts in order."
       : "Confirm first-wave handoff before preparing stabilization receipt writes."
   } : null;
+  const currentStabilizationRecord = stabilizationReceiptWriteRecords.find((item) => (
+    item.recordKey === stabilizationReceiptWriteQueue?.currentRecordKey
+  )) || null;
   return {
     version: "developer-ops-launch-operations-operator-launch-duty-handoff-action/v1",
     status,
     ready,
     currentActionKey: ready
-      ? nextLaunchDutyPhase?.actionKey || preflightNextActionTemplate?.actionKey || refreshAction?.key || "archive_production_signoff_packet"
+      ? readyForNextReceiptWrite
+        ? nextReceiptWritePacket?.actionKey || nextReceiptWriteRecord?.actionKey || null
+        : nextReceiptWriteRecorded && currentStabilizationRecord?.actionKey
+          ? currentStabilizationRecord.actionKey
+          : nextLaunchDutyPhase?.actionKey || preflightNextActionTemplate?.actionKey || refreshAction?.key || "archive_production_signoff_packet"
       : packet?.currentActionKey || "confirm_first_wave_handoff",
     supportInspectionReady,
     supportInspectionStatus,

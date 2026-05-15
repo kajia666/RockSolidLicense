@@ -22498,6 +22498,97 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Launch Operations Operator Entry:[\s\S]*launchDutyFirstReceiptPacket=ready_for_receipt_write/
     );
 
+    const launchDayWatchSummaryReadbackReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        action: "record_index_readback",
+        intent: "launch_day_watch_summary_recorded",
+        planKind: "record_index",
+        planMode: "readback",
+        targetType: "launch-duty-record-index",
+        href: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        fileName: "launch-duty-record-index.json",
+        format: "launch-duty-record-index",
+        launchOpsOverviewContextKind: "launch_ops_overview_status",
+        launchOpsOverviewDownloadKey: "ops_launch_operations_overview_status",
+        launchOpsOverviewDownloadFileName: "developer-ops-launch-operations-overview-status.txt",
+        launchOpsOverviewDownloadFormat: "launch-operations-overview-status",
+        launchOpsOverviewDownloadHref: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        launchReadinessNextGateStatus: expectedSteadyStateGoLiveGate.status,
+        launchReadinessNextGateDecision: expectedSteadyStateGoLiveGate.decision,
+        launchReadinessNextGateCurrentGate: expectedSteadyStateGoLiveGate.currentGate,
+        launchReadinessNextGateCanEnterInitialLaunch: expectedSteadyStateGoLiveGate.canEnterInitialLaunch,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchDutyRecordIndexState: {
+          mode: "staging-launch-duty-record-index",
+          status: "in_progress",
+          recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+          recordedKeys: ["launch_day_watch_summary"],
+          pendingKeys: [
+            "receipt_visibility_snapshot",
+            "first_wave_incident_log",
+            "rollback_signal_review",
+            "stabilization_owner_handoff",
+            "first_wave_closeout"
+          ],
+          nextRecordKey: "receipt_visibility_snapshot",
+          records: {
+            launch_day_watch_summary: {
+              status: "recorded",
+              actionKey: "record_launch_day_watch_summary",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md",
+              receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+              receiptIds: ["record-cutover-watch-receipt", "record-readiness-review-receipt"],
+              recordedAt: "2026-05-14T09:10:00.000Z"
+            }
+          }
+        },
+        note: "launch-day watch summary recorded; receipt visibility snapshot is next"
+      },
+      ownerSession.token
+    );
+    assert.equal(launchDayWatchSummaryReadbackReceipt.launchDutyRecordIndexState.recordedCount, 1);
+    assert.equal(launchDayWatchSummaryReadbackReceipt.launchDutyRecordIndexState.pendingCount, 5);
+    assert.equal(launchDayWatchSummaryReadbackReceipt.launchDutyRecordIndexState.nextRecordKey, "receipt_visibility_snapshot");
+
+    const launchDayWatchSummaryReadbackSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const launchDayWatchSummaryHandoffAction = launchDayWatchSummaryReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyHandoffAction;
+    assert.ok(launchDayWatchSummaryHandoffAction);
+    assert.equal(launchDayWatchSummaryHandoffAction.currentActionKey, "record_receipt_visibility_snapshot");
+    assert.equal(launchDayWatchSummaryHandoffAction.firstReceiptWritePacket.status, "recorded");
+    assert.equal(launchDayWatchSummaryHandoffAction.firstReceiptWritePacket.readyForReceiptWrite, false);
+    assert.equal(launchDayWatchSummaryHandoffAction.firstReceiptWritePacket.recorded, true);
+    assert.equal(
+      launchDayWatchSummaryHandoffAction.firstReceiptWritePacket.recordedAt,
+      "2026-05-14T09:10:00.000Z"
+    );
+    assert.equal(launchDayWatchSummaryHandoffAction.nextReceiptWritePacket.status, "ready_for_receipt_write");
+    assert.equal(launchDayWatchSummaryHandoffAction.nextReceiptWritePacket.readyForReceiptWrite, true);
+    assert.equal(launchDayWatchSummaryHandoffAction.nextReceiptWritePacket.dependsOnRecordRecorded, true);
+    assert.equal(launchDayWatchSummaryHandoffAction.nextReceiptWritePacket.recordKey, "receipt_visibility_snapshot");
+    assert.equal(launchDayWatchSummaryHandoffAction.nextReceiptWritePacket.actionKey, "record_receipt_visibility_snapshot");
+    assert.equal(
+      launchDayWatchSummaryHandoffAction.postSignoffArchiveHandoffPacket?.afterArchiveStatus,
+      "recorded"
+    );
+    assert.match(
+      launchDayWatchSummaryReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyFirstReceiptPacket=recorded/
+    );
+    assert.match(
+      launchDayWatchSummaryReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyNextReceiptPacket=ready_for_receipt_write/
+    );
+
     const launchDutyRecordIndexReadbackReceipt = await postJson(
       baseUrl,
       "/api/developer/ops/steady-state-duty-plan/receipt",

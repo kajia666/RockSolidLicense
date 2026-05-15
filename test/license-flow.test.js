@@ -22403,6 +22403,101 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationProgress=0\/4/
     );
 
+    const postSignoffArchiveReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        action: "archive_production_signoff_packet",
+        intent: "post_signoff_archive",
+        planKind: "production_signoff_archive",
+        planMode: "archive",
+        targetType: "production-signoff-packet",
+        href: confirmedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.productionSignoffPacket,
+        fileName: "staging-production-signoff-packet.json",
+        format: "staging-production-signoff-packet",
+        launchOpsOverviewContextKind: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewContextKind,
+        launchOpsOverviewDownloadKey: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadKey,
+        launchOpsOverviewDownloadFileName: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadFileName,
+        launchOpsOverviewDownloadFormat: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadFormat,
+        launchOpsOverviewDownloadHref: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        launchReadinessNextGateStatus: steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateStatus,
+        launchReadinessNextGateDecision: steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateDecision,
+        launchReadinessNextGateCurrentGate: steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateCurrentGate,
+        launchReadinessNextGateCanEnterInitialLaunch: steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateCanEnterInitialLaunch,
+        launchReadinessNextGateLaunchDutyRecordIndexPath:
+          steadyStateDutyDownloadIntent.executionPlan.prefill.launchReadinessNextGateLaunchDutyRecordIndexPath,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath:
+          steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewContextLaunchDutyRecordIndexPath,
+        note: "production sign-off packet archived before launch-day watch receipt write"
+      },
+      ownerSession.token
+    );
+    assert.equal(postSignoffArchiveReceipt.action, "archive_production_signoff_packet");
+    assert.equal(postSignoffArchiveReceipt.intent, "post_signoff_archive");
+    assert.equal(postSignoffArchiveReceipt.planMode, "archive");
+    assert.equal(postSignoffArchiveReceipt.targetType, "production-signoff-packet");
+    assert.ok(postSignoffArchiveReceipt.auditLogId);
+
+    const postSignoffArchiveSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const archivedLaunchOperationsOperatorEntry = postSignoffArchiveSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry;
+    const archivedLaunchDutyHandoffAction = archivedLaunchOperationsOperatorEntry?.launchDutyHandoffAction;
+    assert.ok(archivedLaunchOperationsOperatorEntry);
+    assert.ok(archivedLaunchDutyHandoffAction);
+    assert.equal(archivedLaunchDutyHandoffAction.currentActionKey, "record_launch_day_watch_summary");
+    assert.equal(archivedLaunchDutyHandoffAction.nextLaunchDutyPhaseKey, "record_launch_day_watch");
+    assert.equal(archivedLaunchDutyHandoffAction.nextLaunchDutyActionKey, "record_launch_day_watch_summary");
+    assert.equal(
+      archivedLaunchOperationsOperatorEntry.postSignoffExecutionChecklist.currentPhaseKey,
+      "record_launch_day_watch"
+    );
+    assert.deepEqual(
+      archivedLaunchOperationsOperatorEntry.postSignoffExecutionChecklist.phases
+        .map((item) => `${item.key}:${item.status}`),
+      [
+        "archive_signoff_packet:completed",
+        "record_launch_day_watch:current",
+        "collect_stabilization_evidence:blocked_until_watch_summary",
+        "close_first_wave:blocked_until_source_records"
+      ]
+    );
+    assert.equal(
+      archivedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.status,
+      "archived_ready_for_first_receipt_write"
+    );
+    assert.equal(archivedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.readyForArchive, false);
+    assert.equal(archivedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.archiveRecorded, true);
+    assert.equal(
+      archivedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.archiveReceiptAuditLogId,
+      postSignoffArchiveReceipt.auditLogId
+    );
+    assert.equal(
+      archivedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.afterArchiveStatus,
+      "ready_for_receipt_write"
+    );
+    assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.status, "ready_for_receipt_write");
+    assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.readyForHandoff, true);
+    assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.readyForReceiptWrite, true);
+    assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.unlockActionKey, "archive_production_signoff_packet");
+    assert.match(
+      postSignoffArchiveSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyPostSignoffArchivePacket=archived_ready_for_first_receipt_write/
+    );
+    assert.match(
+      postSignoffArchiveSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffNextAction=record_launch_day_watch_summary/
+    );
+    assert.match(
+      postSignoffArchiveSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyFirstReceiptPacket=ready_for_receipt_write/
+    );
+
     const launchDutyRecordIndexReadbackReceipt = await postJson(
       baseUrl,
       "/api/developer/ops/steady-state-duty-plan/receipt",

@@ -23541,6 +23541,37 @@ function selectSteadyStateDutyPlanReceiptForLaunchDuty(receipts = [], {
     [0] || null;
 }
 
+function isSteadyStateDutyPlanPostSignoffArchiveReceipt(receipt = null) {
+  const payload = buildSteadyStateDutyPlanReceiptPayload(receipt);
+  if (!payload) {
+    return false;
+  }
+  const action = payload.action || "";
+  const intent = payload.intent || "";
+  const planKind = payload.planKind || "";
+  const planMode = payload.planMode || "";
+  const targetType = payload.targetType || "";
+  const format = payload.format || "";
+  return action === "archive_production_signoff_packet"
+    || intent === "post_signoff_archive"
+    || planKind === "production_signoff_archive"
+    || (planMode === "archive" && /production[-_]signoff/.test(targetType))
+    || (planMode === "archive" && /production[-_]signoff/.test(format));
+}
+
+function selectSteadyStateDutyPlanPostSignoffArchiveReceiptForLaunchDuty(receipts = [], {
+  productCode = "",
+  channel = ""
+} = {}) {
+  const candidates = filterSteadyStateDutyPlanReceiptsForLaunchDuty(receipts, { productCode, channel })
+    .map((item) => buildSteadyStateDutyPlanReceiptPayload(item))
+    .filter((item) => item?.status === "recorded" && isSteadyStateDutyPlanPostSignoffArchiveReceipt(item));
+  return candidates
+    .slice()
+    .sort((left, right) => snapshotDateMs(right?.recordedAt || right?.createdAt) - snapshotDateMs(left?.recordedAt || left?.createdAt))
+    [0] || null;
+}
+
 function selectSteadyStateDutyPlanPacketReviewReceiptForLaunchDuty(receipts = [], {
   productCode = "",
   channel = ""
@@ -29401,30 +29432,37 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchBridge(staging
   };
 }
 
-function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(postSignoffWatchBridge = null) {
+function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(
+  postSignoffWatchBridge = null,
+  postSignoffArchiveReceipt = null
+) {
   const bridge = postSignoffWatchBridge && typeof postSignoffWatchBridge === "object"
     ? postSignoffWatchBridge
     : null;
   if (!bridge) {
     return [];
   }
+  const archiveReceipt = buildSteadyStateDutyPlanReceiptPayload(postSignoffArchiveReceipt);
+  const archiveRecorded = isSteadyStateDutyPlanPostSignoffArchiveReceipt(archiveReceipt);
   return [
     {
       stepNumber: 1,
       key: "archive_production_signoff_packet",
       label: "Archive production sign-off packet",
-      status: "blocked_until_full_test",
+      status: archiveRecorded ? "completed" : "blocked_until_full_test",
       artifact: bridge.productionSignoffPacket || null,
       command: null,
       launchDutyArchiveIndex: bridge.launchDutyArchiveIndex || null,
       launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      archiveReceiptAuditLogId: archiveReceipt?.auditLogId || null,
+      archiveRecordedAt: archiveReceipt?.recordedAt || archiveReceipt?.createdAt || null,
       nextAction: "Archive the signed packet beside the launch-duty archive index before cutover watch starts."
     },
     {
       stepNumber: 2,
       key: "record_launch_day_watch_summary",
       label: "Record launch-day watch summary",
-      status: "blocked_until_signoff_archive",
+      status: archiveRecorded ? "current" : "blocked_until_signoff_archive",
       artifact: bridge.launchDayWatchSummaryArtifact || null,
       command: bridge.watchRecordCommand || null,
       launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
@@ -29444,18 +29482,22 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(postSign
   ];
 }
 
-function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(postSignoffWatchBridge = null) {
+function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(
+  postSignoffWatchBridge = null,
+  postSignoffArchiveReceipt = null
+) {
   const bridge = postSignoffWatchBridge && typeof postSignoffWatchBridge === "object"
     ? postSignoffWatchBridge
     : null;
   if (!bridge) {
     return null;
   }
+  const archiveRecorded = isSteadyStateDutyPlanPostSignoffArchiveReceipt(postSignoffArchiveReceipt);
   const records = [
     {
       stepNumber: 1,
       key: "launch_day_watch_summary",
-      status: "pending_operator_entry",
+      status: archiveRecorded ? "current" : "pending_operator_entry",
       actionKey: "record_launch_day_watch_summary",
       artifact: bridge.launchDayWatchSummaryArtifact || null,
       command: bridge.watchRecordCommand || null,
@@ -29531,7 +29573,7 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(po
   })));
   return {
     version: "developer-ops-launch-operations-operator-post-signoff-watch-receipt-plan/v1",
-    status: "ready_after_full_test",
+    status: archiveRecorded ? "ready_for_first_receipt_write" : "ready_after_full_test",
     currentRecordKey: currentRecord?.key || null,
     currentActionKey: currentRecord?.actionKey || null,
     currentArtifact: currentRecord?.artifact || null,
@@ -29544,7 +29586,8 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(po
 
 function buildDeveloperOpsLaunchOperationsOperatorPostSignoffExecutionChecklist(
   postSignoffWatchBridge = null,
-  postSignoffWatchReceiptPlan = null
+  postSignoffWatchReceiptPlan = null,
+  postSignoffArchiveReceipt = null
 ) {
   const bridge = postSignoffWatchBridge && typeof postSignoffWatchBridge === "object"
     ? postSignoffWatchBridge
@@ -29555,6 +29598,8 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffExecutionChecklist(
   if (!bridge || !receiptPlan) {
     return null;
   }
+  const archiveReceipt = buildSteadyStateDutyPlanReceiptPayload(postSignoffArchiveReceipt);
+  const archiveRecorded = isSteadyStateDutyPlanPostSignoffArchiveReceipt(archiveReceipt);
   const records = Array.isArray(receiptPlan.records) ? receiptPlan.records : [];
   const watchSummaryRecord = records.find((item) => item.key === "launch_day_watch_summary") || null;
   const firstWaveCloseoutRecord = records.find((item) => item.key === "first_wave_closeout") || null;
@@ -29571,18 +29616,20 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffExecutionChecklist(
     {
       stepNumber: 1,
       key: "archive_signoff_packet",
-      status: "current",
+      status: archiveRecorded ? "completed" : "current",
       actionKey: "archive_production_signoff_packet",
       artifact: bridge.productionSignoffPacket || null,
       command: null,
       archiveIndex: bridge.launchDutyArchiveIndex || null,
       launchDutyRecordIndexPath: bridge.launchDutyRecordIndexPath || null,
+      archiveReceiptAuditLogId: archiveReceipt?.auditLogId || null,
+      archiveRecordedAt: archiveReceipt?.recordedAt || archiveReceipt?.createdAt || null,
       acceptanceCriteria: "Signed production packet is archived beside the launch-duty archive index before cutover watch starts."
     },
     {
       stepNumber: 2,
       key: "record_launch_day_watch",
-      status: "blocked_until_signoff_archive",
+      status: archiveRecorded ? "current" : "blocked_until_signoff_archive",
       actionKey: "record_launch_day_watch_summary",
       artifact: bridge.launchDayWatchSummaryArtifact || watchSummaryRecord?.artifact || null,
       command: bridge.watchRecordCommand || null,
@@ -29615,11 +29662,15 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffExecutionChecklist(
   ];
   return {
     version: "developer-ops-launch-operations-operator-post-signoff-execution-checklist/v1",
-    status: "ready_after_full_test",
-    currentPhaseKey: phases[0]?.key || null,
+    status: archiveRecorded ? "ready_for_first_receipt_write" : "ready_after_full_test",
+    currentPhaseKey: archiveRecorded ? "record_launch_day_watch" : phases[0]?.key || null,
     phaseCount: phases.length,
     phases,
-    nextAction: "Archive the production sign-off packet, then advance through watch recording, stabilization evidence, and first-wave closeout."
+    archiveReceiptAuditLogId: archiveReceipt?.auditLogId || null,
+    archiveRecordedAt: archiveReceipt?.recordedAt || archiveReceipt?.createdAt || null,
+    nextAction: archiveRecorded
+      ? "Run the launch-day watch summary receipt write, then refresh Developer Ops export."
+      : "Archive the production sign-off packet, then advance through watch recording, stabilization evidence, and first-wave closeout."
   };
 }
 
@@ -30368,7 +30419,8 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   postSignoffWatchReceiptPlan = null,
   stagingReadinessBridge = null,
   launchDutyRecordIndexPath = null,
-  launchDutyRecordIndexState = null
+  launchDutyRecordIndexState = null,
+  postSignoffArchiveReceipt = null
 } = {}) {
   const queue = receiptVisibilityConfirmationQueue && typeof receiptVisibilityConfirmationQueue === "object"
     ? receiptVisibilityConfirmationQueue
@@ -30423,9 +30475,15 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   const phases = Array.isArray(checklist?.phases) ? checklist.phases : [];
   const receiptRecords = Array.isArray(receiptPlan?.records) ? receiptPlan.records : [];
   const receiptQueue = Array.isArray(receiptPlan?.receiptQueue) ? receiptPlan.receiptQueue : [];
+  const postSignoffArchiveReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(postSignoffArchiveReceipt);
+  const postSignoffArchiveRecorded = isSteadyStateDutyPlanPostSignoffArchiveReceipt(postSignoffArchiveReceiptPayload);
+  const archiveSignoffPhase = phases.find((item) => item?.key === "archive_signoff_packet")
+    || phases.find((item) => item?.actionKey === "archive_production_signoff_packet")
+    || null;
   const nextLaunchDutyPhase = phases.find((item) => item?.key === checklist?.currentPhaseKey)
     || phases[0]
     || null;
+  const archivePhaseForPacket = archiveSignoffPhase || nextLaunchDutyPhase;
   const nextLaunchDutyReceiptOperations = Array.isArray(nextLaunchDutyPhase?.receiptOperations)
     ? nextLaunchDutyPhase.receiptOperations.filter(Boolean)
     : [];
@@ -30610,7 +30668,7 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     phaseKey: firstReceiptWritePhase.key || null,
     recordKey: firstReceiptWriteRecord?.key || null,
     actionKey: firstReceiptWritePhase.actionKey || firstReceiptWriteRecord?.actionKey || null,
-    unlockActionKey: nextLaunchDutyPhase?.actionKey || null,
+    unlockActionKey: archiveSignoffPhase?.actionKey || "archive_production_signoff_packet",
     artifact: firstReceiptWritePhase.artifact || firstReceiptWriteRecord?.artifact || null,
     command: firstReceiptWritePhase.command || null,
     receiptOperations: firstReceiptWriteOperations,
@@ -30626,23 +30684,36 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
       confirmationAuditLogId: packet?.confirmationAuditLogId || queue.confirmationReceipt?.auditLogId || null
     },
     nextAction: ready
-      ? "Archive the production sign-off packet, run the first launch-day watch receipt write command, then refresh Developer Ops export."
+      ? postSignoffArchiveRecorded
+        ? "Run the first launch-day watch receipt write command, then refresh Developer Ops export."
+        : "Archive the production sign-off packet, run the first launch-day watch receipt write command, then refresh Developer Ops export."
       : "Confirm first-wave handoff before archiving the sign-off packet and running the first launch-day watch receipt write command."
   } : null;
-  const postSignoffArchiveReady = ready && preflightReadyForPostSignoffArchive;
-  const postSignoffArchiveHandoffPacket = nextLaunchDutyPhase ? {
-    version: "developer-ops-launch-operations-operator-post-signoff-archive-handoff-packet/v1",
-    status: postSignoffArchiveReady
+  const postSignoffArchiveReady = ready && preflightReadyForPostSignoffArchive && !postSignoffArchiveRecorded;
+  const postSignoffArchivePacketStatus = postSignoffArchiveRecorded
+    ? readyForFirstReceiptWrite
+      ? "archived_ready_for_first_receipt_write"
+      : "archived_pending_first_receipt_write"
+    : postSignoffArchiveReady
       ? "ready_to_archive_signoff_packet"
-      : preflightStatus,
+      : preflightStatus;
+  const postSignoffArchiveHandoffPacket = archivePhaseForPacket ? {
+    version: "developer-ops-launch-operations-operator-post-signoff-archive-handoff-packet/v1",
+    status: postSignoffArchivePacketStatus,
     readyForArchive: postSignoffArchiveReady,
+    archiveRecorded: postSignoffArchiveRecorded,
+    readyForFirstReceiptWrite,
     decision: postSignoffArchiveReady
       ? "allow_archive_signoff_packet"
-      : "hold_archive_signoff_packet",
-    archivePhaseKey: nextLaunchDutyPhase.key || null,
-    archiveActionKey: nextLaunchDutyPhase.actionKey || null,
-    productionSignoffPacket: nextLaunchDutyPhase.artifact || null,
-    launchDutyArchiveIndex: nextLaunchDutyPhase.archiveIndex || null,
+      : postSignoffArchiveRecorded
+        ? "advance_to_first_receipt_write"
+        : "hold_archive_signoff_packet",
+    archivePhaseKey: archivePhaseForPacket.key || null,
+    archiveActionKey: archivePhaseForPacket.actionKey || "archive_production_signoff_packet",
+    archiveReceiptAuditLogId: postSignoffArchiveReceiptPayload?.auditLogId || null,
+    archiveRecordedAt: postSignoffArchiveReceiptPayload?.recordedAt || postSignoffArchiveReceiptPayload?.createdAt || null,
+    productionSignoffPacket: archivePhaseForPacket.artifact || null,
+    launchDutyArchiveIndex: archivePhaseForPacket.archiveIndex || null,
     launchDutyRecordIndexPath: launchDutyRecordIndexPath || packet?.launchDutyRecordIndexPath || queue.launchDutyRecordIndexPath || null,
     afterArchivePhaseKey: firstReceiptWritePhase?.key || null,
     afterArchiveStatus: firstReceiptWritePacket?.status || null,
@@ -30655,19 +30726,29 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     afterArchiveReceiptQueue: firstReceiptWritePacket?.receiptQueue || firstReceiptWriteReceiptQueue,
     afterArchiveExpectedEvidence: firstReceiptWritePacket?.expectedEvidence || firstReceiptWriteRecord?.expectedEvidence || null,
     refreshAfterFirstReceiptWrite: firstReceiptWritePacket?.refreshAfterWrite || null,
-    blockingReasonKeys: postSignoffArchiveReady ? [] : preflightBlockingReasonKeys,
-    blockingReasons: postSignoffArchiveReady ? [] : preflightBlockingReasons,
-    nextActionTemplate: postSignoffArchiveReady
+    blockingReasonKeys: postSignoffArchiveReady || postSignoffArchiveRecorded ? [] : preflightBlockingReasonKeys,
+    blockingReasons: postSignoffArchiveReady || postSignoffArchiveRecorded ? [] : preflightBlockingReasons,
+    nextActionTemplate: postSignoffArchiveRecorded
       ? {
-          actionKey: nextLaunchDutyPhase.actionKey || "archive_production_signoff_packet",
-          phaseKey: nextLaunchDutyPhase.key || null,
-          artifact: nextLaunchDutyPhase.artifact || null,
-          archiveIndex: nextLaunchDutyPhase.archiveIndex || null,
+          actionKey: firstReceiptWritePacket?.actionKey || firstReceiptWritePhase?.actionKey || "record_launch_day_watch_summary",
+          phaseKey: firstReceiptWritePhase?.key || null,
+          command: firstReceiptWritePacket?.command || firstReceiptWritePhase?.command || null,
+          artifact: firstReceiptWritePacket?.artifact || firstReceiptWritePhase?.artifact || null,
+          archiveReceiptAuditLogId: postSignoffArchiveReceiptPayload?.auditLogId || null
+        }
+      : postSignoffArchiveReady
+      ? {
+          actionKey: archivePhaseForPacket.actionKey || "archive_production_signoff_packet",
+          phaseKey: archivePhaseForPacket.key || null,
+          artifact: archivePhaseForPacket.artifact || null,
+          archiveIndex: archivePhaseForPacket.archiveIndex || null,
           afterArchiveActionKey: firstReceiptWritePacket?.actionKey || firstReceiptWritePhase?.actionKey || null,
           afterArchiveCommand: firstReceiptWritePacket?.command || firstReceiptWritePhase?.command || null
         }
       : preflightNextActionTemplate,
-    nextAction: postSignoffArchiveReady
+    nextAction: postSignoffArchiveRecorded
+      ? "Production sign-off archive is recorded; run the first launch-day watch receipt write from this packet."
+      : postSignoffArchiveReady
       ? "Archive the production sign-off packet, then run the first launch-day watch receipt write from this packet."
       : "Clear the launch-duty preflight gate before archiving the production sign-off packet."
   } : null;
@@ -30953,7 +31034,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   firstWaveReadinessBridge = null,
   firstWaveConfirmationChain = null,
   launchDutyRecordIndexReceiptSelection = null,
-  launchDutyPacketReviewReceiptSelection = null
+  launchDutyPacketReviewReceiptSelection = null,
+  postSignoffArchiveReceipt = null
 } = {}) {
   const checklist = launchOperationsOperatorChecklist && typeof launchOperationsOperatorChecklist === "object"
     ? launchOperationsOperatorChecklist
@@ -31035,6 +31117,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
       }
     : null;
   const latestSteadyStateDutyPlanReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt);
+  const postSignoffArchiveReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(postSignoffArchiveReceipt);
   const receiptConfirmation = buildDeveloperOpsLaunchOperationsOperatorReceiptConfirmation(
     latestSteadyStateDutyPlanReceiptPayload || latestSteadyStateDutyPlanReceipt,
     { launchDutyRecordIndexPath }
@@ -31047,11 +31130,18 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   });
   const stagingActionQueue = buildDeveloperOpsLaunchOperationsOperatorStagingActionQueue(stagingReadinessBridge);
   const postSignoffWatchBridge = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchBridge(stagingReadinessBridge);
-  const postSignoffWatchQueue = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(postSignoffWatchBridge);
-  const postSignoffWatchReceiptPlan = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(postSignoffWatchBridge);
+  const postSignoffWatchQueue = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(
+    postSignoffWatchBridge,
+    postSignoffArchiveReceiptPayload
+  );
+  const postSignoffWatchReceiptPlan = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(
+    postSignoffWatchBridge,
+    postSignoffArchiveReceiptPayload
+  );
   const postSignoffExecutionChecklist = buildDeveloperOpsLaunchOperationsOperatorPostSignoffExecutionChecklist(
     postSignoffWatchBridge,
-    postSignoffWatchReceiptPlan
+    postSignoffWatchReceiptPlan,
+    postSignoffArchiveReceiptPayload
   );
   const launchSwitchReadinessSummary = buildDeveloperOpsLaunchOperationsOperatorLaunchSwitchReadinessSummary({
     stagingActionQueue,
@@ -31091,7 +31181,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     postSignoffWatchReceiptPlan,
     stagingReadinessBridge,
     launchDutyRecordIndexPath,
-    launchDutyRecordIndexState: latestSteadyStateDutyPlanReceiptPayload?.launchDutyRecordIndexState || null
+    launchDutyRecordIndexState: latestSteadyStateDutyPlanReceiptPayload?.launchDutyRecordIndexState || null,
+    postSignoffArchiveReceipt: postSignoffArchiveReceiptPayload
   });
   const launchDutyRecordIndexOperatorAction = launchDutyRecordIndexReceiptSelection?.operatorAction
     && typeof launchDutyRecordIndexReceiptSelection.operatorAction === "object"
@@ -31417,6 +31508,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     return productMatches && channelMatches;
   }) || firstWaveReadinessBridges[0] || null;
   const latestSteadyStateDutyPlanReceipt = selectSteadyStateDutyPlanReceiptForLaunchDuty(
+    steadyStateDutyPlanReceipts,
+    {
+      productCode: latestReceipt?.productCode || scope.productCode || "",
+      channel: latestReceipt?.channel || scope.channel || "stable"
+    }
+  );
+  const postSignoffArchiveReceipt = selectSteadyStateDutyPlanPostSignoffArchiveReceiptForLaunchDuty(
     steadyStateDutyPlanReceipts,
     {
       productCode: latestReceipt?.productCode || scope.productCode || "",
@@ -31831,7 +31929,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     firstWaveReadinessBridge,
     firstWaveConfirmationChain,
     launchDutyRecordIndexReceiptSelection,
-    launchDutyPacketReviewReceiptSelection
+    launchDutyPacketReviewReceiptSelection,
+    postSignoffArchiveReceipt
   });
   if (steadyStateOperationalReview?.reviewDownload) {
     const dedupeKey = steadyStateOperationalReview.reviewDownload.key
@@ -32178,6 +32277,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateDutyBoard,
     steadyStateDutyActionLinks,
     latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
+    postSignoffArchiveReceipt: buildSteadyStateDutyPlanReceiptPayload(postSignoffArchiveReceipt),
     launchDutyRecordIndexReceiptSelection,
     launchDutyPacketReviewReceiptSelection,
     launchOperationsEvidenceChain,
@@ -41513,6 +41613,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     launchOperationsOperatorEntryDownload: readiness.launchOperationsOperatorEntryDownload || buildDeveloperOpsLaunchOperationsOperatorEntryDownload(scope),
     launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
     latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null,
+    postSignoffArchiveReceipt: readiness.postSignoffArchiveReceipt || null,
     stagingLaunchDutyArchive: readiness.stagingLaunchDutyArchive || null,
     launchOperationsFileIndex: fileIndex,
     launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope)

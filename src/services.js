@@ -31012,6 +31012,79 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
       ? "Refresh staging readiness, reload staging rehearsal, then hand off the completed launch-duty record index and first-wave closeout artifact to stable operations."
       : "Finish first_wave_closeout before refreshing readiness and reloading rehearsal for stable operations handoff."
   } : null;
+  const currentStabilizationRecordKey = stabilizationHandoffComplete
+    ? null
+    : stabilizationReceiptCompletionState?.nextRecordKey || stabilizationReceiptWriteRecords[0]?.recordKey || null;
+  const currentStabilizationRecord = stabilizationReceiptWriteRecords.find((item) => (
+    item.recordKey === currentStabilizationRecordKey
+  )) || null;
+  const currentStabilizationRecorded = currentStabilizationRecord?.recordKey
+    ? recordedRecordKeySet.has(currentStabilizationRecord.recordKey)
+    : false;
+  const currentStabilizationBlockedByRecordKeys = currentStabilizationRecord?.recordKey === stabilizationCloseoutRecord?.recordKey
+    ? stabilizationCloseoutBlockedByRecordKeys
+    : [];
+  const currentStabilizationReceiptWriteReady = Boolean(
+    readyForStabilizationReceiptWrites
+    && currentStabilizationRecord
+    && !currentStabilizationRecorded
+    && currentStabilizationBlockedByRecordKeys.length === 0
+  );
+  const currentStabilizationReceiptWritePacket = currentStabilizationRecord ? {
+    version: "developer-ops-launch-operations-operator-current-stabilization-receipt-write-packet/v1",
+    status: !ready
+      ? "blocked_until_first_wave_confirmation"
+      : currentStabilizationRecorded
+        ? "recorded"
+        : currentStabilizationReceiptWriteReady
+          ? "ready_for_receipt_write"
+          : currentStabilizationBlockedByRecordKeys.length
+            ? "blocked_until_source_records"
+            : "blocked_until_receipt_visibility_snapshot",
+    readyForHandoff: ready,
+    readyForReceiptWrite: currentStabilizationReceiptWriteReady,
+    dependsOnRecordKey: nextReceiptWriteRecord?.key || null,
+    dependsOnRecordRecorded: nextReceiptWriteRecorded,
+    recordKey: currentStabilizationRecord.recordKey || null,
+    actionKey: currentStabilizationRecord.actionKey || null,
+    artifact: currentStabilizationRecord.artifact || null,
+    command: currentStabilizationRecord.command || null,
+    receiptOperations: Array.isArray(currentStabilizationRecord.receiptOperations)
+      ? currentStabilizationRecord.receiptOperations
+      : [],
+    receiptPlaceholders: Array.isArray(currentStabilizationRecord.receiptPlaceholders)
+      ? currentStabilizationRecord.receiptPlaceholders
+      : [],
+    receiptQueue: Array.isArray(currentStabilizationRecord.receiptQueue)
+      ? currentStabilizationRecord.receiptQueue
+      : [],
+    expectedEvidence: currentStabilizationRecord.expectedEvidence || null,
+    sourceRecordKeys: Array.isArray(currentStabilizationRecord.sourceRecordKeys)
+      ? currentStabilizationRecord.sourceRecordKeys
+      : [],
+    sourceRecordsReady: currentStabilizationBlockedByRecordKeys.length === 0,
+    blockedByRecordKeys: currentStabilizationBlockedByRecordKeys,
+    recorded: currentStabilizationRecorded,
+    recordIndexStatus: normalizedLaunchDutyRecordIndexState?.records?.[currentStabilizationRecord.recordKey]?.status || null,
+    recordIndexArtifactPath: normalizedLaunchDutyRecordIndexState?.records?.[currentStabilizationRecord.recordKey]?.artifactPath || null,
+    recordedAt: normalizedLaunchDutyRecordIndexState?.records?.[currentStabilizationRecord.recordKey]?.recordedAt || null,
+    launchDutyRecordIndexPath: currentStabilizationRecord.launchDutyRecordIndexPath || launchDutyRecordIndexPath || null,
+    refreshAfterWrite: {
+      method: "GET",
+      href: refreshAction?.href || packet?.overviewRefreshHref || null,
+      status: currentStabilizationReceiptWriteReady
+        ? "refresh_after_stabilization_receipt_write"
+        : currentStabilizationRecorded
+          ? "completed_refresh_after_stabilization_receipt_write"
+          : "blocked_until_stabilization_receipt_write",
+      confirmationAuditLogId: packet?.confirmationAuditLogId || queue.confirmationReceipt?.auditLogId || null
+    },
+    nextAction: currentStabilizationReceiptWriteReady
+      ? "Run the current stabilization receipt write command, then refresh Developer Ops export."
+      : currentStabilizationRecorded
+        ? "Current stabilization record is already recorded; refresh Developer Ops export to advance the queue."
+        : "Clear the current stabilization receipt blockers before writing this record."
+  } : null;
   const stabilizationReceiptWriteQueue = stabilizationReceiptWriteRecords.length ? {
     version: "developer-ops-launch-operations-operator-stabilization-receipt-write-queue/v1",
     status: stabilizationCompletionStatus,
@@ -31020,9 +31093,8 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     handoffComplete: stabilizationHandoffComplete,
     readyForSteadyStateHandoff: stabilizationHandoffComplete,
     dependsOnRecordKey: nextReceiptWriteRecord?.key || null,
-    currentRecordKey: stabilizationHandoffComplete
-      ? null
-      : stabilizationReceiptCompletionState?.nextRecordKey || stabilizationReceiptWriteRecords[0]?.recordKey || null,
+    currentRecordKey: currentStabilizationRecordKey,
+    currentReceiptWritePacket: currentStabilizationReceiptWritePacket,
     recordCount: stabilizationReceiptWriteRecords.length,
     closeoutRecordKey: stabilizationCloseoutRecord?.recordKey || null,
     closeoutSourceRecordKeys: stabilizationCloseoutSourceRecordKeys,
@@ -31042,9 +31114,6 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
         : "After receipt_visibility_snapshot is written, capture incident, rollback, stabilization owner, and first-wave closeout receipts in order."
       : "Confirm first-wave handoff before preparing stabilization receipt writes."
   } : null;
-  const currentStabilizationRecord = stabilizationReceiptWriteRecords.find((item) => (
-    item.recordKey === stabilizationReceiptWriteQueue?.currentRecordKey
-  )) || null;
   return {
     version: "developer-ops-launch-operations-operator-launch-duty-handoff-action/v1",
     status,
@@ -42375,6 +42444,34 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         + ` | closeoutReady=${completionState?.closeoutReady === true ? "yes" : "no"}`
         + ` | blockedBy=${blockedBy || "-"}`
       );
+      const currentReceiptWritePacket = stabilizationReceiptWriteQueue.currentReceiptWritePacket || null;
+      if (currentReceiptWritePacket) {
+        const currentReceiptPlaceholders = Array.isArray(currentReceiptWritePacket.receiptPlaceholders)
+          ? currentReceiptWritePacket.receiptPlaceholders.join(",")
+          : "";
+        const currentSourceRecords = Array.isArray(currentReceiptWritePacket.sourceRecordKeys)
+          ? currentReceiptWritePacket.sourceRecordKeys.join(",")
+          : "";
+        const currentBlockedBy = Array.isArray(currentReceiptWritePacket.blockedByRecordKeys)
+          ? currentReceiptWritePacket.blockedByRecordKeys.join(",")
+          : "";
+        lines.push("Current Stabilization Receipt Write Packet:");
+        lines.push(
+          `- status=${currentReceiptWritePacket.status || "-"}`
+          + ` | record=${currentReceiptWritePacket.recordKey || "-"}`
+          + ` | action=${currentReceiptWritePacket.actionKey || "-"}`
+          + ` | ready=${currentReceiptWritePacket.readyForReceiptWrite === true ? "yes" : "no"}`
+          + ` | dependsOn=${currentReceiptWritePacket.dependsOnRecordKey || "-"}`
+          + ` | dependsOnRecorded=${currentReceiptWritePacket.dependsOnRecordRecorded === true ? "yes" : "no"}`
+          + ` | artifact=${currentReceiptWritePacket.artifact || "-"}`
+          + ` | receipts=${currentReceiptPlaceholders || "-"}`
+          + ` | sourceRecords=${currentSourceRecords || "-"}`
+          + ` | blockedBy=${currentBlockedBy || "-"}`
+        );
+        if (currentReceiptWritePacket.command) {
+          lines.push(`   command=${currentReceiptWritePacket.command}`);
+        }
+      }
       const closeoutExecutionState = stabilizationReceiptWriteQueue.closeoutExecutionState || null;
       if (closeoutExecutionState) {
         const closeoutReceipts = Array.isArray(closeoutExecutionState.receiptOperations)

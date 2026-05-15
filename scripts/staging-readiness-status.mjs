@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const REQUIRED_CLOSEOUT_KEYS = [
@@ -495,6 +495,115 @@ function reloadCommand(inputFile) {
 function statusCommand(inputFile, actionsFile = null) {
   const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
   return `npm.cmd run staging:readiness:status -- --input-file ${commandValue(inputFile)}${actionsArg}`;
+}
+
+function sourceRecordText(sourceRecords = []) {
+  return sourceRecords.length
+    ? sourceRecords.map((item) => `${item.key}${item.path ? `=${item.path}` : ""}`).join("; ")
+    : "-";
+}
+
+function loadLaunchDutyCompletionHandoff({ inputFile, actionsFile }) {
+  const recordIndexFile = path.join(path.dirname(inputFile), "launch-duty-record-index.json");
+  if (!existsSync(recordIndexFile)) {
+    return null;
+  }
+  const recordIndex = JSON.parse(readFileSync(recordIndexFile, "utf8"));
+  if (recordIndex?.status !== "complete" || !recordIndex.completionHandoff) {
+    return null;
+  }
+  const completionHandoff = {
+    ...recordIndex.completionHandoff,
+    recordIndexFile: recordIndex.completionHandoff.recordIndexFile || recordIndex.recordIndexFile || recordIndexFile,
+    recordedCount: recordIndex.recordedCount ?? recordIndex.completionHandoff.recordedCount ?? 0,
+    pendingCount: recordIndex.pendingCount ?? recordIndex.completionHandoff.pendingCount ?? 0,
+    completedRecordKeys: recordIndex.recordedKeys || recordIndex.completionHandoff.completedRecordKeys || [],
+    actionsFile: actionsFile || recordIndex.completionHandoff.actionsFile || null,
+    statusCommand: statusCommand(inputFile, actionsFile || recordIndex.completionHandoff.actionsFile || null),
+    rehearsalReloadCommand: recordIndex.completionHandoff.rehearsalReloadCommand || reloadCommand(inputFile)
+  };
+  return {
+    ...completionHandoff,
+    handoffArtifacts: completionHandoff.handoffArtifacts?.length
+      ? completionHandoff.handoffArtifacts
+      : [completionHandoff.recordIndexFile, completionHandoff.firstWaveCloseoutArtifactPath].filter(Boolean)
+  };
+}
+
+function buildLaunchDutyCompletionActionQueue(completionHandoff) {
+  return [
+    {
+      key: "reload_rehearsal_for_stabilization_handoff",
+      phase: "stable_operations_handoff",
+      status: "current",
+      targetKey: null,
+      actionKey: "reload_rehearsal_for_stabilization_handoff",
+      command: completionHandoff.rehearsalReloadCommand,
+      statusCommand: completionHandoff.statusCommand,
+      recordIndexFile: completionHandoff.recordIndexFile,
+      handoffArtifacts: completionHandoff.handoffArtifacts,
+      operatorInstruction: "Reload rehearsal so the final packet and archive index show the completed launch-duty record index."
+    },
+    {
+      key: "stable_operations_handoff",
+      phase: "stable_operations_handoff",
+      status: "blocked_after_rehearsal_reload",
+      targetKey: "first_wave_closeout",
+      actionKey: "handoff_stabilization_owner",
+      command: null,
+      statusCommand: completionHandoff.statusCommand,
+      recordIndexFile: completionHandoff.recordIndexFile,
+      artifactPathHint: completionHandoff.firstWaveCloseoutArtifactPath,
+      handoffArtifacts: completionHandoff.handoffArtifacts,
+      sourceRecordKeys: (completionHandoff.sourceRecords || []).map((item) => item.key),
+      operatorInstruction: completionHandoff.nextAction
+    }
+  ];
+}
+
+function buildLaunchDutyCompletionNextStep(completionHandoff) {
+  return {
+    key: "reload_rehearsal_for_stabilization_handoff",
+    targetKey: null,
+    command: completionHandoff.rehearsalReloadCommand,
+    statusCommand: completionHandoff.statusCommand,
+    recordIndexFile: completionHandoff.recordIndexFile,
+    handoffArtifacts: completionHandoff.handoffArtifacts,
+    nextAction: "Reload rehearsal so the final staging packet reflects the completed launch-duty record index, then hand off stabilization artifacts."
+  };
+}
+
+function buildLaunchDutyCompletionOperatorNextCommands(completionHandoff) {
+  return [
+    {
+      key: "reload_rehearsal_for_stabilization_handoff",
+      status: "current",
+      phase: "stable_operations_handoff",
+      actionKey: "reload_rehearsal_for_stabilization_handoff",
+      command: completionHandoff.rehearsalReloadCommand,
+      statusCommand: completionHandoff.statusCommand,
+      artifactPathHint: null,
+      recordIndexFile: completionHandoff.recordIndexFile,
+      handoffArtifacts: completionHandoff.handoffArtifacts,
+      receiptOperations: [],
+      sourceRecordKeys: [],
+      nextAction: "Reload rehearsal so the final packet and archive index show the completed launch-duty record index."
+    },
+    {
+      key: "stable_operations_handoff",
+      status: "blocked_after_rehearsal_reload",
+      phase: "stable_operations_handoff",
+      actionKey: "handoff_stabilization_owner",
+      command: null,
+      statusCommand: completionHandoff.statusCommand,
+      artifactPathHint: completionHandoff.firstWaveCloseoutArtifactPath,
+      recordIndexFile: completionHandoff.recordIndexFile,
+      handoffArtifacts: completionHandoff.handoffArtifacts,
+      receiptOperations: [],
+      sourceRecordKeys: (completionHandoff.sourceRecords || []).map((item) => item.key),
+      nextAction: completionHandoff.nextAction
+    }
+  ];
 }
 
 function queueStatus(index) {
@@ -1137,7 +1246,38 @@ function renderActionQueueMarkdown(result) {
     lines.push("");
   }
 
-  if (!result.launchDutyNextRun && result.operatorNextCommands?.length) {
+  if (result.launchDutyCompletionHandoff) {
+    const handoff = result.launchDutyCompletionHandoff;
+    lines.push("## Launch Duty Completion Handoff");
+    lines.push("");
+    lines.push(`Completion status: \`${handoff.status || "-"}\``);
+    lines.push(`Completed records: ${(handoff.completedRecordKeys || []).join(", ") || "-"}`);
+    lines.push(`Record index: \`${handoff.recordIndexFile || "-"}\``);
+    lines.push(`First-wave closeout artifact: \`${handoff.firstWaveCloseoutArtifactPath || "-"}\``);
+    lines.push(`Handoff artifacts: ${(handoff.handoffArtifacts || []).map((item) => `\`${item}\``).join("; ") || "-"}`);
+    lines.push(`Completion status command: \`${handoff.statusCommand || "-"}\``);
+    lines.push(`Completion rehearsal reload: \`${handoff.rehearsalReloadCommand || "-"}\``);
+    lines.push(`Completion source records: ${sourceRecordText(handoff.sourceRecords)}`);
+    lines.push(`Completion next action: ${handoff.nextAction || "-"}`);
+    if (result.operatorNextCommands?.length) {
+      lines.push("Operator next commands:");
+      for (const item of result.operatorNextCommands) {
+        lines.push(`- ${item.status}: ${item.actionKey || item.key} -> \`${item.command || item.artifactPathHint || "-"}\``);
+        if (item.recordIndexFile) {
+          lines.push(`  - Record index: \`${item.recordIndexFile}\``);
+        }
+        if (item.handoffArtifacts?.length) {
+          lines.push(`  - Handoff artifacts: ${item.handoffArtifacts.map((artifact) => `\`${artifact}\``).join("; ")}`);
+        }
+        if (item.nextAction) {
+          lines.push(`  - Next action: ${item.nextAction}`);
+        }
+      }
+    }
+    lines.push("");
+  }
+
+  if (!result.launchDutyNextRun && !result.launchDutyCompletionHandoff && result.operatorNextCommands?.length) {
     lines.push("## Operator Next Commands");
     lines.push("");
     for (const item of result.operatorNextCommands) {
@@ -1330,14 +1470,23 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     && missingSignoffKeys.length === 0
     && missingReceiptVisibilityKeys.length === 0
     && productionDecision === "ready-for-production-signoff";
+  const launchDutyCompletionHandoff = canSignoffProduction
+    ? loadLaunchDutyCompletionHandoff({ inputFile, actionsFile })
+    : null;
   const currentGate = !canRunFullTestWindow
     ? "pre_full_test_closeout"
-    : canSignoffProduction
+    : launchDutyCompletionHandoff
+      ? "stable_operations_handoff"
+      : canSignoffProduction
       ? "launch_day_watch"
       : missingSignoffKeys.includes("full_test_window_passed")
         ? "full_test_window"
         : "production_signoff";
-  const launchStatus = canSignoffProduction ? "ready_for_launch_day_watch" : "blocked";
+  const launchStatus = launchDutyCompletionHandoff
+    ? "ready_for_stabilization_handoff"
+    : canSignoffProduction
+      ? "ready_for_launch_day_watch"
+      : "blocked";
   const nextStep = buildNextStep({
     inputFile,
     actionsFile,
@@ -1349,7 +1498,9 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     canRunFullTestWindow,
     canSignoffProduction
   });
-  const actionQueue = buildActionQueue({
+  const actionQueue = launchDutyCompletionHandoff
+    ? buildLaunchDutyCompletionActionQueue(launchDutyCompletionHandoff)
+    : buildActionQueue({
     inputFile,
     actionsFile,
     artifactPathRoot,
@@ -1361,13 +1512,15 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     canRunFullTestWindow,
     canSignoffProduction
   });
-  const launchDutyNextRun = canSignoffProduction
+  const launchDutyNextRun = canSignoffProduction && !launchDutyCompletionHandoff
     ? buildLaunchDutyNextRun({ inputFile, actionQueue, artifactPathRoot })
     : null;
   const launchDutyWatchHandoff = launchDutyNextRun
     ? buildLaunchDutyWatchHandoff({ inputFile, actionsFile, launchDutyNextRun })
     : null;
-  const operatorNextCommands = buildReadinessOperatorNextCommands({ currentGate, actionQueue });
+  const operatorNextCommands = launchDutyCompletionHandoff
+    ? buildLaunchDutyCompletionOperatorNextCommands(launchDutyCompletionHandoff)
+    : buildReadinessOperatorNextCommands({ currentGate, actionQueue });
   const fullTestWindowHandoff = currentGate === "full_test_window"
     ? buildFullTestWindowHandoff({ inputFile, actionsFile, actionQueue })
     : null;
@@ -1400,6 +1553,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
       canRunFullTestWindow,
       canSignoffProduction,
       canStartLaunchDayWatch: canSignoffProduction,
+      launchDutyRecordsComplete: Boolean(launchDutyCompletionHandoff),
       closeout: {
         requiredCount: REQUIRED_CLOSEOUT_KEYS.length,
         filledCount: filledCloseoutKeys.length,
@@ -1424,8 +1578,9 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
     ...(launchDutyNextRun ? { launchDutyNextRun } : {}),
     ...(launchDutyWatchHandoff ? { launchDutyWatchHandoff } : {}),
+    ...(launchDutyCompletionHandoff ? { launchDutyCompletionHandoff } : {}),
     ...(operatorNextCommands?.length ? { operatorNextCommands } : {}),
-    nextStep,
+    nextStep: launchDutyCompletionHandoff ? buildLaunchDutyCompletionNextStep(launchDutyCompletionHandoff) : nextStep,
     actionQueue
   };
 }
@@ -1526,6 +1681,9 @@ function writeResult(result, json) {
         if (item.recordIndexFile) {
           console.log(`Operator next ${item.status} record index: ${item.recordIndexFile}`);
         }
+        if (item.handoffArtifacts?.length) {
+          console.log(`Operator next ${item.status} handoff artifacts: ${item.handoffArtifacts.join("; ")}`);
+        }
         if (item.statusCommand) {
           console.log(`Operator next ${item.status} status check: ${item.statusCommand}`);
         }
@@ -1539,6 +1697,18 @@ function writeResult(result, json) {
           console.log(`Operator next ${item.status} next action: ${item.nextAction}`);
         }
       }
+    }
+    if (result.launchDutyCompletionHandoff) {
+      const handoff = result.launchDutyCompletionHandoff;
+      console.log(`Launch duty completion handoff: ${handoff.status}`);
+      console.log(`Launch duty completion record index: ${handoff.recordIndexFile || "-"}`);
+      console.log(`Launch duty completion progress: ${handoff.recordedCount || 0}/6 recorded, ${handoff.pendingCount || 0} pending`);
+      console.log(`Launch duty completion first-wave closeout: ${handoff.firstWaveCloseoutArtifactPath || "-"}`);
+      console.log(`Launch duty completion handoff artifacts: ${(handoff.handoffArtifacts || []).join("; ") || "-"}`);
+      console.log(`Launch duty completion source records: ${sourceRecordText(handoff.sourceRecords)}`);
+      console.log(`Launch duty completion status refresh: ${handoff.statusCommand || "-"}`);
+      console.log(`Launch duty completion rehearsal reload: ${handoff.rehearsalReloadCommand || "-"}`);
+      console.log(`Launch duty completion next action: ${handoff.nextAction || "-"}`);
     }
     if (result.launchDutyNextRun) {
       const nextRun = result.launchDutyNextRun;

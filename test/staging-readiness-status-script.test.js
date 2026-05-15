@@ -965,6 +965,160 @@ test("staging readiness status reports launch-day watch readiness after all loca
   }
 });
 
+test("staging readiness status reports stabilization handoff when launch-duty record index is complete", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-stabilization-handoff-"));
+  try {
+    const artifactRoot = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable");
+    const inputFile = join(artifactRoot, "filled-closeout-input.json");
+    const actionsFile = join(artifactRoot, "readiness-action-queue.md");
+    const recordIndexFile = join(artifactRoot, "launch-duty-record-index.json");
+    const firstWaveCloseoutArtifactPath = join(artifactRoot, "first-wave-closeout.md");
+    const completedAt = "2026-05-15T08:30:00.000Z";
+    const sourceRecords = [
+      { key: "first_wave_incident_log", path: join(artifactRoot, "first-wave-incident-log.md") },
+      { key: "rollback_signal_review", path: join(artifactRoot, "rollback-signal-review.md") },
+      { key: "stabilization_owner_handoff", path: join(artifactRoot, "stabilization-owner-handoff.md") }
+    ];
+    const completionHandoff = {
+      status: "ready_for_stabilization_handoff",
+      completedAt,
+      closeoutInputFile: inputFile,
+      actionsFile,
+      recordIndexFile,
+      recordedCount: 6,
+      pendingCount: 0,
+      completedRecordKeys: [
+        "launch_day_watch_summary",
+        "receipt_visibility_snapshot",
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff",
+        "first_wave_closeout"
+      ],
+      firstWaveCloseoutArtifactPath,
+      sourceRecords,
+      handoffArtifacts: [recordIndexFile, firstWaveCloseoutArtifactPath],
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile} --actions-file ${actionsFile}`,
+      rehearsalReloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`,
+      nextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner."
+    };
+    mkdirSync(artifactRoot, { recursive: true });
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: closeoutKeys,
+      decision: "ready-for-full-test-window",
+      productionDecision: "ready-for-production-signoff",
+      filledSignoffKeys: signoffKeys,
+      visibleReceiptLanes: receiptVisibilityKeys
+    });
+    writeFileSync(recordIndexFile, `${JSON.stringify({
+      mode: "staging-launch-duty-record-index",
+      status: "complete",
+      recordIndexFile,
+      recordedKeys: completionHandoff.completedRecordKeys,
+      pendingKeys: [],
+      recordedCount: 6,
+      pendingCount: 0,
+      nextRecordKey: null,
+      completionHandoff,
+      records: {
+        first_wave_closeout: {
+          status: "recorded",
+          artifactPath: firstWaveCloseoutArtifactPath,
+          sourceRecords,
+          recordedAt: completedAt
+        }
+      }
+    }, null, 2)}\n`, "utf8");
+
+    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.readiness.currentGate, "stable_operations_handoff");
+    assert.equal(output.readiness.launchStatus, "ready_for_stabilization_handoff");
+    assert.equal(output.readiness.launchDutyRecordsComplete, true);
+    assert.equal(output.launchDutyNextRun, undefined);
+    assert.equal(output.launchDutyWatchHandoff, undefined);
+    assert.deepEqual(output.launchDutyCompletionHandoff, completionHandoff);
+    assert.deepEqual(output.nextStep, {
+      key: "reload_rehearsal_for_stabilization_handoff",
+      targetKey: null,
+      command: completionHandoff.rehearsalReloadCommand,
+      statusCommand: completionHandoff.statusCommand,
+      recordIndexFile,
+      handoffArtifacts: completionHandoff.handoffArtifacts,
+      nextAction: "Reload rehearsal so the final staging packet reflects the completed launch-duty record index, then hand off stabilization artifacts."
+    });
+    assert.deepEqual(output.operatorNextCommands, [
+      {
+        key: "reload_rehearsal_for_stabilization_handoff",
+        status: "current",
+        phase: "stable_operations_handoff",
+        actionKey: "reload_rehearsal_for_stabilization_handoff",
+        command: completionHandoff.rehearsalReloadCommand,
+        statusCommand: completionHandoff.statusCommand,
+        artifactPathHint: null,
+        recordIndexFile,
+        handoffArtifacts: completionHandoff.handoffArtifacts,
+        receiptOperations: [],
+        sourceRecordKeys: [],
+        nextAction: "Reload rehearsal so the final packet and archive index show the completed launch-duty record index."
+      },
+      {
+        key: "stable_operations_handoff",
+        status: "blocked_after_rehearsal_reload",
+        phase: "stable_operations_handoff",
+        actionKey: "handoff_stabilization_owner",
+        command: null,
+        statusCommand: completionHandoff.statusCommand,
+        artifactPathHint: firstWaveCloseoutArtifactPath,
+        recordIndexFile,
+        handoffArtifacts: completionHandoff.handoffArtifacts,
+        receiptOperations: [],
+        sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"],
+        nextAction: completionHandoff.nextAction
+      }
+    ]);
+    assert.deepEqual(
+      output.actionQueue.map((item) => [item.key, item.phase, item.status, item.actionKey]),
+      [
+        ["reload_rehearsal_for_stabilization_handoff", "stable_operations_handoff", "current", "reload_rehearsal_for_stabilization_handoff"],
+        ["stable_operations_handoff", "stable_operations_handoff", "blocked_after_rehearsal_reload", "handoff_stabilization_owner"]
+      ]
+    );
+    assert.equal(output.actionsFile.itemCount, 2);
+    const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /Current gate: `stable_operations_handoff`/);
+    assert.match(markdown, /Launch status: `ready_for_stabilization_handoff`/);
+    assert.match(markdown, /## Launch Duty Completion Handoff/);
+    assert.match(markdown, /Completion status: `ready_for_stabilization_handoff`/);
+    assert.match(markdown, /Completed records: launch_day_watch_summary, receipt_visibility_snapshot, first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff, first_wave_closeout/);
+    assert.match(markdown, /Record index: `.*launch-duty-record-index\.json`/);
+    assert.match(markdown, /First-wave closeout artifact: `.*first-wave-closeout\.md`/);
+    assert.match(markdown, /Handoff artifacts: `.*launch-duty-record-index\.json`; `.*first-wave-closeout\.md`/);
+    assert.match(markdown, /Completion status command: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md`/);
+    assert.match(markdown, /Completion rehearsal reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json`/);
+    assert.match(markdown, /Completion source records: first_wave_incident_log=.*first-wave-incident-log\.md; rollback_signal_review=.*rollback-signal-review\.md; stabilization_owner_handoff=.*stabilization-owner-handoff\.md/);
+    assert.match(markdown, /current: reload_rehearsal_for_stabilization_handoff -> `npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json`/);
+    assert.match(markdown, /blocked_after_rehearsal_reload: handoff_stabilization_owner -> `.*first-wave-closeout\.md`/);
+
+    const plain = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
+    assert.equal(plain.status, 0, plain.stderr || plain.stdout);
+    assert.equal(plain.stderr, "");
+    assert.match(plain.stdout, /Current gate: stable_operations_handoff/);
+    assert.match(plain.stdout, /Next step: reload_rehearsal_for_stabilization_handoff/);
+    assert.match(plain.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
+    assert.match(plain.stdout, /Launch duty completion progress: 6\/6 recorded, 0 pending/);
+    assert.match(plain.stdout, /Launch duty completion first-wave closeout: .*first-wave-closeout\.md/);
+    assert.match(plain.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(plain.stdout, /Launch duty completion source records: first_wave_incident_log=.*first-wave-incident-log\.md; rollback_signal_review=.*rollback-signal-review\.md; stabilization_owner_handoff=.*stabilization-owner-handoff\.md/);
+    assert.match(plain.stdout, /Operator next current: reload_rehearsal_for_stabilization_handoff -> npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(plain.stdout, /Operator next blocked_after_rehearsal_reload: handoff_stabilization_owner -> .*first-wave-closeout\.md/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging readiness status prints launch-duty next run in plain output", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-plain-ready-"));
   try {

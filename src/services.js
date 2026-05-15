@@ -16078,6 +16078,46 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           }
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key))
     : [];
+  const firstWaveSupportInspectionPlan = firstWaveReadinessBridge?.supportInspectionPlan
+    && typeof firstWaveReadinessBridge.supportInspectionPlan === "object"
+      ? firstWaveReadinessBridge.supportInspectionPlan
+      : null;
+  const firstWaveSupportInspectionTarget = Array.isArray(firstWaveSupportInspectionPlan?.inspectionTargets)
+    ? firstWaveSupportInspectionPlan.inspectionTargets.find((item) => item?.workspaceAction?.key) || null
+    : null;
+  const firstWaveSupportInspectionWorkspaceAction = firstWaveSupportInspectionTarget?.workspaceAction
+    ? {
+        ...firstWaveSupportInspectionTarget.workspaceAction,
+        label: "Open First-Wave Accounts"
+      }
+    : null;
+  const firstWaveSupportRuntimeEvidenceDownload = Array.isArray(firstWaveSupportInspectionPlan?.downloads)
+    ? firstWaveSupportInspectionPlan.downloads.find((item) => item?.format === "first-wave-runtime-evidence") || null
+    : null;
+  const firstWaveSupportInspectionControls = firstWaveSupportInspectionPlan?.status === "ready_for_support_inspection"
+    ? [
+        firstWaveSupportInspectionWorkspaceAction ? {
+          kind: "workspace",
+          label: "Open First-Wave Support Inspection",
+          workspaceAction: firstWaveSupportInspectionWorkspaceAction,
+          supportInspectionPlan: {
+            status: firstWaveSupportInspectionPlan.status || null,
+            currentTargetKey: firstWaveSupportInspectionPlan.currentTargetKey || null,
+            targetCount: firstWaveSupportInspectionPlan.targetCount ?? null
+          }
+        } : null,
+        firstWaveSupportRuntimeEvidenceDownload ? {
+          kind: "download",
+          label: "Download First-Wave Runtime Evidence",
+          recommendedDownload: firstWaveSupportRuntimeEvidenceDownload,
+          supportInspectionPlan: {
+            status: firstWaveSupportInspectionPlan.status || null,
+            currentTargetKey: firstWaveSupportInspectionPlan.currentTargetKey || null,
+            targetCount: firstWaveSupportInspectionPlan.targetCount ?? null
+          }
+        } : null
+      ].filter(Boolean)
+    : [];
   const firstWaveHeroControls = firstWaveReadinessBridge?.status === "ready_for_first_wave_handoff" && !firstWaveHandoffConfirmed
     ? [
         firstWaveReadinessBridge.downloads?.summary ? {
@@ -16085,6 +16125,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           label: "Download First-Wave Recommendations",
           recommendedDownload: firstWaveReadinessBridge.downloads.summary
         } : null,
+        ...firstWaveSupportInspectionControls,
         firstWaveReadinessBridge.confirmation?.endpoint ? {
           kind: "confirm",
           label: "Confirm First-Wave Handoff",
@@ -16396,8 +16437,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             label: "ready",
             value: `${firstWaveReadinessBridge.readySegmentCount ?? 0}/${firstWaveReadinessBridge.segmentCount ?? 0}`,
             strong: false
-          }
-        ],
+          },
+          firstWaveSupportInspectionPlan ? {
+            label: "support",
+            value: firstWaveSupportInspectionPlan.status || "unknown",
+            strong: false
+          } : null
+        ].filter(Boolean),
+        supportInspectionPlan: firstWaveSupportInspectionPlan
+          ? {
+              status: firstWaveSupportInspectionPlan.status || null,
+              ownerRole: firstWaveSupportInspectionPlan.ownerRole || null,
+              currentTargetKey: firstWaveSupportInspectionPlan.currentTargetKey || null,
+              targetCount: firstWaveSupportInspectionPlan.targetCount ?? null,
+              readyTargetCount: firstWaveSupportInspectionPlan.readyTargetCount ?? null
+            }
+          : null,
         controls: [
           firstWaveReadinessBridge.downloads?.summary ? {
             kind: "download",
@@ -16414,6 +16469,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             label: "Download First-Wave Checksums",
             recommendedDownload: firstWaveReadinessBridge.downloads.checksums
           } : null,
+          ...firstWaveSupportInspectionControls,
           firstWaveReadinessBridge.confirmation?.endpoint ? {
             kind: "confirm",
             label: "Confirm First-Wave Handoff",

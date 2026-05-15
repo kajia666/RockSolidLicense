@@ -16043,6 +16043,21 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && item.confirmation?.endpoint === "/api/developer/ops/first-wave/recommendations/confirm"
       && item.confirmation?.payloadTemplate?.handoffFileName === "developer-ops-first-wave-recommendations-firstwave-stable.txt"
     ));
+    assert.equal(mainlineFirstWaveBridgeCard.supportInspectionPlan?.status, "ready_for_support_inspection");
+    assert.ok(mainlineFirstWaveBridgeCard.tags.some((item) => item.label === "support" && item.value === "ready_for_support_inspection"));
+    assert.ok(mainlineFirstWaveBridgeCard.controls.some((item) =>
+      item.kind === "workspace"
+      && item.label === "Open First-Wave Support Inspection"
+      && item.workspaceAction?.key === "ops"
+      && item.workspaceAction?.autofocus === "accounts"
+      && /routeAction=review-accounts/.test(item.workspaceAction?.href || "")
+    ));
+    assert.ok(mainlineFirstWaveBridgeCard.controls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download First-Wave Runtime Evidence"
+      && item.recommendedDownload?.format === "first-wave-runtime-evidence"
+      && /format=first-wave-runtime-evidence/.test(item.recommendedDownload?.href || "")
+    ));
     assert.ok(mainlineAfterRecommendation.mainlineSummary.heroControls.some((item) =>
       item.kind === "download"
       && item.label === "Download First-Wave Recommendations"
@@ -16055,6 +16070,17 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && item.confirmation?.endpoint === "/api/developer/ops/first-wave/recommendations/confirm"
       && item.confirmation?.payloadTemplate?.firstRoundOpsStatus === afterSetup.firstRoundOps.status
     ));
+    assert.ok(mainlineAfterRecommendation.mainlineSummary.heroControls.some((item) =>
+      item.kind === "workspace"
+      && item.label === "Open First-Wave Support Inspection"
+      && item.workspaceAction?.autofocus === "accounts"
+      && /routeAction=review-accounts/.test(item.workspaceAction?.href || "")
+    ));
+    assert.ok(mainlineAfterRecommendation.mainlineSummary.heroControls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download First-Wave Runtime Evidence"
+      && item.recommendedDownload?.format === "first-wave-runtime-evidence"
+    ));
     assert.ok(mainlineAfterRecommendation.mainlineSummary.screen?.heroControls?.some((item) =>
       item.kind === "confirm"
       && item.confirmation?.payloadTemplate?.inventoryStatus === afterSetup.inventory.status
@@ -16064,7 +16090,10 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineAfterRecommendation.summaryText, /confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(mainlineAfterRecommendation.summaryText, /First-Wave Readiness Bridge \| First-wave handoff is ready_for_first_wave_handoff at first_round_ops/);
     assert.match(mainlineAfterRecommendation.summaryText, /control: Download First-Wave JSON \| download=.*format=json/);
+    assert.match(mainlineAfterRecommendation.summaryText, /control: Open First-Wave Support Inspection \| workspace=Open First-Wave Accounts@accounts\?productCode=FIRSTWAVE,channel=stable,routeAction=review-accounts/);
+    assert.match(mainlineAfterRecommendation.summaryText, /control: Download First-Wave Runtime Evidence \| download=First-wave runtime evidence:developer-ops-first-wave-runtime-evidence\.txt \| href=.*format=first-wave-runtime-evidence/);
     assert.match(mainlineAfterRecommendation.summaryText, /Mainline Hero Controls:/);
+    assert.match(mainlineAfterRecommendation.summaryText, /Open First-Wave Support Inspection \| workspace=Open First-Wave Accounts@accounts\?productCode=FIRSTWAVE,channel=stable,routeAction=review-accounts/);
     assert.match(mainlineAfterRecommendation.summaryText, /Confirm First-Wave Handoff \| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(
       mainlineAfterRecommendation.summaryText,
@@ -16081,6 +16110,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineSummaryAfterRecommendation.body, /download=.*format=summary/);
     assert.match(mainlineSummaryAfterRecommendation.body, /First-Wave Readiness Bridge \| First-wave handoff is ready_for_first_wave_handoff at first_round_ops/);
     assert.match(mainlineSummaryAfterRecommendation.body, /control: Download First-Wave Checksums \| download=.*format=checksums/);
+    assert.match(mainlineSummaryAfterRecommendation.body, /control: Open First-Wave Support Inspection \| workspace=Open First-Wave Accounts@accounts\?productCode=FIRSTWAVE,channel=stable,routeAction=review-accounts/);
+    assert.match(mainlineSummaryAfterRecommendation.body, /Open First-Wave Support Inspection \| workspace=Open First-Wave Accounts@accounts\?productCode=FIRSTWAVE,channel=stable,routeAction=review-accounts/);
     assert.match(mainlineSummaryAfterRecommendation.body, /Confirm First-Wave Handoff \| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
 
     const handoffConfirmation = await postJson(

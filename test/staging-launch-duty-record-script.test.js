@@ -25,6 +25,38 @@ function runRecordPlain(args) {
   });
 }
 
+function launchDutyArtifactPath(artifactRoot, key) {
+  const fileNames = {
+    launch_day_watch_summary: "launch-day-watch-summary.md",
+    receipt_visibility_snapshot: "receipt-visibility-snapshot.txt",
+    first_wave_incident_log: "first-wave-incident-log.md",
+    rollback_signal_review: "rollback-signal-review.md",
+    stabilization_owner_handoff: "stabilization-owner-handoff.md",
+    first_wave_closeout: "first-wave-closeout.md"
+  };
+  return join(artifactRoot, fileNames[key]);
+}
+
+function recordLaunchDutySequence({ closeoutInputFile, actionsFile, recordIndexFile, artifactRoot, keys }) {
+  for (const key of keys) {
+    const result = runRecord([
+      "--closeout-input-file",
+      closeoutInputFile,
+      "--actions-file",
+      actionsFile,
+      "--key",
+      key,
+      "--artifact-path",
+      launchDutyArtifactPath(artifactRoot, key),
+      "--value-json",
+      `{"result":"recorded","summary":"redacted ${key}"}`,
+      "--record-index-file",
+      recordIndexFile
+    ]);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  }
+}
+
 test("staging launch duty record writes a watch summary artifact and next command", () => {
   const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   assert.equal(packageJson.scripts["staging:launch-duty:record"], "node scripts/staging-launch-duty-record.mjs");
@@ -303,6 +335,150 @@ test("staging launch duty record auto-fills first-wave closeout source records f
 
     const recordIndex = JSON.parse(readFileSync(recordIndexFile, "utf8"));
     assert.deepEqual(recordIndex.records.first_wave_closeout.sourceRecords, output.sourceRecords);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging launch duty record emits completion handoff after first-wave closeout completes the index", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-launch-duty-record-complete-"));
+  try {
+    const artifactRoot = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable");
+    const closeoutInputFile = join(artifactRoot, "filled-closeout-input.json");
+    const actionsFile = join(artifactRoot, "readiness-action-queue.md");
+    const recordIndexFile = join(artifactRoot, "launch-duty-record-index.json");
+    const closeoutArtifactPath = launchDutyArtifactPath(artifactRoot, "first_wave_closeout");
+    recordLaunchDutySequence({
+      closeoutInputFile,
+      actionsFile,
+      recordIndexFile,
+      artifactRoot,
+      keys: [
+        "launch_day_watch_summary",
+        "receipt_visibility_snapshot",
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff"
+      ]
+    });
+
+    const result = runRecord([
+      "--closeout-input-file",
+      closeoutInputFile,
+      "--actions-file",
+      actionsFile,
+      "--key",
+      "first_wave_closeout",
+      "--artifact-path",
+      closeoutArtifactPath,
+      "--value-json",
+      "{\"result\":\"closed\",\"summary\":\"redacted closeout\"}",
+      "--record-index-file",
+      recordIndexFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.recordIndex, {
+      path: recordIndexFile,
+      status: "complete",
+      recordedCount: 6,
+      pendingCount: 0,
+      nextRecordKey: null
+    });
+    assert.equal(output.nextRecord, null);
+    assert.equal(output.nextRecordCommand, null);
+    assert.deepEqual(output.completionHandoff, {
+      status: "ready_for_stabilization_handoff",
+      completedAt: output.recordedAt,
+      closeoutInputFile,
+      actionsFile,
+      recordIndexFile,
+      recordedCount: 6,
+      pendingCount: 0,
+      completedRecordKeys: [
+        "launch_day_watch_summary",
+        "receipt_visibility_snapshot",
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff",
+        "first_wave_closeout"
+      ],
+      firstWaveCloseoutArtifactPath: closeoutArtifactPath,
+      sourceRecords: [
+        { key: "first_wave_incident_log", path: launchDutyArtifactPath(artifactRoot, "first_wave_incident_log") },
+        { key: "rollback_signal_review", path: launchDutyArtifactPath(artifactRoot, "rollback_signal_review") },
+        { key: "stabilization_owner_handoff", path: launchDutyArtifactPath(artifactRoot, "stabilization_owner_handoff") }
+      ],
+      handoffArtifacts: [recordIndexFile, closeoutArtifactPath],
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      rehearsalReloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      nextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner."
+    });
+    assert.deepEqual(
+      output.operatorNextCommands.map((item) => [item.key, item.status]),
+      [
+        ["readiness_status", "current"],
+        ["rehearsal_reload", "blocked_after_readiness_status"],
+        ["stable_operations_handoff", "blocked_after_rehearsal_reload"]
+      ]
+    );
+    const handoffStep = output.operatorNextCommands.find((item) => item.key === "stable_operations_handoff");
+    assert.equal(handoffStep.command, null);
+    assert.deepEqual(handoffStep.handoffArtifacts, [recordIndexFile, closeoutArtifactPath]);
+
+    const recordIndex = JSON.parse(readFileSync(recordIndexFile, "utf8"));
+    assert.deepEqual(recordIndex.completionHandoff, output.completionHandoff);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging launch duty record prints completion handoff after first-wave closeout completes the index", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-launch-duty-record-complete-plain-"));
+  try {
+    const artifactRoot = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable");
+    const closeoutInputFile = join(artifactRoot, "filled-closeout-input.json");
+    const actionsFile = join(artifactRoot, "readiness-action-queue.md");
+    const recordIndexFile = join(artifactRoot, "launch-duty-record-index.json");
+    const closeoutArtifactPath = launchDutyArtifactPath(artifactRoot, "first_wave_closeout");
+    recordLaunchDutySequence({
+      closeoutInputFile,
+      actionsFile,
+      recordIndexFile,
+      artifactRoot,
+      keys: [
+        "launch_day_watch_summary",
+        "receipt_visibility_snapshot",
+        "first_wave_incident_log",
+        "rollback_signal_review",
+        "stabilization_owner_handoff"
+      ]
+    });
+
+    const result = runRecordPlain([
+      "--closeout-input-file",
+      closeoutInputFile,
+      "--actions-file",
+      actionsFile,
+      "--key",
+      "first_wave_closeout",
+      "--artifact-path",
+      closeoutArtifactPath,
+      "--value-json",
+      "{\"result\":\"closed\",\"summary\":\"redacted closeout\"}",
+      "--record-index-file",
+      recordIndexFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Launch duty record index status: complete/);
+    assert.match(result.stdout, /Launch duty record index progress: 6\/6 recorded, 0 pending/);
+    assert.match(result.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
+    assert.match(result.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(result.stdout, /Launch duty completion handoff next action: Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner\./);
+    assert.match(result.stdout, /Launch duty operator next blocked_after_rehearsal_reload: stable_operations_handoff -> -/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

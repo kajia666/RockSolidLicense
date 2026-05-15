@@ -320,6 +320,32 @@ function buildIndexNextRecordCommand({ progress, options, recordIndexFile, recor
   });
 }
 
+function buildCompletionHandoff({ progress, records, options, recordIndexFile, statusRefreshCommand, rehearsalReloadCommand }) {
+  if (progress.status !== "complete") {
+    return null;
+  }
+  const firstWaveCloseoutRecord = records.first_wave_closeout;
+  if (!firstWaveCloseoutRecord?.artifactPath) {
+    return null;
+  }
+  return {
+    status: "ready_for_stabilization_handoff",
+    completedAt: firstWaveCloseoutRecord.recordedAt,
+    closeoutInputFile: options.closeoutInputFile,
+    actionsFile: options.actionsFile || null,
+    recordIndexFile,
+    recordedCount: progress.recordedCount,
+    pendingCount: progress.pendingCount,
+    completedRecordKeys: progress.recordedKeys,
+    firstWaveCloseoutArtifactPath: firstWaveCloseoutRecord.artifactPath,
+    sourceRecords: firstWaveCloseoutRecord.sourceRecords || [],
+    handoffArtifacts: [recordIndexFile, firstWaveCloseoutRecord.artifactPath],
+    statusCommand: statusRefreshCommand,
+    rehearsalReloadCommand,
+    nextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner."
+  };
+}
+
 function buildRecordIndexEntry({ options, target, value, sourceRecords, recordedAt }) {
   return {
     key: options.key,
@@ -343,6 +369,14 @@ function buildRecordIndex({ existingIndex, recordEntry, options, recordIndexFile
   };
   const progress = recordIndexProgress(records);
   const nextRecordCommand = buildIndexNextRecordCommand({ progress, options, recordIndexFile, records });
+  const completionHandoff = buildCompletionHandoff({
+    progress,
+    records,
+    options,
+    recordIndexFile,
+    statusRefreshCommand,
+    rehearsalReloadCommand
+  });
   return {
     ...existingIndex,
     mode: "staging-launch-duty-record-index",
@@ -361,10 +395,13 @@ function buildRecordIndex({ existingIndex, recordEntry, options, recordIndexFile
     nextRecordCommand,
     statusCommand: statusRefreshCommand,
     rehearsalReloadCommand,
+    completionHandoff,
     records,
     nextAction: nextRecordCommand
       ? `Run nextRecordCommand for ${progress.nextRecordKey}, then refresh readiness status.`
-      : "Refresh readiness status, then reload rehearsal for the latest launch-duty archive."
+      : completionHandoff
+        ? completionHandoff.nextAction
+        : "Refresh readiness status, then reload rehearsal for the latest launch-duty archive."
   };
 }
 
@@ -374,7 +411,7 @@ function writeRecordIndex(recordIndexFile, recordIndex) {
   writeFileSync(resolvedRecordIndexFile, `${JSON.stringify(recordIndex, null, 2)}\n`, "utf8");
 }
 
-function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefreshCommand, rehearsalReloadCommand, actionsFile, closeoutInputFile, recordIndexFile }) {
+function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefreshCommand, rehearsalReloadCommand, actionsFile, closeoutInputFile, recordIndexFile, completionHandoff = null }) {
   const commands = [];
   if (nextRecordCommand) {
     commands.push({
@@ -404,6 +441,17 @@ function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefres
       nextAction: "Reload rehearsal so the launch-duty packet and archive index point at the latest record artifacts."
     }
   );
+  if (completionHandoff) {
+    commands.push({
+      key: "stable_operations_handoff",
+      status: "blocked_after_rehearsal_reload",
+      command: null,
+      artifactPath: completionHandoff.firstWaveCloseoutArtifactPath,
+      recordIndexFile,
+      handoffArtifacts: completionHandoff.handoffArtifacts,
+      nextAction: completionHandoff.nextAction
+    });
+  }
   return commands;
 }
 
@@ -504,6 +552,7 @@ function buildResult(options) {
     },
     nextRecord,
     nextRecordCommand,
+    completionHandoff: recordIndex.completionHandoff || null,
     statusCommand: statusRefreshCommand,
     rehearsalReloadCommand,
     operatorNextCommands: buildOperatorNextCommands({
@@ -513,11 +562,14 @@ function buildResult(options) {
       rehearsalReloadCommand,
       actionsFile: options.actionsFile,
       closeoutInputFile: options.closeoutInputFile,
-      recordIndexFile
+      recordIndexFile,
+      completionHandoff: recordIndex.completionHandoff
     }),
     nextAction: nextRecord
       ? `Run nextRecordCommand for ${nextRecord.key}, then refresh readiness status.`
-      : "Refresh readiness status, then reload rehearsal for the latest launch-duty archive."
+      : recordIndex.completionHandoff
+        ? recordIndex.completionHandoff.nextAction
+        : "Refresh readiness status, then reload rehearsal for the latest launch-duty archive."
   };
 }
 
@@ -539,6 +591,11 @@ function writeResult(result, json) {
     console.log(`Launch duty record next command: ${result.nextRecordCommand || "-"}`);
     console.log(`Launch duty record status refresh: ${result.statusCommand}`);
     console.log(`Launch duty record rehearsal reload: ${result.rehearsalReloadCommand}`);
+    if (result.completionHandoff) {
+      console.log(`Launch duty completion handoff: ${result.completionHandoff.status}`);
+      console.log(`Launch duty completion handoff artifacts: ${result.completionHandoff.handoffArtifacts.join("; ")}`);
+      console.log(`Launch duty completion handoff next action: ${result.completionHandoff.nextAction}`);
+    }
     for (const item of result.operatorNextCommands || []) {
       console.log(`Launch duty operator next ${item.status || "-"}: ${item.key || "-"} -> ${item.command || "-"}`);
       console.log(`Launch duty operator next ${item.status || "-"} record index: ${item.recordIndexFile || "-"}`);

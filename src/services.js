@@ -30152,6 +30152,83 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       ? "Refresh Developer Ops overview and attach the confirmation audit plus launch-duty record index to the launch-duty handoff."
       : "Complete first-wave handoff confirmation before preparing launch-duty handoff."
   };
+  const postConfirmationSwitchRequiredChecks = [
+    {
+      key: "receipt_visibility_parity",
+      status: parityStatus,
+      ready: parityAligned
+    },
+    {
+      key: "first_wave_handoff_confirmation",
+      status: handoffConfirmed ? "confirmed" : "pending",
+      ready: handoffConfirmed,
+      auditLogId: confirmationReceipt?.auditLogId || null
+    },
+    {
+      key: "support_inspection_confirmation",
+      status: supportInspectionConfirmation?.status || (supportInspectionReady ? "ready" : "pending"),
+      ready: supportInspectionReady,
+      auditLogId: supportInspectionAuditLogId
+    },
+    {
+      key: "manual_checkpoint_closeout",
+      status: manualCheckpointStatus,
+      ready: manualCheckpointClosed
+    },
+    {
+      key: "developer_ops_overview_refresh",
+      status: overviewRefreshAction.status,
+      ready: overviewRefreshAction.ready === true,
+      href: overviewRefreshAction.href
+    }
+  ];
+  const postConfirmationSwitchReady = parityAligned && handoffConfirmed && manualCheckpointClosed && overviewRefreshAction.ready === true;
+  const postConfirmationSwitchBlockingReasonKeys = postConfirmationSwitchRequiredChecks
+    .filter((item) => item.ready !== true)
+    .map((item) => item.key);
+  const postConfirmationSwitchBlockingReasons = postConfirmationSwitchBlockingReasonKeys
+    .map((key) => ({
+      receipt_visibility_parity: "Receipt visibility parity is not aligned across Launch Review/Smoke summaries.",
+      first_wave_handoff_confirmation: "First-wave handoff confirmation is not recorded yet.",
+      support_inspection_confirmation: "Support inspection confirmation is not ready.",
+      manual_checkpoint_closeout: "Manual checkpoint is not closed from the same record-index context.",
+      developer_ops_overview_refresh: "Developer Ops overview refresh has not reached ready state yet."
+    }[key]))
+    .filter(Boolean);
+  const postConfirmationSwitchNextActionTemplate = !parityAligned
+    ? {
+        actionKey: "repair_receipt_visibility_parity",
+        method: null,
+        route: null,
+        href: null
+      }
+    : !handoffConfirmed
+      ? {
+          actionKey: "confirm_first_wave_handoff",
+          method: confirmationMethod,
+          route: confirmationEndpoint,
+          payload: confirmationPayload
+        }
+      : !manualCheckpointClosed
+        ? {
+            actionKey: "close_manual_checkpoint",
+            method: "GET",
+            route: overviewRefreshAction.route,
+            href: overviewRefreshAction.href
+          }
+        : !overviewRefreshAction.ready
+          ? {
+              actionKey: overviewRefreshAction.key,
+              method: overviewRefreshAction.method,
+              route: overviewRefreshAction.route,
+              href: overviewRefreshAction.href
+            }
+          : {
+              actionKey: "handoff_launch_duty_to_post_signoff",
+              method: null,
+              route: null,
+              href: null
+            };
   const postConfirmationSwitchPacket = {
     version: "developer-ops-launch-operations-operator-post-confirmation-switch-packet/v1",
     status: !parityAligned
@@ -30163,7 +30240,8 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
           : overviewRefreshAction.ready
             ? "ready_for_launch_duty_handoff"
             : "pending_developer_ops_overview_refresh",
-    ready: parityAligned && handoffConfirmed && manualCheckpointClosed && overviewRefreshAction.ready === true,
+    ready: postConfirmationSwitchReady,
+    decision: postConfirmationSwitchReady ? "allow_launch_duty_handoff" : "hold_launch_duty_handoff",
     manualCheckpointStatus,
     manualCheckpointClosed,
     manualCheckpointProgress,
@@ -30173,36 +30251,10 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     refreshHref: overviewRefreshAction.href,
     confirmationAuditLogId: confirmationReceipt?.auditLogId || null,
     launchDutyRecordIndexPath: resolvedRecordIndexPath,
-    requiredChecks: [
-      {
-        key: "receipt_visibility_parity",
-        status: parityStatus,
-        ready: parityAligned
-      },
-      {
-        key: "first_wave_handoff_confirmation",
-        status: handoffConfirmed ? "confirmed" : "pending",
-        ready: handoffConfirmed,
-        auditLogId: confirmationReceipt?.auditLogId || null
-      },
-      {
-        key: "support_inspection_confirmation",
-        status: supportInspectionConfirmation?.status || (supportInspectionReady ? "ready" : "pending"),
-        ready: supportInspectionReady,
-        auditLogId: supportInspectionAuditLogId
-      },
-      {
-        key: "manual_checkpoint_closeout",
-        status: manualCheckpointStatus,
-        ready: manualCheckpointClosed
-      },
-      {
-        key: "developer_ops_overview_refresh",
-        status: overviewRefreshAction.status,
-        ready: overviewRefreshAction.ready === true,
-        href: overviewRefreshAction.href
-      }
-    ],
+    requiredChecks: postConfirmationSwitchRequiredChecks,
+    blockingReasonKeys: postConfirmationSwitchBlockingReasonKeys,
+    blockingReasons: postConfirmationSwitchBlockingReasons,
+    nextActionTemplate: postConfirmationSwitchNextActionTemplate,
     nextAction: !parityAligned
       ? "Repair receipt visibility parity before preparing the post-confirmation switch."
       : !handoffConfirmed
@@ -30460,15 +30512,82 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
       ready: refreshAction?.ready === true
     }
   ];
+  const preflightBlockingReasonKeys = preflightChecks
+    .filter((item) => item.ready !== true)
+    .map((item) => item.key);
+  const preflightBlockingReasons = preflightBlockingReasonKeys
+    .map((key) => ({
+      receipt_visibility_parity: "Receipt visibility parity is not aligned.",
+      first_wave_handoff_confirmation: "First-wave handoff confirmation is missing.",
+      support_inspection_confirmation: "Support inspection confirmation is missing.",
+      manual_checkpoint_closeout: "Manual checkpoint is not closed.",
+      developer_ops_overview_refresh: "Developer Ops overview refresh is not ready."
+    }[key]))
+    .filter(Boolean);
+  const preflightDecision = preflightReadyForPostSignoffArchive
+    ? "allow_post_signoff_archive"
+    : "hold_post_signoff_archive";
+  const preflightNextActionTemplate = preflightReadyForPostSignoffArchive
+    ? {
+        actionKey: nextLaunchDutyPhase?.actionKey || "archive_production_signoff_packet",
+        phaseKey: nextLaunchDutyPhase?.key || null,
+        command: nextLaunchDutyPhase?.command || null,
+        artifact: nextLaunchDutyPhase?.artifact || null
+      }
+    : queue.parityStatus !== "aligned"
+      ? {
+          actionKey: "repair_receipt_visibility_parity",
+          method: null,
+          route: null,
+          href: null
+        }
+      : queue.handoffConfirmed !== true
+        ? {
+            actionKey: "confirm_first_wave_handoff",
+            method: confirmationSubmissionPacket?.method || null,
+            route: confirmationSubmissionPacket?.route || null,
+            payload: confirmationSubmissionPacket?.payload || null
+          }
+        : remainingManualCheckpoints > 0
+          ? {
+              actionKey: "close_manual_checkpoint",
+              method: refreshAction?.method || "GET",
+              route: refreshAction?.route || null,
+              href: refreshAction?.href || null
+            }
+          : !supportInspectionReady
+            ? {
+                actionKey: "complete_support_inspection_confirmation",
+                method: null,
+                route: null,
+                href: null
+              }
+            : postConfirmationSwitchPacket && postConfirmationSwitchPacket.ready !== true
+              ? {
+                  actionKey: postConfirmationSwitchPacket.nextActionTemplate?.actionKey || "refresh_developer_ops_overview",
+                  method: postConfirmationSwitchPacket.nextActionTemplate?.method || refreshAction?.method || null,
+                  route: postConfirmationSwitchPacket.nextActionTemplate?.route || refreshAction?.route || null,
+                  href: postConfirmationSwitchPacket.nextActionTemplate?.href || refreshAction?.href || null
+                }
+              : {
+                  actionKey: refreshAction?.key || "refresh_developer_ops_overview",
+                  method: refreshAction?.method || "GET",
+                  route: refreshAction?.route || null,
+                  href: refreshAction?.href || null
+                };
   const preflightGate = {
     version: "developer-ops-launch-operations-operator-launch-duty-preflight-gate/v1",
     status: preflightStatus,
     readyForPostSignoffArchive: preflightReadyForPostSignoffArchive,
+    decision: preflightDecision,
     manualCheckpointProgress,
     remainingManualCheckpoints,
     confirmationSubmissionStatus: confirmationSubmissionPacket?.status || null,
     postConfirmationSwitchStatus: postConfirmationSwitchPacket?.status || null,
     checks: preflightChecks,
+    blockingReasonKeys: preflightBlockingReasonKeys,
+    blockingReasons: preflightBlockingReasons,
+    nextActionTemplate: preflightNextActionTemplate,
     launchDutyRecordIndexPath: launchDutyRecordIndexPath || packet?.launchDutyRecordIndexPath || queue.launchDutyRecordIndexPath || null,
     nextAction: preflightReadyForPostSignoffArchive
       ? "Preflight is complete; proceed to archive the production sign-off packet and begin launch-day watch receipt writes."

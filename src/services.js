@@ -30974,20 +30974,48 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
         ? "Stabilization receipt writes are complete. Continue steady-state handoff and monitor first-wave stability."
         : "Record the remaining closeout source records before running first_wave_closeout."
   } : null;
+  const stableOperationsRecordIndexFile = launchDutyRecordIndexPath
+    || packet?.launchDutyRecordIndexPath
+    || queue.launchDutyRecordIndexPath
+    || null;
+  const stableOperationsFirstWaveCloseoutArtifactPath = stabilizationCloseoutRecord?.artifact || null;
+  const stableOperationsHandoffArtifacts = [
+    stableOperationsRecordIndexFile,
+    stableOperationsFirstWaveCloseoutArtifactPath
+  ].filter(Boolean);
+  const currentStableOperationsHandoffPacket = stabilizationHandoffComplete && stabilizationCloseoutRecord ? {
+    version: "developer-ops-launch-operations-operator-current-stable-operations-handoff-packet/v1",
+    status: "ready_for_readiness_refresh",
+    readyForHandoff: true,
+    sourceRecordKey: stabilizationCloseoutRecord.recordKey || null,
+    sourceRecordRecorded: stabilizationCloseoutRecorded,
+    sourceRecordRecordedAt: normalizedLaunchDutyRecordIndexState?.records?.[stabilizationCloseoutRecord.recordKey]?.recordedAt || null,
+    actionKey: "refresh_staging_readiness_after_first_wave_closeout",
+    command: stagingReadinessBridge?.readinessStatusCommand || null,
+    nextActionKey: "reload_staging_rehearsal_for_stable_operations",
+    nextCommand: stagingReadinessBridge?.rehearsalReloadCommand || null,
+    recordIndexFile: stableOperationsRecordIndexFile,
+    firstWaveCloseoutArtifactPath: stableOperationsFirstWaveCloseoutArtifactPath,
+    handoffArtifacts: stableOperationsHandoffArtifacts,
+    refreshAfterHandoff: {
+      method: "GET",
+      href: refreshAction?.href || packet?.overviewRefreshHref || null,
+      status: "refresh_after_stable_operations_readiness",
+      confirmationAuditLogId: packet?.confirmationAuditLogId || queue.confirmationReceipt?.auditLogId || null
+    }
+  } : null;
   const stableOperationsHandoffTail = stabilizationCloseoutRecord ? {
     version: "developer-ops-launch-operations-operator-stable-operations-handoff-tail/v1",
     status: stabilizationHandoffComplete
       ? "ready_for_stable_operations_handoff"
       : "blocked_until_first_wave_closeout",
     readyForHandoff: stabilizationHandoffComplete,
-    recordIndexFile: launchDutyRecordIndexPath || packet?.launchDutyRecordIndexPath || queue.launchDutyRecordIndexPath || null,
-    firstWaveCloseoutArtifactPath: stabilizationCloseoutRecord.artifact || null,
+    recordIndexFile: stableOperationsRecordIndexFile,
+    firstWaveCloseoutArtifactPath: stableOperationsFirstWaveCloseoutArtifactPath,
     readinessStatusCommand: stagingReadinessBridge?.readinessStatusCommand || null,
     rehearsalReloadCommand: stagingReadinessBridge?.rehearsalReloadCommand || null,
-    handoffArtifacts: [
-      launchDutyRecordIndexPath || packet?.launchDutyRecordIndexPath || queue.launchDutyRecordIndexPath || null,
-      stabilizationCloseoutRecord.artifact || null
-    ].filter(Boolean),
+    handoffArtifacts: stableOperationsHandoffArtifacts,
+    currentHandoffPacket: currentStableOperationsHandoffPacket,
     actions: [
       {
         key: "refresh_staging_readiness_after_first_wave_closeout",
@@ -31119,11 +31147,12 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     status,
     ready,
     currentActionKey: ready
-      ? readyForNextReceiptWrite
-        ? nextReceiptWritePacket?.actionKey || nextReceiptWriteRecord?.actionKey || null
-        : nextReceiptWriteRecorded && currentStabilizationRecord?.actionKey
-          ? currentStabilizationRecord.actionKey
-          : nextLaunchDutyPhase?.actionKey || preflightNextActionTemplate?.actionKey || refreshAction?.key || "archive_production_signoff_packet"
+      ? currentStableOperationsHandoffPacket?.actionKey
+        || (readyForNextReceiptWrite
+          ? nextReceiptWritePacket?.actionKey || nextReceiptWriteRecord?.actionKey || null
+          : nextReceiptWriteRecorded && currentStabilizationRecord?.actionKey
+            ? currentStabilizationRecord.actionKey
+            : nextLaunchDutyPhase?.actionKey || preflightNextActionTemplate?.actionKey || refreshAction?.key || "archive_production_signoff_packet")
       : packet?.currentActionKey || "confirm_first_wave_handoff",
     supportInspectionReady,
     supportInspectionStatus,
@@ -38433,6 +38462,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           || stabilizationCompletionState?.handoffComplete === true;
         const stabilizationCloseoutExecutionState = stabilizationReceiptWriteQueue?.closeoutExecutionState || null;
         const stableOperationsHandoffTail = stabilizationReceiptWriteQueue?.stableOperationsHandoffTail || null;
+        const stableOperationsHandoffPacket = stableOperationsHandoffTail?.currentHandoffPacket || null;
         lines.push(
           `- launchDutyHandoffAction=${launchDutyHandoffAction.status || "-"}`
           + ` | launchDutyHandoffReady=${launchDutyHandoffAction.ready === true}`
@@ -38467,6 +38497,8 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyStabilizationBlockedBy=${stabilizationBlockedBy || "-"}`
           + ` | launchDutyStableOperationsTail=${stableOperationsHandoffTail?.status || "-"}`
           + ` | launchDutyStableOperationsReady=${stableOperationsHandoffTail?.readyForHandoff === true}`
+          + ` | launchDutyStableOperationsPacket=${stableOperationsHandoffPacket?.status || "-"}`
+          + ` | launchDutyStableOperationsAction=${stableOperationsHandoffPacket?.actionKey || "-"}`
           + ` | refresh=${launchDutyHandoffAction.overviewRefreshHref || "-"}`
           + ` | receiptAudit=${launchDutyHandoffAction.confirmationAuditLogId || "-"}`
           + ` | launchDutyRecordIndex=${launchDutyHandoffAction.launchDutyRecordIndexPath || "-"}`
@@ -39390,6 +39422,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         || stabilizationCompletionState?.handoffComplete === true;
       const stabilizationCloseoutExecutionState = stabilizationReceiptWriteQueue?.closeoutExecutionState || null;
       const stableOperationsHandoffTail = stabilizationReceiptWriteQueue?.stableOperationsHandoffTail || null;
+      const stableOperationsHandoffPacket = stableOperationsHandoffTail?.currentHandoffPacket || null;
       lines.push(
         `- Launch Duty Handoff Action: ${launchDutyHandoffAction.status || "-"}`
         + ` | ready=${launchDutyHandoffAction.ready === true ? "yes" : "no"}`
@@ -39421,6 +39454,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | stabilizationBlockedBy=${stabilizationBlockedBy || "-"}`
         + ` | stableOperationsTail=${stableOperationsHandoffTail?.status || "-"}`
         + ` | stableOperationsReady=${stableOperationsHandoffTail?.readyForHandoff === true}`
+        + ` | stableOperationsPacket=${stableOperationsHandoffPacket?.status || "-"}`
+        + ` | stableOperationsAction=${stableOperationsHandoffPacket?.actionKey || "-"}`
         + ` | refresh=${launchDutyHandoffAction.overviewRefreshHref || "-"}`
       );
     }
@@ -42507,6 +42542,39 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
           + ` | recordIndex=${stableOperationsHandoffTail.recordIndexFile || "-"}`
           + ` | firstWaveCloseout=${stableOperationsHandoffTail.firstWaveCloseoutArtifactPath || "-"}`
         );
+        const currentHandoffPacket = stableOperationsHandoffTail.currentHandoffPacket || null;
+        if (currentHandoffPacket) {
+          const currentHandoffArtifacts = Array.isArray(currentHandoffPacket.handoffArtifacts)
+            ? currentHandoffPacket.handoffArtifacts.join(",")
+            : "";
+          lines.push("Current Stable Operations Handoff Packet:");
+          lines.push(
+            `- status=${currentHandoffPacket.status || "-"}`
+            + ` | action=${currentHandoffPacket.actionKey || "-"}`
+            + ` | next=${currentHandoffPacket.nextActionKey || "-"}`
+            + ` | source=${currentHandoffPacket.sourceRecordKey || "-"}`
+            + ` | sourceRecorded=${currentHandoffPacket.sourceRecordRecorded === true ? "yes" : "no"}`
+            + ` | recordedAt=${currentHandoffPacket.sourceRecordRecordedAt || "-"}`
+            + ` | recordIndex=${currentHandoffPacket.recordIndexFile || "-"}`
+            + ` | firstWaveCloseout=${currentHandoffPacket.firstWaveCloseoutArtifactPath || "-"}`
+          );
+          if (currentHandoffPacket.command) {
+            lines.push(`   command=${currentHandoffPacket.command}`);
+          }
+          if (currentHandoffPacket.nextCommand) {
+            lines.push(`   nextCommand=${currentHandoffPacket.nextCommand}`);
+          }
+          if (currentHandoffArtifacts) {
+            lines.push(`   artifacts=${currentHandoffArtifacts}`);
+          }
+          if (currentHandoffPacket.refreshAfterHandoff) {
+            lines.push(
+              `   refresh=${currentHandoffPacket.refreshAfterHandoff.method || "GET"} ${currentHandoffPacket.refreshAfterHandoff.href || "-"}`
+              + ` | status=${currentHandoffPacket.refreshAfterHandoff.status || "-"}`
+              + ` | audit=${currentHandoffPacket.refreshAfterHandoff.confirmationAuditLogId || "-"}`
+            );
+          }
+        }
         const stableOperationsActions = Array.isArray(stableOperationsHandoffTail.actions)
           ? stableOperationsHandoffTail.actions
           : [];

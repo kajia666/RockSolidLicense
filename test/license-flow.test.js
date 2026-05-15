@@ -23113,6 +23113,33 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
     );
     assert.deepEqual(
+      launchDutyCloseoutRecordedQueue.stableOperationsHandoffTail.currentHandoffPacket,
+      {
+        version: "developer-ops-launch-operations-operator-current-stable-operations-handoff-packet/v1",
+        status: "ready_for_readiness_refresh",
+        readyForHandoff: true,
+        sourceRecordKey: "first_wave_closeout",
+        sourceRecordRecorded: true,
+        sourceRecordRecordedAt: "2026-05-14T10:05:00.000Z",
+        actionKey: "refresh_staging_readiness_after_first_wave_closeout",
+        command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        nextActionKey: "reload_staging_rehearsal_for_stable_operations",
+        nextCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+        recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+        firstWaveCloseoutArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+        handoffArtifacts: [
+          expectedSteadyStateLaunchDutyRecordIndexPath,
+          "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md"
+        ],
+        refreshAfterHandoff: {
+          method: "GET",
+          href: "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&channel=stable",
+          status: "refresh_after_stable_operations_readiness",
+          confirmationAuditLogId: exportCloseoutHandoffConfirmation.auditLogId
+        }
+      }
+    );
+    assert.deepEqual(
       launchDutyCloseoutRecordedQueue.stableOperationsHandoffTail.actions.map((item) => [item.key, item.status, item.command]),
       [
         [
@@ -23190,6 +23217,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.handoffReadinessCheck.nextCheckKey,
       "review_staging_packet_results"
     );
+    assert.equal(
+      launchDutyCloseoutRecordedSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOperatorEntry.launchDutyHandoffAction
+        .currentActionKey,
+      "refresh_staging_readiness_after_first_wave_closeout"
+    );
     assert.match(
       launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.nextAction,
       /Launch-duty record writes are complete/
@@ -23220,6 +23252,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStableOperationsPacket=ready_for_readiness_refresh/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStableOperationsAction=refresh_staging_readiness_after_first_wave_closeout/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
       /Offline Execution Plan Cursor Advance Basis: [^\n]*recordStatus=record_index_complete \| recordAdvanceWhen=selected_record_index_complete \| recordNext=-\.-/
     );
     assert.match(
@@ -23246,6 +23286,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Stable Operations Handoff Tail:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| firstWaveCloseout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Current Stable Operations Handoff Packet:[\s\S]*status=ready_for_readiness_refresh \| action=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| source=first_wave_closeout \| sourceRecorded=yes/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Current Stable Operations Handoff Packet:[\s\S]*command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,

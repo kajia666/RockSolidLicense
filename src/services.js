@@ -16120,6 +16120,16 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             currentTargetKey: firstWaveSupportInspectionPlan.currentTargetKey || null,
             targetCount: firstWaveSupportInspectionPlan.targetCount ?? null
           }
+        } : null,
+        firstWaveSupportInspectionPlan.confirmation?.endpoint ? {
+          kind: "confirm",
+          label: "Confirm First-Wave Support Inspection",
+          confirmation: firstWaveSupportInspectionPlan.confirmation,
+          supportInspectionPlan: {
+            status: firstWaveSupportInspectionPlan.status || null,
+            currentTargetKey: firstWaveSupportInspectionPlan.currentTargetKey || null,
+            targetCount: firstWaveSupportInspectionPlan.targetCount ?? null
+          }
         } : null
       ].filter(Boolean)
     : [];
@@ -18029,6 +18039,13 @@ function formatDeveloperOpsConfirmationDraftText(confirmation = null) {
     : null;
   if (!payloadTemplate) {
     return null;
+  }
+  if (payloadTemplate.supportInspectionStatus) {
+    return [
+      payloadTemplate.decision || "-",
+      payloadTemplate.supportInspectionStatus || "-",
+      `${payloadTemplate.readyTargetCount ?? 0}/${payloadTemplate.targetCount ?? 0}`
+    ].join("/");
   }
   return [
     payloadTemplate.decision || "-",

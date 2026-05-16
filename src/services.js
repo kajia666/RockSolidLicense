@@ -29344,6 +29344,72 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     || stagingLaunchDutyArchive?.launchDutyRecordIndexPath
     || launchDutyRecordIndexPath
     || `${archiveRoot}/launch-duty-record-index.json`;
+  const readinessStatusCommand = `npm.cmd run staging:readiness:status -- --input-file ${filledCloseoutInputFile} --actions-file ${readinessActionQueueFile}`;
+  const rehearsalReloadCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${filledCloseoutInputFile}`;
+  const profileDrivenDryRunCommand = stagingLaunchDutyArchive?.commands?.profileDrivenDryRun || null;
+  const closeoutReloadCommand = stagingLaunchDutyArchive?.commands?.closeoutReload || null;
+  const fullTestWindowCommand = stagingLaunchDutyArchive?.commands?.fullTestWindow || "npm.cmd test";
+  const productionSignoffPacket = files.productionSignoffPacket || `${archiveRoot}/staging-production-signoff-packet.json`;
+  const launchDutyArchiveIndex = files.launchDutyArchiveIndex || `${archiveRoot}/staging-launch-duty-archive-index.json`;
+  const preStagingReadinessSelfCheckPacket = {
+    version: "developer-ops-launch-operations-operator-pre-staging-readiness-self-check-packet/v1",
+    status: "ready_for_pre_staging_self_check",
+    ready: true,
+    productCode,
+    channel,
+    archiveRoot,
+    currentActionKey: "refresh_staging_readiness_status",
+    nextActionKey: "reload_staging_rehearsal",
+    launchDutyRecordIndexPath: launchDutyRecordIndex,
+    requiredArtifacts: [
+      filledCloseoutInputFile,
+      readinessActionQueueFile,
+      launchDutyRecordIndex,
+      productionSignoffPacket,
+      launchDutyArchiveIndex
+    ],
+    commandGroups: [
+      {
+        key: "profile_archive_inputs",
+        status: "ready",
+        command: profileDrivenDryRunCommand,
+        expected: [
+          "filled_closeout_input",
+          "readiness_action_queue",
+          "launch_duty_record_index"
+        ]
+      },
+      {
+        key: "readiness_refresh",
+        status: "current",
+        command: readinessStatusCommand,
+        expected: [
+          "current_gate_visible",
+          "action_queue_written",
+          "launch_duty_record_index_selected"
+        ]
+      },
+      {
+        key: "rehearsal_reload",
+        status: "next",
+        command: rehearsalReloadCommand,
+        expected: [
+          "final_rehearsal_packet_refreshed",
+          "operator_execution_plan_refreshed"
+        ]
+      },
+      {
+        key: "full_test_signoff_entry",
+        status: "blocked_until_rehearsal_reload",
+        command: fullTestWindowCommand,
+        expected: [
+          "full_test_output_captured",
+          "production_signoff_packet_ready"
+        ]
+      }
+    ],
+    nextAction: "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."
+  };
   return {
     version: "developer-ops-launch-operations-operator-staging-readiness-bridge/v1",
     status: "ready",
@@ -29353,13 +29419,14 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     filledCloseoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexPath: launchDutyRecordIndex,
-    readinessStatusCommand: `npm.cmd run staging:readiness:status -- --input-file ${filledCloseoutInputFile} --actions-file ${readinessActionQueueFile}`,
-    rehearsalReloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${filledCloseoutInputFile}`,
-    profileDrivenDryRunCommand: stagingLaunchDutyArchive?.commands?.profileDrivenDryRun || null,
-    closeoutReloadCommand: stagingLaunchDutyArchive?.commands?.closeoutReload || null,
-    fullTestWindowCommand: stagingLaunchDutyArchive?.commands?.fullTestWindow || "npm.cmd test",
-    productionSignoffPacket: files.productionSignoffPacket || `${archiveRoot}/staging-production-signoff-packet.json`,
-    launchDutyArchiveIndex: files.launchDutyArchiveIndex || `${archiveRoot}/staging-launch-duty-archive-index.json`,
+    readinessStatusCommand,
+    rehearsalReloadCommand,
+    profileDrivenDryRunCommand,
+    closeoutReloadCommand,
+    fullTestWindowCommand,
+    productionSignoffPacket,
+    launchDutyArchiveIndex,
+    preStagingReadinessSelfCheckPacket,
     nextAction: "Refresh staging readiness status, then reload rehearsal with the filled closeout input before moving to the full-test window."
   };
 }
@@ -38431,11 +38498,15 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       }
       const stagingReadinessBridge = launchOperationsOperatorEntry.stagingReadinessBridge || null;
       if (stagingReadinessBridge) {
+        const preStagingSelfCheck = stagingReadinessBridge.preStagingReadinessSelfCheckPacket || null;
         lines.push(
           `- stagingReadinessBridge=${stagingReadinessBridge.status || "-"}`
           + ` | stagingReadinessStatus=${stagingReadinessBridge.readinessStatusCommand || "-"}`
           + ` | rehearsalReload=${stagingReadinessBridge.rehearsalReloadCommand || "-"}`
           + ` | actionQueue=${stagingReadinessBridge.readinessActionQueueFile || "-"}`
+          + ` | preStagingSelfCheck=${preStagingSelfCheck?.status || "-"}`
+          + ` | preStagingCurrent=${preStagingSelfCheck?.currentActionKey || "-"}`
+          + ` | preStagingNext=${preStagingSelfCheck?.nextActionKey || "-"}`
           + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
         );
       }
@@ -39381,11 +39452,15 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     }
     const stagingReadinessBridge = launchOperationsOperatorEntry.stagingReadinessBridge || null;
     if (stagingReadinessBridge) {
+      const preStagingSelfCheck = stagingReadinessBridge.preStagingReadinessSelfCheckPacket || null;
       lines.push(
         `- Staging Readiness Bridge: ${stagingReadinessBridge.status || "-"}`
         + ` | readinessStatus=${stagingReadinessBridge.readinessStatusCommand || "-"}`
         + ` | rehearsalReload=${stagingReadinessBridge.rehearsalReloadCommand || "-"}`
         + ` | actionQueue=${stagingReadinessBridge.readinessActionQueueFile || "-"}`
+        + ` | preStagingSelfCheck=${preStagingSelfCheck?.status || "-"}`
+        + ` | preStagingCurrent=${preStagingSelfCheck?.currentActionKey || "-"}`
+        + ` | preStagingNext=${preStagingSelfCheck?.nextActionKey || "-"}`
         + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
       );
     }
@@ -42004,6 +42079,37 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | launchDutyRecordIndex=${stagingReadinessBridge.launchDutyRecordIndexPath || "-"}`
     );
     lines.push(`Staging Bridge Next: ${stagingReadinessBridge.nextAction || "-"}`);
+    const preStagingSelfCheck = stagingReadinessBridge.preStagingReadinessSelfCheckPacket || null;
+    if (preStagingSelfCheck) {
+      const commandGroups = Array.isArray(preStagingSelfCheck.commandGroups)
+        ? preStagingSelfCheck.commandGroups
+        : [];
+      const requiredArtifacts = Array.isArray(preStagingSelfCheck.requiredArtifacts)
+        ? preStagingSelfCheck.requiredArtifacts
+        : [];
+      lines.push("Pre-Staging Readiness Self-Check Packet:");
+      lines.push(
+        `- status=${preStagingSelfCheck.status || "-"}`
+        + ` | current=${preStagingSelfCheck.currentActionKey || "-"}`
+        + ` | next=${preStagingSelfCheck.nextActionKey || "-"}`
+        + ` | groups=${commandGroups.length}`
+        + ` | ready=${preStagingSelfCheck.ready === true}`
+        + ` | launchDutyRecordIndex=${preStagingSelfCheck.launchDutyRecordIndexPath || "-"}`
+      );
+      for (const [index, group] of commandGroups.entries()) {
+        const expected = Array.isArray(group.expected) && group.expected.length
+          ? group.expected.join(",")
+          : "-";
+        lines.push(
+          `${index + 1}. ${group.key || "-"}`
+          + ` | status=${group.status || "-"}`
+          + ` | command=${group.command || "-"}`
+          + ` | expected=${expected}`
+        );
+      }
+      lines.push(`Self-Check Artifacts: ${requiredArtifacts.length ? requiredArtifacts.join(", ") : "-"}`);
+      lines.push(`Self-Check Next: ${preStagingSelfCheck.nextAction || "-"}`);
+    }
     lines.push("");
   }
   const stagingActionQueue = Array.isArray(entry.stagingActionQueue) ? entry.stagingActionQueue : [];

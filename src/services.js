@@ -14798,11 +14798,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     : [];
   const preStagingReadinessSelfCheckDownload = preStagingReadinessSelfCheckSource
     ? ensureLaunchWorkflowDownloadHref(
-        launchOperationsOperatorEntry?.primaryDownload || {
-          key: "ops_launch_operations_operator_entry",
+        launchOperationsOperatorEntry?.preStagingReadinessSelfCheckDownload || {
+          key: "ops_pre_staging_readiness_self_check",
           label: "Open Pre-Staging Self-Check",
-          fileName: "developer-ops-launch-operations-operator-entry.txt",
-          format: "launch-operations-operator-entry",
+          fileName: "developer-ops-pre-staging-readiness-self-check.txt",
+          format: "pre-staging-readiness-self-check",
           source: "developer-ops"
         },
         params
@@ -20021,6 +20021,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/pre-staging-readiness-self-check.txt",
+    payload.opsSnapshot ? buildDeveloperOpsPreStagingReadinessSelfCheckText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-operations-file-index.json",
     payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsFileIndexJsonText(payload.opsSnapshot) : ""
   );
@@ -21568,7 +21573,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (preStagingReadinessSelfCheck) {
     handoffFiles.push([
       "Pre-staging readiness self-check",
-      preStagingReadinessSelfCheckDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"
+      "ops/pre-staging-readiness-self-check.txt"
     ]);
   }
   if (steadyStateDutyReceiptReview) {
@@ -24729,6 +24734,19 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryDownload(scope = {}) {
     {
       source: "developer-ops",
       format: "launch-operations-operator-entry",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
+function buildDeveloperOpsPreStagingReadinessSelfCheckDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_pre_staging_readiness_self_check",
+    "developer-ops-pre-staging-readiness-self-check.txt",
+    "Developer Ops pre-staging readiness self-check",
+    {
+      source: "developer-ops",
+      format: "pre-staging-readiness-self-check",
       params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
     }
   );
@@ -31743,6 +31761,13 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     stagingLaunchDutyArchive,
     launchDutyRecordIndexPath
   });
+  const preStagingReadinessSelfCheckDownload = stagingReadinessBridge?.preStagingReadinessSelfCheckPacket
+    ? buildDeveloperOpsPreStagingReadinessSelfCheckDownload({
+        ...scope,
+        productCode,
+        channel
+      })
+    : null;
   const stagingActionQueue = buildDeveloperOpsLaunchOperationsOperatorStagingActionQueue(stagingReadinessBridge);
   const postSignoffWatchBridge = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchBridge(stagingReadinessBridge);
   const postSignoffWatchQueue = buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchQueue(
@@ -31916,6 +31941,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   const seenDownloadKeys = new Set();
   for (const download of [
     primaryDownload,
+    preStagingReadinessSelfCheckDownload,
     launchDutySteadyStateHandoffDownload,
     launchDutyRecordIndexNextDownload,
     launchOperationsOperatorChecklistDownload,
@@ -31982,6 +32008,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     receiptConfirmation,
     receiptRecoveryAction,
     stagingReadinessBridge,
+    preStagingReadinessSelfCheckDownload,
     stagingActionQueue,
     primaryStagingActionKey: stagingActionQueue[0]?.key || null,
     nextStagingActionKey: stagingActionQueue[1]?.key || null,
@@ -32756,6 +32783,24 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
         format: launchOperationsOperatorEntryDownload.format || null,
         href: launchOperationsOperatorEntryDownload.href || null,
         source: launchOperationsOperatorEntryDownload.source || null
+      });
+    }
+  }
+  if (launchOperationsOperatorEntry?.preStagingReadinessSelfCheckDownload) {
+    const download = launchOperationsOperatorEntry.preStagingReadinessSelfCheckDownload;
+    const dedupeKey = download.key || download.href || download.fileName;
+    if (dedupeKey && !seenRecommendedDownloads.has(dedupeKey)) {
+      seenRecommendedDownloads.add(dedupeKey);
+      recommendedDownloads.push({
+        key: download.key || null,
+        label: download.label || download.title || download.key || null,
+        fileName: download.fileName || null,
+        format: download.format || null,
+        href: download.href || null,
+        source: download.source || null,
+        launchDutyRecordIndexPath: download.launchDutyRecordIndexPath
+          || launchOperationsOperatorEntry.launchDutyRecordIndexPath
+          || null
       });
     }
   }
@@ -41394,13 +41439,16 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const preStagingSelfCheckRequiredArtifacts = Array.isArray(preStagingSelfCheck?.requiredArtifacts)
     ? preStagingSelfCheck.requiredArtifacts
     : [];
-  const preStagingSelfCheckDownload = readiness.launchOperationsOperatorEntry?.primaryDownload
+  const preStagingSelfCheckDownload = readiness.launchOperationsOperatorEntry?.preStagingReadinessSelfCheckDownload
+    || readiness.preStagingReadinessSelfCheckDownload
+    || readiness.launchOperationsOperatorEntry?.primaryDownload
     || readiness.launchOperationsOperatorEntryDownload
     || null;
   const includedFiles = [
     payload.fileName || "developer-ops.json",
     payload.summaryFileName || "developer-ops-summary.txt",
     "handoff-index.txt",
+    "pre-staging-readiness-self-check.txt",
     "launch-receipt-next-follow-up.txt",
     "launch-receipt-backfill-status.txt",
     "first-wave-audit-backfill-status.txt",
@@ -43298,6 +43346,97 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const entry = readiness.launchOperationsOperatorEntry || null;
+  const packet = entry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket || null;
+  const commandGroups = Array.isArray(packet?.commandGroups) ? packet.commandGroups : [];
+  const requiredArtifacts = Array.isArray(packet?.requiredArtifacts) ? packet.requiredArtifacts : [];
+  const directDownload = entry?.preStagingReadinessSelfCheckDownload
+    || buildDeveloperOpsPreStagingReadinessSelfCheckDownload({
+      ...scope,
+      productCode: entry?.productCode || scope.productCode,
+      channel: entry?.channel || scope.channel || "stable"
+    });
+  const operatorEntryDownload = entry?.primaryDownload
+    || readiness.launchOperationsOperatorEntryDownload
+    || buildDeveloperOpsLaunchOperationsOperatorEntryDownload({
+      ...scope,
+      productCode: entry?.productCode || scope.productCode,
+      channel: entry?.channel || scope.channel || "stable"
+    });
+  const lines = [
+    "RockSolid Developer Ops Pre-Staging Readiness Self-Check",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || entry?.productCode || "-"}`,
+    `Channel: ${scope.channel || entry?.channel || "stable"}`,
+    ""
+  ];
+
+  if (!packet) {
+    lines.push("Self-Check: unavailable");
+    lines.push("Operator Order:");
+    lines.push("- Open launch-operations-operator-entry.txt and confirm the staging readiness bridge before entering staging.");
+    return lines.join("\n");
+  }
+
+  lines.push(
+    `Self-Check: status=${packet.status || "-"}`
+    + ` | current=${packet.currentActionKey || "-"}`
+    + ` | next=${packet.nextActionKey || "-"}`
+    + ` | groups=${commandGroups.length}`
+    + ` | ready=${packet.ready === true}`
+    + ` | launchDutyRecordIndex=${packet.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(
+    `Direct Download: ${directDownload?.fileName || "developer-ops-pre-staging-readiness-self-check.txt"}`
+    + ` | key=${directDownload?.key || "ops_pre_staging_readiness_self_check"}`
+    + ` | format=${directDownload?.format || "pre-staging-readiness-self-check"}`
+    + ` | href=${directDownload?.href || "-"}`
+  );
+  lines.push(
+    `Operator Entry: ${operatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
+    + ` | key=${operatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
+    + ` | format=${operatorEntryDownload?.format || "launch-operations-operator-entry"}`
+    + ` | href=${operatorEntryDownload?.href || "-"}`
+  );
+  lines.push("");
+  lines.push("Command Groups:");
+  for (const [index, group] of commandGroups.entries()) {
+    const expected = Array.isArray(group.expected) && group.expected.length
+      ? group.expected.join(",")
+      : "-";
+    lines.push(
+      `${index + 1}. ${group.key || "-"}`
+      + ` | status=${group.status || "-"}`
+      + ` | command=${group.command || "-"}`
+      + ` | expected=${expected}`
+    );
+  }
+  lines.push("");
+  lines.push("Required Artifacts:");
+  for (const artifact of requiredArtifacts) {
+    lines.push(`- ${artifact}`);
+  }
+  if (!requiredArtifacts.length) {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Operator Order:");
+  lines.push(`- ${packet.nextAction || "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."}`);
+  lines.push("- Keep this self-check beside handoff-index.txt and launch-operations-operator-entry.txt during launch-day watch.");
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsExportFiles(payload) {
   return [
     {
@@ -43311,6 +43450,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "handoff-index.txt",
       body: buildDeveloperOpsHandoffIndexText(payload)
+    },
+    {
+      path: "pre-staging-readiness-self-check.txt",
+      body: buildDeveloperOpsPreStagingReadinessSelfCheckText(payload)
     },
     {
       path: "launch-operations-file-index.json",
@@ -44116,7 +44259,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "launch-operations-file-index", "launch-operations-operator-entry", "launch-operations-operator-checklist", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "pre-staging-readiness-self-check", "launch-operations-file-index", "launch-operations-operator-entry", "launch-operations-operator-checklist", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -44151,6 +44294,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-handoff-index.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsHandoffIndexText(payload)
+    };
+  }
+
+  if (normalizedFormat === "pre-staging-readiness-self-check") {
+    return {
+      fileName: "developer-ops-pre-staging-readiness-self-check.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsPreStagingReadinessSelfCheckText(payload)
     };
   }
 

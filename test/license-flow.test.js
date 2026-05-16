@@ -21084,6 +21084,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         nextAction: "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."
       }
     );
+    assert.equal(launchOperationsOperatorEntry.preStagingReadinessSelfCheckDownload?.key, "ops_pre_staging_readiness_self_check");
+    assert.equal(launchOperationsOperatorEntry.preStagingReadinessSelfCheckDownload?.format, "pre-staging-readiness-self-check");
+    assert.equal(launchOperationsOperatorEntry.preStagingReadinessSelfCheckDownload?.fileName, "developer-ops-pre-staging-readiness-self-check.txt");
+    assert.match(
+      launchOperationsOperatorEntry.preStagingReadinessSelfCheckDownload?.href || "",
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=pre-staging-readiness-self-check/
+    );
     assert.ok(Array.isArray(launchOperationsOperatorEntry.stagingActionQueue));
     assert.equal(launchOperationsOperatorEntry.stagingActionQueue.length, 4);
     assert.equal(launchOperationsOperatorEntry.primaryStagingActionKey, "refresh_staging_readiness_status");
@@ -21680,6 +21687,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchDutyHandoffAction.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
+    assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "ops_pre_staging_readiness_self_check"
+      && item.format === "pre-staging-readiness-self-check"
+      && item.fileName === "developer-ops-pre-staging-readiness-self-check.txt"
+    )));
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_operator_checklist"));
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_overview_status"));
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_mainline_handoff_routes"));
@@ -21699,6 +21711,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) => (
         item.key === "ops_launch_operations_operator_entry"
         && item.format === "launch-operations-operator-entry"
+      ))
+    );
+    assert.ok(
+      steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) => (
+        item.key === "ops_pre_staging_readiness_self_check"
+        && item.format === "pre-staging-readiness-self-check"
+        && item.fileName === "developer-ops-pre-staging-readiness-self-check.txt"
       ))
     );
     assert.ok(
@@ -21917,7 +21936,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*preStagingCurrent=refresh_staging_readiness_status/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*preStagingNext=reload_staging_rehearsal/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Pre-Staging Readiness Self-Check:[\s\S]*status=ready_for_pre_staging_self_check \| current=refresh_staging_readiness_status \| next=reload_staging_rehearsal \| groups=4/);
-    assert.match(launchOperationsHandoffIndexDownload.body, /Pre-Staging Readiness Self-Check:[\s\S]*download=developer-ops-launch-operations-operator-entry\.txt \| key=ops_launch_operations_operator_entry \| format=launch-operations-operator-entry/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Pre-Staging Readiness Self-Check:[\s\S]*download=developer-ops-pre-staging-readiness-self-check\.txt \| key=ops_pre_staging_readiness_self_check \| format=pre-staging-readiness-self-check/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Pre-Staging Readiness Self-Check:[\s\S]*2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Pre-Staging Readiness Self-Check:[\s\S]*4\. full_test_signoff_entry \| status=blocked_until_rehearsal_reload \| command=npm\.cmd test/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Operator Order:[\s\S]*Confirm the pre-staging readiness self-check packet from launch-operations-operator-entry\.txt before running staging readiness refresh\./);
@@ -21993,6 +22012,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-mainline-handoff-routes\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-file-index\.json/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/pre-staging-readiness-self-check\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-checklist\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-handoff-summary\.txt/);
@@ -22017,6 +22037,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
     assert.match(launchMainlineOpsRouteMirrorZipText, latestLaunchDutySelectionChecklistStepPattern);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-file-index\.json/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/pre-staging-readiness-self-check\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Pre-Staging Readiness Self-Check/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-checklist\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Checklist/);
@@ -22179,6 +22201,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /4\. refresh_developer_ops_overview \| status=pending_confirmation_receipt \| GET \/api\/developer\/ops\/export\?productCode=EXPORT_CLOSEOUT_READY&channel=stable/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /developer-ops-pre-staging-readiness-self-check\.txt[^\n]*format=pre-staging-readiness-self-check/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
@@ -22191,6 +22214,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsChecksumsDownload.body, /launch-operations-file-index\.json/);
     assert.match(launchOperationsChecksumsDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsChecksumsDownload.body, /launch-operations-operator-entry\.txt/);
+    assert.match(launchOperationsChecksumsDownload.body, /pre-staging-readiness-self-check\.txt/);
+
+    const launchOperationsPreStagingSelfCheckDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=pre-staging-readiness-self-check",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsPreStagingSelfCheckDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(launchOperationsPreStagingSelfCheckDownload.contentDisposition || "", /developer-ops-pre-staging-readiness-self-check\.txt/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /RockSolid Developer Ops Pre-Staging Readiness Self-Check/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /status=ready_for_pre_staging_self_check \| current=refresh_staging_readiness_status \| next=reload_staging_rehearsal \| groups=4/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Operator Order:[\s\S]*Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test\/signoff\./);
 
     const launchOperationsZipDownload = await getBinary(
       baseUrl,
@@ -22202,6 +22238,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsZipText, /launch-operations-file-index\.json/);
     assert.match(launchOperationsZipText, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsZipText, /launch-operations-operator-entry\.txt/);
+    assert.match(launchOperationsZipText, /pre-staging-readiness-self-check\.txt/);
+    assert.match(launchOperationsZipText, /RockSolid Developer Ops Pre-Staging Readiness Self-Check/);
     assert.match(launchOperationsZipText, /launchOpsOverviewContextLaunchDutyRecordIndexPath/);
     assert.match(launchOperationsZipText, /artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
 
@@ -23901,19 +23939,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       mainlinePreStagingSelfCheck.operatorOrder,
       expectedPreStagingSelfCheckOperatorOrder
     );
-    assert.equal(mainlinePreStagingSelfCheck.recommendedDownload.key, "ops_launch_operations_operator_entry");
-    assert.equal(mainlinePreStagingSelfCheck.recommendedDownload.format, "launch-operations-operator-entry");
+    assert.equal(mainlinePreStagingSelfCheck.recommendedDownload.key, "ops_pre_staging_readiness_self_check");
+    assert.equal(mainlinePreStagingSelfCheck.recommendedDownload.format, "pre-staging-readiness-self-check");
+    assert.equal(mainlinePreStagingSelfCheck.recommendedDownload.fileName, "developer-ops-pre-staging-readiness-self-check.txt");
     assert.deepEqual(
       mainlinePreStagingSelfCheck.recommendedDownload.operatorOrder,
       expectedPreStagingSelfCheckOperatorOrder
     );
     assert.match(
       mainlinePreStagingSelfCheck.recommendedDownload.href,
-      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=\d+&format=launch-operations-operator-entry/
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=\d+&format=pre-staging-readiness-self-check/
     );
     assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.heroControls.some((item) => (
       item.label === "Open Pre-Staging Self-Check"
-      && item.recommendedDownload?.key === "ops_launch_operations_operator_entry"
+      && item.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
     )));
     const preStagingSelfCheckActionStep = launchMainlineSteadyStateHandoff.mainlineSummary.actionPlan.find((item) => (
       item.key === "launch_mainline_pre_staging_readiness_self_check"
@@ -23921,7 +23960,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckActionStep);
     assert.deepEqual(preStagingSelfCheckActionStep.operatorOrder, expectedPreStagingSelfCheckOperatorOrder);
     assert.ok(preStagingSelfCheckActionStep.controls.some((control) => (
-      control.recommendedDownload?.key === "ops_launch_operations_operator_entry"
+      control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
     )));
     const preStagingSelfCheckCard = launchMainlineSteadyStateHandoff.mainlineSummary.overviewCards.find((item) => (
       item.key === "pre_staging_readiness_self_check"
@@ -23932,7 +23971,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckCard.details.includes("Next action: reload_staging_rehearsal"));
     assert.ok(preStagingSelfCheckCard.details.includes("Command groups: 4"));
     assert.ok(preStagingSelfCheckCard.controls.some((control) => (
-      control.recommendedDownload?.key === "ops_launch_operations_operator_entry"
+      control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
     )));
     assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.sections.some((item) => (
       item.key === "pre_staging_readiness_self_check"
@@ -24165,7 +24204,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
-      /pre-staging-self-check: [^\n]*key=ops_launch_operations_operator_entry[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /pre-staging-self-check: [^\n]*key=ops_pre_staging_readiness_self_check[^\n]*format=pre-staging-readiness-self-check[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
@@ -24194,11 +24233,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
-      /Pre-Staging Readiness Self-Check:[\s\S]*download=developer-ops-launch-operations-operator-entry\.txt \| key=ops_launch_operations_operator_entry \| format=launch-operations-operator-entry/
+      /Pre-Staging Readiness Self-Check:[\s\S]*download=developer-ops-pre-staging-readiness-self-check\.txt \| key=ops_pre_staging_readiness_self_check \| format=pre-staging-readiness-self-check/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Pre-staging readiness self-check: developer-ops-launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*Pre-staging readiness self-check: ops\/pre-staging-readiness-self-check\.txt/
     );
 
     const forbiddenExport = await getJsonExpectError(

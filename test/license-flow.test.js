@@ -24151,6 +24151,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateRoutesDownload.body,
       /Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
     );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /Pre-Staging Readiness Self-Check Route:[\s\S]*status=ready_for_pre_staging_self_check \| current=refresh_staging_readiness_status \| next=reload_staging_rehearsal \| groups=4/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /pre-staging-self-check: [^\n]*key=ops_launch_operations_operator_entry[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /Pre-Staging Readiness Self-Check Route:[\s\S]*2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
     const launchMainlineSteadyStatePostLaunchIndexDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -24167,6 +24179,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Included Handoff Files:[\s\S]*Steady-state handoff landing: ops\/steady-state-handoff-brief\.txt/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Pre-Staging Readiness Self-Check:[\s\S]*status=ready_for_pre_staging_self_check \| current=refresh_staging_readiness_status \| next=reload_staging_rehearsal \| groups=4/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Pre-Staging Readiness Self-Check:[\s\S]*download=developer-ops-launch-operations-operator-entry\.txt \| key=ops_launch_operations_operator_entry \| format=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Pre-staging readiness self-check: developer-ops-launch-operations-operator-entry\.txt/
     );
 
     const forbiddenExport = await getJsonExpectError(

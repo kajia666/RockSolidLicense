@@ -19585,6 +19585,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     && typeof steadyStateDutyReceiptReview.recommendedDownload === "object"
       ? steadyStateDutyReceiptReview.recommendedDownload
       : null;
+  const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
+    && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
+      ? mainlineSummary.preStagingReadinessSelfCheck
+      : null;
+  const preStagingReadinessSelfCheckDownload = preStagingReadinessSelfCheck?.recommendedDownload
+    && typeof preStagingReadinessSelfCheck.recommendedDownload === "object"
+      ? preStagingReadinessSelfCheck.recommendedDownload
+      : null;
   const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
     ? payload.opsSnapshot.scope
     : {};
@@ -19860,6 +19868,41 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | launchDayWatchEntry=${launchOpsOverviewWatchEntry || "-"}`
     );
   }
+  if (preStagingReadinessSelfCheck) {
+    const commandGroups = Array.isArray(preStagingReadinessSelfCheck.commandGroups)
+      ? preStagingReadinessSelfCheck.commandGroups
+      : [];
+    lines.push("");
+    lines.push("Pre-Staging Readiness Self-Check Route:");
+    lines.push(
+      `- status=${preStagingReadinessSelfCheck.status || "-"}`
+      + ` | current=${preStagingReadinessSelfCheck.currentActionKey || "-"}`
+      + ` | next=${preStagingReadinessSelfCheck.nextActionKey || "-"}`
+      + ` | groups=${commandGroups.length}`
+      + ` | ready=${preStagingReadinessSelfCheck.ready === true}`
+    );
+    lines.push(
+      `- pre-staging-self-check: ${preStagingReadinessSelfCheckDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
+      + ` | key=${preStagingReadinessSelfCheckDownload?.key || "ops_launch_operations_operator_entry"}`
+      + ` | label=${preStagingReadinessSelfCheckDownload?.label || "Launch operations operator entry"}`
+      + ` | format=${preStagingReadinessSelfCheckDownload?.format || "launch-operations-operator-entry"}`
+      + ` | source=${preStagingReadinessSelfCheckDownload?.source || "developer-ops"}`
+      + ` | href=${preStagingReadinessSelfCheckDownload?.href || "-"}`
+      + ` | launchDutyRecordIndex=${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`
+    );
+    for (const [index, group] of commandGroups.entries()) {
+      const expected = Array.isArray(group.expected) && group.expected.length
+        ? group.expected.join(",")
+        : "-";
+      lines.push(
+        `${index + 1}. ${group.key || "-"}`
+        + ` | status=${group.status || "-"}`
+        + ` | command=${group.command || "-"}`
+        + ` | expected=${expected}`
+      );
+    }
+    lines.push(`- nextAction=${preStagingReadinessSelfCheck.nextAction || "-"}`);
+  }
   if (steadyStateHandoffLanding) {
     lines.push("");
     lines.push("Steady-State Handoff Landing Route:");
@@ -19919,6 +19962,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const steadyStateHandoffLandingOperatorOrder = Array.isArray(steadyStateHandoffLanding?.operatorOrder)
     ? steadyStateHandoffLanding.operatorOrder
     : [];
+  const preStagingReadinessSelfCheckOperatorOrder = Array.isArray(preStagingReadinessSelfCheck?.operatorOrder)
+    ? preStagingReadinessSelfCheck.operatorOrder
+    : [];
+  for (const item of preStagingReadinessSelfCheckOperatorOrder) {
+    lines.push(`- ${item}`);
+  }
   for (const item of steadyStateHandoffLandingOperatorOrder) {
     lines.push(`- ${item}`);
   }
@@ -21489,6 +21538,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     && typeof steadyStateDutyReceiptReview.recommendedDownload === "object"
       ? steadyStateDutyReceiptReview.recommendedDownload
       : null;
+  const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
+    && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
+      ? mainlineSummary.preStagingReadinessSelfCheck
+      : null;
+  const preStagingReadinessSelfCheckDownload = preStagingReadinessSelfCheck?.recommendedDownload
+    && typeof preStagingReadinessSelfCheck.recommendedDownload === "object"
+      ? preStagingReadinessSelfCheck.recommendedDownload
+      : null;
   const handoffFiles = [
     ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
     ["Post-launch sweep handoff", payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt"],
@@ -21506,6 +21563,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Steady-state handoff landing",
       "ops/steady-state-handoff-brief.txt"
+    ]);
+  }
+  if (preStagingReadinessSelfCheck) {
+    handoffFiles.push([
+      "Pre-staging readiness self-check",
+      preStagingReadinessSelfCheckDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"
     ]);
   }
   if (steadyStateDutyReceiptReview) {
@@ -21623,6 +21686,32 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   appendInitialLaunchOperatorNextActionTextLines(lines, traceability.initialLaunchOperatorNextAction || null);
   appendInitialLaunchOperatorActionManifestTextLines(lines, traceability.initialLaunchOperatorActionManifest || null);
 
+  if (preStagingReadinessSelfCheck) {
+    const commandGroups = Array.isArray(preStagingReadinessSelfCheck.commandGroups)
+      ? preStagingReadinessSelfCheck.commandGroups
+      : [];
+    lines.push("");
+    lines.push("Pre-Staging Readiness Self-Check:");
+    lines.push(
+      `- status=${preStagingReadinessSelfCheck.status || "-"}`
+      + ` | current=${preStagingReadinessSelfCheck.currentActionKey || "-"}`
+      + ` | next=${preStagingReadinessSelfCheck.nextActionKey || "-"}`
+      + ` | groups=${commandGroups.length}`
+      + ` | ready=${preStagingReadinessSelfCheck.ready === true}`
+    );
+    lines.push(
+      `- download=${preStagingReadinessSelfCheckDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
+      + ` | key=${preStagingReadinessSelfCheckDownload?.key || "ops_launch_operations_operator_entry"}`
+      + ` | format=${preStagingReadinessSelfCheckDownload?.format || "launch-operations-operator-entry"}`
+      + ` | href=${preStagingReadinessSelfCheckDownload?.href || "-"}`
+    );
+    lines.push(
+      `- launchDutyRecordIndex=${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`
+      + ` | archiveRoot=${preStagingReadinessSelfCheck.archiveRoot || "-"}`
+    );
+    lines.push(`- nextAction=${preStagingReadinessSelfCheck.nextAction || "-"}`);
+  }
+
   if (steadyStateHandoffLanding) {
     lines.push("");
     lines.push("Steady-State Handoff Landing:");
@@ -21699,6 +21788,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const steadyStateHandoffLandingOperatorOrder = Array.isArray(steadyStateHandoffLanding?.operatorOrder)
     ? steadyStateHandoffLanding.operatorOrder
     : [];
+  const preStagingReadinessSelfCheckOperatorOrder = Array.isArray(preStagingReadinessSelfCheck?.operatorOrder)
+    ? preStagingReadinessSelfCheck.operatorOrder
+    : [];
+  for (const item of preStagingReadinessSelfCheckOperatorOrder) {
+    lines.push(`- ${item}`);
+  }
   for (const item of steadyStateHandoffLandingOperatorOrder) {
     lines.push(`- ${item}`);
   }

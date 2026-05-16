@@ -41387,6 +41387,16 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const launchDutyRecordIndexSelectionChecklistStep = Array.isArray(launchOperationsOperatorChecklist?.steps)
     ? launchOperationsOperatorChecklist.steps.find((item) => item?.key === "continue_launch_duty_record_index_selection_handoff") || null
     : null;
+  const preStagingSelfCheck = readiness.launchOperationsOperatorEntry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket || null;
+  const preStagingSelfCheckCommandGroups = Array.isArray(preStagingSelfCheck?.commandGroups)
+    ? preStagingSelfCheck.commandGroups
+    : [];
+  const preStagingSelfCheckRequiredArtifacts = Array.isArray(preStagingSelfCheck?.requiredArtifacts)
+    ? preStagingSelfCheck.requiredArtifacts
+    : [];
+  const preStagingSelfCheckDownload = readiness.launchOperationsOperatorEntry?.primaryDownload
+    || readiness.launchOperationsOperatorEntryDownload
+    || null;
   const includedFiles = [
     payload.fileName || "developer-ops.json",
     payload.summaryFileName || "developer-ops-summary.txt",
@@ -41463,6 +41473,9 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | receiptAudit=${readiness.launchOperationsOperatorEntry?.receiptConfirmation?.auditLogId || "-"}`
       + ` | receiptRecovery=${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.method || "-"} ${readiness.launchOperationsOperatorEntry?.receiptRecoveryAction?.route || "-"}`
       + ` | stagingReadiness=${readiness.launchOperationsOperatorEntry?.stagingReadinessBridge?.readinessStatusCommand || "-"}`
+      + ` | preStagingSelfCheck=${preStagingSelfCheck?.status || "-"}`
+      + ` | preStagingCurrent=${preStagingSelfCheck?.currentActionKey || "-"}`
+      + ` | preStagingNext=${preStagingSelfCheck?.nextActionKey || "-"}`
       + ` | currentStagingAction=${readiness.launchOperationsOperatorEntry?.primaryStagingActionKey || "-"}`
       + ` | postSignoffWatch=${readiness.launchOperationsOperatorEntry?.primaryPostSignoffActionKey || "-"}`
       + ` | postSignoffReceipts=${Array.isArray(readiness.launchOperationsOperatorEntry?.postSignoffWatchReceiptPlan?.currentReceiptOperations) ? readiness.launchOperationsOperatorEntry.postSignoffWatchReceiptPlan.currentReceiptOperations.join(",") : "-"}`
@@ -41566,6 +41579,38 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       );
     }
     lines.push(`Launch Duty Record Index Selection Next: ${launchDutyRecordIndexReceiptSelection.nextAction || "-"}`);
+    lines.push("");
+  }
+
+  if (preStagingSelfCheck) {
+    lines.push("Pre-Staging Readiness Self-Check:");
+    lines.push(
+      `- status=${preStagingSelfCheck.status || "-"}`
+      + ` | current=${preStagingSelfCheck.currentActionKey || "-"}`
+      + ` | next=${preStagingSelfCheck.nextActionKey || "-"}`
+      + ` | groups=${preStagingSelfCheckCommandGroups.length}`
+      + ` | ready=${preStagingSelfCheck.ready === true}`
+      + ` | launchDutyRecordIndex=${preStagingSelfCheck.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(
+      `- download=${preStagingSelfCheckDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
+      + ` | key=${preStagingSelfCheckDownload?.key || "ops_launch_operations_operator_entry"}`
+      + ` | format=${preStagingSelfCheckDownload?.format || "launch-operations-operator-entry"}`
+      + ` | href=${preStagingSelfCheckDownload?.href || "-"}`
+    );
+    for (const [index, group] of preStagingSelfCheckCommandGroups.entries()) {
+      const expected = Array.isArray(group.expected) && group.expected.length
+        ? group.expected.join(",")
+        : "-";
+      lines.push(
+        `${index + 1}. ${group.key || "-"}`
+        + ` | status=${group.status || "-"}`
+        + ` | command=${group.command || "-"}`
+        + ` | expected=${expected}`
+      );
+    }
+    lines.push(`- requiredArtifacts=${preStagingSelfCheckRequiredArtifacts.length ? preStagingSelfCheckRequiredArtifacts.join(",") : "-"}`);
+    lines.push(`- nextAction=${preStagingSelfCheck.nextAction || "-"}`);
     lines.push("");
   }
 
@@ -41767,6 +41812,9 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use steady-state-handoff-brief.txt as the single operator-facing handoff cover sheet.");
   lines.push("- Use steady-state-duty-board.txt as the active duty board with quick actions and handoff assets.");
   lines.push("- Use steady-state-duty-action-links.txt to jump from duty board actions to workspace, control, and download links.");
+  if (preStagingSelfCheck) {
+    lines.push("- Confirm the pre-staging readiness self-check packet from launch-operations-operator-entry.txt before running staging readiness refresh.");
+  }
   if (readiness.latestSteadyStateDutyPlanReceipt) {
     lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
   }

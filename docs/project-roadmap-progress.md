@@ -1,6 +1,6 @@
 # Project Roadmap, Overall Plan, and Development Progress
 
-Updated: 2026-05-15
+Updated: 2026-05-16
 
 This document is the rolling project control sheet for RockSolidLicense. It answers three recurring questions:
 
@@ -26,6 +26,7 @@ The project is now close to an initial pilot launch. The most important backend/
 - First-launch operations: launch bootstrap, first batch setup, inventory refill, first-launch handoff, launch receipt follow-ups, initial launch ops readiness.
 - Production readiness: production gate, cutover handoff, recovery drill handoff, operations handoff, post-launch sweep handoff, closeout handoff, stabilization handoff.
 - Launch control plane: `/api/developer/launch-mainline`, `/developer/launch-mainline`, route focus, action receipts, recommended downloads, stage gates, checksums, zip exports.
+- Latest Developer Ops handoff-index pre-staging readiness self-check slice: `handoff-index.txt` now prints the Operator Entry pre-staging self-check status, current readiness refresh, next rehearsal reload, Operator Entry download, grouped commands, required artifacts, launch-duty record index, and an Operator Order reminder before staging readiness refresh. This makes the top-level Ops zip index a direct pre-staging self-check entrypoint instead of requiring operators to reopen `launch-operations-operator-entry.txt` first.
 - Latest Launch Mainline pre-staging readiness route/index slice: `handoff-download-routes.txt` and the Launch Mainline post-launch handoff index now print the same pre-staging readiness self-check route, Operator Entry download, current readiness refresh, next rehearsal reload, grouped commands, launch-duty record index, and operator order. Offline launch reviewers can now recover the staging self-check path from the route map/index package instead of reopening Mainline JSON or Developer Ops first.
 - Latest Launch Mainline pre-staging readiness self-check first-screen slice: Launch Mainline now lifts Developer Ops `preStagingReadinessSelfCheck` into `mainlineSummary`, hero controls, action plan, overview cards, sections, and summary text. The Mainline first screen can open the Operator Entry self-check download, show the current readiness refresh, next rehearsal reload, grouped commands, required artifacts, and operator order without jumping back into Developer Ops JSON first.
 - Latest Developer Ops pre-staging readiness self-check packet slice: `launchOperationsOperatorEntry.stagingReadinessBridge` now carries a `preStagingReadinessSelfCheckPacket` that groups the profile/archive inputs, current readiness refresh, next rehearsal reload, and blocked full-test/signoff entry with required artifacts and expected checks. Developer Ops summary text, initial readiness text, and `launch-operations-operator-entry.txt` expose the same current/next action keys, so the operator can validate the pre-staging handoff from one backend/API payload before entering real staging.
@@ -361,7 +362,7 @@ The project is now close to an initial pilot launch. The most important backend/
 
 Estimated code-side initial pilot-launch readiness: about 99.99%.
 
-Estimated launch-runbook/control-plane readiness for the first pilot: about 98.9%+.
+Estimated launch-runbook/control-plane readiness for the first pilot: about 98.95%+.
 
 Estimated strict operational initial pilot-launch readiness: about 91%-93% until the real staging profile, backup/restore drill result, live-write smoke result, full-test output, production sign-off evidence, receipt visibility, launch-day watch, and stabilization handoff records are attached.
 
@@ -372,7 +373,7 @@ This split is intentional: the script-side launch chain is almost fully connecte
 Work should continue in short backend/API-first slices. Each slice should end with a commit, targeted verification, and a note about the next slice. For launch-facing additions, use the `launchRehearsalBundle.extensionPoints` workflow first so new fields, steps, closeout keys, or readiness gates stay easy to review.
 
 1. Run `npm.cmd run staging:profile:init` for the real staging lane, review the generated secret-free profile, set the required secret env vars, then run the profile-driven `staging:rehearsal` and archive the generated handoff, closeout, run-record, packet, and draft files.
-2. Open the Developer Ops `preStagingReadinessSelfCheckPacket`, confirm the required artifacts and grouped commands, then run the current `staging:readiness:status --actions-file <readiness-action-queue.md>` refresh before reloading rehearsal.
+2. Open the Developer Ops `handoff-index.txt` or `preStagingReadinessSelfCheckPacket`, confirm the required artifacts and grouped commands, then run the current `staging:readiness:status --actions-file <readiness-action-queue.md>` refresh before reloading rehearsal.
 3. Run `npm.cmd run staging:closeout:init` on the generated draft, refresh `staging:readiness:status --actions-file <readiness-action-queue.md>`, then copy the generated `recoveryPreflightCommand` so the backup/restore drill result can be backfilled without manually rebuilding paths.
 4. Use the readiness action queue's generated `staging:closeout:backfill --actions-file <readiness-action-queue.md>` commands to write real route-map gate, backup/restore drill, live-write smoke, Launch Smoke handoff, Launch Mainline receipt, receipt visibility, and operator go/no-go evidence into `filled-closeout-input.json`.
 5. After each closeout or sign-off backfill, verify the printed target, artifact path, receipt IDs, and returned `statusCommand`; it now preserves `--actions-file <readiness-action-queue.md>`, so the same action queue refreshes in place instead of requiring launch duty to re-read the full rehearsal packet.
@@ -552,7 +553,7 @@ The earlier "90%+" estimates refer to feature/mainline completion. The stricter 
 
 Minimum remaining work before a controlled pilot:
 
-1. Keep the full `license-flow` pre-staging self-check packet and grouped launch-readiness checks green after any new backend/API changes.
+1. Keep the full `license-flow` pre-staging self-check packet, handoff-index bridge, and grouped launch-readiness checks green after any new backend/API changes.
 2. Run the full repository test suite once before staging rehearsal sign-off.
 3. Prepare staging environment with non-default secrets and public HTTPS.
 4. Run one complete staging rehearsal:
@@ -567,6 +568,7 @@ Minimum remaining work before a controlled pilot:
 Current rhythm:
 
 - Run focused tests on every small backend/API slice.
+- Latest Developer Ops handoff-index pre-staging readiness self-check check passed on 2026-05-16: targeted `test\license-flow.test.js` now verifies `format=handoff-index` prints `preStagingSelfCheck`, current readiness refresh, next rehearsal reload, the Operator Entry download, grouped self-check commands, full-test/signoff block, and the Operator Order reminder before staging readiness refresh.
 - Latest Launch Mainline pre-staging readiness route/index check passed on 2026-05-16: targeted `test\license-flow.test.js` now verifies `format=handoff-download-routes` and `format=post-launch-handoff-index` both print the pre-staging readiness self-check route, Operator Entry download, readiness refresh command, rehearsal reload context, launch-duty record index, included handoff file, and operator order.
 - Latest Launch Mainline pre-staging readiness self-check first-screen check passed on 2026-05-16: targeted `test\license-flow.test.js` now verifies `mainlineSummary.preStagingReadinessSelfCheck` carries the Developer Ops packet into Launch Mainline, and that Mainline hero controls, action plan, overview cards, sections, and summary text expose the Operator Entry download, current readiness refresh, next rehearsal reload, grouped commands, and operator order.
 - Latest Developer Ops pre-staging readiness self-check packet check passed on 2026-05-16: targeted `test\license-flow.test.js` now verifies `launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket` exposes the profile/archive inputs, readiness refresh, rehearsal reload, full-test/signoff entry, required artifacts, current/next action keys, and `launch-duty-record-index.json`; the same test verifies `launch-operations-operator-entry.txt` prints the packet and grouped commands.

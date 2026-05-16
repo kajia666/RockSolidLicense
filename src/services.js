@@ -14833,6 +14833,19 @@ function buildDeveloperLaunchMainlineSummaryPayload({
               expected: Array.isArray(item?.expected) ? item.expected.slice() : []
             }))
           : [],
+        executionQueue: Array.isArray(preStagingReadinessSelfCheckSource.executionQueue)
+          ? preStagingReadinessSelfCheckSource.executionQueue.map((item) => ({
+              order: Number(item?.order || 0),
+              key: item?.key || null,
+              sourceGroupKey: item?.sourceGroupKey || null,
+              status: item?.status || null,
+              runNow: item?.runNow === true,
+              unlocksWhen: item?.unlocksWhen || null,
+              command: item?.command || null,
+              expectedArtifacts: Array.isArray(item?.expectedArtifacts) ? item.expectedArtifacts.slice() : [],
+              nextAction: item?.nextAction || null
+            }))
+          : [],
         nextAction: preStagingReadinessSelfCheckSource.nextAction
           || "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff.",
         operatorOrder: preStagingReadinessSelfCheckOperatorOrder,
@@ -16815,6 +16828,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         const commandGroups = Array.isArray(preStagingReadinessSelfCheck.commandGroups)
           ? preStagingReadinessSelfCheck.commandGroups
           : [];
+        const executionQueue = Array.isArray(preStagingReadinessSelfCheck.executionQueue)
+          ? preStagingReadinessSelfCheck.executionQueue
+          : [];
+        const runnableNowCount = executionQueue.filter((item) => item?.runNow === true).length;
         const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
         const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
         return {
@@ -16844,6 +16861,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             `Current action: ${preStagingReadinessSelfCheck.currentActionKey || "-"}`,
             `Next action: ${preStagingReadinessSelfCheck.nextActionKey || "-"}`,
             `Command groups: ${commandGroups.length}`,
+            `Execution queue: ${executionQueue.length}`,
+            `Runnable now: ${runnableNowCount}`,
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             readinessRefreshGroup?.command ? `Readiness refresh: ${readinessRefreshGroup.command}` : "",
@@ -18843,6 +18862,9 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     const commandGroups = Array.isArray(preStagingReadinessSelfCheck.commandGroups)
       ? preStagingReadinessSelfCheck.commandGroups
       : [];
+    const executionQueue = Array.isArray(preStagingReadinessSelfCheck.executionQueue)
+      ? preStagingReadinessSelfCheck.executionQueue
+      : [];
     const requiredArtifacts = Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts)
       ? preStagingReadinessSelfCheck.requiredArtifacts
       : [];
@@ -18866,6 +18888,22 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
         + ` | command=${group.command || "-"}`
         + ` | expected=${expected}`
       );
+    }
+    if (executionQueue.length) {
+      lines.push("Execution Queue:");
+      for (const item of executionQueue) {
+        const expectedArtifacts = Array.isArray(item?.expectedArtifacts) && item.expectedArtifacts.length
+          ? item.expectedArtifacts.join(",")
+          : "-";
+        lines.push(
+          `${item.order || "-"}. ${item.key || "-"}`
+          + ` | status=${item.status || "-"}`
+          + ` | runNow=${item.runNow === true}`
+          + ` | unlocksWhen=${item.unlocksWhen || "-"}`
+          + ` | command=${item.command || "-"}`
+          + ` | expectedArtifacts=${expectedArtifacts}`
+        );
+      }
     }
     lines.push(`- requiredArtifacts=${requiredArtifacts.length ? requiredArtifacts.join(", ") : "-"}`);
     lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(preStagingReadinessSelfCheck.recommendedDownload, { fileSeparator: " | " })}`);
@@ -29682,6 +29720,63 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
   const fullTestWindowCommand = stagingLaunchDutyArchive?.commands?.fullTestWindow || "npm.cmd test";
   const productionSignoffPacket = files.productionSignoffPacket || `${archiveRoot}/staging-production-signoff-packet.json`;
   const launchDutyArchiveIndex = files.launchDutyArchiveIndex || `${archiveRoot}/staging-launch-duty-archive-index.json`;
+  const preStagingExecutionQueue = [
+    {
+      order: 1,
+      key: "confirm_profile_archive_inputs",
+      sourceGroupKey: "profile_archive_inputs",
+      status: "ready",
+      runNow: true,
+      unlocksWhen: null,
+      command: profileDrivenDryRunCommand,
+      expectedArtifacts: [
+        filledCloseoutInputFile,
+        readinessActionQueueFile,
+        launchDutyRecordIndex
+      ],
+      nextAction: "Confirm generated staging artifacts before readiness refresh."
+    },
+    {
+      order: 2,
+      key: "run_readiness_refresh",
+      sourceGroupKey: "readiness_refresh",
+      status: "current",
+      runNow: true,
+      unlocksWhen: null,
+      command: readinessStatusCommand,
+      expectedArtifacts: [
+        readinessActionQueueFile,
+        launchDutyRecordIndex
+      ],
+      nextAction: "Open the refreshed readiness action queue and confirm the current staging gate before reloading rehearsal."
+    },
+    {
+      order: 3,
+      key: "reload_rehearsal",
+      sourceGroupKey: "rehearsal_reload",
+      status: "next_after_readiness_refresh",
+      runNow: false,
+      unlocksWhen: "readiness_refresh_completed",
+      command: rehearsalReloadCommand,
+      expectedArtifacts: [
+        filledCloseoutInputFile
+      ],
+      nextAction: "Review the refreshed rehearsal output before entering full-test/signoff."
+    },
+    {
+      order: 4,
+      key: "enter_full_test_signoff",
+      sourceGroupKey: "full_test_signoff_entry",
+      status: "blocked_until_rehearsal_reload",
+      runNow: false,
+      unlocksWhen: "rehearsal_reload_reviewed",
+      command: fullTestWindowCommand,
+      expectedArtifacts: [
+        productionSignoffPacket
+      ],
+      nextAction: "Capture full-test output and production sign-off evidence after rehearsal reload."
+    }
+  ];
   const preStagingReadinessSelfCheckPacket = {
     version: "developer-ops-launch-operations-operator-pre-staging-readiness-self-check-packet/v1",
     status: "ready_for_pre_staging_self_check",
@@ -29739,6 +29834,7 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
         ]
       }
     ],
+    executionQueue: preStagingExecutionQueue,
     nextAction: "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."
   };
   return {
@@ -43360,6 +43456,7 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
   const entry = readiness.launchOperationsOperatorEntry || null;
   const packet = entry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket || null;
   const commandGroups = Array.isArray(packet?.commandGroups) ? packet.commandGroups : [];
+  const executionQueue = Array.isArray(packet?.executionQueue) ? packet.executionQueue : [];
   const requiredArtifacts = Array.isArray(packet?.requiredArtifacts) ? packet.requiredArtifacts : [];
   const directDownload = entry?.preStagingReadinessSelfCheckDownload
     || buildDeveloperOpsPreStagingReadinessSelfCheckDownload({
@@ -43409,6 +43506,25 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
     + ` | format=${operatorEntryDownload?.format || "launch-operations-operator-entry"}`
     + ` | href=${operatorEntryDownload?.href || "-"}`
   );
+  lines.push("");
+  lines.push("Execution Queue:");
+  for (const item of executionQueue) {
+    const expectedArtifacts = Array.isArray(item?.expectedArtifacts) && item.expectedArtifacts.length
+      ? item.expectedArtifacts.join(",")
+      : "-";
+    lines.push(
+      `${item.order || "-"}. ${item.key || "-"}`
+      + ` | status=${item.status || "-"}`
+      + ` | runNow=${item.runNow === true}`
+      + ` | unlocksWhen=${item.unlocksWhen || "-"}`
+      + ` | command=${item.command || "-"}`
+      + ` | expectedArtifacts=${expectedArtifacts}`
+      + ` | nextAction=${item.nextAction || "-"}`
+    );
+  }
+  if (!executionQueue.length) {
+    lines.push("- none");
+  }
   lines.push("");
   lines.push("Command Groups:");
   for (const [index, group] of commandGroups.entries()) {

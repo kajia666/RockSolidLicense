@@ -21081,6 +21081,63 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             ]
           }
         ],
+        executionQueue: [
+          {
+            order: 1,
+            key: "confirm_profile_archive_inputs",
+            sourceGroupKey: "profile_archive_inputs",
+            status: "ready",
+            runNow: true,
+            unlocksWhen: null,
+            command: steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.stagingLaunchDutyArchive.commands.profileDrivenDryRun,
+            expectedArtifacts: [
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+            ],
+            nextAction: "Confirm generated staging artifacts before readiness refresh."
+          },
+          {
+            order: 2,
+            key: "run_readiness_refresh",
+            sourceGroupKey: "readiness_refresh",
+            status: "current",
+            runNow: true,
+            unlocksWhen: null,
+            command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+            expectedArtifacts: [
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+            ],
+            nextAction: "Open the refreshed readiness action queue and confirm the current staging gate before reloading rehearsal."
+          },
+          {
+            order: 3,
+            key: "reload_rehearsal",
+            sourceGroupKey: "rehearsal_reload",
+            status: "next_after_readiness_refresh",
+            runNow: false,
+            unlocksWhen: "readiness_refresh_completed",
+            command: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+            expectedArtifacts: [
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
+            ],
+            nextAction: "Review the refreshed rehearsal output before entering full-test/signoff."
+          },
+          {
+            order: 4,
+            key: "enter_full_test_signoff",
+            sourceGroupKey: "full_test_signoff_entry",
+            status: "blocked_until_rehearsal_reload",
+            runNow: false,
+            unlocksWhen: "rehearsal_reload_reviewed",
+            command: "npm.cmd test",
+            expectedArtifacts: [
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+            ],
+            nextAction: "Capture full-test output and production sign-off evidence after rehearsal reload."
+          }
+        ],
         nextAction: "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."
       }
     );
@@ -22225,6 +22282,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsPreStagingSelfCheckDownload.contentDisposition || "", /developer-ops-pre-staging-readiness-self-check\.txt/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /RockSolid Developer Ops Pre-Staging Readiness Self-Check/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /status=ready_for_pre_staging_self_check \| current=refresh_staging_readiness_status \| next=reload_staging_rehearsal \| groups=4/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Execution Queue:[\s\S]*1\. confirm_profile_archive_inputs \| status=ready \| runNow=true \| unlocksWhen=-/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Execution Queue:[\s\S]*2\. run_readiness_refresh \| status=current \| runNow=true \| unlocksWhen=- \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Execution Queue:[\s\S]*3\. reload_rehearsal \| status=next_after_readiness_refresh \| runNow=false \| unlocksWhen=readiness_refresh_completed/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Execution Queue:[\s\S]*4\. enter_full_test_signoff \| status=blocked_until_rehearsal_reload \| runNow=false \| unlocksWhen=rehearsal_reload_reviewed \| command=npm\.cmd test/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Operator Order:[\s\S]*Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test\/signoff\./);
 
@@ -23927,6 +23988,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(mainlinePreStagingSelfCheck.currentActionKey, "refresh_staging_readiness_status");
     assert.equal(mainlinePreStagingSelfCheck.nextActionKey, "reload_staging_rehearsal");
     assert.equal(mainlinePreStagingSelfCheck.commandGroups.length, 4);
+    assert.equal(mainlinePreStagingSelfCheck.executionQueue.length, 4);
+    assert.deepEqual(
+      mainlinePreStagingSelfCheck.executionQueue.map((item) => [item.order, item.key, item.runNow, item.unlocksWhen]),
+      [
+        [1, "confirm_profile_archive_inputs", true, null],
+        [2, "run_readiness_refresh", true, null],
+        [3, "reload_rehearsal", false, "readiness_refresh_completed"],
+        [4, "enter_full_test_signoff", false, "rehearsal_reload_reviewed"]
+      ]
+    );
     assert.equal(
       mainlinePreStagingSelfCheck.commandGroups[1].command,
       "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
@@ -23970,6 +24041,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckCard.details.includes("Current action: refresh_staging_readiness_status"));
     assert.ok(preStagingSelfCheckCard.details.includes("Next action: reload_staging_rehearsal"));
     assert.ok(preStagingSelfCheckCard.details.includes("Command groups: 4"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Execution queue: 4"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Runnable now: 2"));
     assert.ok(preStagingSelfCheckCard.controls.some((control) => (
       control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
     )));
@@ -23984,6 +24057,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Execution Queue:[\s\S]*2\. run_readiness_refresh \| status=current \| runNow=true \| unlocksWhen=-/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,

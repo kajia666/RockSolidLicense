@@ -14787,6 +14787,69 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     && typeof initialLaunchOpsReadiness.launchOperationsOperatorEntry === "object"
       ? initialLaunchOpsReadiness.launchOperationsOperatorEntry
       : null;
+  const preStagingReadinessSelfCheckSource = launchOperationsOperatorEntry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket
+    && typeof launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket === "object"
+      ? launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket
+      : null;
+  const preStagingReadinessSelfCheckOperatorOrder = preStagingReadinessSelfCheckSource
+    ? [
+        "Confirm the pre-staging readiness self-check packet, run readiness refresh, then reload rehearsal before entering full-test/signoff."
+      ]
+    : [];
+  const preStagingReadinessSelfCheckDownload = preStagingReadinessSelfCheckSource
+    ? ensureLaunchWorkflowDownloadHref(
+        launchOperationsOperatorEntry?.primaryDownload || {
+          key: "ops_launch_operations_operator_entry",
+          label: "Open Pre-Staging Self-Check",
+          fileName: "developer-ops-launch-operations-operator-entry.txt",
+          format: "launch-operations-operator-entry",
+          source: "developer-ops"
+        },
+        params
+      )
+    : null;
+  const preStagingReadinessSelfCheck = preStagingReadinessSelfCheckSource
+    ? {
+        mode: "developer-launch-mainline-pre-staging-readiness-self-check",
+        version: preStagingReadinessSelfCheckSource.version || "developer-ops-launch-operations-operator-pre-staging-readiness-self-check-packet/v1",
+        status: preStagingReadinessSelfCheckSource.status || "ready_for_pre_staging_self_check",
+        ready: preStagingReadinessSelfCheckSource.ready === true,
+        productCode: preStagingReadinessSelfCheckSource.productCode || params.productCode || null,
+        channel: preStagingReadinessSelfCheckSource.channel || params.channel || "stable",
+        archiveRoot: preStagingReadinessSelfCheckSource.archiveRoot || null,
+        currentActionKey: preStagingReadinessSelfCheckSource.currentActionKey || "refresh_staging_readiness_status",
+        nextActionKey: preStagingReadinessSelfCheckSource.nextActionKey || "reload_staging_rehearsal",
+        launchDutyRecordIndexPath: preStagingReadinessSelfCheckSource.launchDutyRecordIndexPath
+          || launchOperationsOperatorEntry?.launchDutyRecordIndexPath
+          || null,
+        requiredArtifacts: Array.isArray(preStagingReadinessSelfCheckSource.requiredArtifacts)
+          ? preStagingReadinessSelfCheckSource.requiredArtifacts.slice()
+          : [],
+        commandGroups: Array.isArray(preStagingReadinessSelfCheckSource.commandGroups)
+          ? preStagingReadinessSelfCheckSource.commandGroups.map((item) => ({
+              key: item?.key || null,
+              status: item?.status || null,
+              command: item?.command || null,
+              expected: Array.isArray(item?.expected) ? item.expected.slice() : []
+            }))
+          : [],
+        nextAction: preStagingReadinessSelfCheckSource.nextAction
+          || "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff.",
+        operatorOrder: preStagingReadinessSelfCheckOperatorOrder,
+        recommendedDownload: preStagingReadinessSelfCheckDownload
+          ? {
+              ...preStagingReadinessSelfCheckDownload,
+              operatorOrder: preStagingReadinessSelfCheckOperatorOrder
+            }
+          : null,
+        workspaceAction: createLaunchWorkflowWorkspaceShortcut(
+          "ops",
+          "snapshot",
+          "Open Pre-Staging Ops Workspace",
+          params
+        )
+      }
+    : null;
   const launchDutySteadyStateHandoffLandingSource = launchOperationsOperatorEntry?.launchDutySteadyStateHandoffLanding
     || launchDutyActionOrder?.offlineExecutionPlan?.steadyStateHandoffLanding
     || null;
@@ -16200,6 +16263,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
+  const preStagingReadinessSelfCheckHeroControls = preStagingReadinessSelfCheck
+    ? [
+        preStagingReadinessSelfCheck.recommendedDownload ? {
+          kind: "download",
+          label: "Open Pre-Staging Self-Check",
+          recommendedDownload: preStagingReadinessSelfCheck.recommendedDownload,
+          operatorOrder: preStagingReadinessSelfCheckOperatorOrder
+        } : null,
+        preStagingReadinessSelfCheck.workspaceAction ? {
+          kind: "workspace",
+          label: "Open Pre-Staging Ops Workspace",
+          workspaceAction: preStagingReadinessSelfCheck.workspaceAction,
+          operatorOrder: preStagingReadinessSelfCheckOperatorOrder
+        } : null
+      ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+    : [];
   const steadyStateDutyReceiptHeroControls = steadyStateDutyReceiptReview
     ? [
         steadyStateDutyReceiptReview.recommendedDownload ? {
@@ -16220,6 +16299,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     ...confirmedFirstWaveHeroControls,
     ...firstWaveHeroControls,
     ...firstWaveRuntimeEvidenceHeroControls,
+    ...preStagingReadinessSelfCheckHeroControls,
     ...steadyStateHandoffHeroControls,
     ...steadyStateDutyReceiptHeroControls,
     ...launchRunwayHeroControls,
@@ -16330,6 +16410,36 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ].filter(Boolean)
     });
   }
+  if (preStagingReadinessSelfCheck) {
+    const preStagingSelfCheckStep = createLaunchWorkflowActionPlanStep({
+      key: "launch_mainline_pre_staging_readiness_self_check",
+      title: "Review pre-staging readiness self-check",
+      summary: preStagingReadinessSelfCheck.nextAction
+        || "Confirm the current staging readiness refresh and next rehearsal reload before full-test/signoff.",
+      status: preStagingReadinessSelfCheck.ready ? "pass" : "review",
+      priority: "secondary",
+      workspaceAction: preStagingReadinessSelfCheck.workspaceAction,
+      recommendedDownload: preStagingReadinessSelfCheck.recommendedDownload,
+      operatorOrder: preStagingReadinessSelfCheckOperatorOrder
+    });
+    actionPlan.push({
+      ...preStagingSelfCheckStep,
+      controls: [
+        preStagingSelfCheckStep.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+          kind: "download",
+          label: "Open Pre-Staging Self-Check",
+          recommendedDownload: preStagingSelfCheckStep.recommendedDownload,
+          operatorOrder: preStagingSelfCheckStep.operatorOrder
+        }, params) : null,
+        preStagingSelfCheckStep.workspaceAction ? ensureLaunchMainlineControlHrefs({
+          kind: "workspace",
+          label: preStagingSelfCheckStep.workspaceAction.label || "Open Pre-Staging Ops Workspace",
+          workspaceAction: preStagingSelfCheckStep.workspaceAction,
+          operatorOrder: preStagingSelfCheckStep.operatorOrder
+        }, params) : null
+      ].filter(Boolean)
+    });
+  }
   if (steadyStateHandoffLanding) {
     const steadyStateStep = createLaunchWorkflowActionPlanStep({
       key: "launch_mainline_steady_state_handoff_landing",
@@ -16412,6 +16522,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstLaunchHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(initialLaunchOpsOverviewStatusDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(preStagingReadinessSelfCheck?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateHandoffLanding?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateDutyReceiptReview?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
@@ -16699,6 +16810,63 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     }
     : null;
   const steadyStateHandoffLandingBridge = steadyStateHandoffLanding?.stableOperationsLandingBridge || null;
+  const preStagingReadinessSelfCheckCard = preStagingReadinessSelfCheck
+    ? (() => {
+        const commandGroups = Array.isArray(preStagingReadinessSelfCheck.commandGroups)
+          ? preStagingReadinessSelfCheck.commandGroups
+          : [];
+        const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
+        const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
+        return {
+          key: "pre_staging_readiness_self_check",
+          title: "Pre-Staging Readiness Self-Check",
+          summary: preStagingReadinessSelfCheck.nextAction
+            || "Confirm the pre-staging self-check before entering the real staging lane.",
+          operatorOrder: preStagingReadinessSelfCheckOperatorOrder,
+          tags: [
+            {
+              label: "status",
+              value: preStagingReadinessSelfCheck.status || "unknown",
+              strong: true
+            },
+            {
+              label: "current",
+              value: preStagingReadinessSelfCheck.currentActionKey || "-",
+              strong: false
+            },
+            {
+              label: "next",
+              value: preStagingReadinessSelfCheck.nextActionKey || "-",
+              strong: false
+            }
+          ],
+          details: [
+            `Current action: ${preStagingReadinessSelfCheck.currentActionKey || "-"}`,
+            `Next action: ${preStagingReadinessSelfCheck.nextActionKey || "-"}`,
+            `Command groups: ${commandGroups.length}`,
+            `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
+            `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
+            readinessRefreshGroup?.command ? `Readiness refresh: ${readinessRefreshGroup.command}` : "",
+            rehearsalReloadGroup?.command ? `Rehearsal reload: ${rehearsalReloadGroup.command}` : "",
+            ...preStagingReadinessSelfCheckOperatorOrder.map((item) => `Operator order: ${item}`)
+          ].filter(Boolean),
+          controls: [
+            preStagingReadinessSelfCheck.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+              kind: "download",
+              label: "Open Pre-Staging Self-Check",
+              recommendedDownload: preStagingReadinessSelfCheck.recommendedDownload,
+              operatorOrder: preStagingReadinessSelfCheckOperatorOrder
+            }, params) : null,
+            preStagingReadinessSelfCheck.workspaceAction ? ensureLaunchMainlineControlHrefs({
+              kind: "workspace",
+              label: "Open Pre-Staging Ops Workspace",
+              workspaceAction: preStagingReadinessSelfCheck.workspaceAction,
+              operatorOrder: preStagingReadinessSelfCheckOperatorOrder
+            }, params) : null
+          ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+        };
+      })()
+    : null;
   const steadyStateHandoffLandingCard = steadyStateHandoffLanding
     ? {
         key: "steady_state_handoff_landing",
@@ -16884,6 +17052,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveSupportInspectionConfirmationCard,
     firstWaveRuntimeEvidenceCard,
     launchReadinessNextGateCard,
+    preStagingReadinessSelfCheckCard,
     steadyStateHandoffLandingCard,
     steadyStateDutyReceiptReviewCard,
     {
@@ -17411,6 +17580,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: postLaunchLifecycleCards
     },
     {
+      key: "pre_staging_readiness_self_check",
+      title: "Pre-Staging Readiness Self-Check",
+      emptyState: "Open Developer Ops once to expose the pre-staging readiness self-check packet here.",
+      cards: overviewCards.filter((item) => item?.key === "pre_staging_readiness_self_check")
+    },
+    {
       key: "steady_state_handoff_landing",
       title: "Steady-State Handoff Landing",
       emptyState: "Complete launch-duty packet and record readbacks to expose the steady-state handoff landing here.",
@@ -17809,6 +17984,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveRuntimeEvidence,
     initialLaunchOpsOverviewStatus,
     launchDutyActionOrder,
+    preStagingReadinessSelfCheck,
     steadyStateHandoffLanding,
     steadyStateDutyReceiptReview,
     initialLaunchOpsGate,
@@ -18661,6 +18837,48 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Mainline Launch Duty Action Order:"
     });
+  }
+  const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck || null;
+  if (preStagingReadinessSelfCheck) {
+    const commandGroups = Array.isArray(preStagingReadinessSelfCheck.commandGroups)
+      ? preStagingReadinessSelfCheck.commandGroups
+      : [];
+    const requiredArtifacts = Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts)
+      ? preStagingReadinessSelfCheck.requiredArtifacts
+      : [];
+    lines.push("");
+    lines.push("Launch Mainline Pre-Staging Readiness Self-Check:");
+    lines.push(
+      `- status=${preStagingReadinessSelfCheck.status || "-"}`
+      + ` | current=${preStagingReadinessSelfCheck.currentActionKey || "-"}`
+      + ` | next=${preStagingReadinessSelfCheck.nextActionKey || "-"}`
+      + ` | groups=${commandGroups.length}`
+      + ` | ready=${preStagingReadinessSelfCheck.ready === true}`
+      + ` | launchDutyRecordIndex=${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`
+    );
+    for (const [index, group] of commandGroups.entries()) {
+      const expected = Array.isArray(group.expected) && group.expected.length
+        ? group.expected.join(",")
+        : "-";
+      lines.push(
+        `${index + 1}. ${group.key || "-"}`
+        + ` | status=${group.status || "-"}`
+        + ` | command=${group.command || "-"}`
+        + ` | expected=${expected}`
+      );
+    }
+    lines.push(`- requiredArtifacts=${requiredArtifacts.length ? requiredArtifacts.join(", ") : "-"}`);
+    lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(preStagingReadinessSelfCheck.recommendedDownload, { fileSeparator: " | " })}`);
+    lines.push(`- nextAction=${preStagingReadinessSelfCheck.nextAction || "-"}`);
+    const operatorOrder = Array.isArray(preStagingReadinessSelfCheck.operatorOrder)
+      ? preStagingReadinessSelfCheck.operatorOrder
+      : [];
+    if (operatorOrder.length) {
+      lines.push("Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
   }
   const steadyStateHandoffLanding = mainlineSummary.steadyStateHandoffLanding || null;
   if (steadyStateHandoffLanding) {

@@ -23872,6 +23872,76 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
       ownerSession.token
     );
+    const expectedPreStagingSelfCheckOperatorOrder = [
+      "Confirm the pre-staging readiness self-check packet, run readiness refresh, then reload rehearsal before entering full-test/signoff."
+    ];
+    const mainlinePreStagingSelfCheck = launchMainlineSteadyStateHandoff.mainlineSummary.preStagingReadinessSelfCheck;
+    assert.ok(mainlinePreStagingSelfCheck);
+    assert.equal(mainlinePreStagingSelfCheck.status, "ready_for_pre_staging_self_check");
+    assert.equal(mainlinePreStagingSelfCheck.currentActionKey, "refresh_staging_readiness_status");
+    assert.equal(mainlinePreStagingSelfCheck.nextActionKey, "reload_staging_rehearsal");
+    assert.equal(mainlinePreStagingSelfCheck.commandGroups.length, 4);
+    assert.equal(
+      mainlinePreStagingSelfCheck.commandGroups[1].command,
+      "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+    );
+    assert.equal(
+      mainlinePreStagingSelfCheck.commandGroups[2].command,
+      "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
+    );
+    assert.deepEqual(
+      mainlinePreStagingSelfCheck.operatorOrder,
+      expectedPreStagingSelfCheckOperatorOrder
+    );
+    assert.equal(mainlinePreStagingSelfCheck.recommendedDownload.key, "ops_launch_operations_operator_entry");
+    assert.equal(mainlinePreStagingSelfCheck.recommendedDownload.format, "launch-operations-operator-entry");
+    assert.deepEqual(
+      mainlinePreStagingSelfCheck.recommendedDownload.operatorOrder,
+      expectedPreStagingSelfCheckOperatorOrder
+    );
+    assert.match(
+      mainlinePreStagingSelfCheck.recommendedDownload.href,
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=\d+&format=launch-operations-operator-entry/
+    );
+    assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.heroControls.some((item) => (
+      item.label === "Open Pre-Staging Self-Check"
+      && item.recommendedDownload?.key === "ops_launch_operations_operator_entry"
+    )));
+    const preStagingSelfCheckActionStep = launchMainlineSteadyStateHandoff.mainlineSummary.actionPlan.find((item) => (
+      item.key === "launch_mainline_pre_staging_readiness_self_check"
+    ));
+    assert.ok(preStagingSelfCheckActionStep);
+    assert.deepEqual(preStagingSelfCheckActionStep.operatorOrder, expectedPreStagingSelfCheckOperatorOrder);
+    assert.ok(preStagingSelfCheckActionStep.controls.some((control) => (
+      control.recommendedDownload?.key === "ops_launch_operations_operator_entry"
+    )));
+    const preStagingSelfCheckCard = launchMainlineSteadyStateHandoff.mainlineSummary.overviewCards.find((item) => (
+      item.key === "pre_staging_readiness_self_check"
+    ));
+    assert.ok(preStagingSelfCheckCard);
+    assert.deepEqual(preStagingSelfCheckCard.operatorOrder, expectedPreStagingSelfCheckOperatorOrder);
+    assert.ok(preStagingSelfCheckCard.details.includes("Current action: refresh_staging_readiness_status"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Next action: reload_staging_rehearsal"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Command groups: 4"));
+    assert.ok(preStagingSelfCheckCard.controls.some((control) => (
+      control.recommendedDownload?.key === "ops_launch_operations_operator_entry"
+    )));
+    assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.sections.some((item) => (
+      item.key === "pre_staging_readiness_self_check"
+      && item.cards?.some((card) => card.key === "pre_staging_readiness_self_check")
+    )));
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*status=ready_for_pre_staging_self_check \| current=refresh_staging_readiness_status \| next=reload_staging_rehearsal \| groups=4/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Mainline Hero Controls:[\s\S]*Open Pre-Staging Self-Check[\s\S]*Operator Order:[\s\S]*Confirm the pre-staging readiness self-check packet/
+    );
     assert.equal(
       launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.status,
       "ready_for_steady_state_handoff"

@@ -14981,6 +14981,21 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                       nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.nextAction || null
                     }
                   : null,
+              readbackChecklist: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.readbackChecklist)
+                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.readbackChecklist.map((item) => ({
+                    order: Number(item?.order || 0),
+                    key: item?.key || null,
+                    queueKey: item?.queueKey || null,
+                    artifactPath: item?.artifactPath || null,
+                    receiptOperations: Array.isArray(item?.receiptOperations) ? item.receiptOperations.slice() : [],
+                    readbackFiles: Array.isArray(item?.readbackFiles) ? item.readbackFiles.slice() : [],
+                    expectedNextQueueKey: item?.expectedNextQueueKey || null,
+                    expectedNextBackfillKey: item?.expectedNextBackfillKey || null,
+                    expectedNextUnlocksWhen: item?.expectedNextUnlocksWhen || null,
+                    successCriteriaCount: Number(item?.successCriteriaCount || 0),
+                    command: item?.command || null
+                  }))
+                : [],
               nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.nextAction || null
             }
           : null,
@@ -16987,6 +17002,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           && typeof closeoutEvidenceHandoff.operatorCheckpoint === "object"
             ? closeoutEvidenceHandoff.operatorCheckpoint
             : null;
+        const closeoutEvidenceReadbackChecklist = Array.isArray(closeoutEvidenceHandoff?.readbackChecklist)
+          ? closeoutEvidenceHandoff.readbackChecklist
+          : [];
         const runnableNowCount = executionQueue.filter((item) => item?.runNow === true).length;
         const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
         const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
@@ -17035,6 +17053,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             closeoutEvidenceOperatorCheckpoint?.postRunReadback?.status ? `Closeout post-run readback: ${closeoutEvidenceOperatorCheckpoint.postRunReadback.status}` : "",
             closeoutEvidenceOperatorCheckpoint?.postRunReadback?.expectedNextQueueKey ? `Closeout post-run next queue: ${closeoutEvidenceOperatorCheckpoint.postRunReadback.expectedNextQueueKey}` : "",
             closeoutEvidenceOperatorCheckpoint?.postRunReadback ? `Closeout post-run criteria: ${Array.isArray(closeoutEvidenceOperatorCheckpoint.postRunReadback.successCriteria) ? closeoutEvidenceOperatorCheckpoint.postRunReadback.successCriteria.length : 0}` : "",
+            `Closeout readback checklist: ${closeoutEvidenceReadbackChecklist.length}`,
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -19060,6 +19079,34 @@ function appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, checkp
   lines.push(`- nextAction=${checkpoint.nextAction || "-"}`);
 }
 
+function appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, checklist, heading = "Closeout Evidence Readback Checklist") {
+  const items = Array.isArray(checklist) ? checklist : [];
+  if (!items.length) {
+    return;
+  }
+  lines.push(`${heading}:`);
+  for (const item of items) {
+    const receipts = Array.isArray(item?.receiptOperations) && item.receiptOperations.length
+      ? item.receiptOperations.join(",")
+      : "-";
+    const readbackFiles = Array.isArray(item?.readbackFiles) && item.readbackFiles.length
+      ? item.readbackFiles.join(",")
+      : "-";
+    lines.push(
+      `${item?.order || "-"}. ${item?.key || "-"}`
+      + ` | queue=${item?.queueKey || "-"}`
+      + ` | artifact=${item?.artifactPath || "-"}`
+      + ` | receipts=${receipts}`
+      + ` | nextQueue=${item?.expectedNextQueueKey || "-"}`
+      + ` | nextBackfill=${item?.expectedNextBackfillKey || "-"}`
+      + ` | nextUnlocksWhen=${item?.expectedNextUnlocksWhen || "-"}`
+      + ` | criteria=${Number(item?.successCriteriaCount || 0)}`
+      + ` | readbackFiles=${readbackFiles}`
+      + ` | command=${item?.command || "-"}`
+    );
+  }
+}
+
 function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -19228,6 +19275,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
       appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceHandoff.progress);
       appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceHandoff.operatorCheckpoint);
+      appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, closeoutEvidenceHandoff.readbackChecklist);
       if (closeoutEvidenceTargets.length) {
         lines.push("Closeout Evidence Targets:");
         for (const target of closeoutEvidenceTargets) {
@@ -30305,6 +30353,27 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
   const nextCloseoutEvidenceBackfillQueueItem = closeoutEvidenceBackfillQueue[1] || null;
   const nextCloseoutEvidenceTarget = closeoutEvidenceTargets[1] || null;
   const finalCloseoutEvidenceQueueItem = closeoutEvidenceQueue[closeoutEvidenceQueue.length - 1] || null;
+  const closeoutEvidenceReadbackChecklist = closeoutEvidenceTargets.map((target, index) => {
+    const queueItem = closeoutEvidenceBackfillQueue[index] || null;
+    const nextQueueItem = closeoutEvidenceBackfillQueue[index + 1] || finalCloseoutEvidenceQueueItem || null;
+    const nextTarget = closeoutEvidenceTargets[index + 1] || null;
+    return {
+      order: target.order,
+      key: target.key,
+      queueKey: queueItem?.key || null,
+      artifactPath: target.artifactPath,
+      receiptOperations: Array.isArray(target.receiptOperations) ? target.receiptOperations.slice() : [],
+      readbackFiles: [
+        filledCloseoutInputFile,
+        readinessActionQueueFile
+      ],
+      expectedNextQueueKey: nextQueueItem?.key || null,
+      expectedNextBackfillKey: nextTarget?.key || null,
+      expectedNextUnlocksWhen: nextQueueItem?.unlocksWhen || null,
+      successCriteriaCount: 4,
+      command: target.command
+    };
+  });
   const closeoutEvidenceReceiptOperationPlaceholderCount = closeoutEvidenceTargets.reduce(
     (total, target) => total + (Array.isArray(target?.receiptOperations) ? target.receiptOperations.length : 0),
     0
@@ -30455,6 +30524,7 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     queue: closeoutEvidenceQueue,
     progress: closeoutEvidenceProgress,
     operatorCheckpoint: closeoutEvidenceOperatorCheckpoint,
+    readbackChecklist: closeoutEvidenceReadbackChecklist,
     nextAction: "Run closeout init after profile/archive inputs, refresh readiness, backfill all seven pre-full-test closeout evidence targets, then refresh readiness for the full-test window."
   };
   const preStagingReadinessSelfCheckPacket = {
@@ -42471,6 +42541,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       lines.push(`- rehearsalReload=${preStagingCloseoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
       appendDeveloperOpsCloseoutEvidenceProgressLines(lines, preStagingCloseoutEvidenceProgress, "Pre-Staging Closeout Evidence Progress");
       appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, preStagingCloseoutEvidenceOperatorCheckpoint, "Pre-Staging Closeout Evidence Operator Checkpoint");
+      appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, preStagingCloseoutEvidenceHandoff.readbackChecklist, "Pre-Staging Closeout Evidence Readback Checklist");
       if (preStagingCloseoutEvidenceTargets.length) {
         lines.push("Pre-Staging Closeout Evidence Targets:");
         for (const target of preStagingCloseoutEvidenceTargets) {
@@ -43389,6 +43460,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
         appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceProgress, "Pre-Staging Closeout Evidence Progress");
         appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceOperatorCheckpoint, "Pre-Staging Closeout Evidence Operator Checkpoint");
+        appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, closeoutEvidenceHandoff.readbackChecklist, "Pre-Staging Closeout Evidence Readback Checklist");
         if (closeoutEvidenceTargets.length) {
           lines.push("Pre-Staging Closeout Evidence Targets:");
           for (const target of closeoutEvidenceTargets) {
@@ -44355,6 +44427,7 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
     lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
     appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceProgress);
     appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceOperatorCheckpoint);
+    appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, closeoutEvidenceHandoff.readbackChecklist);
     lines.push("Closeout Evidence Targets:");
     for (const target of closeoutEvidenceTargets) {
       const receiptOperations = Array.isArray(target?.receiptOperations) && target.receiptOperations.length

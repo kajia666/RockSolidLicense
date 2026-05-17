@@ -21469,6 +21469,120 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             },
             nextAction: "Run the current closeout evidence backfill when its artifact and receipts are available, continue the remaining backfills, then run the final readiness refresh and rehearsal reload before full-test."
           },
+          readbackChecklist: [
+            {
+              order: 1,
+              key: "route_map_gate_result",
+              queueKey: "route_map_gate_result_backfill",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt",
+              receiptOperations: ["<route-map-gate-receipt-id>"],
+              readbackFiles: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              expectedNextQueueKey: "backup_restore_drill_result_backfill",
+              expectedNextBackfillKey: "backup_restore_drill_result",
+              expectedNextUnlocksWhen: "backup_restore_drill_output_ready",
+              successCriteriaCount: 4,
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 2,
+              key: "backup_restore_drill_result",
+              queueKey: "backup_restore_drill_result_backfill",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt",
+              receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"],
+              readbackFiles: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              expectedNextQueueKey: "live_write_smoke_result_backfill",
+              expectedNextBackfillKey: "live_write_smoke_result",
+              expectedNextUnlocksWhen: "live_write_smoke_output_ready",
+              successCriteriaCount: 4,
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 3,
+              key: "live_write_smoke_result",
+              queueKey: "live_write_smoke_result_backfill",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json",
+              receiptOperations: ["<record_launch_rehearsal_run-receipt-id>"],
+              readbackFiles: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              expectedNextQueueKey: "launch_smoke_handoff_backfill",
+              expectedNextBackfillKey: "launch_smoke_handoff",
+              expectedNextUnlocksWhen: "launch_smoke_handoff_archived",
+              successCriteriaCount: 4,
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key live_write_smoke_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json --receipt-id <record_launch_rehearsal_run-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 4,
+              key: "launch_smoke_handoff",
+              queueKey: "launch_smoke_handoff_backfill",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-smoke-handoff.json",
+              receiptOperations: ["<record_post_launch_ops_sweep-receipt-id>"],
+              readbackFiles: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              expectedNextQueueKey: "launch_mainline_evidence_receipts_backfill",
+              expectedNextBackfillKey: "launch_mainline_evidence_receipts",
+              expectedNextUnlocksWhen: "launch_mainline_receipts_ready",
+              successCriteriaCount: 4,
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key launch_smoke_handoff --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-smoke-handoff.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 5,
+              key: "launch_mainline_evidence_receipts",
+              queueKey: "launch_mainline_evidence_receipts_backfill",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-mainline-evidence-receipts.json",
+              receiptOperations: ["<record_launch_rehearsal_run-receipt-id>"],
+              readbackFiles: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              expectedNextQueueKey: "receipt_visibility_review_backfill",
+              expectedNextBackfillKey: "receipt_visibility_review",
+              expectedNextUnlocksWhen: "receipt_visibility_review_ready",
+              successCriteriaCount: 4,
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key launch_mainline_evidence_receipts --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-mainline-evidence-receipts.json --receipt-id <record_launch_rehearsal_run-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 6,
+              key: "receipt_visibility_review",
+              queueKey: "receipt_visibility_review_backfill",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/receipt-visibility-review.txt",
+              receiptOperations: ["<record_post_launch_ops_sweep-receipt-id>"],
+              readbackFiles: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              expectedNextQueueKey: "operator_go_no_go_backfill",
+              expectedNextBackfillKey: "operator_go_no_go",
+              expectedNextUnlocksWhen: "operator_go_no_go_ready",
+              successCriteriaCount: 4,
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key receipt_visibility_review --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/receipt-visibility-review.txt --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 7,
+              key: "operator_go_no_go",
+              queueKey: "operator_go_no_go_backfill",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/operator-go-no-go.md",
+              receiptOperations: [],
+              readbackFiles: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              expectedNextQueueKey: "post_closeout_evidence_readiness_status",
+              expectedNextBackfillKey: null,
+              expectedNextUnlocksWhen: "operator_go_no_go_backfilled",
+              successCriteriaCount: 4,
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key operator_go_no_go --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/operator-go-no-go.md --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            }
+          ],
           nextAction: "Run closeout init after profile/archive inputs, refresh readiness, backfill all seven pre-full-test closeout evidence targets, then refresh readiness for the full-test window."
         },
         nextAction: "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."
@@ -22637,6 +22751,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Post-Run Readback:[\s\S]*status=awaiting_current_backfill_readback \| completed=route_map_gate_result \| nextQueue=backup_restore_drill_result_backfill \| nextBackfill=backup_restore_drill_result/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Post-Run Readback:[\s\S]*readbackFiles=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json,artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Post-Run Criteria:[\s\S]*4\. full_test_remains_blocked \| expected=all_closeout_evidence_backfilled_and_post_closeout_evidence_readiness_status_completed/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Readback Checklist:[\s\S]*1\. route_map_gate_result \| queue=route_map_gate_result_backfill \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt \| receipts=<route-map-gate-receipt-id> \| nextQueue=backup_restore_drill_result_backfill \| nextBackfill=backup_restore_drill_result/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Readback Checklist:[\s\S]*7\. operator_go_no_go \| queue=operator_go_no_go_backfill \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/operator-go-no-go\.md \| receipts=- \| nextQueue=post_closeout_evidence_readiness_status \| nextBackfill=-/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*2\. backup_restore_drill_result \| source=run_backup_restore_drill \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*7\. operator_go_no_go \| source=backfill_filled_closeout_input \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/operator-go-no-go\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Queue:[\s\S]*3\. route_map_gate_result_backfill \| status=blocked_after_route_map_gate \| runNow=false \| unlocksWhen=route_map_gate_output_ready \| command=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
@@ -24516,6 +24632,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         nextAction: "Run the current closeout evidence backfill when its artifact and receipts are available, continue the remaining backfills, then run the final readiness refresh and rehearsal reload before full-test."
       }
     );
+    assert.equal(mainlinePreStagingSelfCheck.closeoutEvidenceHandoff.readbackChecklist.length, 7);
+    assert.deepEqual(
+      mainlinePreStagingSelfCheck.closeoutEvidenceHandoff.readbackChecklist.map((item) => [
+        item.order,
+        item.key,
+        item.queueKey,
+        item.expectedNextQueueKey,
+        item.expectedNextBackfillKey,
+        item.successCriteriaCount
+      ]),
+      [
+        [1, "route_map_gate_result", "route_map_gate_result_backfill", "backup_restore_drill_result_backfill", "backup_restore_drill_result", 4],
+        [2, "backup_restore_drill_result", "backup_restore_drill_result_backfill", "live_write_smoke_result_backfill", "live_write_smoke_result", 4],
+        [3, "live_write_smoke_result", "live_write_smoke_result_backfill", "launch_smoke_handoff_backfill", "launch_smoke_handoff", 4],
+        [4, "launch_smoke_handoff", "launch_smoke_handoff_backfill", "launch_mainline_evidence_receipts_backfill", "launch_mainline_evidence_receipts", 4],
+        [5, "launch_mainline_evidence_receipts", "launch_mainline_evidence_receipts_backfill", "receipt_visibility_review_backfill", "receipt_visibility_review", 4],
+        [6, "receipt_visibility_review", "receipt_visibility_review_backfill", "operator_go_no_go_backfill", "operator_go_no_go", 4],
+        [7, "operator_go_no_go", "operator_go_no_go_backfill", "post_closeout_evidence_readiness_status", null, 4]
+      ]
+    );
     assert.equal(
       mainlinePreStagingSelfCheck.commandGroups[1].command,
       "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
@@ -24574,6 +24710,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout post-run readback: awaiting_current_backfill_readback"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout post-run next queue: backup_restore_drill_result_backfill"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout post-run criteria: 4"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout readback checklist: 7"));
     assert.ok(preStagingSelfCheckCard.details.includes("First closeout target: route_map_gate_result -> artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt"));
     assert.ok(preStagingSelfCheckCard.controls.some((control) => (
       control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
@@ -24613,6 +24750,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Post-Run Readback:[\s\S]*status=awaiting_current_backfill_readback \| completed=route_map_gate_result \| nextQueue=backup_restore_drill_result_backfill \| nextBackfill=backup_restore_drill_result/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Readback Checklist:[\s\S]*7\. operator_go_no_go \| queue=operator_go_no_go_backfill \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/operator-go-no-go\.md \| receipts=- \| nextQueue=post_closeout_evidence_readiness_status \| nextBackfill=-/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,

@@ -21649,6 +21649,46 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                 nextAction: "Backfill full_test_window_passed only after the full-test output is reviewed."
               }
             ],
+            clearanceReviewPacket: {
+              status: "awaiting_full_test_clearance_readbacks",
+              currentStepKey: "complete_closeout_readbacks",
+              currentReadbackKey: "route_map_gate_result",
+              remainingStepCount: 5,
+              requiredReadbackCount: 7,
+              blockerCount: 8,
+              readbackFiles: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              requiredReadbackKeys: [
+                "route_map_gate_result",
+                "backup_restore_drill_result",
+                "live_write_smoke_result",
+                "launch_smoke_handoff",
+                "launch_mainline_evidence_receipts",
+                "receipt_visibility_review",
+                "operator_go_no_go"
+              ],
+              exitCriteria: [
+                {
+                  key: "all_closeout_readbacks_reviewed",
+                  expected: "7 closeout evidence readbacks reviewed against filled closeout input and readiness action queue"
+                },
+                {
+                  key: "final_readiness_refresh_selects_full_test",
+                  expected: "readiness action queue refresh selects full-test/signoff without new closeout blockers"
+                },
+                {
+                  key: "rehearsal_reload_matches_signoff_packet",
+                  expected: "rehearsal reload points at the same production sign-off packet and launch-duty record index"
+                },
+                {
+                  key: "full_test_output_captured_before_backfill",
+                  expected: "guarded full-test output is captured before full_test_window_passed is backfilled"
+                }
+              ],
+              nextAction: "Review the clearance packet, complete the required readbacks, then move through the clearance sequence without skipping the final readiness refresh or rehearsal reload."
+            },
             nextAction: "Complete all closeout evidence readbacks, run the final readiness refresh, reload rehearsal, then enter full-test only when the refreshed gate is full-test/signoff."
           },
           nextAction: "Run closeout init after profile/archive inputs, refresh readiness, backfill all seven pre-full-test closeout evidence targets, then refresh readiness for the full-test window."
@@ -22825,6 +22865,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Entry Gate:[\s\S]*currentReadback=route_map_gate_result \| finalReadinessRefresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Clearance Sequence:[\s\S]*1\. complete_closeout_readbacks \| status=blocked_until_all_readbacks_reviewed \| command=- \| expected=7 closeout evidence readbacks reviewed/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Clearance Sequence:[\s\S]*4\. run_guarded_full_test \| status=blocked_until_rehearsal_reload \| command=npm\.cmd test \| expected=full_test_output_captured/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Clearance Review Packet:[\s\S]*status=awaiting_full_test_clearance_readbacks \| currentStep=complete_closeout_readbacks \| currentReadback=route_map_gate_result \| remainingSteps=5 \| readbacks=7 \| blockers=8 \| exitCriteria=4/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Clearance Exit Criteria:[\s\S]*4\. full_test_output_captured_before_backfill \| expected=guarded full-test output is captured before full_test_window_passed is backfilled/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*2\. backup_restore_drill_result \| source=run_backup_restore_drill \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*7\. operator_go_no_go \| source=backfill_filled_closeout_input \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/operator-go-no-go\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Queue:[\s\S]*3\. route_map_gate_result_backfill \| status=blocked_after_route_map_gate \| runNow=false \| unlocksWhen=route_map_gate_output_ready \| command=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
@@ -24792,6 +24834,46 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             nextAction: "Backfill full_test_window_passed only after the full-test output is reviewed."
           }
         ],
+        clearanceReviewPacket: {
+          status: "awaiting_full_test_clearance_readbacks",
+          currentStepKey: "complete_closeout_readbacks",
+          currentReadbackKey: "route_map_gate_result",
+          remainingStepCount: 5,
+          requiredReadbackCount: 7,
+          blockerCount: 8,
+          readbackFiles: [
+            "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+            "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+          ],
+          requiredReadbackKeys: [
+            "route_map_gate_result",
+            "backup_restore_drill_result",
+            "live_write_smoke_result",
+            "launch_smoke_handoff",
+            "launch_mainline_evidence_receipts",
+            "receipt_visibility_review",
+            "operator_go_no_go"
+          ],
+          exitCriteria: [
+            {
+              key: "all_closeout_readbacks_reviewed",
+              expected: "7 closeout evidence readbacks reviewed against filled closeout input and readiness action queue"
+            },
+            {
+              key: "final_readiness_refresh_selects_full_test",
+              expected: "readiness action queue refresh selects full-test/signoff without new closeout blockers"
+            },
+            {
+              key: "rehearsal_reload_matches_signoff_packet",
+              expected: "rehearsal reload points at the same production sign-off packet and launch-duty record index"
+            },
+            {
+              key: "full_test_output_captured_before_backfill",
+              expected: "guarded full-test output is captured before full_test_window_passed is backfilled"
+            }
+          ],
+          nextAction: "Review the clearance packet, complete the required readbacks, then move through the clearance sequence without skipping the final readiness refresh or rehearsal reload."
+        },
         nextAction: "Complete all closeout evidence readbacks, run the final readiness refresh, reload rehearsal, then enter full-test only when the refreshed gate is full-test/signoff."
       }
     );
@@ -24858,6 +24940,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout full-test blockers: 8"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout full-test clearance steps: 5"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout full-test next clearance: complete_closeout_readbacks"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout clearance review packet: awaiting_full_test_clearance_readbacks"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout clearance exit criteria: 4"));
     assert.ok(preStagingSelfCheckCard.details.includes("First closeout target: route_map_gate_result -> artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt"));
     assert.ok(preStagingSelfCheckCard.controls.some((control) => (
       control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
@@ -24909,6 +24993,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Full-Test Clearance Sequence:[\s\S]*5\. capture_full_test_result_for_signoff \| status=blocked_until_full_test_output \| command=- \| expected=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Full-Test Clearance Review Packet:[\s\S]*readbackFiles=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json,artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,

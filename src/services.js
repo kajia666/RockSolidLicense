@@ -15025,6 +15025,30 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                             nextAction: item?.nextAction || null
                           }))
                         : [],
+                      clearanceReviewPacket: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket
+                        && typeof preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket === "object"
+                          ? {
+                              status: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.status || null,
+                              currentStepKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.currentStepKey || null,
+                              currentReadbackKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.currentReadbackKey || null,
+                              remainingStepCount: Number(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.remainingStepCount || 0),
+                              requiredReadbackCount: Number(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.requiredReadbackCount || 0),
+                              blockerCount: Number(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.blockerCount || 0),
+                              readbackFiles: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.readbackFiles)
+                                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.readbackFiles.slice()
+                                : [],
+                              requiredReadbackKeys: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.requiredReadbackKeys)
+                                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.requiredReadbackKeys.slice()
+                                : [],
+                              exitCriteria: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.exitCriteria)
+                                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.exitCriteria.map((item) => ({
+                                    key: item?.key || null,
+                                    expected: item?.expected || null
+                                  }))
+                                : [],
+                              nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.clearanceReviewPacket.nextAction || null
+                            }
+                          : null,
                       nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.nextAction || null
                     }
                   : null,
@@ -17041,6 +17065,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           && typeof closeoutEvidenceHandoff.fullTestEntryGate === "object"
             ? closeoutEvidenceHandoff.fullTestEntryGate
             : null;
+        const closeoutEvidenceFullTestClearanceReviewPacket = closeoutEvidenceFullTestEntryGate?.clearanceReviewPacket
+          && typeof closeoutEvidenceFullTestEntryGate.clearanceReviewPacket === "object"
+            ? closeoutEvidenceFullTestEntryGate.clearanceReviewPacket
+            : null;
         const runnableNowCount = executionQueue.filter((item) => item?.runNow === true).length;
         const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
         const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
@@ -17094,6 +17122,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             closeoutEvidenceFullTestEntryGate ? `Closeout full-test blockers: ${Number(closeoutEvidenceFullTestEntryGate.blockerCount || 0)}` : "",
             closeoutEvidenceFullTestEntryGate ? `Closeout full-test clearance steps: ${Number(closeoutEvidenceFullTestEntryGate.clearanceStepCount || 0)}` : "",
             closeoutEvidenceFullTestEntryGate?.nextClearanceKey ? `Closeout full-test next clearance: ${closeoutEvidenceFullTestEntryGate.nextClearanceKey}` : "",
+            closeoutEvidenceFullTestClearanceReviewPacket?.status ? `Closeout clearance review packet: ${closeoutEvidenceFullTestClearanceReviewPacket.status}` : "",
+            closeoutEvidenceFullTestClearanceReviewPacket ? `Closeout clearance exit criteria: ${Array.isArray(closeoutEvidenceFullTestClearanceReviewPacket.exitCriteria) ? closeoutEvidenceFullTestClearanceReviewPacket.exitCriteria.length : 0}` : "",
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -19188,6 +19218,44 @@ function appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, gate, h
         + ` | nextAction=${item?.nextAction || "-"}`
       );
     }
+  }
+  const clearanceReviewPacket = gate.clearanceReviewPacket && typeof gate.clearanceReviewPacket === "object"
+    ? gate.clearanceReviewPacket
+    : null;
+  if (clearanceReviewPacket) {
+    const reviewPacketHeading = heading.endsWith("Entry Gate")
+      ? heading.replace(/Entry Gate$/, "Clearance Review Packet")
+      : `${heading} Clearance Review Packet`;
+    const exitCriteriaHeading = heading.endsWith("Entry Gate")
+      ? heading.replace(/Entry Gate$/, "Clearance Exit Criteria")
+      : `${heading} Clearance Exit Criteria`;
+    const readbackFiles = Array.isArray(clearanceReviewPacket.readbackFiles) && clearanceReviewPacket.readbackFiles.length
+      ? clearanceReviewPacket.readbackFiles.join(",")
+      : "-";
+    const requiredReadbackKeys = Array.isArray(clearanceReviewPacket.requiredReadbackKeys) && clearanceReviewPacket.requiredReadbackKeys.length
+      ? clearanceReviewPacket.requiredReadbackKeys.join(",")
+      : "-";
+    const exitCriteria = Array.isArray(clearanceReviewPacket.exitCriteria) ? clearanceReviewPacket.exitCriteria : [];
+    lines.push(`${reviewPacketHeading}:`);
+    lines.push(
+      `- status=${clearanceReviewPacket.status || "-"}`
+      + ` | currentStep=${clearanceReviewPacket.currentStepKey || "-"}`
+      + ` | currentReadback=${clearanceReviewPacket.currentReadbackKey || "-"}`
+      + ` | remainingSteps=${Number(clearanceReviewPacket.remainingStepCount || 0)}`
+      + ` | readbacks=${Number(clearanceReviewPacket.requiredReadbackCount || 0)}`
+      + ` | blockers=${Number(clearanceReviewPacket.blockerCount || 0)}`
+      + ` | exitCriteria=${exitCriteria.length}`
+    );
+    lines.push(`- readbackFiles=${readbackFiles}`);
+    lines.push(`- requiredReadbackKeys=${requiredReadbackKeys}`);
+    if (exitCriteria.length) {
+      lines.push(`${exitCriteriaHeading}:`);
+      for (let index = 0; index < exitCriteria.length; index += 1) {
+        const item = exitCriteria[index];
+        lines.push(`${index + 1}. ${item?.key || "-"} | expected=${item?.expected || "-"}`);
+      }
+    }
+    lines.push(`- clearanceReviewNextAction=${clearanceReviewPacket.nextAction || "-"}`);
   }
   lines.push(`- nextAction=${gate.nextAction || "-"}`);
 }
@@ -30506,6 +30574,38 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
       nextAction: "Backfill full_test_window_passed only after the full-test output is reviewed."
     }
   ];
+  const closeoutEvidenceFullTestClearanceReviewPacket = {
+    status: "awaiting_full_test_clearance_readbacks",
+    currentStepKey: closeoutEvidenceFullTestClearanceSequence[0]?.key || null,
+    currentReadbackKey: closeoutEvidenceReadbackChecklist[0]?.key || null,
+    remainingStepCount: closeoutEvidenceFullTestClearanceSequence.length,
+    requiredReadbackCount: closeoutEvidenceReadbackChecklist.length,
+    blockerCount: closeoutEvidenceFullTestEntryGateBlockers.length,
+    readbackFiles: [
+      filledCloseoutInputFile,
+      readinessActionQueueFile
+    ],
+    requiredReadbackKeys: closeoutEvidenceReadbackChecklist.map((item) => item.key).filter(Boolean),
+    exitCriteria: [
+      {
+        key: "all_closeout_readbacks_reviewed",
+        expected: `${closeoutEvidenceReadbackChecklist.length} closeout evidence readbacks reviewed against filled closeout input and readiness action queue`
+      },
+      {
+        key: "final_readiness_refresh_selects_full_test",
+        expected: "readiness action queue refresh selects full-test/signoff without new closeout blockers"
+      },
+      {
+        key: "rehearsal_reload_matches_signoff_packet",
+        expected: "rehearsal reload points at the same production sign-off packet and launch-duty record index"
+      },
+      {
+        key: "full_test_output_captured_before_backfill",
+        expected: "guarded full-test output is captured before full_test_window_passed is backfilled"
+      }
+    ],
+    nextAction: "Review the clearance packet, complete the required readbacks, then move through the clearance sequence without skipping the final readiness refresh or rehearsal reload."
+  };
   const closeoutEvidenceFullTestEntryGate = {
     status: "blocked_until_closeout_evidence_readbacks_complete",
     canEnterFullTest: false,
@@ -30522,6 +30622,7 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     clearanceStepCount: closeoutEvidenceFullTestClearanceSequence.length,
     nextClearanceKey: closeoutEvidenceFullTestClearanceSequence[0]?.key || null,
     clearanceSequence: closeoutEvidenceFullTestClearanceSequence,
+    clearanceReviewPacket: closeoutEvidenceFullTestClearanceReviewPacket,
     nextAction: "Complete all closeout evidence readbacks, run the final readiness refresh, reload rehearsal, then enter full-test only when the refreshed gate is full-test/signoff."
   };
   const closeoutEvidenceReceiptOperationPlaceholderCount = closeoutEvidenceTargets.reduce(

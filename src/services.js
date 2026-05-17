@@ -15063,6 +15063,28 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                               prerequisiteKeys: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.prerequisiteKeys)
                                 ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.prerequisiteKeys.slice()
                                 : [],
+                              postBackfillReadback: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback
+                                && typeof preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback === "object"
+                                  ? {
+                                      status: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.status || null,
+                                      command: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.command || null,
+                                      expectedFilledKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.expectedFilledKey || null,
+                                      expectedDecision: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.expectedDecision || null,
+                                      expectedArtifactPath: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.expectedArtifactPath || null,
+                                      expectedNextGate: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.expectedNextGate || null,
+                                      productionSignoffPacket: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffPacket || null,
+                                      readbackFiles: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.readbackFiles)
+                                        ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.readbackFiles.slice()
+                                        : [],
+                                      successCriteria: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.successCriteria)
+                                        ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.successCriteria.map((item) => ({
+                                            key: item?.key || null,
+                                            expected: item?.expected || null
+                                          }))
+                                        : [],
+                                      nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.nextAction || null
+                                    }
+                                  : null,
                               nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.nextAction || null
                             }
                           : null,
@@ -17147,6 +17169,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             closeoutEvidenceFullTestClearanceReviewPacket ? `Closeout clearance exit criteria: ${Array.isArray(closeoutEvidenceFullTestClearanceReviewPacket.exitCriteria) ? closeoutEvidenceFullTestClearanceReviewPacket.exitCriteria.length : 0}` : "",
             closeoutEvidenceFullTestSignoffBackfillGuard?.status ? `Closeout signoff backfill guard: ${closeoutEvidenceFullTestSignoffBackfillGuard.status}` : "",
             closeoutEvidenceFullTestSignoffBackfillGuard ? `Closeout signoff backfill prerequisites: ${Array.isArray(closeoutEvidenceFullTestSignoffBackfillGuard.prerequisiteKeys) ? closeoutEvidenceFullTestSignoffBackfillGuard.prerequisiteKeys.length : 0}` : "",
+            closeoutEvidenceFullTestSignoffBackfillGuard?.postBackfillReadback?.status ? `Closeout signoff post-backfill readback: ${closeoutEvidenceFullTestSignoffBackfillGuard.postBackfillReadback.status}` : "",
+            closeoutEvidenceFullTestSignoffBackfillGuard?.postBackfillReadback ? `Closeout signoff post-backfill criteria: ${Array.isArray(closeoutEvidenceFullTestSignoffBackfillGuard.postBackfillReadback.successCriteria) ? closeoutEvidenceFullTestSignoffBackfillGuard.postBackfillReadback.successCriteria.length : 0}` : "",
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -19305,6 +19329,48 @@ function appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, gate, h
     lines.push(`- command=${signoffBackfillGuard.command || "-"}`);
     lines.push(`- readbackAfterCommand=${signoffBackfillGuard.readbackAfterCommand || "-"}`);
     lines.push(`- prerequisiteKeys=${prerequisiteKeys.length ? prerequisiteKeys.join(",") : "-"}`);
+    const postBackfillReadback = signoffBackfillGuard.postBackfillReadback
+      && typeof signoffBackfillGuard.postBackfillReadback === "object"
+        ? signoffBackfillGuard.postBackfillReadback
+        : null;
+    if (postBackfillReadback) {
+      const postBackfillHeading = heading.endsWith("Entry Gate")
+        ? heading.replace(/Entry Gate$/, "Signoff Post-Backfill Readback")
+        : `${heading} Signoff Post-Backfill Readback`;
+      const successCriteriaHeading = heading.endsWith("Entry Gate")
+        ? heading.replace(/Entry Gate$/, "Signoff Post-Backfill Success Criteria")
+        : `${heading} Signoff Post-Backfill Success Criteria`;
+      const readbackFiles = Array.isArray(postBackfillReadback.readbackFiles) && postBackfillReadback.readbackFiles.length
+        ? postBackfillReadback.readbackFiles.join(",")
+        : "-";
+      const successCriteria = Array.isArray(postBackfillReadback.successCriteria)
+        ? postBackfillReadback.successCriteria
+        : [];
+      lines.push(`${postBackfillHeading}:`);
+      lines.push(
+        `- status=${postBackfillReadback.status || "-"}`
+        + ` | expectedFilled=${postBackfillReadback.expectedFilledKey || "-"}`
+        + ` | expectedGate=${postBackfillReadback.expectedNextGate || "-"}`
+        + ` | criteria=${successCriteria.length}`
+      );
+      lines.push(
+        `- command=${postBackfillReadback.command || "-"}`
+        + ` | decision=${postBackfillReadback.expectedDecision || "-"}`
+      );
+      lines.push(
+        `- artifact=${postBackfillReadback.expectedArtifactPath || "-"}`
+        + ` | productionSignoffPacket=${postBackfillReadback.productionSignoffPacket || "-"}`
+      );
+      lines.push(`- readbackFiles=${readbackFiles}`);
+      if (successCriteria.length) {
+        lines.push(`${successCriteriaHeading}:`);
+        for (let index = 0; index < successCriteria.length; index += 1) {
+          const item = successCriteria[index];
+          lines.push(`${index + 1}. ${item?.key || "-"} | expected=${item?.expected || "-"}`);
+        }
+      }
+      lines.push(`- postBackfillReadbackNextAction=${postBackfillReadback.nextAction || "-"}`);
+    }
     lines.push(`- signoffBackfillGuardNextAction=${signoffBackfillGuard.nextAction || "-"}`);
   }
   lines.push(`- nextAction=${gate.nextAction || "-"}`);
@@ -30682,6 +30748,39 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     command: fullTestSignoffBackfillCommand,
     readbackAfterCommand: readinessStatusCommand,
     prerequisiteKeys: closeoutEvidenceFullTestClearanceReviewPacket.exitCriteria.map((item) => item.key).filter(Boolean),
+    postBackfillReadback: {
+      status: "required_after_full_test_window_passed_backfill",
+      command: readinessStatusCommand,
+      expectedFilledKey: "full_test_window_passed",
+      expectedDecision: "ready-for-production-signoff",
+      expectedArtifactPath: fullTestOutputFile,
+      expectedNextGate: "production_signoff",
+      productionSignoffPacket,
+      readbackFiles: [
+        filledCloseoutInputFile,
+        readinessActionQueueFile,
+        productionSignoffPacket
+      ],
+      successCriteria: [
+        {
+          key: "full_test_condition_filled",
+          expected: "filled closeout input records full_test_window_passed with the redacted full-test artifact"
+        },
+        {
+          key: "readiness_advances_to_production_signoff",
+          expected: "readiness action queue advances from full-test window into production sign-off evidence"
+        },
+        {
+          key: "signoff_packet_references_full_test_output",
+          expected: "production sign-off packet references the same full-test-output.txt artifact"
+        },
+        {
+          key: "launch_duty_record_index_preserved",
+          expected: `launch-duty record index remains ${launchDutyRecordIndex}`
+        }
+      ],
+      nextAction: "After the guarded backfill, run the readiness readback and confirm production sign-off evidence is the next gate before archiving sign-off."
+    },
     nextAction: "Do not backfill full_test_window_passed until the guarded full-test output is reviewed and attached as the redacted artifact."
   };
   const closeoutEvidenceFullTestEntryGate = {

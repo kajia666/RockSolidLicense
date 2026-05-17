@@ -21704,6 +21704,39 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                 "rehearsal_reload_matches_signoff_packet",
                 "full_test_output_captured_before_backfill"
               ],
+              postBackfillReadback: {
+                status: "required_after_full_test_window_passed_backfill",
+                command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+                expectedFilledKey: "full_test_window_passed",
+                expectedDecision: "ready-for-production-signoff",
+                expectedArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt",
+                expectedNextGate: "production_signoff",
+                productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+                readbackFiles: [
+                  "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                  "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+                  "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+                ],
+                successCriteria: [
+                  {
+                    key: "full_test_condition_filled",
+                    expected: "filled closeout input records full_test_window_passed with the redacted full-test artifact"
+                  },
+                  {
+                    key: "readiness_advances_to_production_signoff",
+                    expected: "readiness action queue advances from full-test window into production sign-off evidence"
+                  },
+                  {
+                    key: "signoff_packet_references_full_test_output",
+                    expected: "production sign-off packet references the same full-test-output.txt artifact"
+                  },
+                  {
+                    key: "launch_duty_record_index_preserved",
+                    expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+                  }
+                ],
+                nextAction: "After the guarded backfill, run the readiness readback and confirm production sign-off evidence is the next gate before archiving sign-off."
+              },
               nextAction: "Do not backfill full_test_window_passed until the guarded full-test output is reviewed and attached as the redacted artifact."
             },
             nextAction: "Complete all closeout evidence readbacks, run the final readiness refresh, reload rehearsal, then enter full-test only when the refreshed gate is full-test/signoff."
@@ -22886,6 +22919,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Clearance Exit Criteria:[\s\S]*4\. full_test_output_captured_before_backfill \| expected=guarded full-test output is captured before full_test_window_passed is backfilled/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Signoff Backfill Guard:[\s\S]*status=blocked_until_full_test_output_reviewed \| canBackfill=false \| target=full_test_window_passed \| blockedUntil=full_test_output_captured_before_backfill/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Signoff Backfill Guard:[\s\S]*artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt \| decision=ready-for-production-signoff \| prerequisites=4/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Signoff Post-Backfill Readback:[\s\S]*status=required_after_full_test_window_passed_backfill \| expectedFilled=full_test_window_passed \| expectedGate=production_signoff \| criteria=4/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Signoff Post-Backfill Success Criteria:[\s\S]*2\. readiness_advances_to_production_signoff \| expected=readiness action queue advances from full-test window into production sign-off evidence/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*2\. backup_restore_drill_result \| source=run_backup_restore_drill \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*7\. operator_go_no_go \| source=backfill_filled_closeout_input \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/operator-go-no-go\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Queue:[\s\S]*3\. route_map_gate_result_backfill \| status=blocked_after_route_map_gate \| runNow=false \| unlocksWhen=route_map_gate_output_ready \| command=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
@@ -24908,6 +24943,39 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             "rehearsal_reload_matches_signoff_packet",
             "full_test_output_captured_before_backfill"
           ],
+          postBackfillReadback: {
+            status: "required_after_full_test_window_passed_backfill",
+            command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+            expectedFilledKey: "full_test_window_passed",
+            expectedDecision: "ready-for-production-signoff",
+            expectedArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt",
+            expectedNextGate: "production_signoff",
+            productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+            readbackFiles: [
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+            ],
+            successCriteria: [
+              {
+                key: "full_test_condition_filled",
+                expected: "filled closeout input records full_test_window_passed with the redacted full-test artifact"
+              },
+              {
+                key: "readiness_advances_to_production_signoff",
+                expected: "readiness action queue advances from full-test window into production sign-off evidence"
+              },
+              {
+                key: "signoff_packet_references_full_test_output",
+                expected: "production sign-off packet references the same full-test-output.txt artifact"
+              },
+              {
+                key: "launch_duty_record_index_preserved",
+                expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+              }
+            ],
+            nextAction: "After the guarded backfill, run the readiness readback and confirm production sign-off evidence is the next gate before archiving sign-off."
+          },
           nextAction: "Do not backfill full_test_window_passed until the guarded full-test output is reviewed and attached as the redacted artifact."
         },
         nextAction: "Complete all closeout evidence readbacks, run the final readiness refresh, reload rehearsal, then enter full-test only when the refreshed gate is full-test/signoff."
@@ -24980,6 +25048,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout clearance exit criteria: 4"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout signoff backfill guard: blocked_until_full_test_output_reviewed"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout signoff backfill prerequisites: 4"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout signoff post-backfill readback: required_after_full_test_window_passed_backfill"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout signoff post-backfill criteria: 4"));
     assert.ok(preStagingSelfCheckCard.details.includes("First closeout target: route_map_gate_result -> artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt"));
     assert.ok(preStagingSelfCheckCard.controls.some((control) => (
       control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
@@ -25039,6 +25109,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Full-Test Signoff Backfill Guard:[\s\S]*command=npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt --decision ready-for-production-signoff --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Full-Test Signoff Post-Backfill Readback:[\s\S]*readbackFiles=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json,artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md,artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,

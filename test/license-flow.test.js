@@ -23331,9 +23331,64 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.readyForHandoff, true);
     assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.readyForReceiptWrite, true);
     assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.unlockActionKey, "archive_production_signoff_packet");
+    assert.deepEqual(
+      archivedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.postArchiveLaunchDayWatchReadback,
+      {
+        version: "developer-ops-launch-operations-operator-post-archive-launch-day-watch-readback/v1",
+        status: "ready_for_launch_day_watch_summary_write",
+        archiveRecorded: true,
+        archiveReceiptAuditLogId: postSignoffArchiveReceipt.auditLogId,
+        currentActionKey: "record_launch_day_watch_summary",
+        expectedCurrentActionKey: "record_launch_day_watch_summary",
+        phaseKey: "record_launch_day_watch",
+        recordKey: "launch_day_watch_summary",
+        actionKey: "record_launch_day_watch_summary",
+        artifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md",
+        command: archivedLaunchDutyHandoffAction.firstReceiptWritePacket.command,
+        firstReceiptWritePacketStatus: "ready_for_receipt_write",
+        expectedFirstReceiptWritePacketStatus: "ready_for_receipt_write",
+        launchDutyRecordIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
+        receiptOperations: [
+          "record_cutover_walkthrough",
+          "record_launch_day_readiness_review"
+        ],
+        receiptPlaceholders: [
+          "<record_cutover_walkthrough-receipt-id>",
+          "<record_launch_day_readiness_review-receipt-id>"
+        ],
+        refreshAfterWrite: archivedLaunchDutyHandoffAction.firstReceiptWritePacket.refreshAfterWrite,
+        successCriteria: [
+          {
+            key: "archive_receipt_visible",
+            expected: "archive_production_signoff_packet receipt is visible before launch-day watch summary write"
+          },
+          {
+            key: "current_action_advanced",
+            expected: "current action advances to record_launch_day_watch_summary"
+          },
+          {
+            key: "first_receipt_write_ready",
+            expected: "firstReceiptWritePacket is ready_for_receipt_write for launch_day_watch_summary"
+          },
+          {
+            key: "record_index_continues",
+            expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+          }
+        ],
+        nextAction: "Run the launch-day watch summary record command, then refresh Developer Ops export to confirm the record index readback."
+      }
+    );
     assert.match(
       postSignoffArchiveSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyPostSignoffArchivePacket=archived_ready_for_first_receipt_write/
+    );
+    assert.match(
+      postSignoffArchiveSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyPostArchiveWatchReadback=ready_for_launch_day_watch_summary_write/
+    );
+    assert.match(
+      postSignoffArchiveSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyPostArchiveWatchAction=record_launch_day_watch_summary/
     );
     assert.match(
       postSignoffArchiveSnapshot.summaryText,
@@ -23342,6 +23397,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       postSignoffArchiveSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyFirstReceiptPacket=ready_for_receipt_write/
+    );
+    const postSignoffArchiveOperatorEntryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
+      ownerSession.token
+    );
+    assert.match(
+      postSignoffArchiveOperatorEntryDownload.body,
+      /Post-Archive Launch-Day Watch Readback:[\s\S]*status=ready_for_launch_day_watch_summary_write \| archiveRecorded=yes \| currentAction=record_launch_day_watch_summary \| expectedCurrent=record_launch_day_watch_summary/
+    );
+    assert.match(
+      postSignoffArchiveOperatorEntryDownload.body,
+      /Post-Archive Launch-Day Watch Success Criteria:[\s\S]*3\. first_receipt_write_ready \| expected=firstReceiptWritePacket is ready_for_receipt_write for launch_day_watch_summary/
     );
 
     const launchDayWatchSummaryReadbackReceipt = await postJson(

@@ -21360,6 +21360,29 @@ test("developer ops export bundles scoped data and downloadable assets", async (
               nextAction: "Refresh readiness after closeout evidence so the full-test window handoff can unlock."
             }
           ],
+          progress: {
+            status: "awaiting_closeout_evidence_runway",
+            targetCount: 7,
+            queueCount: 10,
+            backfillQueueCount: 7,
+            receiptOperationPlaceholderCount: 7,
+            targetsWithReceiptPlaceholders: 6,
+            targetsWithoutReceiptPlaceholders: 1,
+            firstPendingTarget: {
+              key: "route_map_gate_result",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt",
+              unlocksWhen: "route_map_gate_output_ready",
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            finalQueueItem: {
+              key: "post_closeout_evidence_readiness_status",
+              unlocksWhen: "operator_go_no_go_backfilled",
+              command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            readinessAfterEvidenceCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+            fullTestUnlocksWhen: "post_closeout_evidence_readiness_status_completed",
+            nextAction: "Complete all seven closeout evidence backfills, refresh readiness, then enter the guarded full-test window only after the refreshed action queue selects full-test/signoff."
+          },
           nextAction: "Run closeout init after profile/archive inputs, refresh readiness, backfill all seven pre-full-test closeout evidence targets, then refresh readiness for the full-test window."
         },
         nextAction: "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."
@@ -22517,6 +22540,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Execution Queue:[\s\S]*4\. enter_full_test_signoff \| status=blocked_until_rehearsal_reload \| runNow=false \| unlocksWhen=rehearsal_reload_reviewed \| command=npm\.cmd test/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Handoff:[\s\S]*status=ready_for_closeout_init_and_first_backfill \| firstTarget=route_map_gate_result \| draft=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.draft\.json/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Handoff:[\s\S]*closeoutInit=npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Progress:[\s\S]*status=awaiting_closeout_evidence_runway \| targets=7 \| queue=10 \| backfills=7 \| receiptPlaceholders=7/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Progress:[\s\S]*firstPending=route_map_gate_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt \| unlocksWhen=route_map_gate_output_ready/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Progress:[\s\S]*finalQueue=post_closeout_evidence_readiness_status \| unlocksWhen=operator_go_no_go_backfilled \| fullTestUnlocksWhen=post_closeout_evidence_readiness_status_completed/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*2\. backup_restore_drill_result \| source=run_backup_restore_drill \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*7\. operator_go_no_go \| source=backfill_filled_closeout_input \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/operator-go-no-go\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Queue:[\s\S]*3\. route_map_gate_result_backfill \| status=blocked_after_route_map_gate \| runNow=false \| unlocksWhen=route_map_gate_output_ready \| command=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
@@ -24281,6 +24307,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         [10, "post_closeout_evidence_readiness_status", false, "operator_go_no_go_backfilled"]
       ]
     );
+    assert.deepEqual(
+      mainlinePreStagingSelfCheck.closeoutEvidenceHandoff.progress,
+      {
+        status: "awaiting_closeout_evidence_runway",
+        targetCount: 7,
+        queueCount: 10,
+        backfillQueueCount: 7,
+        receiptOperationPlaceholderCount: 7,
+        targetsWithReceiptPlaceholders: 6,
+        targetsWithoutReceiptPlaceholders: 1,
+        firstPendingTarget: {
+          key: "route_map_gate_result",
+          artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt",
+          unlocksWhen: "route_map_gate_output_ready",
+          command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+        },
+        finalQueueItem: {
+          key: "post_closeout_evidence_readiness_status",
+          unlocksWhen: "operator_go_no_go_backfilled",
+          command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+        },
+        readinessAfterEvidenceCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        fullTestUnlocksWhen: "post_closeout_evidence_readiness_status_completed",
+        nextAction: "Complete all seven closeout evidence backfills, refresh readiness, then enter the guarded full-test window only after the refreshed action queue selects full-test/signoff."
+      }
+    );
     assert.equal(
       mainlinePreStagingSelfCheck.commandGroups[1].command,
       "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
@@ -24328,6 +24380,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckCard.details.includes("Runnable now: 2"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout evidence queue: 10"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout evidence targets: 7"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout evidence receipt placeholders: 7"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout evidence first pending: route_map_gate_result"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout evidence final queue: post_closeout_evidence_readiness_status"));
     assert.ok(preStagingSelfCheckCard.details.includes("First closeout target: route_map_gate_result -> artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt"));
     assert.ok(preStagingSelfCheckCard.controls.some((control) => (
       control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
@@ -24351,6 +24406,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Handoff:[\s\S]*status=ready_for_closeout_init_and_first_backfill \| firstTarget=route_map_gate_result/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Progress:[\s\S]*status=awaiting_closeout_evidence_runway \| targets=7 \| queue=10 \| backfills=7 \| receiptPlaceholders=7/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,

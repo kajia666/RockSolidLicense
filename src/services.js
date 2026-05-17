@@ -14996,6 +14996,26 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                     command: item?.command || null
                   }))
                 : [],
+              fullTestEntryGate: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate
+                && typeof preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate === "object"
+                  ? {
+                      status: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.status || null,
+                      canEnterFullTest: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.canEnterFullTest === true,
+                      requiredReadbackCount: Number(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.requiredReadbackCount || 0),
+                      completedReadbackCount: Number(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.completedReadbackCount || 0),
+                      blockerCount: Number(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.blockerCount || 0),
+                      currentReadbackKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.currentReadbackKey || null,
+                      currentBlockers: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.currentBlockers)
+                        ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.currentBlockers.slice()
+                        : [],
+                      finalReadinessRefreshCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.finalReadinessRefreshCommand || null,
+                      rehearsalReloadCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.rehearsalReloadCommand || null,
+                      fullTestCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.fullTestCommand || null,
+                      productionSignoffPacket: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.productionSignoffPacket || null,
+                      launchDutyRecordIndexPath: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.launchDutyRecordIndexPath || null,
+                      nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.nextAction || null
+                    }
+                  : null,
               nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.nextAction || null
             }
           : null,
@@ -17005,6 +17025,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         const closeoutEvidenceReadbackChecklist = Array.isArray(closeoutEvidenceHandoff?.readbackChecklist)
           ? closeoutEvidenceHandoff.readbackChecklist
           : [];
+        const closeoutEvidenceFullTestEntryGate = closeoutEvidenceHandoff?.fullTestEntryGate
+          && typeof closeoutEvidenceHandoff.fullTestEntryGate === "object"
+            ? closeoutEvidenceHandoff.fullTestEntryGate
+            : null;
         const runnableNowCount = executionQueue.filter((item) => item?.runNow === true).length;
         const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
         const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
@@ -17054,6 +17078,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             closeoutEvidenceOperatorCheckpoint?.postRunReadback?.expectedNextQueueKey ? `Closeout post-run next queue: ${closeoutEvidenceOperatorCheckpoint.postRunReadback.expectedNextQueueKey}` : "",
             closeoutEvidenceOperatorCheckpoint?.postRunReadback ? `Closeout post-run criteria: ${Array.isArray(closeoutEvidenceOperatorCheckpoint.postRunReadback.successCriteria) ? closeoutEvidenceOperatorCheckpoint.postRunReadback.successCriteria.length : 0}` : "",
             `Closeout readback checklist: ${closeoutEvidenceReadbackChecklist.length}`,
+            closeoutEvidenceFullTestEntryGate?.status ? `Closeout full-test gate: ${closeoutEvidenceFullTestEntryGate.status}` : "",
+            closeoutEvidenceFullTestEntryGate ? `Closeout full-test blockers: ${Number(closeoutEvidenceFullTestEntryGate.blockerCount || 0)}` : "",
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -19107,6 +19133,35 @@ function appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, checkli
   }
 }
 
+function appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, gate, heading = "Closeout Evidence Full-Test Entry Gate") {
+  if (!gate || typeof gate !== "object") {
+    return;
+  }
+  const currentBlockers = Array.isArray(gate.currentBlockers) && gate.currentBlockers.length
+    ? gate.currentBlockers.join(",")
+    : "-";
+  lines.push(`${heading}:`);
+  lines.push(
+    `- status=${gate.status || "-"}`
+    + ` | canEnterFullTest=${gate.canEnterFullTest === true}`
+    + ` | requiredReadbacks=${Number(gate.requiredReadbackCount || 0)}`
+    + ` | completedReadbacks=${Number(gate.completedReadbackCount || 0)}`
+    + ` | blockers=${Number(gate.blockerCount || 0)}`
+  );
+  lines.push(
+    `- currentReadback=${gate.currentReadbackKey || "-"}`
+    + ` | finalReadinessRefresh=${gate.finalReadinessRefreshCommand || "-"}`
+  );
+  lines.push(`- rehearsalReload=${gate.rehearsalReloadCommand || "-"}`);
+  lines.push(
+    `- fullTestCommand=${gate.fullTestCommand || "-"}`
+    + ` | productionSignoffPacket=${gate.productionSignoffPacket || "-"}`
+    + ` | launchDutyRecordIndex=${gate.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`- currentBlockers=${currentBlockers}`);
+  lines.push(`- nextAction=${gate.nextAction || "-"}`);
+}
+
 function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -19276,6 +19331,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceHandoff.progress);
       appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceHandoff.operatorCheckpoint);
       appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, closeoutEvidenceHandoff.readbackChecklist);
+      appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, closeoutEvidenceHandoff.fullTestEntryGate);
       if (closeoutEvidenceTargets.length) {
         lines.push("Closeout Evidence Targets:");
         for (const target of closeoutEvidenceTargets) {
@@ -30374,6 +30430,25 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
       command: target.command
     };
   });
+  const closeoutEvidenceFullTestEntryGateBlockers = [
+    ...closeoutEvidenceReadbackChecklist.map((item) => item.key).filter(Boolean),
+    finalCloseoutEvidenceQueueItem?.key || null
+  ].filter(Boolean);
+  const closeoutEvidenceFullTestEntryGate = {
+    status: "blocked_until_closeout_evidence_readbacks_complete",
+    canEnterFullTest: false,
+    requiredReadbackCount: closeoutEvidenceReadbackChecklist.length,
+    completedReadbackCount: 0,
+    blockerCount: closeoutEvidenceFullTestEntryGateBlockers.length,
+    currentReadbackKey: closeoutEvidenceReadbackChecklist[0]?.key || null,
+    currentBlockers: closeoutEvidenceFullTestEntryGateBlockers,
+    finalReadinessRefreshCommand: readinessStatusCommand,
+    rehearsalReloadCommand,
+    fullTestCommand: fullTestWindowCommand,
+    productionSignoffPacket,
+    launchDutyRecordIndexPath: launchDutyRecordIndex,
+    nextAction: "Complete all closeout evidence readbacks, run the final readiness refresh, reload rehearsal, then enter full-test only when the refreshed gate is full-test/signoff."
+  };
   const closeoutEvidenceReceiptOperationPlaceholderCount = closeoutEvidenceTargets.reduce(
     (total, target) => total + (Array.isArray(target?.receiptOperations) ? target.receiptOperations.length : 0),
     0
@@ -30525,6 +30600,7 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     progress: closeoutEvidenceProgress,
     operatorCheckpoint: closeoutEvidenceOperatorCheckpoint,
     readbackChecklist: closeoutEvidenceReadbackChecklist,
+    fullTestEntryGate: closeoutEvidenceFullTestEntryGate,
     nextAction: "Run closeout init after profile/archive inputs, refresh readiness, backfill all seven pre-full-test closeout evidence targets, then refresh readiness for the full-test window."
   };
   const preStagingReadinessSelfCheckPacket = {
@@ -42542,6 +42618,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       appendDeveloperOpsCloseoutEvidenceProgressLines(lines, preStagingCloseoutEvidenceProgress, "Pre-Staging Closeout Evidence Progress");
       appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, preStagingCloseoutEvidenceOperatorCheckpoint, "Pre-Staging Closeout Evidence Operator Checkpoint");
       appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, preStagingCloseoutEvidenceHandoff.readbackChecklist, "Pre-Staging Closeout Evidence Readback Checklist");
+      appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, preStagingCloseoutEvidenceHandoff.fullTestEntryGate, "Pre-Staging Closeout Evidence Full-Test Entry Gate");
       if (preStagingCloseoutEvidenceTargets.length) {
         lines.push("Pre-Staging Closeout Evidence Targets:");
         for (const target of preStagingCloseoutEvidenceTargets) {
@@ -43461,6 +43538,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceProgress, "Pre-Staging Closeout Evidence Progress");
         appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceOperatorCheckpoint, "Pre-Staging Closeout Evidence Operator Checkpoint");
         appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, closeoutEvidenceHandoff.readbackChecklist, "Pre-Staging Closeout Evidence Readback Checklist");
+        appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, closeoutEvidenceHandoff.fullTestEntryGate, "Pre-Staging Closeout Evidence Full-Test Entry Gate");
         if (closeoutEvidenceTargets.length) {
           lines.push("Pre-Staging Closeout Evidence Targets:");
           for (const target of closeoutEvidenceTargets) {
@@ -44428,6 +44506,7 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
     appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceProgress);
     appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceOperatorCheckpoint);
     appendDeveloperOpsCloseoutEvidenceReadbackChecklistLines(lines, closeoutEvidenceHandoff.readbackChecklist);
+    appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, closeoutEvidenceHandoff.fullTestEntryGate);
     lines.push("Closeout Evidence Targets:");
     for (const target of closeoutEvidenceTargets) {
       const receiptOperations = Array.isArray(target?.receiptOperations) && target.receiptOperations.length

@@ -21735,6 +21735,37 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                     expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
                   }
                 ],
+                productionSignoffEntryHandoff: {
+                  status: "blocked_until_post_backfill_readback_confirms_production_signoff",
+                  currentActionKey: "review_production_signoff_packet",
+                  archiveActionKey: "archive_production_signoff_packet",
+                  productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+                  launchDutyRecordIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
+                  launchDutyArchiveIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-launch-duty-archive-index.json",
+                  readinessReadbackCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+                  rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                  nextGate: "production_signoff",
+                  nextAfterSignoffActionKey: "enter_after_production_signoff",
+                  requiredChecks: [
+                    {
+                      key: "production_signoff_packet_ready",
+                      expected: "production sign-off packet is regenerated after full_test_window_passed backfill"
+                    },
+                    {
+                      key: "archive_action_visible",
+                      expected: "archive_production_signoff_packet is visible before launch-day watch"
+                    },
+                    {
+                      key: "record_index_continues",
+                      expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+                    },
+                    {
+                      key: "launch_day_watch_entry_preserved",
+                      expected: "enter_after_production_signoff remains the next launch-day watch entry after sign-off archive"
+                    }
+                  ],
+                  nextAction: "Review the production sign-off packet, archive it only after the readiness readback confirms production_signoff, then continue to launch-day watch."
+                },
                 nextAction: "After the guarded backfill, run the readiness readback and confirm production sign-off evidence is the next gate before archiving sign-off."
               },
               nextAction: "Do not backfill full_test_window_passed until the guarded full-test output is reviewed and attached as the redacted artifact."
@@ -22921,6 +22952,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Signoff Backfill Guard:[\s\S]*artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt \| decision=ready-for-production-signoff \| prerequisites=4/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Signoff Post-Backfill Readback:[\s\S]*status=required_after_full_test_window_passed_backfill \| expectedFilled=full_test_window_passed \| expectedGate=production_signoff \| criteria=4/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Signoff Post-Backfill Success Criteria:[\s\S]*2\. readiness_advances_to_production_signoff \| expected=readiness action queue advances from full-test window into production sign-off evidence/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| checks=4/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Full-Test Production Signoff Entry Checks:[\s\S]*4\. launch_day_watch_entry_preserved \| expected=enter_after_production_signoff remains the next launch-day watch entry after sign-off archive/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*2\. backup_restore_drill_result \| source=run_backup_restore_drill \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Targets:[\s\S]*7\. operator_go_no_go \| source=backfill_filled_closeout_input \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/operator-go-no-go\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Queue:[\s\S]*3\. route_map_gate_result_backfill \| status=blocked_after_route_map_gate \| runNow=false \| unlocksWhen=route_map_gate_output_ready \| command=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
@@ -24971,12 +25004,43 @@ test("developer ops export bundles scoped data and downloadable assets", async (
               },
               {
                 key: "launch_duty_record_index_preserved",
-                expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
-              }
-            ],
-            nextAction: "After the guarded backfill, run the readiness readback and confirm production sign-off evidence is the next gate before archiving sign-off."
-          },
-          nextAction: "Do not backfill full_test_window_passed until the guarded full-test output is reviewed and attached as the redacted artifact."
+                  expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+                }
+              ],
+              productionSignoffEntryHandoff: {
+                status: "blocked_until_post_backfill_readback_confirms_production_signoff",
+                currentActionKey: "review_production_signoff_packet",
+                archiveActionKey: "archive_production_signoff_packet",
+                productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+                launchDutyRecordIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
+                launchDutyArchiveIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-launch-duty-archive-index.json",
+                readinessReadbackCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+                rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                nextGate: "production_signoff",
+                nextAfterSignoffActionKey: "enter_after_production_signoff",
+                requiredChecks: [
+                  {
+                    key: "production_signoff_packet_ready",
+                    expected: "production sign-off packet is regenerated after full_test_window_passed backfill"
+                  },
+                  {
+                    key: "archive_action_visible",
+                    expected: "archive_production_signoff_packet is visible before launch-day watch"
+                  },
+                  {
+                    key: "record_index_continues",
+                    expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+                  },
+                  {
+                    key: "launch_day_watch_entry_preserved",
+                    expected: "enter_after_production_signoff remains the next launch-day watch entry after sign-off archive"
+                  }
+                ],
+                nextAction: "Review the production sign-off packet, archive it only after the readiness readback confirms production_signoff, then continue to launch-day watch."
+              },
+              nextAction: "After the guarded backfill, run the readiness readback and confirm production sign-off evidence is the next gate before archiving sign-off."
+            },
+            nextAction: "Do not backfill full_test_window_passed until the guarded full-test output is reviewed and attached as the redacted artifact."
         },
         nextAction: "Complete all closeout evidence readbacks, run the final readiness refresh, reload rehearsal, then enter full-test only when the refreshed gate is full-test/signoff."
       }
@@ -25050,6 +25114,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout signoff backfill prerequisites: 4"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout signoff post-backfill readback: required_after_full_test_window_passed_backfill"));
     assert.ok(preStagingSelfCheckCard.details.includes("Closeout signoff post-backfill criteria: 4"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout production signoff entry: blocked_until_post_backfill_readback_confirms_production_signoff"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout production signoff checks: 4"));
     assert.ok(preStagingSelfCheckCard.details.includes("First closeout target: route_map_gate_result -> artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt"));
     assert.ok(preStagingSelfCheckCard.controls.some((control) => (
       control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
@@ -25113,6 +25179,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Full-Test Signoff Post-Backfill Readback:[\s\S]*readbackFiles=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json,artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md,artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Full-Test Production Signoff Entry Handoff:[\s\S]*nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,

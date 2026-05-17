@@ -15082,6 +15082,28 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                                             expected: item?.expected || null
                                           }))
                                         : [],
+                                      productionSignoffEntryHandoff: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff
+                                        && typeof preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff === "object"
+                                          ? {
+                                              status: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.status || null,
+                                              currentActionKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.currentActionKey || null,
+                                              archiveActionKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.archiveActionKey || null,
+                                              productionSignoffPacket: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.productionSignoffPacket || null,
+                                              launchDutyRecordIndexPath: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.launchDutyRecordIndexPath || null,
+                                              launchDutyArchiveIndexPath: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.launchDutyArchiveIndexPath || null,
+                                              readinessReadbackCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.readinessReadbackCommand || null,
+                                              rehearsalReloadCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.rehearsalReloadCommand || null,
+                                              nextGate: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.nextGate || null,
+                                              nextAfterSignoffActionKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.nextAfterSignoffActionKey || null,
+                                              requiredChecks: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.requiredChecks)
+                                                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.requiredChecks.map((item) => ({
+                                                    key: item?.key || null,
+                                                    expected: item?.expected || null
+                                                  }))
+                                                : [],
+                                              nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff.nextAction || null
+                                            }
+                                          : null,
                                       nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.fullTestEntryGate.signoffBackfillGuard.postBackfillReadback.nextAction || null
                                     }
                                   : null,
@@ -17112,6 +17134,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           && typeof closeoutEvidenceFullTestEntryGate.signoffBackfillGuard === "object"
             ? closeoutEvidenceFullTestEntryGate.signoffBackfillGuard
             : null;
+        const closeoutEvidenceFullTestProductionSignoffEntryHandoff = closeoutEvidenceFullTestSignoffBackfillGuard?.postBackfillReadback?.productionSignoffEntryHandoff
+          && typeof closeoutEvidenceFullTestSignoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff === "object"
+            ? closeoutEvidenceFullTestSignoffBackfillGuard.postBackfillReadback.productionSignoffEntryHandoff
+            : null;
         const runnableNowCount = executionQueue.filter((item) => item?.runNow === true).length;
         const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
         const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
@@ -17171,6 +17197,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             closeoutEvidenceFullTestSignoffBackfillGuard ? `Closeout signoff backfill prerequisites: ${Array.isArray(closeoutEvidenceFullTestSignoffBackfillGuard.prerequisiteKeys) ? closeoutEvidenceFullTestSignoffBackfillGuard.prerequisiteKeys.length : 0}` : "",
             closeoutEvidenceFullTestSignoffBackfillGuard?.postBackfillReadback?.status ? `Closeout signoff post-backfill readback: ${closeoutEvidenceFullTestSignoffBackfillGuard.postBackfillReadback.status}` : "",
             closeoutEvidenceFullTestSignoffBackfillGuard?.postBackfillReadback ? `Closeout signoff post-backfill criteria: ${Array.isArray(closeoutEvidenceFullTestSignoffBackfillGuard.postBackfillReadback.successCriteria) ? closeoutEvidenceFullTestSignoffBackfillGuard.postBackfillReadback.successCriteria.length : 0}` : "",
+            closeoutEvidenceFullTestProductionSignoffEntryHandoff?.status ? `Closeout production signoff entry: ${closeoutEvidenceFullTestProductionSignoffEntryHandoff.status}` : "",
+            closeoutEvidenceFullTestProductionSignoffEntryHandoff ? `Closeout production signoff checks: ${Array.isArray(closeoutEvidenceFullTestProductionSignoffEntryHandoff.requiredChecks) ? closeoutEvidenceFullTestProductionSignoffEntryHandoff.requiredChecks.length : 0}` : "",
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -19368,6 +19396,47 @@ function appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, gate, h
           const item = successCriteria[index];
           lines.push(`${index + 1}. ${item?.key || "-"} | expected=${item?.expected || "-"}`);
         }
+      }
+      const productionSignoffEntryHandoff = postBackfillReadback.productionSignoffEntryHandoff
+        && typeof postBackfillReadback.productionSignoffEntryHandoff === "object"
+          ? postBackfillReadback.productionSignoffEntryHandoff
+          : null;
+      if (productionSignoffEntryHandoff) {
+        const productionSignoffEntryHeading = heading.endsWith("Entry Gate")
+          ? heading.replace(/Entry Gate$/, "Production Signoff Entry Handoff")
+          : `${heading} Production Signoff Entry Handoff`;
+        const productionSignoffChecksHeading = heading.endsWith("Entry Gate")
+          ? heading.replace(/Entry Gate$/, "Production Signoff Entry Checks")
+          : `${heading} Production Signoff Entry Checks`;
+        const requiredChecks = Array.isArray(productionSignoffEntryHandoff.requiredChecks)
+          ? productionSignoffEntryHandoff.requiredChecks
+          : [];
+        lines.push(`${productionSignoffEntryHeading}:`);
+        lines.push(
+          `- status=${productionSignoffEntryHandoff.status || "-"}`
+          + ` | currentAction=${productionSignoffEntryHandoff.currentActionKey || "-"}`
+          + ` | archiveAction=${productionSignoffEntryHandoff.archiveActionKey || "-"}`
+          + ` | checks=${requiredChecks.length}`
+        );
+        lines.push(
+          `- packet=${productionSignoffEntryHandoff.productionSignoffPacket || "-"}`
+          + ` | launchDutyRecordIndex=${productionSignoffEntryHandoff.launchDutyRecordIndexPath || "-"}`
+          + ` | launchDutyArchiveIndex=${productionSignoffEntryHandoff.launchDutyArchiveIndexPath || "-"}`
+        );
+        lines.push(`- readinessReadback=${productionSignoffEntryHandoff.readinessReadbackCommand || "-"}`);
+        lines.push(
+          `- rehearsalReload=${productionSignoffEntryHandoff.rehearsalReloadCommand || "-"}`
+          + ` | nextGate=${productionSignoffEntryHandoff.nextGate || "-"}`
+          + ` | nextAfterSignoff=${productionSignoffEntryHandoff.nextAfterSignoffActionKey || "-"}`
+        );
+        if (requiredChecks.length) {
+          lines.push(`${productionSignoffChecksHeading}:`);
+          for (let index = 0; index < requiredChecks.length; index += 1) {
+            const item = requiredChecks[index];
+            lines.push(`${index + 1}. ${item?.key || "-"} | expected=${item?.expected || "-"}`);
+          }
+        }
+        lines.push(`- productionSignoffEntryNextAction=${productionSignoffEntryHandoff.nextAction || "-"}`);
       }
       lines.push(`- postBackfillReadbackNextAction=${postBackfillReadback.nextAction || "-"}`);
     }
@@ -30738,6 +30807,37 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     ],
     nextAction: "Review the clearance packet, complete the required readbacks, then move through the clearance sequence without skipping the final readiness refresh or rehearsal reload."
   };
+  const closeoutEvidenceFullTestProductionSignoffEntryHandoff = {
+    status: "blocked_until_post_backfill_readback_confirms_production_signoff",
+    currentActionKey: "review_production_signoff_packet",
+    archiveActionKey: "archive_production_signoff_packet",
+    productionSignoffPacket,
+    launchDutyRecordIndexPath: launchDutyRecordIndex,
+    launchDutyArchiveIndexPath: launchDutyArchiveIndex,
+    readinessReadbackCommand: readinessStatusCommand,
+    rehearsalReloadCommand,
+    nextGate: "production_signoff",
+    nextAfterSignoffActionKey: "enter_after_production_signoff",
+    requiredChecks: [
+      {
+        key: "production_signoff_packet_ready",
+        expected: "production sign-off packet is regenerated after full_test_window_passed backfill"
+      },
+      {
+        key: "archive_action_visible",
+        expected: "archive_production_signoff_packet is visible before launch-day watch"
+      },
+      {
+        key: "record_index_continues",
+        expected: `launch-duty record index remains ${launchDutyRecordIndex}`
+      },
+      {
+        key: "launch_day_watch_entry_preserved",
+        expected: "enter_after_production_signoff remains the next launch-day watch entry after sign-off archive"
+      }
+    ],
+    nextAction: "Review the production sign-off packet, archive it only after the readiness readback confirms production_signoff, then continue to launch-day watch."
+  };
   const closeoutEvidenceFullTestSignoffBackfillGuard = {
     status: "blocked_until_full_test_output_reviewed",
     canBackfillFullTestWindowPassed: false,
@@ -30779,6 +30879,7 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
           expected: `launch-duty record index remains ${launchDutyRecordIndex}`
         }
       ],
+      productionSignoffEntryHandoff: closeoutEvidenceFullTestProductionSignoffEntryHandoff,
       nextAction: "After the guarded backfill, run the readiness readback and confirm production sign-off evidence is the next gate before archiving sign-off."
     },
     nextAction: "Do not backfill full_test_window_passed until the guarded full-test output is reviewed and attached as the redacted artifact."

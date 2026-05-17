@@ -21003,8 +21003,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
     );
     assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.filledCloseoutDraftFile,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.draft.json"
+    );
+    assert.equal(
       launchOperationsOperatorEntry.stagingReadinessBridge.readinessActionQueueFile,
       "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+    );
+    assert.equal(
+      launchOperationsOperatorEntry.stagingReadinessBridge.closeoutInitCommand,
+      "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.draft.json --output-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
     );
     assert.equal(
       launchOperationsOperatorEntry.stagingReadinessBridge.readinessStatusCommand,
@@ -21036,6 +21044,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         launchDutyRecordIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
         requiredArtifacts: [
           "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+          "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.draft.json",
           "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
           "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
           "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
@@ -21138,6 +21147,66 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             nextAction: "Capture full-test output and production sign-off evidence after rehearsal reload."
           }
         ],
+        closeoutEvidenceHandoff: {
+          version: "developer-ops-launch-operations-operator-pre-staging-closeout-evidence-handoff/v1",
+          status: "ready_for_closeout_init_and_first_backfill",
+          closeoutDraftFile: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.draft.json",
+          filledCloseoutInputFile: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+          readinessActionQueueFile: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.draft.json --output-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          firstBackfillTarget: {
+            key: "route_map_gate_result",
+            sourceStep: "run_route_map_gate",
+            artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt",
+            receiptOperations: []
+          },
+          firstBackfillCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+          queue: [
+            {
+              order: 1,
+              key: "closeout_init",
+              status: "blocked_after_profile_archive_inputs",
+              runNow: false,
+              unlocksWhen: "profile_archive_inputs_confirmed",
+              command: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.draft.json --output-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              expectedArtifacts: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.draft.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              nextAction: "Promote the generated closeout draft into the real filled closeout input before refreshing readiness."
+            },
+            {
+              order: 2,
+              key: "readiness_status_after_closeout_init",
+              status: "blocked_after_closeout_init",
+              runNow: false,
+              unlocksWhen: "closeout_input_initialized",
+              command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              expectedArtifacts: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              nextAction: "Refresh readiness so the action queue selects the first closeout evidence target."
+            },
+            {
+              order: 3,
+              key: "route_map_gate_result_backfill",
+              status: "blocked_after_route_map_gate",
+              runNow: false,
+              unlocksWhen: "route_map_gate_output_ready",
+              command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              expectedArtifacts: [
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+                "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              ],
+              nextAction: "Backfill route_map_gate_result with redacted gate output, then refresh readiness and reload rehearsal."
+            }
+          ],
+          nextAction: "Run closeout init after profile/archive inputs, refresh readiness, then backfill route_map_gate_result once the route-map gate output is available."
+        },
         nextAction: "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."
       }
     );
@@ -22175,6 +22244,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Pre-Staging Readiness Self-Check Packet:[\s\S]*status=ready_for_pre_staging_self_check \| current=refresh_staging_readiness_status \| next=reload_staging_rehearsal \| groups=4/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Pre-Staging Readiness Self-Check Packet:[\s\S]*2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Pre-Staging Readiness Self-Check Packet:[\s\S]*4\. full_test_signoff_entry \| status=blocked_until_rehearsal_reload \| command=npm\.cmd test/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Pre-Staging Closeout Evidence Handoff:[\s\S]*status=ready_for_closeout_init_and_first_backfill \| firstTarget=route_map_gate_result/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Pre-Staging Closeout Evidence Handoff:[\s\S]*closeoutInit=npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Pre-Staging Closeout Evidence Handoff:[\s\S]*firstBackfill=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Staging Action Queue:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /1\. refresh_staging_readiness_status \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsOperatorEntryDownload.body, /2\. reload_staging_rehearsal \| status=next \| command=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json/);
@@ -22286,6 +22358,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Execution Queue:[\s\S]*2\. run_readiness_refresh \| status=current \| runNow=true \| unlocksWhen=- \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Execution Queue:[\s\S]*3\. reload_rehearsal \| status=next_after_readiness_refresh \| runNow=false \| unlocksWhen=readiness_refresh_completed/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Execution Queue:[\s\S]*4\. enter_full_test_signoff \| status=blocked_until_rehearsal_reload \| runNow=false \| unlocksWhen=rehearsal_reload_reviewed \| command=npm\.cmd test/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Handoff:[\s\S]*status=ready_for_closeout_init_and_first_backfill \| firstTarget=route_map_gate_result \| draft=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.draft\.json/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Handoff:[\s\S]*closeoutInit=npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
+    assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Closeout Evidence Queue:[\s\S]*3\. route_map_gate_result_backfill \| status=blocked_after_route_map_gate \| runNow=false \| unlocksWhen=route_map_gate_output_ready \| command=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/route-map-gate-output\.txt --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsPreStagingSelfCheckDownload.body, /Operator Order:[\s\S]*Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test\/signoff\./);
 
@@ -23998,6 +24073,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         [4, "enter_full_test_signoff", false, "rehearsal_reload_reviewed"]
       ]
     );
+    assert.ok(mainlinePreStagingSelfCheck.closeoutEvidenceHandoff);
+    assert.equal(
+      mainlinePreStagingSelfCheck.closeoutEvidenceHandoff.closeoutInitCommand,
+      "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.draft.json --output-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+    );
+    assert.deepEqual(
+      mainlinePreStagingSelfCheck.closeoutEvidenceHandoff.firstBackfillTarget,
+      {
+        key: "route_map_gate_result",
+        sourceStep: "run_route_map_gate",
+        artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt",
+        receiptOperations: []
+      }
+    );
+    assert.equal(
+      mainlinePreStagingSelfCheck.closeoutEvidenceHandoff.firstBackfillCommand,
+      "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+    );
+    assert.deepEqual(
+      mainlinePreStagingSelfCheck.closeoutEvidenceHandoff.queue.map((item) => [item.order, item.key, item.runNow, item.unlocksWhen]),
+      [
+        [1, "closeout_init", false, "profile_archive_inputs_confirmed"],
+        [2, "readiness_status_after_closeout_init", false, "closeout_input_initialized"],
+        [3, "route_map_gate_result_backfill", false, "route_map_gate_output_ready"]
+      ]
+    );
     assert.equal(
       mainlinePreStagingSelfCheck.commandGroups[1].command,
       "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
@@ -24043,6 +24144,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(preStagingSelfCheckCard.details.includes("Command groups: 4"));
     assert.ok(preStagingSelfCheckCard.details.includes("Execution queue: 4"));
     assert.ok(preStagingSelfCheckCard.details.includes("Runnable now: 2"));
+    assert.ok(preStagingSelfCheckCard.details.includes("Closeout evidence queue: 3"));
+    assert.ok(preStagingSelfCheckCard.details.includes("First closeout target: route_map_gate_result -> artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt"));
     assert.ok(preStagingSelfCheckCard.controls.some((control) => (
       control.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
     )));
@@ -24061,6 +24164,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Execution Queue:[\s\S]*2\. run_readiness_refresh \| status=current \| runNow=true \| unlocksWhen=-/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Handoff:[\s\S]*status=ready_for_closeout_init_and_first_backfill \| firstTarget=route_map_gate_result/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Pre-Staging Readiness Self-Check:[\s\S]*Closeout Evidence Queue:[\s\S]*3\. route_map_gate_result_backfill \| status=blocked_after_route_map_gate \| runNow=false \| unlocksWhen=route_map_gate_output_ready/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,

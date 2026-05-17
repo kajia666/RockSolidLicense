@@ -14846,6 +14846,44 @@ function buildDeveloperLaunchMainlineSummaryPayload({
               nextAction: item?.nextAction || null
             }))
           : [],
+        closeoutEvidenceHandoff: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff
+          && typeof preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff === "object"
+          ? {
+              version: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.version || null,
+              status: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.status || null,
+              closeoutDraftFile: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.closeoutDraftFile || null,
+              filledCloseoutInputFile: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.filledCloseoutInputFile || null,
+              readinessActionQueueFile: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.readinessActionQueueFile || null,
+              closeoutInitCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.closeoutInitCommand || null,
+              readinessStatusCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.readinessStatusCommand || null,
+              firstBackfillTarget: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillTarget
+                && typeof preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillTarget === "object"
+                  ? {
+                      key: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillTarget.key || null,
+                      sourceStep: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillTarget.sourceStep || null,
+                      artifactPath: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillTarget.artifactPath || null,
+                      receiptOperations: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillTarget.receiptOperations)
+                        ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillTarget.receiptOperations.slice()
+                        : []
+                    }
+                  : null,
+              firstBackfillCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillCommand || null,
+              rehearsalReloadCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.rehearsalReloadCommand || null,
+              queue: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.queue)
+                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.queue.map((item) => ({
+                    order: Number(item?.order || 0),
+                    key: item?.key || null,
+                    status: item?.status || null,
+                    runNow: item?.runNow === true,
+                    unlocksWhen: item?.unlocksWhen || null,
+                    command: item?.command || null,
+                    expectedArtifacts: Array.isArray(item?.expectedArtifacts) ? item.expectedArtifacts.slice() : [],
+                    nextAction: item?.nextAction || null
+                  }))
+                : [],
+              nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.nextAction || null
+            }
+          : null,
         nextAction: preStagingReadinessSelfCheckSource.nextAction
           || "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff.",
         operatorOrder: preStagingReadinessSelfCheckOperatorOrder,
@@ -16831,9 +16869,17 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         const executionQueue = Array.isArray(preStagingReadinessSelfCheck.executionQueue)
           ? preStagingReadinessSelfCheck.executionQueue
           : [];
+        const closeoutEvidenceHandoff = preStagingReadinessSelfCheck.closeoutEvidenceHandoff
+          && typeof preStagingReadinessSelfCheck.closeoutEvidenceHandoff === "object"
+            ? preStagingReadinessSelfCheck.closeoutEvidenceHandoff
+            : null;
+        const closeoutEvidenceQueue = Array.isArray(closeoutEvidenceHandoff?.queue)
+          ? closeoutEvidenceHandoff.queue
+          : [];
         const runnableNowCount = executionQueue.filter((item) => item?.runNow === true).length;
         const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
         const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
+        const firstBackfillTarget = closeoutEvidenceHandoff?.firstBackfillTarget || null;
         return {
           key: "pre_staging_readiness_self_check",
           title: "Pre-Staging Readiness Self-Check",
@@ -16863,8 +16909,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             `Command groups: ${commandGroups.length}`,
             `Execution queue: ${executionQueue.length}`,
             `Runnable now: ${runnableNowCount}`,
+            `Closeout evidence queue: ${closeoutEvidenceQueue.length}`,
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
+            firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
+            closeoutEvidenceHandoff?.closeoutInitCommand ? `Closeout init: ${closeoutEvidenceHandoff.closeoutInitCommand}` : "",
+            closeoutEvidenceHandoff?.firstBackfillCommand ? `First closeout backfill: ${closeoutEvidenceHandoff.firstBackfillCommand}` : "",
             readinessRefreshGroup?.command ? `Readiness refresh: ${readinessRefreshGroup.command}` : "",
             rehearsalReloadGroup?.command ? `Rehearsal reload: ${rehearsalReloadGroup.command}` : "",
             ...preStagingReadinessSelfCheckOperatorOrder.map((item) => `Operator order: ${item}`)
@@ -18865,6 +18915,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     const executionQueue = Array.isArray(preStagingReadinessSelfCheck.executionQueue)
       ? preStagingReadinessSelfCheck.executionQueue
       : [];
+    const closeoutEvidenceHandoff = preStagingReadinessSelfCheck.closeoutEvidenceHandoff
+      && typeof preStagingReadinessSelfCheck.closeoutEvidenceHandoff === "object"
+        ? preStagingReadinessSelfCheck.closeoutEvidenceHandoff
+        : null;
+    const closeoutEvidenceQueue = Array.isArray(closeoutEvidenceHandoff?.queue)
+      ? closeoutEvidenceHandoff.queue
+      : [];
     const requiredArtifacts = Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts)
       ? preStagingReadinessSelfCheck.requiredArtifacts
       : [];
@@ -18904,6 +18961,38 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
           + ` | expectedArtifacts=${expectedArtifacts}`
         );
       }
+    }
+    if (closeoutEvidenceHandoff) {
+      const firstTarget = closeoutEvidenceHandoff.firstBackfillTarget || null;
+      lines.push("Closeout Evidence Handoff:");
+      lines.push(
+        `- status=${closeoutEvidenceHandoff.status || "-"}`
+        + ` | firstTarget=${firstTarget?.key || "-"}`
+        + ` | draft=${closeoutEvidenceHandoff.closeoutDraftFile || "-"}`
+        + ` | filled=${closeoutEvidenceHandoff.filledCloseoutInputFile || "-"}`
+        + ` | actionQueue=${closeoutEvidenceHandoff.readinessActionQueueFile || "-"}`
+      );
+      lines.push(`- closeoutInit=${closeoutEvidenceHandoff.closeoutInitCommand || "-"}`);
+      lines.push(`- readinessStatus=${closeoutEvidenceHandoff.readinessStatusCommand || "-"}`);
+      lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
+      lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
+      if (closeoutEvidenceQueue.length) {
+        lines.push("Closeout Evidence Queue:");
+        for (const item of closeoutEvidenceQueue) {
+          const expectedArtifacts = Array.isArray(item?.expectedArtifacts) && item.expectedArtifacts.length
+            ? item.expectedArtifacts.join(",")
+            : "-";
+          lines.push(
+            `${item.order || "-"}. ${item.key || "-"}`
+            + ` | status=${item.status || "-"}`
+            + ` | runNow=${item.runNow === true}`
+            + ` | unlocksWhen=${item.unlocksWhen || "-"}`
+            + ` | command=${item.command || "-"}`
+            + ` | expectedArtifacts=${expectedArtifacts}`
+          );
+        }
+      }
+      lines.push(`- closeoutNextAction=${closeoutEvidenceHandoff.nextAction || "-"}`);
     }
     lines.push(`- requiredArtifacts=${requiredArtifacts.length ? requiredArtifacts.join(", ") : "-"}`);
     lines.push(`- recommendedDownload: ${formatLaunchHandoffDownloadText(preStagingReadinessSelfCheck.recommendedDownload, { fileSeparator: " | " })}`);
@@ -29708,13 +29797,17 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     ? stagingLaunchDutyArchive.files
     : {};
   const filledCloseoutInputFile = files.filledCloseoutInput || `${archiveRoot}/filled-closeout-input.json`;
+  const filledCloseoutDraftFile = files.filledCloseoutDraft || `${archiveRoot}/filled-closeout-input.draft.json`;
   const readinessActionQueueFile = files.readinessActionQueue || `${archiveRoot}/readiness-action-queue.md`;
+  const routeMapGateOutputFile = files.routeMapGateOutput || `${archiveRoot}/route-map-gate-output.txt`;
   const launchDutyRecordIndex = files.launchDutyRecordIndex
     || stagingLaunchDutyArchive?.launchDutyRecordIndexPath
     || launchDutyRecordIndexPath
     || `${archiveRoot}/launch-duty-record-index.json`;
+  const closeoutInitCommand = `npm.cmd run staging:closeout:init -- --draft-file ${filledCloseoutDraftFile} --output-file ${filledCloseoutInputFile} --actions-file ${readinessActionQueueFile}`;
   const readinessStatusCommand = `npm.cmd run staging:readiness:status -- --input-file ${filledCloseoutInputFile} --actions-file ${readinessActionQueueFile}`;
   const rehearsalReloadCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${filledCloseoutInputFile}`;
+  const firstCloseoutBackfillCommand = `npm.cmd run staging:closeout:backfill -- --input-file ${filledCloseoutInputFile} --key route_map_gate_result --value-json <redacted-json> --artifact-path ${routeMapGateOutputFile} --actions-file ${readinessActionQueueFile}`;
   const profileDrivenDryRunCommand = stagingLaunchDutyArchive?.commands?.profileDrivenDryRun || null;
   const closeoutReloadCommand = stagingLaunchDutyArchive?.commands?.closeoutReload || null;
   const fullTestWindowCommand = stagingLaunchDutyArchive?.commands?.fullTestWindow || "npm.cmd test";
@@ -29777,6 +29870,67 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
       nextAction: "Capture full-test output and production sign-off evidence after rehearsal reload."
     }
   ];
+  const closeoutEvidenceQueue = [
+    {
+      order: 1,
+      key: "closeout_init",
+      status: "blocked_after_profile_archive_inputs",
+      runNow: false,
+      unlocksWhen: "profile_archive_inputs_confirmed",
+      command: closeoutInitCommand,
+      expectedArtifacts: [
+        filledCloseoutDraftFile,
+        filledCloseoutInputFile,
+        readinessActionQueueFile
+      ],
+      nextAction: "Promote the generated closeout draft into the real filled closeout input before refreshing readiness."
+    },
+    {
+      order: 2,
+      key: "readiness_status_after_closeout_init",
+      status: "blocked_after_closeout_init",
+      runNow: false,
+      unlocksWhen: "closeout_input_initialized",
+      command: readinessStatusCommand,
+      expectedArtifacts: [
+        readinessActionQueueFile
+      ],
+      nextAction: "Refresh readiness so the action queue selects the first closeout evidence target."
+    },
+    {
+      order: 3,
+      key: "route_map_gate_result_backfill",
+      status: "blocked_after_route_map_gate",
+      runNow: false,
+      unlocksWhen: "route_map_gate_output_ready",
+      command: firstCloseoutBackfillCommand,
+      expectedArtifacts: [
+        routeMapGateOutputFile,
+        filledCloseoutInputFile,
+        readinessActionQueueFile
+      ],
+      nextAction: "Backfill route_map_gate_result with redacted gate output, then refresh readiness and reload rehearsal."
+    }
+  ];
+  const closeoutEvidenceHandoff = {
+    version: "developer-ops-launch-operations-operator-pre-staging-closeout-evidence-handoff/v1",
+    status: "ready_for_closeout_init_and_first_backfill",
+    closeoutDraftFile: filledCloseoutDraftFile,
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    closeoutInitCommand,
+    readinessStatusCommand,
+    firstBackfillTarget: {
+      key: "route_map_gate_result",
+      sourceStep: "run_route_map_gate",
+      artifactPath: routeMapGateOutputFile,
+      receiptOperations: []
+    },
+    firstBackfillCommand: firstCloseoutBackfillCommand,
+    rehearsalReloadCommand,
+    queue: closeoutEvidenceQueue,
+    nextAction: "Run closeout init after profile/archive inputs, refresh readiness, then backfill route_map_gate_result once the route-map gate output is available."
+  };
   const preStagingReadinessSelfCheckPacket = {
     version: "developer-ops-launch-operations-operator-pre-staging-readiness-self-check-packet/v1",
     status: "ready_for_pre_staging_self_check",
@@ -29789,6 +29943,7 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     launchDutyRecordIndexPath: launchDutyRecordIndex,
     requiredArtifacts: [
       filledCloseoutInputFile,
+      filledCloseoutDraftFile,
       readinessActionQueueFile,
       launchDutyRecordIndex,
       productionSignoffPacket,
@@ -29835,6 +29990,7 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
       }
     ],
     executionQueue: preStagingExecutionQueue,
+    closeoutEvidenceHandoff,
     nextAction: "Run the current readiness refresh, confirm the action queue and launch-duty record index, then reload rehearsal before entering full-test/signoff."
   };
   return {
@@ -29844,8 +30000,10 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     channel,
     archiveRoot,
     filledCloseoutInputFile,
+    filledCloseoutDraftFile,
     readinessActionQueueFile,
     launchDutyRecordIndexPath: launchDutyRecordIndex,
+    closeoutInitCommand,
     readinessStatusCommand,
     rehearsalReloadCommand,
     profileDrivenDryRunCommand,
@@ -41535,6 +41693,13 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const preStagingSelfCheckRequiredArtifacts = Array.isArray(preStagingSelfCheck?.requiredArtifacts)
     ? preStagingSelfCheck.requiredArtifacts
     : [];
+  const preStagingCloseoutEvidenceHandoff = preStagingSelfCheck?.closeoutEvidenceHandoff
+    && typeof preStagingSelfCheck.closeoutEvidenceHandoff === "object"
+      ? preStagingSelfCheck.closeoutEvidenceHandoff
+      : null;
+  const preStagingCloseoutEvidenceQueue = Array.isArray(preStagingCloseoutEvidenceHandoff?.queue)
+    ? preStagingCloseoutEvidenceHandoff.queue
+    : [];
   const preStagingSelfCheckDownload = readiness.launchOperationsOperatorEntry?.preStagingReadinessSelfCheckDownload
     || readiness.preStagingReadinessSelfCheckDownload
     || readiness.launchOperationsOperatorEntry?.primaryDownload
@@ -41752,6 +41917,30 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
         + ` | command=${group.command || "-"}`
         + ` | expected=${expected}`
       );
+    }
+    if (preStagingCloseoutEvidenceHandoff) {
+      const firstTarget = preStagingCloseoutEvidenceHandoff.firstBackfillTarget || null;
+      lines.push("Pre-Staging Closeout Evidence Handoff:");
+      lines.push(
+        `- status=${preStagingCloseoutEvidenceHandoff.status || "-"}`
+        + ` | firstTarget=${firstTarget?.key || "-"}`
+        + ` | draft=${preStagingCloseoutEvidenceHandoff.closeoutDraftFile || "-"}`
+        + ` | filled=${preStagingCloseoutEvidenceHandoff.filledCloseoutInputFile || "-"}`
+        + ` | actionQueue=${preStagingCloseoutEvidenceHandoff.readinessActionQueueFile || "-"}`
+      );
+      lines.push(`- closeoutInit=${preStagingCloseoutEvidenceHandoff.closeoutInitCommand || "-"}`);
+      lines.push(`- readinessStatus=${preStagingCloseoutEvidenceHandoff.readinessStatusCommand || "-"}`);
+      lines.push(`- firstBackfill=${preStagingCloseoutEvidenceHandoff.firstBackfillCommand || "-"}`);
+      lines.push(`- rehearsalReload=${preStagingCloseoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
+      for (const item of preStagingCloseoutEvidenceQueue) {
+        lines.push(
+          `${item.order || "-"}. ${item.key || "-"}`
+          + ` | status=${item.status || "-"}`
+          + ` | runNow=${item.runNow === true}`
+          + ` | unlocksWhen=${item.unlocksWhen || "-"}`
+          + ` | command=${item.command || "-"}`
+        );
+      }
     }
     lines.push(`- requiredArtifacts=${preStagingSelfCheckRequiredArtifacts.length ? preStagingSelfCheckRequiredArtifacts.join(",") : "-"}`);
     lines.push(`- nextAction=${preStagingSelfCheck.nextAction || "-"}`);
@@ -42592,6 +42781,13 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       const requiredArtifacts = Array.isArray(preStagingSelfCheck.requiredArtifacts)
         ? preStagingSelfCheck.requiredArtifacts
         : [];
+      const closeoutEvidenceHandoff = preStagingSelfCheck.closeoutEvidenceHandoff
+        && typeof preStagingSelfCheck.closeoutEvidenceHandoff === "object"
+          ? preStagingSelfCheck.closeoutEvidenceHandoff
+          : null;
+      const closeoutEvidenceQueue = Array.isArray(closeoutEvidenceHandoff?.queue)
+        ? closeoutEvidenceHandoff.queue
+        : [];
       lines.push("Pre-Staging Readiness Self-Check Packet:");
       lines.push(
         `- status=${preStagingSelfCheck.status || "-"}`
@@ -42611,6 +42807,30 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
           + ` | command=${group.command || "-"}`
           + ` | expected=${expected}`
         );
+      }
+      if (closeoutEvidenceHandoff) {
+        const firstTarget = closeoutEvidenceHandoff.firstBackfillTarget || null;
+        lines.push("Pre-Staging Closeout Evidence Handoff:");
+        lines.push(
+          `- status=${closeoutEvidenceHandoff.status || "-"}`
+          + ` | firstTarget=${firstTarget?.key || "-"}`
+          + ` | draft=${closeoutEvidenceHandoff.closeoutDraftFile || "-"}`
+          + ` | filled=${closeoutEvidenceHandoff.filledCloseoutInputFile || "-"}`
+          + ` | actionQueue=${closeoutEvidenceHandoff.readinessActionQueueFile || "-"}`
+        );
+        lines.push(`- closeoutInit=${closeoutEvidenceHandoff.closeoutInitCommand || "-"}`);
+        lines.push(`- readinessStatus=${closeoutEvidenceHandoff.readinessStatusCommand || "-"}`);
+        lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
+        lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
+        for (const item of closeoutEvidenceQueue) {
+          lines.push(
+            `${item.order || "-"}. ${item.key || "-"}`
+            + ` | status=${item.status || "-"}`
+            + ` | runNow=${item.runNow === true}`
+            + ` | unlocksWhen=${item.unlocksWhen || "-"}`
+            + ` | command=${item.command || "-"}`
+          );
+        }
       }
       lines.push(`Self-Check Artifacts: ${requiredArtifacts.length ? requiredArtifacts.join(", ") : "-"}`);
       lines.push(`Self-Check Next: ${preStagingSelfCheck.nextAction || "-"}`);
@@ -43457,6 +43677,10 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
   const packet = entry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket || null;
   const commandGroups = Array.isArray(packet?.commandGroups) ? packet.commandGroups : [];
   const executionQueue = Array.isArray(packet?.executionQueue) ? packet.executionQueue : [];
+  const closeoutEvidenceHandoff = packet?.closeoutEvidenceHandoff && typeof packet.closeoutEvidenceHandoff === "object"
+    ? packet.closeoutEvidenceHandoff
+    : null;
+  const closeoutEvidenceQueue = Array.isArray(closeoutEvidenceHandoff?.queue) ? closeoutEvidenceHandoff.queue : [];
   const requiredArtifacts = Array.isArray(packet?.requiredArtifacts) ? packet.requiredArtifacts : [];
   const directDownload = entry?.preStagingReadinessSelfCheckDownload
     || buildDeveloperOpsPreStagingReadinessSelfCheckDownload({
@@ -43523,6 +43747,43 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
     );
   }
   if (!executionQueue.length) {
+    lines.push("- none");
+  }
+  lines.push("");
+  lines.push("Closeout Evidence Handoff:");
+  if (closeoutEvidenceHandoff) {
+    const firstTarget = closeoutEvidenceHandoff.firstBackfillTarget || null;
+    lines.push(
+      `- status=${closeoutEvidenceHandoff.status || "-"}`
+      + ` | firstTarget=${firstTarget?.key || "-"}`
+      + ` | draft=${closeoutEvidenceHandoff.closeoutDraftFile || "-"}`
+      + ` | filled=${closeoutEvidenceHandoff.filledCloseoutInputFile || "-"}`
+      + ` | actionQueue=${closeoutEvidenceHandoff.readinessActionQueueFile || "-"}`
+    );
+    lines.push(`- closeoutInit=${closeoutEvidenceHandoff.closeoutInitCommand || "-"}`);
+    lines.push(`- readinessStatus=${closeoutEvidenceHandoff.readinessStatusCommand || "-"}`);
+    lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
+    lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
+    lines.push("Closeout Evidence Queue:");
+    for (const item of closeoutEvidenceQueue) {
+      const expectedArtifacts = Array.isArray(item?.expectedArtifacts) && item.expectedArtifacts.length
+        ? item.expectedArtifacts.join(",")
+        : "-";
+      lines.push(
+        `${item.order || "-"}. ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | runNow=${item.runNow === true}`
+        + ` | unlocksWhen=${item.unlocksWhen || "-"}`
+        + ` | command=${item.command || "-"}`
+        + ` | expectedArtifacts=${expectedArtifacts}`
+        + ` | nextAction=${item.nextAction || "-"}`
+      );
+    }
+    if (!closeoutEvidenceQueue.length) {
+      lines.push("- none");
+    }
+    lines.push(`- closeoutNextAction=${closeoutEvidenceHandoff.nextAction || "-"}`);
+  } else {
     lines.push("- none");
   }
   lines.push("");

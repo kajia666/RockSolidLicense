@@ -14923,6 +14923,23 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                       nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.progress.nextAction || null
                     }
                   : null,
+              operatorCheckpoint: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint
+                && typeof preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint === "object"
+                  ? {
+                      status: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.status || null,
+                      currentBackfillKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.currentBackfillKey || null,
+                      currentArtifactPath: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.currentArtifactPath || null,
+                      currentReceiptOperations: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.currentReceiptOperations)
+                        ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.currentReceiptOperations.slice()
+                        : [],
+                      currentCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.currentCommand || null,
+                      finalReadinessRefreshCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.finalReadinessRefreshCommand || null,
+                      rehearsalReloadCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.rehearsalReloadCommand || null,
+                      fullTestCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.fullTestCommand || null,
+                      blockedUntil: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.blockedUntil || null,
+                      nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.nextAction || null
+                    }
+                  : null,
               nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.nextAction || null
             }
           : null,
@@ -16925,6 +16942,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           && typeof closeoutEvidenceHandoff.progress === "object"
             ? closeoutEvidenceHandoff.progress
             : null;
+        const closeoutEvidenceOperatorCheckpoint = closeoutEvidenceHandoff?.operatorCheckpoint
+          && typeof closeoutEvidenceHandoff.operatorCheckpoint === "object"
+            ? closeoutEvidenceHandoff.operatorCheckpoint
+            : null;
         const runnableNowCount = executionQueue.filter((item) => item?.runNow === true).length;
         const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
         const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
@@ -16965,6 +16986,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             closeoutEvidenceProgress ? `Closeout evidence receipt placeholders: ${closeoutEvidenceProgress.receiptOperationPlaceholderCount || 0}` : "",
             progressFirstPendingTarget?.key ? `Closeout evidence first pending: ${progressFirstPendingTarget.key}` : "",
             progressFinalQueueItem?.key ? `Closeout evidence final queue: ${progressFinalQueueItem.key}` : "",
+            closeoutEvidenceOperatorCheckpoint?.status ? `Closeout evidence checkpoint: ${closeoutEvidenceOperatorCheckpoint.status}` : "",
+            closeoutEvidenceOperatorCheckpoint?.currentBackfillKey ? `Closeout evidence current backfill: ${closeoutEvidenceOperatorCheckpoint.currentBackfillKey}` : "",
+            closeoutEvidenceOperatorCheckpoint?.blockedUntil ? `Closeout evidence full-test blocker: ${closeoutEvidenceOperatorCheckpoint.blockedUntil}` : "",
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -18900,6 +18924,30 @@ function appendDeveloperOpsCloseoutEvidenceProgressLines(lines, progress, headin
   lines.push(`- nextAction=${progress.nextAction || "-"}`);
 }
 
+function appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, checkpoint, heading = "Closeout Evidence Operator Checkpoint") {
+  if (!checkpoint || typeof checkpoint !== "object") {
+    return;
+  }
+  const receiptOperations = Array.isArray(checkpoint.currentReceiptOperations) && checkpoint.currentReceiptOperations.length
+    ? checkpoint.currentReceiptOperations.join(",")
+    : "-";
+  lines.push(`${heading}:`);
+  lines.push(
+    `- status=${checkpoint.status || "-"}`
+    + ` | current=${checkpoint.currentBackfillKey || "-"}`
+    + ` | artifact=${checkpoint.currentArtifactPath || "-"}`
+    + ` | receipts=${receiptOperations}`
+  );
+  lines.push(`- currentCommand=${checkpoint.currentCommand || "-"}`);
+  lines.push(`- finalReadinessRefresh=${checkpoint.finalReadinessRefreshCommand || "-"}`);
+  lines.push(`- rehearsalReload=${checkpoint.rehearsalReloadCommand || "-"}`);
+  lines.push(
+    `- fullTestCommand=${checkpoint.fullTestCommand || "-"}`
+    + ` | blockedUntil=${checkpoint.blockedUntil || "-"}`
+  );
+  lines.push(`- nextAction=${checkpoint.nextAction || "-"}`);
+}
+
 function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -19067,6 +19115,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
       lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
       appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceHandoff.progress);
+      appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceHandoff.operatorCheckpoint);
       if (closeoutEvidenceTargets.length) {
         lines.push("Closeout Evidence Targets:");
         for (const target of closeoutEvidenceTargets) {
@@ -30176,6 +30225,20 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     fullTestUnlocksWhen: "post_closeout_evidence_readiness_status_completed",
     nextAction: "Complete all seven closeout evidence backfills, refresh readiness, then enter the guarded full-test window only after the refreshed action queue selects full-test/signoff."
   };
+  const closeoutEvidenceOperatorCheckpoint = {
+    status: "awaiting_first_closeout_backfill",
+    currentBackfillKey: firstCloseoutEvidenceTarget?.key || null,
+    currentArtifactPath: firstCloseoutEvidenceTarget?.artifactPath || null,
+    currentReceiptOperations: Array.isArray(firstCloseoutEvidenceTarget?.receiptOperations)
+      ? firstCloseoutEvidenceTarget.receiptOperations.slice()
+      : [],
+    currentCommand: firstCloseoutEvidenceTarget?.command || firstCloseoutEvidenceBackfillQueueItem?.command || null,
+    finalReadinessRefreshCommand: readinessStatusCommand,
+    rehearsalReloadCommand,
+    fullTestCommand: fullTestWindowCommand,
+    blockedUntil: "post_closeout_evidence_readiness_status_completed",
+    nextAction: "Run the current closeout evidence backfill when its artifact and receipts are available, continue the remaining backfills, then run the final readiness refresh and rehearsal reload before full-test."
+  };
   const closeoutEvidenceHandoff = {
     version: "developer-ops-launch-operations-operator-pre-staging-closeout-evidence-handoff/v1",
     status: "ready_for_closeout_init_and_first_backfill",
@@ -30197,6 +30260,7 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     evidenceTargets: closeoutEvidenceTargets,
     queue: closeoutEvidenceQueue,
     progress: closeoutEvidenceProgress,
+    operatorCheckpoint: closeoutEvidenceOperatorCheckpoint,
     nextAction: "Run closeout init after profile/archive inputs, refresh readiness, backfill all seven pre-full-test closeout evidence targets, then refresh readiness for the full-test window."
   };
   const preStagingReadinessSelfCheckPacket = {
@@ -41975,6 +42039,10 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     && typeof preStagingCloseoutEvidenceHandoff.progress === "object"
       ? preStagingCloseoutEvidenceHandoff.progress
       : null;
+  const preStagingCloseoutEvidenceOperatorCheckpoint = preStagingCloseoutEvidenceHandoff?.operatorCheckpoint
+    && typeof preStagingCloseoutEvidenceHandoff.operatorCheckpoint === "object"
+      ? preStagingCloseoutEvidenceHandoff.operatorCheckpoint
+      : null;
   const preStagingSelfCheckDownload = readiness.launchOperationsOperatorEntry?.preStagingReadinessSelfCheckDownload
     || readiness.preStagingReadinessSelfCheckDownload
     || readiness.launchOperationsOperatorEntry?.primaryDownload
@@ -42208,6 +42276,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       lines.push(`- firstBackfill=${preStagingCloseoutEvidenceHandoff.firstBackfillCommand || "-"}`);
       lines.push(`- rehearsalReload=${preStagingCloseoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
       appendDeveloperOpsCloseoutEvidenceProgressLines(lines, preStagingCloseoutEvidenceProgress, "Pre-Staging Closeout Evidence Progress");
+      appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, preStagingCloseoutEvidenceOperatorCheckpoint, "Pre-Staging Closeout Evidence Operator Checkpoint");
       if (preStagingCloseoutEvidenceTargets.length) {
         lines.push("Pre-Staging Closeout Evidence Targets:");
         for (const target of preStagingCloseoutEvidenceTargets) {
@@ -43086,6 +43155,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         && typeof closeoutEvidenceHandoff.progress === "object"
           ? closeoutEvidenceHandoff.progress
           : null;
+      const closeoutEvidenceOperatorCheckpoint = closeoutEvidenceHandoff?.operatorCheckpoint
+        && typeof closeoutEvidenceHandoff.operatorCheckpoint === "object"
+          ? closeoutEvidenceHandoff.operatorCheckpoint
+          : null;
       lines.push("Pre-Staging Readiness Self-Check Packet:");
       lines.push(
         `- status=${preStagingSelfCheck.status || "-"}`
@@ -43121,6 +43194,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
         lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
         appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceProgress, "Pre-Staging Closeout Evidence Progress");
+        appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceOperatorCheckpoint, "Pre-Staging Closeout Evidence Operator Checkpoint");
         if (closeoutEvidenceTargets.length) {
           lines.push("Pre-Staging Closeout Evidence Targets:");
           for (const target of closeoutEvidenceTargets) {
@@ -43999,6 +44073,9 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
   const closeoutEvidenceProgress = closeoutEvidenceHandoff?.progress && typeof closeoutEvidenceHandoff.progress === "object"
     ? closeoutEvidenceHandoff.progress
     : null;
+  const closeoutEvidenceOperatorCheckpoint = closeoutEvidenceHandoff?.operatorCheckpoint && typeof closeoutEvidenceHandoff.operatorCheckpoint === "object"
+    ? closeoutEvidenceHandoff.operatorCheckpoint
+    : null;
   const requiredArtifacts = Array.isArray(packet?.requiredArtifacts) ? packet.requiredArtifacts : [];
   const directDownload = entry?.preStagingReadinessSelfCheckDownload
     || buildDeveloperOpsPreStagingReadinessSelfCheckDownload({
@@ -44083,6 +44160,7 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
     lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
     lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
     appendDeveloperOpsCloseoutEvidenceProgressLines(lines, closeoutEvidenceProgress);
+    appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, closeoutEvidenceOperatorCheckpoint);
     lines.push("Closeout Evidence Targets:");
     for (const target of closeoutEvidenceTargets) {
       const receiptOperations = Array.isArray(target?.receiptOperations) && target.receiptOperations.length

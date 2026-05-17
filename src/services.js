@@ -14937,6 +14937,20 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                       rehearsalReloadCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.rehearsalReloadCommand || null,
                       fullTestCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.fullTestCommand || null,
                       blockedUntil: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.blockedUntil || null,
+                      confirmationChecklist: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.confirmationChecklist)
+                        ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.confirmationChecklist.map((item) => ({
+                            key: item?.key || null,
+                            status: item?.status || null,
+                            expected: item?.expected || null
+                          }))
+                        : [],
+                      riskChecks: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.riskChecks)
+                        ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.riskChecks.map((item) => ({
+                            key: item?.key || null,
+                            severity: item?.severity || null,
+                            blocks: item?.blocks || null
+                          }))
+                        : [],
                       nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.nextAction || null
                     }
                   : null,
@@ -16989,6 +17003,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             closeoutEvidenceOperatorCheckpoint?.status ? `Closeout evidence checkpoint: ${closeoutEvidenceOperatorCheckpoint.status}` : "",
             closeoutEvidenceOperatorCheckpoint?.currentBackfillKey ? `Closeout evidence current backfill: ${closeoutEvidenceOperatorCheckpoint.currentBackfillKey}` : "",
             closeoutEvidenceOperatorCheckpoint?.blockedUntil ? `Closeout evidence full-test blocker: ${closeoutEvidenceOperatorCheckpoint.blockedUntil}` : "",
+            closeoutEvidenceOperatorCheckpoint ? `Closeout checkpoint confirmations: ${Array.isArray(closeoutEvidenceOperatorCheckpoint.confirmationChecklist) ? closeoutEvidenceOperatorCheckpoint.confirmationChecklist.length : 0}` : "",
+            closeoutEvidenceOperatorCheckpoint ? `Closeout checkpoint risks: ${Array.isArray(closeoutEvidenceOperatorCheckpoint.riskChecks) ? closeoutEvidenceOperatorCheckpoint.riskChecks.length : 0}` : "",
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -18945,6 +18961,32 @@ function appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, checkp
     `- fullTestCommand=${checkpoint.fullTestCommand || "-"}`
     + ` | blockedUntil=${checkpoint.blockedUntil || "-"}`
   );
+  const confirmationChecklist = Array.isArray(checkpoint.confirmationChecklist)
+    ? checkpoint.confirmationChecklist
+    : [];
+  if (confirmationChecklist.length) {
+    lines.push("Closeout Evidence Checkpoint Confirmation:");
+    for (const [index, item] of confirmationChecklist.entries()) {
+      lines.push(
+        `${index + 1}. ${item?.key || "-"}`
+        + ` | status=${item?.status || "-"}`
+        + ` | expected=${item?.expected || "-"}`
+      );
+    }
+  }
+  const riskChecks = Array.isArray(checkpoint.riskChecks)
+    ? checkpoint.riskChecks
+    : [];
+  if (riskChecks.length) {
+    lines.push("Closeout Evidence Checkpoint Risks:");
+    for (const [index, item] of riskChecks.entries()) {
+      lines.push(
+        `${index + 1}. ${item?.key || "-"}`
+        + ` | severity=${item?.severity || "-"}`
+        + ` | blocks=${item?.blocks || "-"}`
+      );
+    }
+  }
   lines.push(`- nextAction=${checkpoint.nextAction || "-"}`);
 }
 
@@ -30237,6 +30279,47 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     rehearsalReloadCommand,
     fullTestCommand: fullTestWindowCommand,
     blockedUntil: "post_closeout_evidence_readiness_status_completed",
+    confirmationChecklist: [
+      {
+        key: "artifact_redacted_and_present",
+        status: "required",
+        expected: `${firstCloseoutEvidenceTarget?.key || "closeout evidence"} artifact exists at ${firstCloseoutEvidenceTarget?.artifactPath || "-"} and secrets are redacted`
+      },
+      {
+        key: "receipt_id_attached",
+        status: "required",
+        expected: Array.isArray(firstCloseoutEvidenceTarget?.receiptOperations) && firstCloseoutEvidenceTarget.receiptOperations.length
+          ? firstCloseoutEvidenceTarget.receiptOperations.join(",")
+          : "-"
+      },
+      {
+        key: "actions_file_preserved",
+        status: "required",
+        expected: readinessActionQueueFile
+      },
+      {
+        key: "full_test_stays_blocked",
+        status: "blocked",
+        expected: "post_closeout_evidence_readiness_status_completed"
+      }
+    ],
+    riskChecks: [
+      {
+        key: "missing_artifact_blocks_backfill",
+        severity: "high",
+        blocks: firstCloseoutEvidenceTarget?.key || null
+      },
+      {
+        key: "missing_receipt_breaks_audit_trace",
+        severity: "high",
+        blocks: firstCloseoutEvidenceTarget?.key || null
+      },
+      {
+        key: "skipping_final_readiness_blocks_full_test",
+        severity: "high",
+        blocks: fullTestWindowCommand
+      }
+    ],
     nextAction: "Run the current closeout evidence backfill when its artifact and receipts are available, continue the remaining backfills, then run the final readiness refresh and rehearsal reload before full-test."
   };
   const closeoutEvidenceHandoff = {

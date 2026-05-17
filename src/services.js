@@ -14951,6 +14951,33 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                             blocks: item?.blocks || null
                           }))
                         : [],
+                      postRunReadback: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback
+                        && typeof preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback === "object"
+                          ? {
+                              status: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.status || null,
+                              readbackFiles: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.readbackFiles)
+                                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.readbackFiles.slice()
+                                : [],
+                              completedEvidenceKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.completedEvidenceKey || null,
+                              expectedReceiptOperations: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.expectedReceiptOperations)
+                                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.expectedReceiptOperations.slice()
+                                : [],
+                              expectedNextQueueKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.expectedNextQueueKey || null,
+                              expectedNextBackfillKey: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.expectedNextBackfillKey || null,
+                              expectedNextUnlocksWhen: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.expectedNextUnlocksWhen || null,
+                              readinessRefreshCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.readinessRefreshCommand || null,
+                              rehearsalReloadCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.rehearsalReloadCommand || null,
+                              fullTestCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.fullTestCommand || null,
+                              fullTestBlockedUntil: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.fullTestBlockedUntil || null,
+                              successCriteria: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.successCriteria)
+                                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.successCriteria.map((item) => ({
+                                    key: item?.key || null,
+                                    expected: item?.expected || null
+                                  }))
+                                : [],
+                              nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.postRunReadback.nextAction || null
+                            }
+                          : null,
                       nextAction: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.operatorCheckpoint.nextAction || null
                     }
                   : null,
@@ -17005,6 +17032,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             closeoutEvidenceOperatorCheckpoint?.blockedUntil ? `Closeout evidence full-test blocker: ${closeoutEvidenceOperatorCheckpoint.blockedUntil}` : "",
             closeoutEvidenceOperatorCheckpoint ? `Closeout checkpoint confirmations: ${Array.isArray(closeoutEvidenceOperatorCheckpoint.confirmationChecklist) ? closeoutEvidenceOperatorCheckpoint.confirmationChecklist.length : 0}` : "",
             closeoutEvidenceOperatorCheckpoint ? `Closeout checkpoint risks: ${Array.isArray(closeoutEvidenceOperatorCheckpoint.riskChecks) ? closeoutEvidenceOperatorCheckpoint.riskChecks.length : 0}` : "",
+            closeoutEvidenceOperatorCheckpoint?.postRunReadback?.status ? `Closeout post-run readback: ${closeoutEvidenceOperatorCheckpoint.postRunReadback.status}` : "",
+            closeoutEvidenceOperatorCheckpoint?.postRunReadback?.expectedNextQueueKey ? `Closeout post-run next queue: ${closeoutEvidenceOperatorCheckpoint.postRunReadback.expectedNextQueueKey}` : "",
+            closeoutEvidenceOperatorCheckpoint?.postRunReadback ? `Closeout post-run criteria: ${Array.isArray(closeoutEvidenceOperatorCheckpoint.postRunReadback.successCriteria) ? closeoutEvidenceOperatorCheckpoint.postRunReadback.successCriteria.length : 0}` : "",
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -18986,6 +19016,46 @@ function appendDeveloperOpsCloseoutEvidenceOperatorCheckpointLines(lines, checkp
         + ` | blocks=${item?.blocks || "-"}`
       );
     }
+  }
+  const postRunReadback = checkpoint.postRunReadback && typeof checkpoint.postRunReadback === "object"
+    ? checkpoint.postRunReadback
+    : null;
+  if (postRunReadback) {
+    const readbackFiles = Array.isArray(postRunReadback.readbackFiles) && postRunReadback.readbackFiles.length
+      ? postRunReadback.readbackFiles.join(",")
+      : "-";
+    const expectedReceiptOperations = Array.isArray(postRunReadback.expectedReceiptOperations) && postRunReadback.expectedReceiptOperations.length
+      ? postRunReadback.expectedReceiptOperations.join(",")
+      : "-";
+    lines.push("Closeout Evidence Post-Run Readback:");
+    lines.push(
+      `- status=${postRunReadback.status || "-"}`
+      + ` | completed=${postRunReadback.completedEvidenceKey || "-"}`
+      + ` | nextQueue=${postRunReadback.expectedNextQueueKey || "-"}`
+      + ` | nextBackfill=${postRunReadback.expectedNextBackfillKey || "-"}`
+    );
+    lines.push(`- readbackFiles=${readbackFiles}`);
+    lines.push(
+      `- receipts=${expectedReceiptOperations}`
+      + ` | nextUnlocksWhen=${postRunReadback.expectedNextUnlocksWhen || "-"}`
+      + ` | fullTestBlockedUntil=${postRunReadback.fullTestBlockedUntil || "-"}`
+    );
+    lines.push(`- readinessRefresh=${postRunReadback.readinessRefreshCommand || "-"}`);
+    lines.push(`- rehearsalReload=${postRunReadback.rehearsalReloadCommand || "-"}`);
+    lines.push(`- fullTestCommand=${postRunReadback.fullTestCommand || "-"}`);
+    const successCriteria = Array.isArray(postRunReadback.successCriteria)
+      ? postRunReadback.successCriteria
+      : [];
+    if (successCriteria.length) {
+      lines.push("Closeout Evidence Post-Run Criteria:");
+      for (const [index, item] of successCriteria.entries()) {
+        lines.push(
+          `${index + 1}. ${item?.key || "-"}`
+          + ` | expected=${item?.expected || "-"}`
+        );
+      }
+    }
+    lines.push(`- readbackNextAction=${postRunReadback.nextAction || "-"}`);
   }
   lines.push(`- nextAction=${checkpoint.nextAction || "-"}`);
 }
@@ -30232,6 +30302,8 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
   ];
   const closeoutEvidenceBackfillQueue = closeoutEvidenceQueue.filter((item) => item?.key?.endsWith("_backfill"));
   const firstCloseoutEvidenceBackfillQueueItem = closeoutEvidenceBackfillQueue[0] || null;
+  const nextCloseoutEvidenceBackfillQueueItem = closeoutEvidenceBackfillQueue[1] || null;
+  const nextCloseoutEvidenceTarget = closeoutEvidenceTargets[1] || null;
   const finalCloseoutEvidenceQueueItem = closeoutEvidenceQueue[closeoutEvidenceQueue.length - 1] || null;
   const closeoutEvidenceReceiptOperationPlaceholderCount = closeoutEvidenceTargets.reduce(
     (total, target) => total + (Array.isArray(target?.receiptOperations) ? target.receiptOperations.length : 0),
@@ -30320,6 +30392,45 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
         blocks: fullTestWindowCommand
       }
     ],
+    postRunReadback: {
+      status: "awaiting_current_backfill_readback",
+      readbackFiles: [
+        filledCloseoutInputFile,
+        readinessActionQueueFile
+      ],
+      completedEvidenceKey: firstCloseoutEvidenceTarget?.key || null,
+      expectedReceiptOperations: Array.isArray(firstCloseoutEvidenceTarget?.receiptOperations)
+        ? firstCloseoutEvidenceTarget.receiptOperations.slice()
+        : [],
+      expectedNextQueueKey: nextCloseoutEvidenceBackfillQueueItem?.key || null,
+      expectedNextBackfillKey: nextCloseoutEvidenceTarget?.key || null,
+      expectedNextUnlocksWhen: nextCloseoutEvidenceBackfillQueueItem?.unlocksWhen || null,
+      readinessRefreshCommand: readinessStatusCommand,
+      rehearsalReloadCommand,
+      fullTestCommand: fullTestWindowCommand,
+      fullTestBlockedUntil: "all_closeout_evidence_backfilled_and_post_closeout_evidence_readiness_status_completed",
+      successCriteria: [
+        {
+          key: "filled_closeout_contains_current_key",
+          expected: firstCloseoutEvidenceTarget?.key || null
+        },
+        {
+          key: "receipt_operations_attached",
+          expected: Array.isArray(firstCloseoutEvidenceTarget?.receiptOperations) && firstCloseoutEvidenceTarget.receiptOperations.length
+            ? firstCloseoutEvidenceTarget.receiptOperations.join(",")
+            : "-"
+        },
+        {
+          key: "action_queue_moves_to_next_backfill",
+          expected: nextCloseoutEvidenceBackfillQueueItem?.key || null
+        },
+        {
+          key: "full_test_remains_blocked",
+          expected: "all_closeout_evidence_backfilled_and_post_closeout_evidence_readiness_status_completed"
+        }
+      ],
+      nextAction: `Review filled closeout input and action queue after the current backfill; continue with ${nextCloseoutEvidenceTarget?.key || "the next closeout evidence target"} only after the queue selects that next backfill.`
+    },
     nextAction: "Run the current closeout evidence backfill when its artifact and receipts are available, continue the remaining backfills, then run the final readiness refresh and rehearsal reload before full-test."
   };
   const closeoutEvidenceHandoff = {

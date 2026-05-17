@@ -14869,6 +14869,16 @@ function buildDeveloperLaunchMainlineSummaryPayload({
                   : null,
               firstBackfillCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.firstBackfillCommand || null,
               rehearsalReloadCommand: preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.rehearsalReloadCommand || null,
+              evidenceTargets: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.evidenceTargets)
+                ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.evidenceTargets.map((item) => ({
+                    order: Number(item?.order || 0),
+                    key: item?.key || null,
+                    sourceStep: item?.sourceStep || null,
+                    artifactPath: item?.artifactPath || null,
+                    receiptOperations: Array.isArray(item?.receiptOperations) ? item.receiptOperations.slice() : [],
+                    command: item?.command || null
+                  }))
+                : [],
               queue: Array.isArray(preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.queue)
                 ? preStagingReadinessSelfCheckSource.closeoutEvidenceHandoff.queue.map((item) => ({
                     order: Number(item?.order || 0),
@@ -16876,6 +16886,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         const closeoutEvidenceQueue = Array.isArray(closeoutEvidenceHandoff?.queue)
           ? closeoutEvidenceHandoff.queue
           : [];
+        const closeoutEvidenceTargets = Array.isArray(closeoutEvidenceHandoff?.evidenceTargets)
+          ? closeoutEvidenceHandoff.evidenceTargets
+          : [];
         const runnableNowCount = executionQueue.filter((item) => item?.runNow === true).length;
         const readinessRefreshGroup = commandGroups.find((item) => item?.key === "readiness_refresh") || null;
         const rehearsalReloadGroup = commandGroups.find((item) => item?.key === "rehearsal_reload") || null;
@@ -16910,6 +16923,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             `Execution queue: ${executionQueue.length}`,
             `Runnable now: ${runnableNowCount}`,
             `Closeout evidence queue: ${closeoutEvidenceQueue.length}`,
+            `Closeout evidence targets: ${closeoutEvidenceTargets.length}`,
             `Required artifacts: ${Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts) ? preStagingReadinessSelfCheck.requiredArtifacts.length : 0}`,
             `Launch duty record index: ${preStagingReadinessSelfCheck.launchDutyRecordIndexPath || "-"}`,
             firstBackfillTarget?.key ? `First closeout target: ${firstBackfillTarget.key} -> ${firstBackfillTarget.artifactPath || "-"}` : "",
@@ -18922,6 +18936,9 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     const closeoutEvidenceQueue = Array.isArray(closeoutEvidenceHandoff?.queue)
       ? closeoutEvidenceHandoff.queue
       : [];
+    const closeoutEvidenceTargets = Array.isArray(closeoutEvidenceHandoff?.evidenceTargets)
+      ? closeoutEvidenceHandoff.evidenceTargets
+      : [];
     const requiredArtifacts = Array.isArray(preStagingReadinessSelfCheck.requiredArtifacts)
       ? preStagingReadinessSelfCheck.requiredArtifacts
       : [];
@@ -18976,6 +18993,21 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       lines.push(`- readinessStatus=${closeoutEvidenceHandoff.readinessStatusCommand || "-"}`);
       lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
       lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
+      if (closeoutEvidenceTargets.length) {
+        lines.push("Closeout Evidence Targets:");
+        for (const target of closeoutEvidenceTargets) {
+          const receiptOperations = Array.isArray(target?.receiptOperations) && target.receiptOperations.length
+            ? target.receiptOperations.join(",")
+            : "-";
+          lines.push(
+            `${target.order || "-"}. ${target.key || "-"}`
+            + ` | source=${target.sourceStep || "-"}`
+            + ` | artifact=${target.artifactPath || "-"}`
+            + ` | receipts=${receiptOperations}`
+            + ` | command=${target.command || "-"}`
+          );
+        }
+      }
       if (closeoutEvidenceQueue.length) {
         lines.push("Closeout Evidence Queue:");
         for (const item of closeoutEvidenceQueue) {
@@ -24897,7 +24929,14 @@ function buildDeveloperOpsStagingLaunchDutyArchive(scope = {}, launchReadinessNe
     launchDutyArchiveIndex: file("staging-launch-duty-archive-index.json"),
     launchDutyRecordIndex: file("launch-duty-record-index.json"),
     filledCloseoutInput: file("filled-closeout-input.json"),
-    filledCloseoutDraft: file("filled-closeout-input.draft.json")
+    filledCloseoutDraft: file("filled-closeout-input.draft.json"),
+    routeMapGateOutput: file("route-map-gate-output.txt"),
+    backupRestoreDrill: file("backup-restore-drill.txt"),
+    liveWriteSmokeOutput: file("live-write-smoke-output.json"),
+    launchSmokeHandoff: file("launch-smoke-handoff.json"),
+    launchMainlineEvidenceReceipts: file("launch-mainline-evidence-receipts.json"),
+    receiptVisibilityReview: file("receipt-visibility-review.txt"),
+    operatorGoNoGo: file("operator-go-no-go.md")
   };
   const packetFiles = [
     ["run_record_index", files.runRecordIndex],
@@ -29800,6 +29839,12 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
   const filledCloseoutDraftFile = files.filledCloseoutDraft || `${archiveRoot}/filled-closeout-input.draft.json`;
   const readinessActionQueueFile = files.readinessActionQueue || `${archiveRoot}/readiness-action-queue.md`;
   const routeMapGateOutputFile = files.routeMapGateOutput || `${archiveRoot}/route-map-gate-output.txt`;
+  const backupRestoreDrillFile = files.backupRestoreDrill || `${archiveRoot}/backup-restore-drill.txt`;
+  const liveWriteSmokeOutputFile = files.liveWriteSmokeOutput || `${archiveRoot}/live-write-smoke-output.json`;
+  const launchSmokeHandoffFile = files.launchSmokeHandoff || `${archiveRoot}/launch-smoke-handoff.json`;
+  const launchMainlineEvidenceReceiptsFile = files.launchMainlineEvidenceReceipts || `${archiveRoot}/launch-mainline-evidence-receipts.json`;
+  const receiptVisibilityReviewFile = files.receiptVisibilityReview || `${archiveRoot}/receipt-visibility-review.txt`;
+  const operatorGoNoGoFile = files.operatorGoNoGo || `${archiveRoot}/operator-go-no-go.md`;
   const launchDutyRecordIndex = files.launchDutyRecordIndex
     || stagingLaunchDutyArchive?.launchDutyRecordIndexPath
     || launchDutyRecordIndexPath
@@ -29807,7 +29852,20 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
   const closeoutInitCommand = `npm.cmd run staging:closeout:init -- --draft-file ${filledCloseoutDraftFile} --output-file ${filledCloseoutInputFile} --actions-file ${readinessActionQueueFile}`;
   const readinessStatusCommand = `npm.cmd run staging:readiness:status -- --input-file ${filledCloseoutInputFile} --actions-file ${readinessActionQueueFile}`;
   const rehearsalReloadCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${filledCloseoutInputFile}`;
-  const firstCloseoutBackfillCommand = `npm.cmd run staging:closeout:backfill -- --input-file ${filledCloseoutInputFile} --key route_map_gate_result --value-json <redacted-json> --artifact-path ${routeMapGateOutputFile} --actions-file ${readinessActionQueueFile}`;
+  const buildCloseoutBackfillCommand = ({ key, artifactPath, receiptOperations = [] } = {}) => [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    filledCloseoutInputFile,
+    "--key",
+    key,
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    artifactPath,
+    ...receiptOperations.flatMap((receiptId) => ["--receipt-id", receiptId]),
+    "--actions-file",
+    readinessActionQueueFile
+  ].filter(Boolean).join(" ");
   const profileDrivenDryRunCommand = stagingLaunchDutyArchive?.commands?.profileDrivenDryRun || null;
   const closeoutReloadCommand = stagingLaunchDutyArchive?.commands?.closeoutReload || null;
   const fullTestWindowCommand = stagingLaunchDutyArchive?.commands?.fullTestWindow || "npm.cmd test";
@@ -29870,6 +29928,88 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
       nextAction: "Capture full-test output and production sign-off evidence after rehearsal reload."
     }
   ];
+  const closeoutEvidenceTargetSpecs = [
+    {
+      key: "route_map_gate_result",
+      sourceStep: "run_route_map_gate",
+      artifactPath: routeMapGateOutputFile,
+      receiptOperations: ["<route-map-gate-receipt-id>"],
+      queueKey: "route_map_gate_result_backfill",
+      status: "blocked_after_route_map_gate",
+      unlocksWhen: "route_map_gate_output_ready",
+      nextAction: "Backfill route_map_gate_result with redacted gate output, then refresh readiness and reload rehearsal."
+    },
+    {
+      key: "backup_restore_drill_result",
+      sourceStep: "run_backup_restore_drill",
+      artifactPath: backupRestoreDrillFile,
+      receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"],
+      queueKey: "backup_restore_drill_result_backfill",
+      status: "blocked_after_recovery_preflight",
+      unlocksWhen: "backup_restore_drill_output_ready",
+      nextAction: "Backfill backup_restore_drill_result after the recovery drill and restore-target healthcheck evidence are archived."
+    },
+    {
+      key: "live_write_smoke_result",
+      sourceStep: "run_live_write_smoke",
+      artifactPath: liveWriteSmokeOutputFile,
+      receiptOperations: ["<record_launch_rehearsal_run-receipt-id>"],
+      queueKey: "live_write_smoke_result_backfill",
+      status: "blocked_after_launch_smoke_staging",
+      unlocksWhen: "live_write_smoke_output_ready",
+      nextAction: "Backfill live_write_smoke_result after Launch Smoke writes the live-write smoke output."
+    },
+    {
+      key: "launch_smoke_handoff",
+      sourceStep: "archive_launch_smoke_handoff",
+      artifactPath: launchSmokeHandoffFile,
+      receiptOperations: ["<record_post_launch_ops_sweep-receipt-id>"],
+      queueKey: "launch_smoke_handoff_backfill",
+      status: "blocked_after_live_write_smoke_result",
+      unlocksWhen: "launch_smoke_handoff_archived",
+      nextAction: "Backfill launch_smoke_handoff after the Launch Smoke handoff artifact is archived with secrets redacted."
+    },
+    {
+      key: "launch_mainline_evidence_receipts",
+      sourceStep: "record_launch_mainline_evidence",
+      artifactPath: launchMainlineEvidenceReceiptsFile,
+      receiptOperations: ["<record_launch_rehearsal_run-receipt-id>"],
+      queueKey: "launch_mainline_evidence_receipts_backfill",
+      status: "blocked_after_launch_smoke_handoff",
+      unlocksWhen: "launch_mainline_receipts_ready",
+      nextAction: "Backfill Launch Mainline receipt evidence after the launch-mainline evidence receipts are captured."
+    },
+    {
+      key: "receipt_visibility_review",
+      sourceStep: "verify_receipt_visibility",
+      artifactPath: receiptVisibilityReviewFile,
+      receiptOperations: ["<record_post_launch_ops_sweep-receipt-id>"],
+      queueKey: "receipt_visibility_review_backfill",
+      status: "blocked_after_launch_mainline_evidence_receipts",
+      unlocksWhen: "receipt_visibility_review_ready",
+      nextAction: "Backfill receipt_visibility_review after Launch Review, Launch Smoke, Developer Ops, and Launch Mainline receipts are visible."
+    },
+    {
+      key: "operator_go_no_go",
+      sourceStep: "backfill_filled_closeout_input",
+      artifactPath: operatorGoNoGoFile,
+      receiptOperations: [],
+      queueKey: "operator_go_no_go_backfill",
+      status: "blocked_after_receipt_visibility_review",
+      unlocksWhen: "operator_go_no_go_ready",
+      nextAction: "Backfill operator_go_no_go as ready-for-full-test-window only after the pre-full-test evidence records are attached."
+    }
+  ];
+  const closeoutEvidenceTargets = closeoutEvidenceTargetSpecs.map((target, index) => ({
+    order: index + 1,
+    key: target.key,
+    sourceStep: target.sourceStep,
+    artifactPath: target.artifactPath,
+    receiptOperations: target.receiptOperations.slice(),
+    command: buildCloseoutBackfillCommand(target)
+  }));
+  const firstCloseoutEvidenceTarget = closeoutEvidenceTargets[0] || null;
+  const firstCloseoutBackfillCommand = firstCloseoutEvidenceTarget?.command || null;
   const closeoutEvidenceQueue = [
     {
       order: 1,
@@ -29897,19 +30037,32 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
       ],
       nextAction: "Refresh readiness so the action queue selects the first closeout evidence target."
     },
-    {
-      order: 3,
-      key: "route_map_gate_result_backfill",
-      status: "blocked_after_route_map_gate",
+    ...closeoutEvidenceTargetSpecs.map((target, index) => ({
+      order: index + 3,
+      key: target.queueKey,
+      status: target.status,
       runNow: false,
-      unlocksWhen: "route_map_gate_output_ready",
-      command: firstCloseoutBackfillCommand,
+      unlocksWhen: target.unlocksWhen,
+      command: buildCloseoutBackfillCommand(target),
       expectedArtifacts: [
-        routeMapGateOutputFile,
+        target.artifactPath,
         filledCloseoutInputFile,
         readinessActionQueueFile
       ],
-      nextAction: "Backfill route_map_gate_result with redacted gate output, then refresh readiness and reload rehearsal."
+      nextAction: target.nextAction
+    })),
+    {
+      order: closeoutEvidenceTargetSpecs.length + 3,
+      key: "post_closeout_evidence_readiness_status",
+      status: "blocked_after_operator_go_no_go",
+      runNow: false,
+      unlocksWhen: "operator_go_no_go_backfilled",
+      command: readinessStatusCommand,
+      expectedArtifacts: [
+        readinessActionQueueFile,
+        filledCloseoutInputFile
+      ],
+      nextAction: "Refresh readiness after closeout evidence so the full-test window handoff can unlock."
     }
   ];
   const closeoutEvidenceHandoff = {
@@ -29921,15 +30074,18 @@ function buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     closeoutInitCommand,
     readinessStatusCommand,
     firstBackfillTarget: {
-      key: "route_map_gate_result",
-      sourceStep: "run_route_map_gate",
-      artifactPath: routeMapGateOutputFile,
-      receiptOperations: []
+      key: firstCloseoutEvidenceTarget?.key || null,
+      sourceStep: firstCloseoutEvidenceTarget?.sourceStep || null,
+      artifactPath: firstCloseoutEvidenceTarget?.artifactPath || null,
+      receiptOperations: Array.isArray(firstCloseoutEvidenceTarget?.receiptOperations)
+        ? firstCloseoutEvidenceTarget.receiptOperations.slice()
+        : []
     },
     firstBackfillCommand: firstCloseoutBackfillCommand,
     rehearsalReloadCommand,
+    evidenceTargets: closeoutEvidenceTargets,
     queue: closeoutEvidenceQueue,
-    nextAction: "Run closeout init after profile/archive inputs, refresh readiness, then backfill route_map_gate_result once the route-map gate output is available."
+    nextAction: "Run closeout init after profile/archive inputs, refresh readiness, backfill all seven pre-full-test closeout evidence targets, then refresh readiness for the full-test window."
   };
   const preStagingReadinessSelfCheckPacket = {
     version: "developer-ops-launch-operations-operator-pre-staging-readiness-self-check-packet/v1",
@@ -41700,6 +41856,9 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const preStagingCloseoutEvidenceQueue = Array.isArray(preStagingCloseoutEvidenceHandoff?.queue)
     ? preStagingCloseoutEvidenceHandoff.queue
     : [];
+  const preStagingCloseoutEvidenceTargets = Array.isArray(preStagingCloseoutEvidenceHandoff?.evidenceTargets)
+    ? preStagingCloseoutEvidenceHandoff.evidenceTargets
+    : [];
   const preStagingSelfCheckDownload = readiness.launchOperationsOperatorEntry?.preStagingReadinessSelfCheckDownload
     || readiness.preStagingReadinessSelfCheckDownload
     || readiness.launchOperationsOperatorEntry?.primaryDownload
@@ -41932,6 +42091,21 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       lines.push(`- readinessStatus=${preStagingCloseoutEvidenceHandoff.readinessStatusCommand || "-"}`);
       lines.push(`- firstBackfill=${preStagingCloseoutEvidenceHandoff.firstBackfillCommand || "-"}`);
       lines.push(`- rehearsalReload=${preStagingCloseoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
+      if (preStagingCloseoutEvidenceTargets.length) {
+        lines.push("Pre-Staging Closeout Evidence Targets:");
+        for (const target of preStagingCloseoutEvidenceTargets) {
+          const receiptOperations = Array.isArray(target?.receiptOperations) && target.receiptOperations.length
+            ? target.receiptOperations.join(",")
+            : "-";
+          lines.push(
+            `${target.order || "-"}. ${target.key || "-"}`
+            + ` | source=${target.sourceStep || "-"}`
+            + ` | artifact=${target.artifactPath || "-"}`
+            + ` | receipts=${receiptOperations}`
+            + ` | command=${target.command || "-"}`
+          );
+        }
+      }
       for (const item of preStagingCloseoutEvidenceQueue) {
         lines.push(
           `${item.order || "-"}. ${item.key || "-"}`
@@ -42788,6 +42962,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       const closeoutEvidenceQueue = Array.isArray(closeoutEvidenceHandoff?.queue)
         ? closeoutEvidenceHandoff.queue
         : [];
+      const closeoutEvidenceTargets = Array.isArray(closeoutEvidenceHandoff?.evidenceTargets)
+        ? closeoutEvidenceHandoff.evidenceTargets
+        : [];
       lines.push("Pre-Staging Readiness Self-Check Packet:");
       lines.push(
         `- status=${preStagingSelfCheck.status || "-"}`
@@ -42822,6 +42999,21 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         lines.push(`- readinessStatus=${closeoutEvidenceHandoff.readinessStatusCommand || "-"}`);
         lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
         lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
+        if (closeoutEvidenceTargets.length) {
+          lines.push("Pre-Staging Closeout Evidence Targets:");
+          for (const target of closeoutEvidenceTargets) {
+            const receiptOperations = Array.isArray(target?.receiptOperations) && target.receiptOperations.length
+              ? target.receiptOperations.join(",")
+              : "-";
+            lines.push(
+              `${target.order || "-"}. ${target.key || "-"}`
+              + ` | source=${target.sourceStep || "-"}`
+              + ` | artifact=${target.artifactPath || "-"}`
+              + ` | receipts=${receiptOperations}`
+              + ` | command=${target.command || "-"}`
+            );
+          }
+        }
         for (const item of closeoutEvidenceQueue) {
           lines.push(
             `${item.order || "-"}. ${item.key || "-"}`
@@ -43681,6 +43873,7 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
     ? packet.closeoutEvidenceHandoff
     : null;
   const closeoutEvidenceQueue = Array.isArray(closeoutEvidenceHandoff?.queue) ? closeoutEvidenceHandoff.queue : [];
+  const closeoutEvidenceTargets = Array.isArray(closeoutEvidenceHandoff?.evidenceTargets) ? closeoutEvidenceHandoff.evidenceTargets : [];
   const requiredArtifacts = Array.isArray(packet?.requiredArtifacts) ? packet.requiredArtifacts : [];
   const directDownload = entry?.preStagingReadinessSelfCheckDownload
     || buildDeveloperOpsPreStagingReadinessSelfCheckDownload({
@@ -43764,6 +43957,22 @@ function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
     lines.push(`- readinessStatus=${closeoutEvidenceHandoff.readinessStatusCommand || "-"}`);
     lines.push(`- firstBackfill=${closeoutEvidenceHandoff.firstBackfillCommand || "-"}`);
     lines.push(`- rehearsalReload=${closeoutEvidenceHandoff.rehearsalReloadCommand || "-"}`);
+    lines.push("Closeout Evidence Targets:");
+    for (const target of closeoutEvidenceTargets) {
+      const receiptOperations = Array.isArray(target?.receiptOperations) && target.receiptOperations.length
+        ? target.receiptOperations.join(",")
+        : "-";
+      lines.push(
+        `${target.order || "-"}. ${target.key || "-"}`
+        + ` | source=${target.sourceStep || "-"}`
+        + ` | artifact=${target.artifactPath || "-"}`
+        + ` | receipts=${receiptOperations}`
+        + ` | command=${target.command || "-"}`
+      );
+    }
+    if (!closeoutEvidenceTargets.length) {
+      lines.push("- none");
+    }
     lines.push("Closeout Evidence Queue:");
     for (const item of closeoutEvidenceQueue) {
       const expectedArtifacts = Array.isArray(item?.expectedArtifacts) && item.expectedArtifacts.length

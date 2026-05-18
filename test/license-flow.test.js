@@ -20345,6 +20345,69 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload.href,
       /\/api\/developer\/ops\/export\/download\?[^ ]*productCode=EXPORT_CLOSEOUT_READY[^ ]*format=steady-state-duty-board/
     );
+    const expectedRolloutWideningDecisionOperatorOrder = [
+      "Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached."
+    ];
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.status,
+      rolloutWideningDecisionStatus
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.ready,
+      rolloutWideningDecisionReady
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.actionKey,
+      "review_rollout_widening_decision"
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.boardDownloadFormat,
+      "steady-state-duty-board"
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.handoffBriefDownloadFormat,
+      "steady-state-handoff-brief"
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.queueStatus,
+      steadyStateDutyBoard.queueStatus
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.queueTotal,
+      steadyStateDutyBoard.queueTotal
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.attentionCount,
+      steadyStateDutyBoard.attentionCount
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.productionSignoffPacket,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json"
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.launchDayWatchEntry,
+      "enter_after_production_signoff"
+    );
+    assert.deepEqual(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.recommendedDownload.key,
+      "ops_steady_state_duty_board"
+    );
+    assert.deepEqual(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.recommendedDownload.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.recommendedDownload.href,
+      /\/api\/developer\/ops\/export\/download\?[^ ]*productCode=EXPORT_CLOSEOUT_READY[^ ]*format=steady-state-duty-board/
+    );
+    assert.equal(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.rolloutWideningDecisionAction.nextAction,
+      rolloutWideningDecisionNextAction
+    );
     const steadyStateDutyReceiptRecommendedDownload = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.recommendedDownloads.find((item) => (
       item.key === "ops_latest_steady_state_duty_receipt_asset"
     ));
@@ -20353,10 +20416,46 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptRecommendedDownload.operatorOrder,
       expectedSteadyStateDutyReceiptOperatorOrder
     );
+    const rolloutWideningDecisionRecommendedDownload = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.recommendedDownloads.find((item) => (
+      item.key === "ops_steady_state_duty_board"
+    ));
+    assert.ok(rolloutWideningDecisionRecommendedDownload);
+    assert.deepEqual(
+      rolloutWideningDecisionRecommendedDownload.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
     assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.heroControls.some((item) => (
       item.label === "Review Steady-State Duty Receipt"
       && item.recommendedDownload?.key === "ops_latest_steady_state_duty_receipt_asset"
     )));
+    assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.heroControls.some((item) => (
+      item.label === "Review Rollout Widening Decision"
+      && item.recommendedDownload?.key === "ops_steady_state_duty_board"
+    )));
+    const rolloutWideningDecisionHeroControl = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.heroControls.find((item) => (
+      item.label === "Review Rollout Widening Decision"
+    ));
+    assert.ok(rolloutWideningDecisionHeroControl);
+    assert.deepEqual(
+      rolloutWideningDecisionHeroControl.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
+    const rolloutWideningDecisionScreenControl = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.screen.heroControls.find((item) => (
+      item.label === "Review Rollout Widening Decision"
+    ));
+    assert.ok(rolloutWideningDecisionScreenControl);
+    assert.deepEqual(
+      rolloutWideningDecisionScreenControl.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
+    const rolloutWideningDecisionPageControl = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.mainlinePage.heroControls.find((item) => (
+      item.label === "Review Rollout Widening Decision"
+    ));
+    assert.ok(rolloutWideningDecisionPageControl);
+    assert.deepEqual(
+      rolloutWideningDecisionPageControl.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
     const steadyStateDutyReceiptReviewHeroControl = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.heroControls.find((item) => (
       item.label === "Review Steady-State Duty Receipt"
     ));
@@ -20399,6 +20498,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptReviewActionControl.operatorOrder,
       expectedSteadyStateDutyReceiptOperatorOrder
     );
+    const rolloutWideningDecisionActionStep = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.actionPlan.find((item) => (
+      item.key === "launch_mainline_rollout_widening_decision"
+    ));
+    assert.ok(rolloutWideningDecisionActionStep);
+    assert.deepEqual(
+      rolloutWideningDecisionActionStep.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
+    assert.ok(rolloutWideningDecisionActionStep.controls.some((control) => (
+      control.recommendedDownload?.key === "ops_steady_state_duty_board"
+    )));
+    const rolloutWideningDecisionActionControl = rolloutWideningDecisionActionStep.controls.find((control) => (
+      control.recommendedDownload?.key === "ops_steady_state_duty_board"
+    ));
+    assert.ok(rolloutWideningDecisionActionControl);
+    assert.deepEqual(
+      rolloutWideningDecisionActionControl.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
     const steadyStateDutyReceiptReviewActionCard = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.sections
       .find((item) => item.key === "action_plan")
       ?.cards.find((card) => card.key === "launch_mainline_steady_state_duty_receipt_review");
@@ -20410,9 +20528,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(steadyStateDutyReceiptReviewActionCard.details.includes(
       `Operator order: ${expectedSteadyStateDutyReceiptOperatorOrder[0]}`
     ));
+    const rolloutWideningDecisionActionCard = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.sections
+      .find((item) => item.key === "action_plan")
+      ?.cards.find((card) => card.key === "launch_mainline_rollout_widening_decision");
+    assert.ok(rolloutWideningDecisionActionCard);
+    assert.deepEqual(
+      rolloutWideningDecisionActionCard.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
+    assert.ok(rolloutWideningDecisionActionCard.details.includes(
+      `Operator order: ${expectedRolloutWideningDecisionOperatorOrder[0]}`
+    ));
     assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.overviewCards.some((item) => (
       item.key === "steady_state_duty_receipt_review"
       && item.controls?.some((control) => control.recommendedDownload?.key === "ops_latest_steady_state_duty_receipt_asset")
+    )));
+    assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.overviewCards.some((item) => (
+      item.key === "rollout_widening_decision"
+      && item.controls?.some((control) => control.recommendedDownload?.key === "ops_steady_state_duty_board")
     )));
     const steadyStateDutyReceiptReviewCard = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.overviewCards.find((item) => (
       item.key === "steady_state_duty_receipt_review"
@@ -20433,6 +20566,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptReviewCardControl.operatorOrder,
       expectedSteadyStateDutyReceiptOperatorOrder
     );
+    const rolloutWideningDecisionCard = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.overviewCards.find((item) => (
+      item.key === "rollout_widening_decision"
+    ));
+    assert.ok(rolloutWideningDecisionCard);
+    assert.deepEqual(
+      rolloutWideningDecisionCard.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
+    assert.ok(rolloutWideningDecisionCard.details.includes(
+      `Operator order: ${expectedRolloutWideningDecisionOperatorOrder[0]}`
+    ));
+    const rolloutWideningDecisionCardControl = rolloutWideningDecisionCard.controls.find((control) => (
+      control.recommendedDownload?.key === "ops_steady_state_duty_board"
+    ));
+    assert.ok(rolloutWideningDecisionCardControl);
+    assert.deepEqual(
+      rolloutWideningDecisionCardControl.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
     assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.sections.some((item) => (
       item.key === "steady_state_duty_receipt_review"
       && item.cards?.some((card) => card.key === "steady_state_duty_receipt_review")
@@ -20449,9 +20601,29 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptReviewSectionCard.operatorOrder,
       expectedSteadyStateDutyReceiptOperatorOrder
     );
+    assert.ok(launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.sections.some((item) => (
+      item.key === "rollout_widening_decision"
+      && item.cards?.some((card) => card.key === "rollout_widening_decision")
+    )));
+    const rolloutWideningDecisionSection = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.sections.find((item) => (
+      item.key === "rollout_widening_decision"
+    ));
+    assert.ok(rolloutWideningDecisionSection);
+    const rolloutWideningDecisionSectionCard = rolloutWideningDecisionSection.cards.find((card) => (
+      card.key === "rollout_widening_decision"
+    ));
+    assert.ok(rolloutWideningDecisionSectionCard);
+    assert.deepEqual(
+      rolloutWideningDecisionSectionCard.operatorOrder,
+      expectedRolloutWideningDecisionOperatorOrder
+    );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       new RegExp(`Launch Mainline Steady-State Duty Receipt Review:[\\s\\S]*status=recorded \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      new RegExp(`Launch Mainline Rollout Widening Decision:[\\s\\S]*status=${rolloutWideningDecisionStatus} \\| action=review_rollout_widening_decision \\| ready=${rolloutWideningDecisionReady}`)
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
@@ -20459,11 +20631,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Mainline Action Plan:[\s\S]*Review rollout widening decision[\s\S]*Operator Order:[\s\S]*Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached\./
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Mainline Hero Controls:[\s\S]*Review Steady-State Duty Receipt[\s\S]*Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Mainline Hero Controls:[\s\S]*Review Rollout Widening Decision[\s\S]*Operator Order:[\s\S]*Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached\./
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Mainline Overview Cards:[\s\S]*Steady-State Duty Receipt Review[\s\S]*Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Mainline Overview Cards:[\s\S]*Rollout Widening Decision[\s\S]*Operator Order:[\s\S]*Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached\./
     );
     const steadyStateDutyReceiptRecommendedDownloadsCard = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.overviewCards.find((item) => (
       item.key === "recommended_downloads"
@@ -20593,6 +20777,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const latestLaunchDutySelectionChecklistStepPattern = /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-launch-operations-operator-entry\.txt \| format=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/;
     const steadyStateDutyReceiptOperatorOrderPattern = /Operator Order:[\s\S]*Review the steady-state duty receipt review route before stable operations handoff\./;
+    const rolloutWideningDecisionOperatorOrderPattern = /Operator Order:[\s\S]*Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached\./;
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsHandoffDownload = await getText(
@@ -22774,6 +22959,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      new RegExp(`Rollout Widening Decision Route:[\\s\\S]*status=${rolloutWideningDecisionStatus} \\| action=review_rollout_widening_decision \\| ready=${rolloutWideningDecisionReady} \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /rollout-widening-decision: [^\n]*key=ops_steady_state_duty_board[^\n]*source=developer-ops[^\n]*queueTotal=0[^\n]*attention=0/
+    );
+    assert.match(launchOperationsMainlineHandoffRoutesDownload.body, rolloutWideningDecisionOperatorOrderPattern);
 
     const launchMainlineHandoffDownloadRoutesSelectionDownload = await getText(
       baseUrl,
@@ -22791,6 +22985,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      new RegExp(`Rollout Widening Decision Route:[\\s\\S]*status=${rolloutWideningDecisionStatus} \\| action=review_rollout_widening_decision \\| ready=${rolloutWideningDecisionReady} \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /rollout-widening-decision: [^\n]*key=ops_steady_state_duty_board[^\n]*source=developer-ops[^\n]*queueTotal=0[^\n]*attention=0/
+    );
+    assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, rolloutWideningDecisionOperatorOrderPattern);
 
     const launchMainlineOpsRouteMirrorChecksumsDownload = await getText(
       baseUrl,
@@ -22871,6 +23074,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Included Handoff Files:[\s\S]*Steady-state duty receipt review: ops\/steady-state-duty-board\.txt/
     );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      new RegExp(`Rollout Widening Decision:[\\s\\S]*status=${rolloutWideningDecisionStatus} \\| action=review_rollout_widening_decision \\| ready=${rolloutWideningDecisionReady} \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Rollout widening decision: ops\/steady-state-duty-board\.txt/
+    );
+    assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, rolloutWideningDecisionOperatorOrderPattern);
 
     const launchMainlineSummarySelectionDownload = await getText(
       baseUrl,
@@ -22880,6 +23092,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineSummarySelectionDownload.body, /Post-Launch Handoff Traceability:/);
     assert.match(launchMainlineSummarySelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
     assert.match(launchMainlineSummarySelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
+    assert.match(launchMainlineSummarySelectionDownload.body, rolloutWideningDecisionOperatorOrderPattern);
 
     const launchOperationsOperatorEntryDownload = await getText(
       baseUrl,

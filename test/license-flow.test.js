@@ -22548,6 +22548,51 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(receiptVisibilityConfirmationQueue.manualCheckpointCompleted, 1);
     assert.equal(receiptVisibilityConfirmationQueue.remainingManualCheckpoints, 1);
     assert.equal(receiptVisibilityConfirmationQueue.manualCheckpointProgress, "1/2");
+    assert.ok(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction);
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.version,
+      "developer-ops-launch-operations-launch-surface-review-closeout-action/v1"
+    );
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.key, "launch_surface_review_closeout");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.status, "ready_for_first_wave_confirmation");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.ready, false);
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.currentActionKey, "confirm_first_wave_handoff");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.decision, "hold_launch_duty_handoff");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.manualCheckpointProgress, "1/2");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.remainingManualCheckpoints, 1);
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.reviewSurfaceCount, 3);
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.readyReviewSurfaceCount, 2);
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.deepEqual(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.reviewDownloads.map((item) => [item.key, item.status, item.ready, item.fileName]),
+      [
+        ["launch_review_summary", "aligned", true, "launch-review.txt"],
+        ["launch_smoke_summary", "aligned", true, "launch-smoke-kit.txt"]
+      ]
+    );
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.status, "ready_to_submit");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.ready, true);
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.method, "POST");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.route, "/api/developer/ops/first-wave/recommendations/confirm");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh.status, "pending_confirmation_receipt");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh.ready, false);
+    assert.match(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh.href || "", /\/api\/developer\/ops\/export\?/);
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.postConfirmationSwitch.status, "blocked_until_first_wave_confirmation");
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.postConfirmationSwitch.ready, false);
+    assert.deepEqual(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.postConfirmationSwitch.blockingReasonKeys,
+      ["first_wave_handoff_confirmation", "manual_checkpoint_closeout", "developer_ops_overview_refresh"]
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey,
+      "confirm_first_wave_handoff"
+    );
+    assert.ok(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorOrder.some((item) => (
+      /Launch Review and Launch Smoke summaries/.test(item)
+    )));
     assert.equal(receiptVisibilityConfirmationQueue.confirmationReceipt, null);
     assert.equal(
       receiptVisibilityConfirmationQueue.overviewRefreshAction?.version,
@@ -22677,6 +22722,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(receiptVisibilityConfirmationQueue.steps[3].href || "", /channel=stable/);
     const launchDutyHandoffAction = launchOperationsOperatorEntry.launchDutyHandoffAction;
     assert.ok(launchDutyHandoffAction);
+    assert.deepEqual(
+      launchOperationsOperatorEntry.launchSurfaceReviewCloseoutAction,
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction
+    );
     assert.equal(
       launchDutyHandoffAction.version,
       "developer-ops-launch-operations-operator-launch-duty-handoff-action/v1"
@@ -22957,6 +23006,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueCheckpointClosed=false/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueManualProgress=1\/2/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueManualRemaining=1/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*surfaceCloseout=ready_for_first_wave_confirmation/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*surfaceCloseoutCurrent=confirm_first_wave_handoff/);
+    assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*surfaceCloseoutManualRemaining=1/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueConfirmPacket=ready_to_submit/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueSwitchPacket=blocked_until_first_wave_confirmation/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Operator Entry:[\s\S]*receiptQueueRefreshAction=pending_confirmation_receipt/);
@@ -23093,6 +23145,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueCheckpointClosed=false/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueManualProgress=1\/2/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueManualRemaining=1/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*surfaceCloseout=ready_for_first_wave_confirmation/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*surfaceCloseoutCurrent=confirm_first_wave_handoff/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*surfaceCloseoutManualRemaining=1/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueConfirmPacket=ready_to_submit/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueSwitchPacket=blocked_until_first_wave_confirmation/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Operator Entry: [^\n]*receiptQueueRefreshAction=pending_confirmation_receipt/);
@@ -23403,6 +23458,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*refreshAction=pending_confirmation_receipt \| refreshReady=false/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Confirmation Queue:[\s\S]*handoffPacket=awaiting_first_wave_confirmation \| handoffReady=false \| supportInspection=confirmed \| supportReady=true/);
     assert.match(launchOperationsOperatorEntryDownload.body, new RegExp(`Receipt Visibility Confirmation Queue:[\\s\\S]*supportAudit=${launchOperationsSupportInspectionConfirmation.auditLogId}`));
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Action:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Action:[\s\S]*status=ready_for_first_wave_confirmation \| ready=no \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Action:[\s\S]*manualProgress=1\/2 \| manualRemaining=1 \| surfaces=2\/3/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Downloads:[\s\S]*launch_review_summary \| status=aligned \| ready=yes \| file=launch-review\.txt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Downloads:[\s\S]*launch_smoke_summary \| status=aligned \| ready=yes \| file=launch-smoke-kit\.txt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Next:[\s\S]*action=confirm_first_wave_handoff \| method=POST \| route=\/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Handoff Packet Evidence: receipt_visibility_parity=ready; first_wave_handoff_confirmation=pending; support_inspection_confirmation=confirmed; developer_ops_overview_refresh=pending_confirmation_receipt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*status=awaiting_first_wave_confirmation \| ready=no \| currentAction=confirm_first_wave_handoff[\s\S]*\| manualProgress=1\/2 \| manualRemaining=1 \| confirmPacket=ready_to_submit \| preflight=blocked_until_first_wave_confirmation[\s\S]*\| nextLaunchDutyPhase=archive_signoff_packet \| nextLaunchDutyAction=archive_production_signoff_packet/);

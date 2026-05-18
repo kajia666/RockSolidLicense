@@ -23777,6 +23777,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key launch_day_watch_summary/
     );
     assert.deepEqual(confirmedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.blockingReasonKeys, []);
+    assert.ok(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction);
+    assert.equal(
+      confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.version,
+      "developer-ops-launch-operations-operator-launch-duty-cutover-execution-action/v1"
+    );
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.key, "launch_duty_cutover_execution");
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.status, "ready_to_archive_signoff_packet");
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.ready, true);
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.currentActionKey, "archive_production_signoff_packet");
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.currentArtifact, "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json");
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.nextActionTemplate?.afterActionKey, "record_launch_day_watch_summary");
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.firstReceiptWritePacketStatus, "queued_after_signoff_archive");
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.archivePacketStatus, "ready_to_archive_signoff_packet");
+    assert.equal(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.remainingManualCheckpoints, 0);
+    assert.ok(confirmedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.operatorOrder.some((item) => (
+      /Archive the production sign-off packet/.test(item)
+    )));
     assert.equal(confirmedLaunchDutyHandoffAction.firstReceiptWritePhaseKey, "record_launch_day_watch");
     assert.equal(confirmedLaunchDutyHandoffAction.firstReceiptWritePacket.status, "queued_after_signoff_archive");
     assert.equal(confirmedLaunchDutyHandoffAction.firstReceiptWritePacket.readyForHandoff, true);
@@ -23823,6 +23840,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       exportCloseoutConfirmedSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyPostSignoffArchivePacket=ready_to_archive_signoff_packet/
+    );
+    assert.match(
+      exportCloseoutConfirmedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyCutoverAction=ready_to_archive_signoff_packet/
+    );
+    assert.match(
+      exportCloseoutConfirmedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyCutoverCurrent=archive_production_signoff_packet/
     );
     assert.match(
       exportCloseoutConfirmedSnapshot.summaryText,
@@ -23927,6 +23952,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.readyForHandoff, true);
     assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.readyForReceiptWrite, true);
     assert.equal(archivedLaunchDutyHandoffAction.firstReceiptWritePacket.unlockActionKey, "archive_production_signoff_packet");
+    assert.equal(archivedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.status, "ready_for_launch_day_watch_summary_write");
+    assert.equal(archivedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.ready, true);
+    assert.equal(archivedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.currentActionKey, "record_launch_day_watch_summary");
+    assert.equal(archivedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.currentRecordKey, "launch_day_watch_summary");
+    assert.equal(archivedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.archiveReceiptAuditLogId, postSignoffArchiveReceipt.auditLogId);
+    assert.match(
+      archivedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.currentCommand || "",
+      /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key launch_day_watch_summary/
+    );
+    assert.equal(archivedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.nextActionTemplate?.actionKey, "record_launch_day_watch_summary");
+    assert.equal(archivedLaunchDutyHandoffAction.launchDutyCutoverExecutionAction.nextActionTemplate?.recordKey, "launch_day_watch_summary");
     assert.deepEqual(
       archivedLaunchDutyHandoffAction.postSignoffArchiveHandoffPacket?.postArchiveLaunchDayWatchReadback,
       {
@@ -23988,6 +24024,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       postSignoffArchiveSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyCutoverAction=ready_for_launch_day_watch_summary_write/
+    );
+    assert.match(
+      postSignoffArchiveSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyCutoverRecord=launch_day_watch_summary/
+    );
+    assert.match(
+      postSignoffArchiveSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyHandoffNextAction=record_launch_day_watch_summary/
     );
     assert.match(
@@ -24006,6 +24050,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       postSignoffArchiveOperatorEntryDownload.body,
       /Post-Archive Launch-Day Watch Success Criteria:[\s\S]*3\. first_receipt_write_ready \| expected=firstReceiptWritePacket is ready_for_receipt_write for launch_day_watch_summary/
+    );
+    assert.match(
+      postSignoffArchiveOperatorEntryDownload.body,
+      /Launch Duty Cutover Execution Action:[\s\S]*status=ready_for_launch_day_watch_summary_write \| ready=yes \| current=record_launch_day_watch_summary \| record=launch_day_watch_summary/
+    );
+    assert.match(
+      postSignoffArchiveOperatorEntryDownload.body,
+      /Launch Duty Cutover Execution Next:[\s\S]*action=record_launch_day_watch_summary \| record=launch_day_watch_summary/
     );
 
     const launchDayWatchSummaryReadbackReceipt = await postJson(
@@ -24086,6 +24138,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchDayWatchSummaryHandoffAction.nextReceiptWritePacket.dependsOnRecordRecorded, true);
     assert.equal(launchDayWatchSummaryHandoffAction.nextReceiptWritePacket.recordKey, "receipt_visibility_snapshot");
     assert.equal(launchDayWatchSummaryHandoffAction.nextReceiptWritePacket.actionKey, "record_receipt_visibility_snapshot");
+    assert.equal(launchDayWatchSummaryHandoffAction.launchDutyCutoverExecutionAction.status, "ready_for_receipt_visibility_snapshot_write");
+    assert.equal(launchDayWatchSummaryHandoffAction.launchDutyCutoverExecutionAction.currentActionKey, "record_receipt_visibility_snapshot");
+    assert.equal(launchDayWatchSummaryHandoffAction.launchDutyCutoverExecutionAction.currentRecordKey, "receipt_visibility_snapshot");
+    assert.equal(launchDayWatchSummaryHandoffAction.launchDutyCutoverExecutionAction.previousRecordKey, "launch_day_watch_summary");
+    assert.match(
+      launchDayWatchSummaryHandoffAction.launchDutyCutoverExecutionAction.currentCommand || "",
+      /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key receipt_visibility_snapshot/
+    );
     assert.deepEqual(
       launchDayWatchSummaryHandoffAction.launchDayWatchSummaryRecordReadback,
       {

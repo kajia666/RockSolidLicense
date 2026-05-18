@@ -25185,6 +25185,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         nextAction: "Open the steady-state handoff brief after confirming readiness/rehearsal readback and packet/record readbacks."
       }
     );
+    assert.deepEqual(
+      launchDutyPacketReviewOperatorEntry.launchDutyPacketReviewReceiptSelection.operatorAction,
+      {
+        key: "continue_steady_state_handoff",
+        reviewRequired: false,
+        nextDownloadFormat: "steady-state-handoff-brief",
+        nextDownloadKey: "ops_steady_state_handoff_brief",
+        nextDownloadHref: "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief",
+        nextAction: "Continue steady-state handoff from the selected complete packet-review readback."
+      }
+    );
     assert.ok(launchDutyPacketReviewOperatorEntry.quickAccessDownloads.some((item) => (
       item.key === "ops_steady_state_handoff_brief"
       && item.source === "developer-ops-launch-duty-handoff-landing"
@@ -25199,6 +25210,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyPacketReviewOperatorEntry.operatorSummary,
       /launchDutyStableOperationsLandingBridge=ready_for_steady_state_handoff_brief/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntry.operatorSummary,
+      /launchDutyPacketReviewOperatorAction=continue_steady_state_handoff/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntry.operatorSummary,
+      /launchDutyPacketReviewNextDownload=steady-state-handoff-brief/
     );
     const launchDutyPacketReviewOperatorEntryDownload = await getText(
       baseUrl,
@@ -25220,6 +25239,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyPacketReviewOperatorEntryDownload.body,
       /Stable Operations Landing Bridge:[\s\S]*handoffBrief=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntryDownload.body,
+      /Launch Duty Packet Review Receipt Selection:[\s\S]*status=selected_latest_packet_review_readback \| selected=.+ \| selectedProgress=6\/6 \| latest=.+ \| latestProgress=6\/6 \| ignoredLatest=no/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntryDownload.body,
+      /Launch Duty Packet Review Receipt Selection:[\s\S]*operatorAction=continue_steady_state_handoff \| reviewRequired=no \| nextDownload=steady-state-handoff-brief \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
     assert.match(
       launchDutyPacketReviewOperatorEntryDownload.body,

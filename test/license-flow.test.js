@@ -23754,6 +23754,152 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Receipt Visibility Snapshot Readback Success Criteria:[\s\S]*3\. first_wave_incident_log_ready \| expected=current stabilization receipt write packet is ready for first_wave_incident_log/
     );
 
+    const firstWaveIncidentLogReadbackReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        productCode: "EXPORT_CLOSEOUT_READY",
+        channel: "stable",
+        action: "record_index_readback",
+        intent: "first_wave_incident_log_recorded",
+        planKind: "record_index",
+        planMode: "readback",
+        targetType: "launch-duty-record-index",
+        href: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        fileName: "launch-duty-record-index.json",
+        format: "launch-duty-record-index",
+        launchOpsOverviewContextKind: "launch_ops_overview_status",
+        launchOpsOverviewDownloadKey: "ops_launch_operations_overview_status",
+        launchOpsOverviewDownloadFileName: "developer-ops-launch-operations-overview-status.txt",
+        launchOpsOverviewDownloadFormat: "launch-operations-overview-status",
+        launchOpsOverviewDownloadHref: steadyStateDutyDownloadIntent.executionPlan.prefill.launchOpsOverviewDownloadHref,
+        launchReadinessNextGateStatus: expectedSteadyStateGoLiveGate.status,
+        launchReadinessNextGateDecision: expectedSteadyStateGoLiveGate.decision,
+        launchReadinessNextGateCurrentGate: expectedSteadyStateGoLiveGate.currentGate,
+        launchReadinessNextGateCanEnterInitialLaunch: expectedSteadyStateGoLiveGate.canEnterInitialLaunch,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchDutyRecordIndexState: {
+          mode: "staging-launch-duty-record-index",
+          status: "in_progress",
+          recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+          recordedKeys: [
+            "launch_day_watch_summary",
+            "receipt_visibility_snapshot",
+            "first_wave_incident_log"
+          ],
+          pendingKeys: ["rollback_signal_review", "stabilization_owner_handoff", "first_wave_closeout"],
+          nextRecordKey: "rollback_signal_review",
+          records: {
+            first_wave_incident_log: {
+              status: "recorded",
+              actionKey: "record_first_wave_incident_log",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-incident-log.md",
+              receiptOperations: ["record_post_launch_ops_sweep"],
+              receiptIds: ["record-post-launch-ops-sweep-receipt"],
+              recordedAt: "2026-05-14T09:30:00.000Z"
+            }
+          }
+        },
+        note: "first-wave incident log recorded; rollback signal review is next"
+      },
+      ownerSession.token
+    );
+    assert.equal(firstWaveIncidentLogReadbackReceipt.launchDutyRecordIndexState.recordedCount, 3);
+    assert.equal(firstWaveIncidentLogReadbackReceipt.launchDutyRecordIndexState.pendingCount, 3);
+    assert.equal(firstWaveIncidentLogReadbackReceipt.launchDutyRecordIndexState.nextRecordKey, "rollback_signal_review");
+
+    const firstWaveIncidentLogReadbackSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const firstWaveIncidentLogHandoffAction = firstWaveIncidentLogReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyHandoffAction;
+    const firstWaveIncidentLogQueue = firstWaveIncidentLogHandoffAction?.stabilizationReceiptWriteQueue;
+    assert.ok(firstWaveIncidentLogHandoffAction);
+    assert.ok(firstWaveIncidentLogQueue);
+    assert.equal(firstWaveIncidentLogHandoffAction.currentActionKey, "record_rollback_signal_review");
+    assert.equal(firstWaveIncidentLogQueue.currentRecordKey, "rollback_signal_review");
+    assert.equal(firstWaveIncidentLogQueue.currentReceiptWritePacket?.status, "ready_for_receipt_write");
+    assert.equal(firstWaveIncidentLogQueue.currentReceiptWritePacket?.recordKey, "rollback_signal_review");
+    assert.equal(firstWaveIncidentLogQueue.currentReceiptWritePacket?.actionKey, "record_rollback_signal_review");
+    assert.equal(firstWaveIncidentLogQueue.currentReceiptWritePacket?.readyForReceiptWrite, true);
+    assert.match(
+      firstWaveIncidentLogQueue.currentReceiptWritePacket?.command || "",
+      /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key rollback_signal_review/
+    );
+    assert.equal(firstWaveIncidentLogQueue.completionState.recordedRecordCount, 1);
+    assert.equal(firstWaveIncidentLogQueue.completionState.pendingRecordCount, 3);
+    assert.equal(firstWaveIncidentLogQueue.completionState.nextRecordKey, "rollback_signal_review");
+    assert.deepEqual(
+      firstWaveIncidentLogHandoffAction.firstWaveIncidentLogRecordReadback,
+      {
+        version: "developer-ops-launch-operations-operator-first-wave-incident-log-record-readback/v1",
+        status: "ready_for_rollback_signal_review_write",
+        recorded: true,
+        recordKey: "first_wave_incident_log",
+        recordedAt: "2026-05-14T09:30:00.000Z",
+        recordIndexStatus: "recorded",
+        recordIndexArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-incident-log.md",
+        recordedReceiptIds: ["record-post-launch-ops-sweep-receipt"],
+        currentActionKey: "record_rollback_signal_review",
+        expectedCurrentActionKey: "record_rollback_signal_review",
+        nextRecordKey: "rollback_signal_review",
+        nextActionKey: "record_rollback_signal_review",
+        nextArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/rollback-signal-review.md",
+        nextCommand: firstWaveIncidentLogQueue.currentReceiptWritePacket?.command,
+        currentReceiptWritePacketStatus: "ready_for_receipt_write",
+        expectedCurrentReceiptWritePacketStatus: "ready_for_receipt_write",
+        launchDutyRecordIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
+        refreshAfterWrite: firstWaveIncidentLogQueue.currentReceiptWritePacket?.refreshAfterWrite,
+        successCriteria: [
+          {
+            key: "first_wave_incident_log_recorded",
+            expected: "first_wave_incident_log is recorded in the launch-duty record index"
+          },
+          {
+            key: "current_action_advanced",
+            expected: "current action advances to record_rollback_signal_review"
+          },
+          {
+            key: "rollback_signal_review_ready",
+            expected: "current stabilization receipt write packet is ready for rollback_signal_review"
+          },
+          {
+            key: "record_index_continues",
+            expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+          }
+        ],
+        nextAction: "Run the rollback signal review record command, then refresh Developer Ops export to continue stabilization evidence."
+      }
+    );
+    assert.match(
+      firstWaveIncidentLogReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyFirstWaveIncidentReadback=ready_for_rollback_signal_review_write/
+    );
+    assert.match(
+      firstWaveIncidentLogReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyFirstWaveIncidentNext=record_rollback_signal_review/
+    );
+    const firstWaveIncidentLogOperatorEntryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
+      ownerSession.token
+    );
+    assert.match(
+      firstWaveIncidentLogOperatorEntryDownload.body,
+      /Current Stabilization Receipt Write Packet:[\s\S]*record=rollback_signal_review \| action=record_rollback_signal_review \| ready=yes \| dependsOn=receipt_visibility_snapshot/
+    );
+    assert.match(
+      firstWaveIncidentLogOperatorEntryDownload.body,
+      /First-Wave Incident Log Record Readback:[\s\S]*status=ready_for_rollback_signal_review_write \| recorded=yes \| record=first_wave_incident_log \| currentAction=record_rollback_signal_review/
+    );
+    assert.match(
+      firstWaveIncidentLogOperatorEntryDownload.body,
+      /First-Wave Incident Log Readback Success Criteria:[\s\S]*3\. rollback_signal_review_ready \| expected=current stabilization receipt write packet is ready for rollback_signal_review/
+    );
+
     const launchDutyRecordIndexReadbackReceipt = await postJson(
       baseUrl,
       "/api/developer/ops/steady-state-duty-plan/receipt",

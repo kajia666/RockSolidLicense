@@ -24330,6 +24330,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.recordedRecordCount, 0);
     assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.pendingRecordCount, 4);
     assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.nextRecordKey, "first_wave_incident_log");
+    assert.equal(
+      receiptVisibilitySnapshotHandoffAction.launchDutyStabilizationExecutionAction?.status,
+      "ready_for_first_wave_incident_log_write"
+    );
+    assert.equal(receiptVisibilitySnapshotHandoffAction.launchDutyStabilizationExecutionAction?.ready, true);
+    assert.equal(
+      receiptVisibilitySnapshotHandoffAction.launchDutyStabilizationExecutionAction?.currentActionKey,
+      "record_first_wave_incident_log"
+    );
+    assert.equal(
+      receiptVisibilitySnapshotHandoffAction.launchDutyStabilizationExecutionAction?.currentRecordKey,
+      "first_wave_incident_log"
+    );
+    assert.equal(
+      receiptVisibilitySnapshotHandoffAction.launchDutyStabilizationExecutionAction?.nextActionTemplate?.afterActionKey,
+      "record_rollback_signal_review"
+    );
     assert.deepEqual(
       receiptVisibilitySnapshotHandoffAction.receiptVisibilitySnapshotRecordReadback,
       {
@@ -24388,6 +24405,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       receiptVisibilitySnapshotReadbackSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationQueue=ready_for_stabilization_receipt_write/
     );
+    assert.match(
+      receiptVisibilitySnapshotReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationAction=ready_for_first_wave_incident_log_write/
+    );
     const receiptVisibilitySnapshotOperatorEntryDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
@@ -24408,6 +24429,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       receiptVisibilitySnapshotOperatorEntryDownload.body,
       /Receipt Visibility Snapshot Readback Success Criteria:[\s\S]*3\. first_wave_incident_log_ready \| expected=current stabilization receipt write packet is ready for first_wave_incident_log/
+    );
+    assert.match(
+      receiptVisibilitySnapshotOperatorEntryDownload.body,
+      /Launch Duty Stabilization Execution Action:[\s\S]*status=ready_for_first_wave_incident_log_write \| ready=yes \| current=record_first_wave_incident_log \| record=first_wave_incident_log/
     );
 
     const firstWaveIncidentLogReadbackReceipt = await postJson(
@@ -24901,6 +24926,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyCloseoutReadyQueue.closeoutExecutionState.receiptPlaceholders,
       ["<record_launch_closeout_review-receipt-id>"]
     );
+    assert.equal(
+      launchDutyCloseoutReadyHandoffAction.launchDutyStabilizationExecutionAction?.status,
+      "ready_for_first_wave_closeout_write"
+    );
+    assert.equal(launchDutyCloseoutReadyHandoffAction.launchDutyStabilizationExecutionAction?.ready, true);
+    assert.equal(
+      launchDutyCloseoutReadyHandoffAction.launchDutyStabilizationExecutionAction?.currentActionKey,
+      "close_first_wave"
+    );
+    assert.equal(
+      launchDutyCloseoutReadyHandoffAction.launchDutyStabilizationExecutionAction?.currentRecordKey,
+      "first_wave_closeout"
+    );
+    assert.equal(
+      launchDutyCloseoutReadyHandoffAction.launchDutyStabilizationExecutionAction?.nextActionTemplate?.afterActionKey,
+      "refresh_staging_readiness_after_first_wave_closeout"
+    );
     assert.deepEqual(
       launchDutyCloseoutReadyHandoffAction.stabilizationOwnerHandoffRecordReadback,
       {
@@ -24985,6 +25027,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyCloseoutReadySnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyFirstWaveCloseoutReadback=blocked_until_first_wave_closeout_recorded/
     );
+    assert.match(
+      launchDutyCloseoutReadySnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationAction=ready_for_first_wave_closeout_write/
+    );
     const launchDutyCloseoutReadyOperatorEntryDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
@@ -25017,6 +25063,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutReadyOperatorEntryDownload.body,
       /First-Wave Closeout Record Readback:[\s\S]*status=blocked_until_first_wave_closeout_recorded \| recorded=no \| record=first_wave_closeout \| currentAction=close_first_wave/
+    );
+    assert.match(
+      launchDutyCloseoutReadyOperatorEntryDownload.body,
+      /Launch Duty Stabilization Execution Action:[\s\S]*status=ready_for_first_wave_closeout_write \| ready=yes \| current=close_first_wave \| record=first_wave_closeout/
     );
     const launchDutyCloseoutRecordedReceipt = await postJson(
       baseUrl,
@@ -25213,6 +25263,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchDutyCloseoutRecordedQueue.closeoutExecutionState.status, "recorded");
     assert.equal(launchDutyCloseoutRecordedQueue.closeoutExecutionState.readyForCloseoutWrite, false);
     assert.equal(launchDutyCloseoutRecordedQueue.closeoutExecutionState.recorded, true);
+    assert.equal(
+      launchDutyCloseoutRecordedHandoffAction.launchDutyStabilizationExecutionAction?.status,
+      "ready_for_stable_operations_handoff"
+    );
+    assert.equal(launchDutyCloseoutRecordedHandoffAction.launchDutyStabilizationExecutionAction?.ready, true);
+    assert.equal(
+      launchDutyCloseoutRecordedHandoffAction.launchDutyStabilizationExecutionAction?.currentActionKey,
+      "refresh_staging_readiness_after_first_wave_closeout"
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedHandoffAction.launchDutyStabilizationExecutionAction?.currentRecordKey,
+      "first_wave_closeout"
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedHandoffAction.launchDutyStabilizationExecutionAction?.nextActionTemplate?.afterActionKey,
+      "reload_staging_rehearsal_for_stable_operations"
+    );
     assert.deepEqual(
       launchDutyCloseoutRecordedHandoffAction.firstWaveCloseoutRecordReadback,
       {
@@ -25371,6 +25438,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationAction=ready_for_stable_operations_handoff/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyFirstWaveCloseoutNext=reload_staging_rehearsal_for_stable_operations/
     );
     assert.match(
@@ -25441,6 +25512,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /First-Wave Closeout Record Readback:[\s\S]*status=ready_for_stable_operations_handoff \| recorded=yes \| record=first_wave_closeout \| currentAction=refresh_staging_readiness_after_first_wave_closeout/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Duty Stabilization Execution Action:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| record=first_wave_closeout/
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
@@ -25590,6 +25665,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackInitialReadinessDownload.body,
       /Launch Duty Record Index Selection Checklist Step:[\s\S]*key=continue_launch_duty_record_index_selection_handoff \| order=8 \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      staleLaunchDutyReadbackInitialReadinessDownload.body,
+      /Launch Duty Handoff Action: [^\n]*stabilizationAction=ready_for_stable_operations_handoff[^\n]*stabilizationActionCurrent=refresh_staging_readiness_after_first_wave_closeout[^\n]*stabilizationActionRecord=first_wave_closeout/
+    );
     const staleLaunchDutyReadbackOperatorEntryDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
@@ -25627,6 +25706,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       staleLaunchDutyReadbackHandoffIndexDownload.body,
       /Launch Duty Record Index Selection Checklist Step: [^\n]*key=continue_launch_duty_record_index_selection_handoff[^\n]*order=8[^\n]*file=developer-ops-steady-state-handoff-brief\.txt[^\n]*format=steady-state-handoff-brief[^\n]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      staleLaunchDutyReadbackHandoffIndexDownload.body,
+      /Launch Operations Operator Entry: [^\n]*launchDutyStabilizationAction=ready_for_stable_operations_handoff[^\n]*launchDutyStabilizationActionCurrent=refresh_staging_readiness_after_first_wave_closeout[^\n]*launchDutyStabilizationActionRecord=first_wave_closeout/
     );
     const launchDutyPacketReviewReceipt = await postJson(
       baseUrl,

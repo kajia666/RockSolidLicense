@@ -23945,7 +23945,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             },
             rollback_signal_review: {
               status: "recorded",
+              actionKey: "record_rollback_signal_review",
               artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/rollback-signal-review.md",
+              receiptOperations: ["record_rollback_walkthrough", "record_launch_stabilization_review"],
+              receiptIds: ["record-rollback-walkthrough-receipt", "record-launch-stabilization-review-receipt"],
               recordedAt: "2026-05-14T09:40:00.000Z"
             }
           }
@@ -23967,10 +23970,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
       ownerSession.token
     );
-    const launchDutyRecordIndexReadbackQueue = launchDutyRecordIndexReadbackSnapshot.summary.initialLaunchOpsReadiness
-      .launchOperationsOperatorEntry?.launchDutyHandoffAction?.stabilizationReceiptWriteQueue;
+    const launchDutyRecordIndexReadbackHandoffAction = launchDutyRecordIndexReadbackSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyHandoffAction;
+    const launchDutyRecordIndexReadbackQueue = launchDutyRecordIndexReadbackHandoffAction?.stabilizationReceiptWriteQueue;
+    assert.ok(launchDutyRecordIndexReadbackHandoffAction);
     assert.ok(launchDutyRecordIndexReadbackQueue);
+    assert.equal(launchDutyRecordIndexReadbackHandoffAction.currentActionKey, "handoff_stabilization_owner");
     assert.equal(launchDutyRecordIndexReadbackQueue.currentRecordKey, "stabilization_owner_handoff");
+    assert.equal(launchDutyRecordIndexReadbackQueue.currentReceiptWritePacket?.status, "ready_for_receipt_write");
+    assert.equal(launchDutyRecordIndexReadbackQueue.currentReceiptWritePacket?.recordKey, "stabilization_owner_handoff");
+    assert.equal(launchDutyRecordIndexReadbackQueue.currentReceiptWritePacket?.actionKey, "handoff_stabilization_owner");
+    assert.equal(launchDutyRecordIndexReadbackQueue.currentReceiptWritePacket?.readyForReceiptWrite, true);
+    assert.match(
+      launchDutyRecordIndexReadbackQueue.currentReceiptWritePacket?.command || "",
+      /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key stabilization_owner_handoff/
+    );
     assert.equal(launchDutyRecordIndexReadbackQueue.completionState.recordedRecordCount, 2);
     assert.equal(launchDutyRecordIndexReadbackQueue.completionState.pendingRecordCount, 2);
     assert.equal(launchDutyRecordIndexReadbackQueue.completionState.nextRecordKey, "stabilization_owner_handoff");
@@ -23992,6 +24006,48 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ["first_wave_closeout", "blocked_until_source_records", false]
       ]
     );
+    assert.deepEqual(
+      launchDutyRecordIndexReadbackHandoffAction.rollbackSignalReviewRecordReadback,
+      {
+        version: "developer-ops-launch-operations-operator-rollback-signal-review-record-readback/v1",
+        status: "ready_for_stabilization_owner_handoff_write",
+        recorded: true,
+        recordKey: "rollback_signal_review",
+        recordedAt: "2026-05-14T09:40:00.000Z",
+        recordIndexStatus: "recorded",
+        recordIndexArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/rollback-signal-review.md",
+        recordedReceiptIds: ["record-rollback-walkthrough-receipt", "record-launch-stabilization-review-receipt"],
+        currentActionKey: "handoff_stabilization_owner",
+        expectedCurrentActionKey: "handoff_stabilization_owner",
+        nextRecordKey: "stabilization_owner_handoff",
+        nextActionKey: "handoff_stabilization_owner",
+        nextArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/stabilization-owner-handoff.md",
+        nextCommand: launchDutyRecordIndexReadbackQueue.currentReceiptWritePacket?.command,
+        currentReceiptWritePacketStatus: "ready_for_receipt_write",
+        expectedCurrentReceiptWritePacketStatus: "ready_for_receipt_write",
+        launchDutyRecordIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
+        refreshAfterWrite: launchDutyRecordIndexReadbackQueue.currentReceiptWritePacket?.refreshAfterWrite,
+        successCriteria: [
+          {
+            key: "rollback_signal_review_recorded",
+            expected: "rollback_signal_review is recorded in the launch-duty record index"
+          },
+          {
+            key: "current_action_advanced",
+            expected: "current action advances to handoff_stabilization_owner"
+          },
+          {
+            key: "stabilization_owner_handoff_ready",
+            expected: "current stabilization receipt write packet is ready for stabilization_owner_handoff"
+          },
+          {
+            key: "record_index_continues",
+            expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+          }
+        ],
+        nextAction: "Run the stabilization owner handoff record command, then refresh Developer Ops export to continue stabilization evidence."
+      }
+    );
     assert.match(
       launchDutyRecordIndexReadbackSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationProgress=2\/4/
@@ -24003,6 +24059,31 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyRecordIndexReadbackSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationBlockedBy=stabilization_owner_handoff/
+    );
+    assert.match(
+      launchDutyRecordIndexReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyRollbackSignalReadback=ready_for_stabilization_owner_handoff_write/
+    );
+    assert.match(
+      launchDutyRecordIndexReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyRollbackSignalNext=handoff_stabilization_owner/
+    );
+    const rollbackSignalReviewOperatorEntryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
+      ownerSession.token
+    );
+    assert.match(
+      rollbackSignalReviewOperatorEntryDownload.body,
+      /Current Stabilization Receipt Write Packet:[\s\S]*record=stabilization_owner_handoff \| action=handoff_stabilization_owner \| ready=yes \| dependsOn=receipt_visibility_snapshot/
+    );
+    assert.match(
+      rollbackSignalReviewOperatorEntryDownload.body,
+      /Rollback Signal Review Record Readback:[\s\S]*status=ready_for_stabilization_owner_handoff_write \| recorded=yes \| record=rollback_signal_review \| currentAction=handoff_stabilization_owner/
+    );
+    assert.match(
+      rollbackSignalReviewOperatorEntryDownload.body,
+      /Rollback Signal Review Readback Success Criteria:[\s\S]*3\. stabilization_owner_handoff_ready \| expected=current stabilization receipt write packet is ready for stabilization_owner_handoff/
     );
     const launchDutyRecordIndexReadbackActionOrder = launchDutyRecordIndexReadbackSnapshot.summary.initialLaunchOpsReadiness
       .launchDutyActionOrder;

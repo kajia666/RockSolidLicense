@@ -25392,6 +25392,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         .currentActionKey,
       "refresh_staging_readiness_after_first_wave_closeout"
     );
+    const launchDutyCloseoutStableOpsTransition = launchDutyCloseoutRecordedSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyStableOperationsTransitionAction;
+    assert.ok(launchDutyCloseoutStableOpsTransition);
+    assert.equal(launchDutyCloseoutStableOpsTransition.status, "blocked_until_packet_result_review");
+    assert.equal(launchDutyCloseoutStableOpsTransition.ready, false);
+    assert.equal(launchDutyCloseoutStableOpsTransition.recordReady, true);
+    assert.equal(launchDutyCloseoutStableOpsTransition.packetReady, false);
+    assert.equal(launchDutyCloseoutStableOpsTransition.handoffReady, false);
+    assert.equal(launchDutyCloseoutStableOpsTransition.currentActionKey, "review_staging_packet_results");
+    assert.equal(launchDutyCloseoutStableOpsTransition.nextDownloadFormat, "launch-operations-operator-entry");
+    assert.equal(launchDutyCloseoutStableOpsTransition.recordIndexProgress, "6/6");
+    assert.equal(launchDutyCloseoutStableOpsTransition.packetReviewProgress, null);
     assert.match(
       launchDutyCloseoutRecordedActionOrder.offlineExecutionPlan.nextAction,
       /Launch-duty record writes are complete/
@@ -25439,6 +25451,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationAction=ready_for_stable_operations_handoff/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStableOpsTransition=blocked_until_packet_result_review/
     );
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
@@ -25516,6 +25532,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Launch Duty Stabilization Execution Action:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| record=first_wave_closeout/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Duty Stable Operations Transition Action:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results/
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
@@ -25622,6 +25642,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackOperatorEntry.operatorSummary,
       /launchDutyRecordIndexNextDownload=steady-state-handoff-brief/
     );
+    assert.equal(
+      staleLaunchDutyReadbackOperatorEntry.launchDutyStableOperationsTransitionAction?.status,
+      "blocked_until_packet_result_review"
+    );
+    assert.equal(staleLaunchDutyReadbackOperatorEntry.launchDutyStableOperationsTransitionAction?.recordReady, true);
+    assert.equal(staleLaunchDutyReadbackOperatorEntry.launchDutyStableOperationsTransitionAction?.packetReady, false);
+    assert.equal(
+      staleLaunchDutyReadbackOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey,
+      "review_staging_packet_results"
+    );
     assert.ok(staleLaunchDutyReadbackOperatorEntry.quickAccessDownloads.some((item) => (
       item.key === "ops_steady_state_handoff_brief"
       && item.format === "steady-state-handoff-brief"
@@ -25669,6 +25699,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackInitialReadinessDownload.body,
       /Launch Duty Handoff Action: [^\n]*stabilizationAction=ready_for_stable_operations_handoff[^\n]*stabilizationActionCurrent=refresh_staging_readiness_after_first_wave_closeout[^\n]*stabilizationActionRecord=first_wave_closeout/
     );
+    assert.match(
+      staleLaunchDutyReadbackInitialReadinessDownload.body,
+      /Launch Duty Handoff Action: [^\n]*stableOpsTransition=blocked_until_packet_result_review[^\n]*stableOpsTransitionCurrent=review_staging_packet_results/
+    );
     const staleLaunchDutyReadbackOperatorEntryDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
@@ -25710,6 +25744,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       staleLaunchDutyReadbackHandoffIndexDownload.body,
       /Launch Operations Operator Entry: [^\n]*launchDutyStabilizationAction=ready_for_stable_operations_handoff[^\n]*launchDutyStabilizationActionCurrent=refresh_staging_readiness_after_first_wave_closeout[^\n]*launchDutyStabilizationActionRecord=first_wave_closeout/
+    );
+    assert.match(
+      staleLaunchDutyReadbackHandoffIndexDownload.body,
+      /Launch Operations Operator Entry: [^\n]*launchDutyStableOpsTransition=blocked_until_packet_result_review[^\n]*launchDutyStableOpsTransitionCurrent=review_staging_packet_results/
     );
     const launchDutyPacketReviewReceipt = await postJson(
       baseUrl,
@@ -25871,6 +25909,31 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const launchDutyPacketReviewOperatorEntry = launchDutyPacketReviewSnapshot.summary.initialLaunchOpsReadiness
       .launchOperationsOperatorEntry;
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutyStableOperationsTransitionAction?.status,
+      "ready_for_steady_state_handoff"
+    );
+    assert.equal(launchDutyPacketReviewOperatorEntry.launchDutyStableOperationsTransitionAction?.ready, true);
+    assert.equal(launchDutyPacketReviewOperatorEntry.launchDutyStableOperationsTransitionAction?.recordReady, true);
+    assert.equal(launchDutyPacketReviewOperatorEntry.launchDutyStableOperationsTransitionAction?.packetReady, true);
+    assert.equal(launchDutyPacketReviewOperatorEntry.launchDutyStableOperationsTransitionAction?.handoffReady, true);
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey,
+      "open_steady_state_handoff_brief"
+    );
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadFormat,
+      "steady-state-handoff-brief"
+    );
+    assert.deepEqual(
+      launchDutyPacketReviewOperatorEntry.launchDutyStableOperationsTransitionAction?.requiredChecks,
+      [
+        "readiness_gate_stable_operations_handoff",
+        "rehearsal_ready_for_stable_operations_handoff",
+        "packet_result_review_complete",
+        "record_index_complete"
+      ]
+    );
     const expectedSteadyStateHandoffOperatorOrder = [
       "Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations."
     ];
@@ -25976,6 +26039,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyPacketReviewOperatorEntry.operatorSummary,
+      /launchDutyStableOpsTransition=ready_for_steady_state_handoff/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntry.operatorSummary,
       /launchDutySteadyStateReceiptReviewAction=ready_for_receipt_review/
     );
     assert.match(
@@ -26018,6 +26085,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyPacketReviewOperatorEntryDownload.body,
       /Stable Operations Landing Bridge:[\s\S]*handoffBrief=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntryDownload.body,
+      /Launch Duty Stable Operations Transition Action:[\s\S]*status=ready_for_steady_state_handoff \| ready=yes \| current=open_steady_state_handoff_brief/
     );
     assert.match(
       launchDutyPacketReviewOperatorEntryDownload.body,

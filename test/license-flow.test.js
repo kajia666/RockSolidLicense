@@ -24183,7 +24183,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             },
             stabilization_owner_handoff: {
               status: "recorded",
+              actionKey: "handoff_stabilization_owner",
               artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/stabilization-owner-handoff.md",
+              receiptOperations: ["record_launch_stabilization_review"],
+              receiptIds: ["record-launch-stabilization-review-receipt"],
               recordedAt: "2026-05-14T09:50:00.000Z"
             }
           }
@@ -24200,9 +24203,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
       ownerSession.token
     );
-    const launchDutyCloseoutReadyQueue = launchDutyCloseoutReadySnapshot.summary.initialLaunchOpsReadiness
-      .launchOperationsOperatorEntry?.launchDutyHandoffAction?.stabilizationReceiptWriteQueue;
+    const launchDutyCloseoutReadyHandoffAction = launchDutyCloseoutReadySnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry?.launchDutyHandoffAction;
+    const launchDutyCloseoutReadyQueue = launchDutyCloseoutReadyHandoffAction?.stabilizationReceiptWriteQueue;
+    assert.ok(launchDutyCloseoutReadyHandoffAction);
     assert.ok(launchDutyCloseoutReadyQueue);
+    assert.equal(launchDutyCloseoutReadyHandoffAction.currentActionKey, "close_first_wave");
     assert.equal(launchDutyCloseoutReadyQueue.status, "ready_for_stabilization_receipt_write");
     assert.equal(launchDutyCloseoutReadyQueue.readyForReceiptWrites, true);
     assert.equal(launchDutyCloseoutReadyQueue.currentRecordKey, "first_wave_closeout");
@@ -24239,6 +24245,50 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyCloseoutReadyQueue.closeoutExecutionState.receiptPlaceholders,
       ["<record_launch_closeout_review-receipt-id>"]
     );
+    assert.deepEqual(
+      launchDutyCloseoutReadyHandoffAction.stabilizationOwnerHandoffRecordReadback,
+      {
+        version: "developer-ops-launch-operations-operator-stabilization-owner-handoff-record-readback/v1",
+        status: "ready_for_first_wave_closeout_write",
+        recorded: true,
+        recordKey: "stabilization_owner_handoff",
+        recordedAt: "2026-05-14T09:50:00.000Z",
+        recordIndexStatus: "recorded",
+        recordIndexArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/stabilization-owner-handoff.md",
+        recordedReceiptIds: ["record-launch-stabilization-review-receipt"],
+        currentActionKey: "close_first_wave",
+        expectedCurrentActionKey: "close_first_wave",
+        nextRecordKey: "first_wave_closeout",
+        nextActionKey: "close_first_wave",
+        nextArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+        nextCommand: launchDutyCloseoutReadyQueue.currentReceiptWritePacket?.command,
+        currentReceiptWritePacketStatus: "ready_for_receipt_write",
+        expectedCurrentReceiptWritePacketStatus: "ready_for_receipt_write",
+        closeoutExecutionStateStatus: "ready_for_first_wave_closeout",
+        expectedCloseoutExecutionStateStatus: "ready_for_first_wave_closeout",
+        launchDutyRecordIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
+        refreshAfterWrite: launchDutyCloseoutReadyQueue.currentReceiptWritePacket?.refreshAfterWrite,
+        successCriteria: [
+          {
+            key: "stabilization_owner_handoff_recorded",
+            expected: "stabilization_owner_handoff is recorded in the launch-duty record index"
+          },
+          {
+            key: "current_action_advanced",
+            expected: "current action advances to close_first_wave"
+          },
+          {
+            key: "first_wave_closeout_ready",
+            expected: "current stabilization receipt write packet is ready for first_wave_closeout"
+          },
+          {
+            key: "record_index_continues",
+            expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+          }
+        ],
+        nextAction: "Run the first-wave closeout record command, then refresh Developer Ops export to confirm stabilization completion."
+      }
+    );
     assert.match(
       launchDutyCloseoutReadySnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationProgress=3\/4/
@@ -24254,6 +24304,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutReadySnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationCloseoutStatus=ready_for_first_wave_closeout/
+    );
+    assert.match(
+      launchDutyCloseoutReadySnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationOwnerReadback=ready_for_first_wave_closeout_write/
+    );
+    assert.match(
+      launchDutyCloseoutReadySnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationOwnerNext=close_first_wave/
     );
     const launchDutyCloseoutReadyOperatorEntryDownload = await getText(
       baseUrl,
@@ -24275,6 +24333,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutReadyOperatorEntryDownload.body,
       /Stabilization Closeout Execution:[\s\S]*command=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key first_wave_closeout/
+    );
+    assert.match(
+      launchDutyCloseoutReadyOperatorEntryDownload.body,
+      /Stabilization Owner Handoff Record Readback:[\s\S]*status=ready_for_first_wave_closeout_write \| recorded=yes \| record=stabilization_owner_handoff \| currentAction=close_first_wave/
+    );
+    assert.match(
+      launchDutyCloseoutReadyOperatorEntryDownload.body,
+      /Stabilization Owner Handoff Readback Success Criteria:[\s\S]*3\. first_wave_closeout_ready \| expected=current stabilization receipt write packet is ready for first_wave_closeout/
     );
     const launchDutyCloseoutRecordedReceipt = await postJson(
       baseUrl,

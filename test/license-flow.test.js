@@ -20803,6 +20803,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(
       launchOperationsHandoffSummary.supportingDownloads.some((item) => item.format === "steady-state-duty-board")
     );
+    assert.equal(
+      launchOperationsHandoffSummary.supportingDownloads.filter((item) => item.format === "steady-state-duty-board").length,
+      1
+    );
     assert.ok(Array.isArray(launchOperationsHandoffSummary.handoffChecklist));
     assert.ok(launchOperationsHandoffSummary.handoffChecklist.some((item) => (
       item.key === "steady_state_duty_plan_receipt"
@@ -20930,6 +20934,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.ok(
       launchOperationsDailyBrief.supportingDownloads.some((item) => item.format === "steady-state-duty-board")
+    );
+    assert.equal(
+      launchOperationsDailyBrief.supportingDownloads.filter((item) => item.format === "steady-state-duty-board").length,
+      1
     );
     assert.ok(Array.isArray(launchOperationsDailyBrief.dailyChecklist));
     assert.ok(launchOperationsDailyBrief.dailyChecklist.some((item) => (
@@ -21072,6 +21080,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         && item.launchOpsOverviewContextLaunchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
         && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
       ))
+    );
+    assert.equal(
+      launchOperationsShiftActionPlan.supportingDownloads.filter((item) => item.format === "steady-state-duty-board").length,
+      1
     );
     assert.equal(launchOperationsShiftActionPlan.executionPlanCount, launchOperationsShiftActionPlan.operatorActions.length);
     assert.ok(launchOperationsShiftActionPlan.readyExecutionPlanCount >= 3);
@@ -21283,6 +21295,29 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOverviewStatus.watchRecordDraftRecordCount, steadyStateWatchRecordDraftRecordCount);
     assert.equal(launchOperationsOverviewStatus.productionSignoffPacket, expectedProductionSignoffPacket);
     assert.equal(launchOperationsOverviewStatus.launchDayWatchEntry, expectedLaunchDayWatchEntry);
+    assert.ok(launchOperationsOverviewStatus.rolloutWideningDecisionAction);
+    assert.equal(launchOperationsOverviewStatus.rolloutWideningDecisionStatus, rolloutWideningDecisionStatus);
+    assert.equal(launchOperationsOverviewStatus.rolloutWideningDecisionReady, rolloutWideningDecisionReady);
+    assert.equal(launchOperationsOverviewStatus.rolloutWideningDecisionAction.status, rolloutWideningDecisionStatus);
+    assert.equal(launchOperationsOverviewStatus.rolloutWideningDecisionAction.ready, rolloutWideningDecisionReady);
+    assert.equal(launchOperationsOverviewStatus.rolloutWideningDecisionAction.actionKey, "review_rollout_widening_decision");
+    assert.equal(
+      Number(launchOperationsOverviewStatus.rolloutWideningDecisionAction.queueTotal),
+      Number(steadyStateDutyBoard.queueTotal || 0)
+    );
+    assert.equal(
+      Number(launchOperationsOverviewStatus.rolloutWideningDecisionAction.attentionCount),
+      Number(steadyStateDutyBoard.attentionCount || 0)
+    );
+    assert.equal(launchOperationsOverviewStatus.rolloutWideningDecisionAction.nextAction, rolloutWideningDecisionNextAction);
+    assert.equal(
+      launchOperationsOverviewStatus.rolloutWideningDecisionAction.recommendedDownload?.format,
+      "steady-state-duty-board"
+    );
+    assert.match(
+      launchOperationsOverviewStatus.rolloutWideningDecisionAction.recommendedDownload?.href || "",
+      /format=steady-state-duty-board/
+    );
     assert.equal(launchOperationsOverviewStatus.nextAction.key, launchOperationsShiftActionPlan.primaryAction.key);
     assert.equal(launchOperationsOverviewStatus.launchOpsOverviewContext?.kind, "launch_ops_overview_status");
     assert.equal(launchOperationsOverviewStatus.launchOpsOverviewContext?.downloadFormat, "launch-operations-overview-status");
@@ -21293,6 +21328,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.ok(launchOperationsOverviewStatus.panels.some((item) => (
       item.key === "launch_operations_shift_action_plan"
+      && item.launchOpsOverviewContextLaunchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
+    assert.ok(launchOperationsOverviewStatus.panels.some((item) => (
+      item.key === "rollout_widening_decision"
+      && item.status === rolloutWideningDecisionStatus
+      && item.ready === rolloutWideningDecisionReady
+      && item.fileName === "developer-ops-steady-state-duty-board.txt"
+      && /format=steady-state-duty-board/.test(item.href || "")
       && item.launchOpsOverviewContextLaunchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
       && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
     )));
@@ -22976,6 +23020,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Overview Status:[\s\S]*context=launch_ops_overview_status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(
+      launchOperationsOverviewStatusDownload.body,
+      new RegExp(`Overview Status:[\\s\\S]*rolloutWideningDecision=${rolloutWideningDecisionStatus} \\| action=review_rollout_widening_decision \\| ready=${rolloutWideningDecisionReady}`)
+    );
     assert.match(launchOperationsOverviewStatusDownload.body, /Launch Readiness Next Gate:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /recommendedDownload=developer-ops-launch-receipt-next-follow-up\.txt/);
     assert.match(launchOperationsOverviewStatusDownload.body, steadyStateWatchRecordDraftPattern);
@@ -22988,8 +23036,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOverviewStatusDownload.body, /Receipt Recovery:[\s\S]*launchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsOverviewStatusDownload.body, latestLaunchDutySelectionChecklistStepPattern);
     assert.match(launchOperationsOverviewStatusDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
+    assert.match(launchOperationsOverviewStatusDownload.body, rolloutWideningDecisionOperatorOrderPattern);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:/);
     assert.match(launchOperationsOverviewStatusDownload.body, /Panels:[\s\S]*launch_operations_shift_action_plan[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(
+      launchOperationsOverviewStatusDownload.body,
+      new RegExp(`Panels:[\\s\\S]*rollout_widening_decision[^\\n]*status=${rolloutWideningDecisionStatus} \\| ready=${rolloutWideningDecisionReady ? "yes" : "no"}[^\\n]*file=developer-ops-steady-state-duty-board\\.txt`)
+    );
 
     const launchOperationsHandoffIndexDownload = await getText(
       baseUrl,

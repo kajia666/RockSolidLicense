@@ -29602,7 +29602,9 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     || steadyStateOperationalReview?.firstWaveLifecycle
     || null;
   const launchOpsOverviewDownload = buildScopedLaunchOpsOverviewContextDownload(handoffScope, launchOpsOverviewContext);
-  const supportingDownloads = [
+  const supportingDownloads = [];
+  const seenDownloads = new Set();
+  for (const item of [
     handoffDownload,
     launchOpsOverviewDownload,
     firstWaveLifecycle?.handoff?.primaryDownload || null,
@@ -29612,7 +29614,17 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     steadyStateDutyActionLinks?.actionLinksDownload || null,
     steadyStateOperationalReview?.reviewDownload || null,
     steadyStateExceptionDigest?.digestDownload || null
-  ].filter(Boolean);
+  ]) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const key = item.key || item.href || item.fileName;
+    if (!key || seenDownloads.has(key)) {
+      continue;
+    }
+    seenDownloads.add(key);
+    supportingDownloads.push(item);
+  }
   return {
     version: "developer-ops-launch-operations-handoff-summary/v1",
     status: chain.complete === true ? "ready" : "review",
@@ -30478,6 +30490,14 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     || dailyBrief?.firstWaveLifecycle
     || handoffSummary?.firstWaveLifecycle
     || null;
+  const rolloutWideningDecisionAction = buildLaunchOperationsRolloutWideningDecisionActionPayload({
+    scope: overviewScope,
+    rolloutWideningDecisionAction:
+      shiftPlan?.rolloutWideningDecisionAction
+      || dailyBrief?.rolloutWideningDecisionAction
+      || handoffSummary?.rolloutWideningDecisionAction
+      || null
+  });
   const currentLaunchReadinessNextGate = launchReadinessNextGate
     || shiftPlan?.launchReadinessNextGate
     || dailyBrief?.launchReadinessNextGate
@@ -30550,6 +30570,14 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
       ready: Boolean(firstWaveLifecycle?.status),
       href: firstWaveLifecycle?.primaryDownloadHref || null,
       fileName: firstWaveLifecycle?.primaryDownloadFileName || null
+    }),
+    withLaunchOpsOverviewContextRecordIndex({
+      key: "rollout_widening_decision",
+      label: "Rollout Widening Decision",
+      status: rolloutWideningDecisionAction?.status || "missing",
+      ready: rolloutWideningDecisionAction?.ready === true,
+      href: rolloutWideningDecisionAction?.recommendedDownload?.href || null,
+      fileName: rolloutWideningDecisionAction?.recommendedDownload?.fileName || null
     })
   ];
   const receiptVisible = receiptVisibilitySummary?.status === "visible";
@@ -30598,6 +30626,9 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
     firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
     firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || null,
+    rolloutWideningDecisionAction,
+    rolloutWideningDecisionStatus: rolloutWideningDecisionAction?.status || null,
+    rolloutWideningDecisionReady: rolloutWideningDecisionAction?.ready === true,
     receiptVisibilityStatus: receiptVisibilitySummary?.status || "pending",
     receiptVisibilitySummary,
     canRecoverReceipt: Boolean(receiptVisibilitySummary?.failureRecovery?.route),
@@ -30607,7 +30638,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     panels,
     readyPanelCount,
     panelCount: panels.length,
-    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, signoff=${productionSignoffPacket || "-"}, watchEntry=${launchDayWatchEntry || "-"}, next=${nextAction?.key || "-"}.`
+    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, signoff=${productionSignoffPacket || "-"}, watchEntry=${launchDayWatchEntry || "-"}, rollout=${rolloutWideningDecisionAction?.status || "-"}, rolloutReady=${rolloutWideningDecisionAction?.ready === true}, rolloutQueue=${rolloutWideningDecisionAction?.queueTotal ?? "-"}, rolloutAttention=${rolloutWideningDecisionAction?.attentionCount ?? "-"}, next=${nextAction?.key || "-"}.`
   };
 }
 
@@ -43881,6 +43912,10 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null
   });
   const panels = Array.isArray(overview?.panels) ? overview.panels : [];
+  const rolloutWideningDecisionAction = overview?.rolloutWideningDecisionAction
+    && typeof overview.rolloutWideningDecisionAction === "object"
+      ? overview.rolloutWideningDecisionAction
+      : null;
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(overview?.launchOpsOverviewContext);
   const lines = [
     "RockSolid Developer Ops Launch Operations Overview Status",
@@ -43911,6 +43946,15 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     `- productionSignoffPacket=${overview?.productionSignoffPacket || "-"}`
     + ` | launchDayWatchEntry=${overview?.launchDayWatchEntry || "-"}`
   );
+  if (rolloutWideningDecisionAction) {
+    lines.push(
+      `- rolloutWideningDecision=${rolloutWideningDecisionAction.status || "-"}`
+      + ` | action=${rolloutWideningDecisionAction.actionKey || "-"}`
+      + ` | ready=${rolloutWideningDecisionAction.ready === true}`
+      + ` | queue=${rolloutWideningDecisionAction.queueTotal ?? "-"}`
+      + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
+    );
+  }
   const firstWaveLifecycleText = formatDeveloperOpsFirstWaveLifecycleSummaryText(overview?.firstWaveLifecycle);
   if (firstWaveLifecycleText) {
     lines.push(`- ${firstWaveLifecycleText}`);
@@ -43984,10 +44028,21 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
   }
   lines.push("");
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
-  if (readiness.latestSteadyStateDutyPlanReceipt || overview?.canRecoverReceipt === true || receiptRecoveryPayload.action) {
+  if (
+    readiness.latestSteadyStateDutyPlanReceipt
+    || overview?.canRecoverReceipt === true
+    || receiptRecoveryPayload.action
+    || rolloutWideningDecisionAction
+  ) {
     lines.push("");
     lines.push("Operator Order:");
     lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+    const operatorOrder = Array.isArray(rolloutWideningDecisionAction?.operatorOrder)
+      ? rolloutWideningDecisionAction.operatorOrder
+      : [];
+    for (const item of operatorOrder) {
+      lines.push(`- ${item}`);
+    }
   }
   return lines.join("\n");
 }

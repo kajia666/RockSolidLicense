@@ -25151,6 +25151,30 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.operatorOrder,
       expectedSteadyStateHandoffOperatorOrder
     );
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.steadyStateDutyReceiptReviewAction?.status,
+      "ready_for_receipt_review"
+    );
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.steadyStateDutyReceiptReviewAction?.auditLogId,
+      launchDutyPacketReviewReceipt.auditLogId
+    );
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.steadyStateDutyReceiptReviewAction?.action,
+      "packet_review_readback"
+    );
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.steadyStateDutyReceiptReviewAction?.format,
+      "launch-duty-packet-review"
+    );
+    assert.equal(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.steadyStateDutyReceiptReviewAction?.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.deepEqual(
+      launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.steadyStateDutyReceiptReviewAction?.operatorOrder,
+      ["Review the steady-state duty receipt review route before stable operations handoff."]
+    );
     assert.deepEqual(
       launchDutyPacketReviewOperatorEntry.launchDutySteadyStateHandoffLanding.stableOperationsLandingBridge,
       {
@@ -25213,6 +25237,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyPacketReviewOperatorEntry.operatorSummary,
+      /launchDutySteadyStateReceiptReviewAction=ready_for_receipt_review/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntry.operatorSummary,
+      /launchDutySteadyStateReceiptReviewAudit=/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntry.operatorSummary,
       /launchDutyPacketReviewOperatorAction=continue_steady_state_handoff/
     );
     assert.match(
@@ -25231,6 +25263,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyPacketReviewOperatorEntryDownload.body,
       /Launch Duty Steady-State Handoff Landing:[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntryDownload.body,
+      /Steady-State Duty Receipt Review Action:[\s\S]*status=ready_for_receipt_review \| audit=.+ \| action=packet_review_readback \| format=launch-duty-packet-review/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntryDownload.body,
+      /Steady-State Duty Receipt Review Action:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchDutyPacketReviewOperatorEntryDownload.body,

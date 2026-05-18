@@ -29449,6 +29449,81 @@ function buildDeveloperOpsLaunchOperationsEvidenceChain({
   };
 }
 
+const LAUNCH_OPERATIONS_ROLLOUT_WIDENING_DECISION_OPERATOR_ORDER = [
+  "Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached."
+];
+
+function buildLaunchOperationsRolloutWideningDecisionActionPayload({
+  scope = {},
+  steadyStateDutyBoard = null,
+  rolloutWideningDecisionAction = null
+} = {}) {
+  const board = steadyStateDutyBoard && typeof steadyStateDutyBoard === "object"
+    ? steadyStateDutyBoard
+    : null;
+  const decision = rolloutWideningDecisionAction && typeof rolloutWideningDecisionAction === "object"
+    ? rolloutWideningDecisionAction
+    : board?.rolloutWideningDecisionAction && typeof board.rolloutWideningDecisionAction === "object"
+      ? board.rolloutWideningDecisionAction
+      : null;
+  if (!decision) {
+    return null;
+  }
+  const decisionScope = {
+    ...scope,
+    productCode: scope.productCode || board?.projectCode || "",
+    channel: scope.channel || board?.channel || "stable"
+  };
+  const boardDownload = buildDeveloperOpsSteadyStateDutyBoardDownload(decisionScope)
+    || board?.boardDownload
+    || null;
+  const recommendedDownload = boardDownload
+    ? {
+        ...boardDownload,
+        key: decision.boardDownloadKey || boardDownload.key || "ops_steady_state_duty_board",
+        label: boardDownload.label || "Steady-state duty board",
+        fileName: boardDownload.fileName || "developer-ops-steady-state-duty-board.txt",
+        format: decision.boardDownloadFormat || boardDownload.format || "steady-state-duty-board",
+        href: decision.boardDownloadHref || boardDownload.href || null,
+        source: boardDownload.source || "developer-ops",
+        operatorOrder: LAUNCH_OPERATIONS_ROLLOUT_WIDENING_DECISION_OPERATOR_ORDER.slice()
+      }
+    : null;
+  return {
+    version: decision.version || "developer-ops-steady-state-duty-board-rollout-widening-decision-action/v1",
+    status: decision.status || "hold_first_stable_operating_window",
+    ready: decision.ready === true,
+    actionKey: decision.actionKey || "review_rollout_widening_decision",
+    firstStableOperatingWindowStatus: decision.firstStableOperatingWindowStatus
+      || board?.firstStableOperatingWindowAction?.status
+      || null,
+    firstStableOperatingWindowActionKey: decision.firstStableOperatingWindowActionKey
+      || board?.firstStableOperatingWindowAction?.actionKey
+      || null,
+    boardDownloadKey: decision.boardDownloadKey || recommendedDownload?.key || null,
+    boardDownloadFormat: decision.boardDownloadFormat || recommendedDownload?.format || null,
+    boardDownloadHref: decision.boardDownloadHref || recommendedDownload?.href || null,
+    handoffBriefDownloadKey: decision.handoffBriefDownloadKey || board?.handoffBriefDownload?.key || null,
+    handoffBriefDownloadFormat: decision.handoffBriefDownloadFormat || board?.handoffBriefDownload?.format || null,
+    launchOpsOverviewContextKind: decision.launchOpsOverviewContextKind || board?.launchOpsOverviewContext?.kind || null,
+    launchOpsOverviewDownloadFormat: decision.launchOpsOverviewDownloadFormat || board?.launchOpsOverviewContext?.downloadFormat || null,
+    queueStatus: decision.queueStatus || board?.queueStatus || null,
+    queueTotal: decision.queueTotal ?? board?.queueTotal ?? null,
+    attentionCount: decision.attentionCount ?? board?.attentionCount ?? null,
+    firstWaveLifecycleStatus: decision.firstWaveLifecycleStatus || board?.firstWaveLifecycleStatus || null,
+    firstWaveLifecycleNextOperation: decision.firstWaveLifecycleNextOperation || board?.firstWaveLifecycleNextOperation || null,
+    productionSignoffPacket: decision.productionSignoffPacket || board?.productionSignoffPacket || null,
+    launchDayWatchEntry: decision.launchDayWatchEntry || board?.launchDayWatchEntry || null,
+    recommendedDownload,
+    workspaceAction: board?.workspaceAction || null,
+    operatorOrder: LAUNCH_OPERATIONS_ROLLOUT_WIDENING_DECISION_OPERATOR_ORDER.slice(),
+    nextAction: decision.nextAction
+      || (decision.ready === true
+        ? "Review the first stable operating window evidence, confirm the queue remains clear, then decide whether to widen rollout."
+        : "Hold the first stable operating window until exception queue and attention signals are clear before widening rollout.")
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
   scope = {},
   launchOperationsEvidenceChain = null,
@@ -29474,6 +29549,10 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     productCode,
     channel
   };
+  const rolloutWideningDecisionAction = buildLaunchOperationsRolloutWideningDecisionActionPayload({
+    scope: handoffScope,
+    steadyStateDutyBoard
+  });
   const handoffDownload = productCode ? buildDeveloperOpsLaunchOperationsHandoffSummaryDownload(handoffScope) : null;
   const stages = Array.isArray(chain.stages) ? chain.stages : [];
   const handoffChecklist = stages.map((item) => ({
@@ -29528,6 +29607,7 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     launchOpsOverviewDownload,
     firstWaveLifecycle?.handoff?.primaryDownload || null,
     steadyStateHandoffBrief?.handoffDownload || null,
+    rolloutWideningDecisionAction?.recommendedDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
     steadyStateDutyActionLinks?.actionLinksDownload || null,
     steadyStateOperationalReview?.reviewDownload || null,
@@ -29558,6 +29638,7 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
     launchDayWatchEntry,
     launchReadinessNextGate,
     launchReadinessNextGateHandoff,
+    rolloutWideningDecisionAction,
     firstWaveLifecycle,
     firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
     firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || null,
@@ -29608,6 +29689,11 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     productCode,
     channel
   };
+  const rolloutWideningDecisionAction = buildLaunchOperationsRolloutWideningDecisionActionPayload({
+    scope: briefScope,
+    steadyStateDutyBoard,
+    rolloutWideningDecisionAction: handoffSummary.rolloutWideningDecisionAction || null
+  });
   const briefDownload = productCode ? buildDeveloperOpsLaunchOperationsDailyBriefDownload(briefScope) : null;
   const queueTotal = Number(
     steadyStateExceptionDigest?.queueSummary?.total
@@ -29721,6 +29807,16 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
       fileName: steadyStateDutyActionLinks?.actionLinksDownload?.fileName || null,
       href: steadyStateDutyActionLinks?.actionLinksDownload?.href || null
     }),
+    withLaunchOpsOverviewContextRecordIndex({
+      key: "rollout_widening_decision",
+      label: "Review rollout widening decision",
+      status: rolloutWideningDecisionAction?.status || "missing",
+      ready: rolloutWideningDecisionAction?.ready === true,
+      summary: rolloutWideningDecisionAction?.nextAction
+        || "Review first stable operating window evidence before widening rollout.",
+      fileName: rolloutWideningDecisionAction?.recommendedDownload?.fileName || null,
+      href: rolloutWideningDecisionAction?.recommendedDownload?.href || null
+    }),
     {
       key: "first_wave_lifecycle",
       label: "Review first-wave lifecycle handoff",
@@ -29760,6 +29856,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     launchOpsOverviewDownload,
     firstWaveLifecycle?.handoff?.primaryDownload || null,
     handoffSummary.handoffDownload || null,
+    rolloutWideningDecisionAction?.recommendedDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
     steadyStateDutyActionLinks?.actionLinksDownload || null,
     steadyStateExceptionDigest?.digestDownload || null,
@@ -29806,6 +29903,7 @@ function buildDeveloperOpsLaunchOperationsDailyBriefPayload({
     launchDayWatchEntry,
     launchReadinessNextGate: currentLaunchReadinessNextGate,
     launchReadinessNextGateHandoff: currentLaunchReadinessNextGateHandoff,
+    rolloutWideningDecisionAction,
     launchOpsOverviewContext,
     firstWaveLifecycle,
     firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
@@ -29906,6 +30004,14 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     || steadyStateDutyBoard?.firstWaveLifecycle
     || steadyStateOperationalReview?.firstWaveLifecycle
     || null;
+  const rolloutWideningDecisionAction = buildLaunchOperationsRolloutWideningDecisionActionPayload({
+    scope: planScope,
+    steadyStateDutyBoard,
+    rolloutWideningDecisionAction:
+      dailyBrief.rolloutWideningDecisionAction
+      || launchOperationsHandoffSummary?.rolloutWideningDecisionAction
+      || null
+  });
   const currentLaunchReadinessNextGate = launchReadinessNextGate
     || dailyBrief.launchReadinessNextGate
     || launchOperationsHandoffSummary?.launchReadinessNextGate
@@ -29984,6 +30090,11 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
       firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || "",
       firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
+      rolloutWideningDecisionStatus: rolloutWideningDecisionAction?.status || "",
+      rolloutWideningDecisionReady: rolloutWideningDecisionAction?.ready === true,
+      steadyStateQueueStatus: rolloutWideningDecisionAction?.queueStatus || steadyStateDutyBoard?.queueStatus || "",
+      steadyStateQueueTotal: rolloutWideningDecisionAction?.queueTotal ?? steadyStateDutyBoard?.queueTotal ?? "",
+      steadyStateAttentionCount: rolloutWideningDecisionAction?.attentionCount ?? steadyStateDutyBoard?.attentionCount ?? "",
       note: `launch_operations_shift_action:${key || "shift_action"}`
     };
     return {
@@ -30020,7 +30131,12 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || "",
         firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
         firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || "",
-        firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || ""
+        firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
+        rolloutWideningDecisionStatus: rolloutWideningDecisionAction?.status || "",
+        rolloutWideningDecisionReady: rolloutWideningDecisionAction?.ready === true,
+        steadyStateQueueStatus: rolloutWideningDecisionAction?.queueStatus || steadyStateDutyBoard?.queueStatus || "",
+        steadyStateQueueTotal: rolloutWideningDecisionAction?.queueTotal ?? steadyStateDutyBoard?.queueTotal ?? "",
+        steadyStateAttentionCount: rolloutWideningDecisionAction?.attentionCount ?? steadyStateDutyBoard?.attentionCount ?? ""
       }),
       confirmationLabel: label || key || "Confirm shift action",
       operatorHint: confirmation || summary || "Complete this shift action and record the result in the operator note.",
@@ -30139,6 +30255,22 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     summary: `${steadyStateDutyActionLinks?.actionCount ?? 0} mapped duty action link${Number(steadyStateDutyActionLinks?.actionCount ?? 0) === 1 ? "" : "s"} are available for operator follow-through.`,
     confirmation: "Use the mapped links instead of manually reconstructing API routes during launch watch."
   });
+  if (rolloutWideningDecisionAction) {
+    pushOperatorAction({
+      key: rolloutWideningDecisionAction.actionKey || "review_rollout_widening_decision",
+      label: "Review Rollout Widening Decision",
+      priority: rolloutWideningDecisionAction.ready ? "primary" : "review",
+      kind: "download",
+      status: rolloutWideningDecisionAction.ready ? "ready" : "review",
+      href: rolloutWideningDecisionAction.recommendedDownload?.href || rolloutWideningDecisionAction.boardDownloadHref || "",
+      fileName: rolloutWideningDecisionAction.recommendedDownload?.fileName || "developer-ops-steady-state-duty-board.txt",
+      format: rolloutWideningDecisionAction.recommendedDownload?.format || rolloutWideningDecisionAction.boardDownloadFormat || "steady-state-duty-board",
+      source: "rollout_widening_decision",
+      summary: rolloutWideningDecisionAction.nextAction
+        || "Review first stable operating window evidence before deciding whether to widen rollout.",
+      confirmation: "Confirm queue and attention are clear before widening rollout."
+    });
+  }
   if (firstWaveLifecycle?.nextOperation || firstWaveLifecycle?.status) {
     pushOperatorAction({
       key: "review_first_wave_lifecycle",
@@ -30203,6 +30335,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     firstWaveLifecycle?.handoff?.primaryDownload || null,
     dailyBrief.briefDownload || null,
     launchOperationsHandoffSummary?.handoffDownload || null,
+    rolloutWideningDecisionAction?.recommendedDownload || null,
     steadyStateDutyBoard?.boardDownload || null,
     steadyStateDutyActionLinks?.actionLinksDownload || null,
     steadyStateExceptionDigest?.digestDownload || null,
@@ -30247,6 +30380,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     launchDayWatchEntry,
     launchReadinessNextGate: currentLaunchReadinessNextGate,
     launchReadinessNextGateHandoff: currentLaunchReadinessNextGateHandoff,
+    rolloutWideningDecisionAction,
     launchOpsOverviewContext,
     firstWaveLifecycle,
     firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
@@ -43162,6 +43296,10 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   const supportingDownloads = Array.isArray(handoffSummary?.supportingDownloads)
     ? handoffSummary.supportingDownloads
     : [];
+  const rolloutWideningDecisionAction = handoffSummary?.rolloutWideningDecisionAction
+    && typeof handoffSummary.rolloutWideningDecisionAction === "object"
+      ? handoffSummary.rolloutWideningDecisionAction
+      : null;
   const supportingDownloadRecordIndexPath = handoffSummary?.receiptVisibilitySummary?.launchDutyRecordIndexPath
     || handoffSummary?.launchReadinessNextGate?.launchDutyRecordIndexPath
     || "";
@@ -43201,6 +43339,22 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
     launchReadinessNextGate: handoffSummary?.launchReadinessNextGate || null,
     launchReadinessNextGateHandoff: handoffSummary?.launchReadinessNextGateHandoff || null
   });
+  if (rolloutWideningDecisionAction) {
+    lines.push("Rollout Widening Decision:");
+    lines.push(
+      `- status=${rolloutWideningDecisionAction.status || "-"}`
+      + ` | action=${rolloutWideningDecisionAction.actionKey || "-"}`
+      + ` | ready=${rolloutWideningDecisionAction.ready === true}`
+      + ` | queue=${rolloutWideningDecisionAction.queueTotal ?? "-"}`
+      + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
+    );
+    lines.push(
+      `- download=${formatLaunchHandoffDownloadText(rolloutWideningDecisionAction.recommendedDownload, { fileSeparator: " | " })}`
+      + ` | firstStableWindow=${rolloutWideningDecisionAction.firstStableOperatingWindowStatus || "-"}`
+    );
+    lines.push(`- nextAction=${rolloutWideningDecisionAction.nextAction || "-"}`);
+    lines.push("");
+  }
   if (chain) {
     lines.push("Evidence Chain:");
     lines.push(
@@ -43269,10 +43423,18 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   }
   lines.push("");
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
-  if (readiness.latestSteadyStateDutyPlanReceipt) {
+  if (readiness.latestSteadyStateDutyPlanReceipt || rolloutWideningDecisionAction) {
     lines.push("");
     lines.push("Operator Order:");
-    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+    if (readiness.latestSteadyStateDutyPlanReceipt) {
+      lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+    }
+    const operatorOrder = Array.isArray(rolloutWideningDecisionAction?.operatorOrder)
+      ? rolloutWideningDecisionAction.operatorOrder
+      : [];
+    for (const item of operatorOrder) {
+      lines.push(`- ${item}`);
+    }
   }
   return lines.join("\n");
 }
@@ -43315,6 +43477,10 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   const supportingDownloads = Array.isArray(dailyBrief?.supportingDownloads)
     ? dailyBrief.supportingDownloads
     : [];
+  const rolloutWideningDecisionAction = dailyBrief?.rolloutWideningDecisionAction
+    && typeof dailyBrief.rolloutWideningDecisionAction === "object"
+      ? dailyBrief.rolloutWideningDecisionAction
+      : null;
   const supportingDownloadRecordIndexPath = dailyBrief?.receiptVisibilitySummary?.launchDutyRecordIndexPath
     || dailyBrief?.launchReadinessNextGate?.launchDutyRecordIndexPath
     || "";
@@ -43343,6 +43509,15 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
     + ` | actions=${dailyBrief?.dutyActionCount ?? 0}`
     + ` | followUps=${dailyBrief?.followUpCount ?? 0}`
   );
+  if (rolloutWideningDecisionAction) {
+    lines.push(
+      `- rolloutWideningDecision=${rolloutWideningDecisionAction.status || "-"}`
+      + ` | action=${rolloutWideningDecisionAction.actionKey || "-"}`
+      + ` | ready=${rolloutWideningDecisionAction.ready === true}`
+      + ` | queue=${rolloutWideningDecisionAction.queueTotal ?? "-"}`
+      + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
+    );
+  }
   lines.push(
     `- watchRecordDraft=${dailyBrief?.watchRecordDraftStatus || "-"}`
     + ` | records=${dailyBrief?.watchRecordDraftRecordCount ?? "-"}`
@@ -43416,10 +43591,22 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   }
   lines.push("");
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
-  if (readiness.latestSteadyStateDutyPlanReceipt || dailyBrief?.receiptVisibilitySummary?.status === "visible") {
+  if (
+    readiness.latestSteadyStateDutyPlanReceipt
+    || dailyBrief?.receiptVisibilitySummary?.status === "visible"
+    || rolloutWideningDecisionAction
+  ) {
     lines.push("");
     lines.push("Operator Order:");
-    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+    if (readiness.latestSteadyStateDutyPlanReceipt || dailyBrief?.receiptVisibilitySummary?.status === "visible") {
+      lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+    }
+    const operatorOrder = Array.isArray(rolloutWideningDecisionAction?.operatorOrder)
+      ? rolloutWideningDecisionAction.operatorOrder
+      : [];
+    for (const item of operatorOrder) {
+      lines.push(`- ${item}`);
+    }
   }
   return lines.join("\n");
 }
@@ -43469,6 +43656,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   });
   const actions = Array.isArray(actionPlan?.operatorActions) ? actionPlan.operatorActions : [];
   const supportingDownloads = Array.isArray(actionPlan?.supportingDownloads) ? actionPlan.supportingDownloads : [];
+  const rolloutWideningDecisionAction = actionPlan?.rolloutWideningDecisionAction
+    && typeof actionPlan.rolloutWideningDecisionAction === "object"
+      ? actionPlan.rolloutWideningDecisionAction
+      : null;
   const supportingDownloadRecordIndexPath = actionPlan?.receiptVisibilitySummary?.launchDutyRecordIndexPath
     || actionPlan?.launchReadinessNextGate?.launchDutyRecordIndexPath
     || "";
@@ -43522,6 +43713,15 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     + ` | executionPlans=${actionPlan?.executionPlanCount ?? 0}`
     + ` | followUps=${actionPlan?.followUpCount ?? 0}`
   );
+  if (rolloutWideningDecisionAction) {
+    lines.push(
+      `- rolloutWideningDecision=${rolloutWideningDecisionAction.status || "-"}`
+      + ` | action=${rolloutWideningDecisionAction.actionKey || "-"}`
+      + ` | ready=${rolloutWideningDecisionAction.ready === true}`
+      + ` | queue=${rolloutWideningDecisionAction.queueTotal ?? "-"}`
+      + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
+    );
+  }
   lines.push(
     `- watchRecordDraft=${actionPlan?.watchRecordDraftStatus || "-"}`
     + ` | records=${actionPlan?.watchRecordDraftRecordCount ?? "-"}`
@@ -43617,6 +43817,11 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | firstWaveLifecycleStatus=${payload.firstWaveLifecycleStatus || "-"}`
         + ` | firstWaveLifecycleNextOperation=${payload.firstWaveLifecycleNextOperation || "-"}`
         + ` | firstWaveLifecyclePrimaryDownloadKey=${payload.firstWaveLifecyclePrimaryDownloadKey || "-"}`
+        + ` | rolloutWideningDecisionStatus=${payload.rolloutWideningDecisionStatus || "-"}`
+        + ` | rolloutWideningDecisionReady=${payload.rolloutWideningDecisionReady === true}`
+        + ` | steadyStateQueueStatus=${payload.steadyStateQueueStatus || "-"}`
+        + ` | steadyStateQueueTotal=${payload.steadyStateQueueTotal ?? "-"}`
+        + ` | steadyStateAttentionCount=${payload.steadyStateAttentionCount ?? "-"}`
       );
       lines.push(`  - note=${payload.note || "-"} | hint=${receiptPlan.operatorHint || "-"}`);
     }
@@ -43636,10 +43841,22 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   }
   lines.push("");
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
-  if (readiness.latestSteadyStateDutyPlanReceipt || actionPlan?.receiptVisibilitySummary?.status === "visible") {
+  if (
+    readiness.latestSteadyStateDutyPlanReceipt
+    || actionPlan?.receiptVisibilitySummary?.status === "visible"
+    || rolloutWideningDecisionAction
+  ) {
     lines.push("");
     lines.push("Operator Order:");
-    lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+    if (readiness.latestSteadyStateDutyPlanReceipt || actionPlan?.receiptVisibilitySummary?.status === "visible") {
+      lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
+    }
+    const operatorOrder = Array.isArray(rolloutWideningDecisionAction?.operatorOrder)
+      ? rolloutWideningDecisionAction.operatorOrder
+      : [];
+    for (const item of operatorOrder) {
+      lines.push(`- ${item}`);
+    }
   }
   return lines.join("\n");
 }

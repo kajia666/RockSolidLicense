@@ -23674,9 +23674,59 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.recordedRecordCount, 0);
     assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.pendingRecordCount, 4);
     assert.equal(receiptVisibilitySnapshotStabilizationQueue.completionState.nextRecordKey, "first_wave_incident_log");
+    assert.deepEqual(
+      receiptVisibilitySnapshotHandoffAction.receiptVisibilitySnapshotRecordReadback,
+      {
+        version: "developer-ops-launch-operations-operator-receipt-visibility-snapshot-record-readback/v1",
+        status: "ready_for_first_wave_incident_log_write",
+        recorded: true,
+        recordKey: "receipt_visibility_snapshot",
+        recordedAt: "2026-05-14T09:20:00.000Z",
+        recordIndexStatus: "recorded",
+        recordIndexArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/receipt-visibility-snapshot.txt",
+        recordedReceiptIds: ["record-post-launch-ops-sweep-receipt"],
+        currentActionKey: "record_first_wave_incident_log",
+        expectedCurrentActionKey: "record_first_wave_incident_log",
+        nextRecordKey: "first_wave_incident_log",
+        nextActionKey: "record_first_wave_incident_log",
+        nextArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-incident-log.md",
+        nextCommand: receiptVisibilitySnapshotStabilizationQueue.currentReceiptWritePacket?.command,
+        currentReceiptWritePacketStatus: "ready_for_receipt_write",
+        expectedCurrentReceiptWritePacketStatus: "ready_for_receipt_write",
+        launchDutyRecordIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json",
+        refreshAfterWrite: receiptVisibilitySnapshotStabilizationQueue.currentReceiptWritePacket?.refreshAfterWrite,
+        successCriteria: [
+          {
+            key: "receipt_visibility_snapshot_recorded",
+            expected: "receipt_visibility_snapshot is recorded in the launch-duty record index"
+          },
+          {
+            key: "current_action_advanced",
+            expected: "current action advances to record_first_wave_incident_log"
+          },
+          {
+            key: "first_wave_incident_log_ready",
+            expected: "current stabilization receipt write packet is ready for first_wave_incident_log"
+          },
+          {
+            key: "record_index_continues",
+            expected: "launch-duty record index remains artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
+          }
+        ],
+        nextAction: "Run the first-wave incident log record command, then refresh Developer Ops export to continue stabilization evidence."
+      }
+    );
     assert.match(
       receiptVisibilitySnapshotReadbackSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyNextReceiptPacket=recorded/
+    );
+    assert.match(
+      receiptVisibilitySnapshotReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyReceiptVisibilityReadback=ready_for_first_wave_incident_log_write/
+    );
+    assert.match(
+      receiptVisibilitySnapshotReadbackSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyReceiptVisibilityNext=record_first_wave_incident_log/
     );
     assert.match(
       receiptVisibilitySnapshotReadbackSnapshot.summaryText,
@@ -23694,6 +23744,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       receiptVisibilitySnapshotOperatorEntryDownload.body,
       /Current Stabilization Receipt Write Packet:[\s\S]*command=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key first_wave_incident_log/
+    );
+    assert.match(
+      receiptVisibilitySnapshotOperatorEntryDownload.body,
+      /Receipt Visibility Snapshot Record Readback:[\s\S]*status=ready_for_first_wave_incident_log_write \| recorded=yes \| record=receipt_visibility_snapshot \| currentAction=record_first_wave_incident_log/
+    );
+    assert.match(
+      receiptVisibilitySnapshotOperatorEntryDownload.body,
+      /Receipt Visibility Snapshot Readback Success Criteria:[\s\S]*3\. first_wave_incident_log_ready \| expected=current stabilization receipt write packet is ready for first_wave_incident_log/
     );
 
     const launchDutyRecordIndexReadbackReceipt = await postJson(

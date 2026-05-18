@@ -27943,6 +27943,7 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     && steadyStateExceptionDigest?.monitoringReady === true
     && steadyStateOperationalReview?.monitoringReady === true;
   const queueTotal = Number(steadyStateExceptionDigest?.queueSummary?.total ?? steadyStateExceptionDigest?.queueTotal ?? 0);
+  const attentionCount = Number(steadyStateExceptionDigest?.attentionCount ?? 0);
   const watchRecordDraftStatus = steadyStateHandoffBrief?.watchRecordDraftStatus
     || steadyStateOperationalReview?.watchRecordDraftStatus
     || closeoutReadinessSummary?.watchRecordDraftStatus
@@ -28109,6 +28110,49 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     source: "first_stable_operating_window",
     summary: firstStableOperatingWindowAction.nextAction
   });
+  const rolloutWideningDecisionReady = readyForDuty
+    && queueTotal === 0
+    && attentionCount === 0;
+  const rolloutWideningDecisionStatus = !readyForDuty
+    ? "blocked_until_ready_for_duty"
+    : rolloutWideningDecisionReady
+      ? "ready_for_rollout_widening_decision"
+      : "hold_first_stable_operating_window";
+  const rolloutWideningDecisionAction = {
+    version: "developer-ops-steady-state-duty-board-rollout-widening-decision-action/v1",
+    status: rolloutWideningDecisionStatus,
+    ready: rolloutWideningDecisionReady,
+    actionKey: "review_rollout_widening_decision",
+    firstStableOperatingWindowStatus: firstStableOperatingWindowAction.status || null,
+    firstStableOperatingWindowActionKey: firstStableOperatingWindowAction.actionKey || null,
+    boardDownloadKey: boardDownload?.key || null,
+    boardDownloadFormat: boardDownload?.format || null,
+    boardDownloadHref: boardDownload?.href || null,
+    handoffBriefDownloadKey: steadyStateHandoffBrief?.handoffDownload?.key || null,
+    handoffBriefDownloadFormat: steadyStateHandoffBrief?.handoffDownload?.format || null,
+    launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || null,
+    launchOpsOverviewDownloadFormat: launchOpsOverviewContext?.downloadFormat || null,
+    queueStatus: steadyStateExceptionDigest?.queueStatus || null,
+    queueTotal,
+    attentionCount,
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || null,
+    productionSignoffPacket,
+    launchDayWatchEntry,
+    nextAction: rolloutWideningDecisionReady
+      ? "Review the first stable operating window evidence, confirm the queue remains clear, then decide whether to widen rollout."
+      : readyForDuty
+        ? "Hold the first stable operating window until exception queue and attention signals are clear before widening rollout."
+        : "Finish steady-state duty readiness before considering rollout widening."
+  };
+  pushQuickAction({
+    key: rolloutWideningDecisionAction.actionKey,
+    label: "Review Rollout Widening Decision",
+    priority: rolloutWideningDecisionReady ? "primary" : "review",
+    href: boardDownload?.href || workspaceAction?.href || "",
+    source: "rollout_widening_decision",
+    summary: rolloutWideningDecisionAction.nextAction
+  });
   const handoffAssets = [];
   const seenAssets = new Set();
   for (const item of [
@@ -28144,7 +28188,7 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     readyForDuty,
     queueStatus: steadyStateExceptionDigest?.queueStatus || null,
     queueTotal,
-    attentionCount: steadyStateExceptionDigest?.attentionCount ?? 0,
+    attentionCount,
     closeoutStatus: closeoutReadinessSummary?.status || steadyStateHandoffBrief?.closeoutStatus || null,
     watchRecordDraftStatus,
     watchRecordDraftRecordCount,
@@ -28173,6 +28217,7 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     exceptionDigestDownload: steadyStateExceptionDigest?.digestDownload || null,
     quickActions,
     firstStableOperatingWindowAction,
+    rolloutWideningDecisionAction,
     handoffAssets,
     summary: readyForDuty
       ? "Steady-state duty board is active for the first stable operating lane."
@@ -28211,6 +28256,10 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
   const firstWaveLifecycle = steadyStateDutyBoard.firstWaveLifecycle
     && typeof steadyStateDutyBoard.firstWaveLifecycle === "object"
     ? steadyStateDutyBoard.firstWaveLifecycle
+    : null;
+  const rolloutWideningDecisionAction = steadyStateDutyBoard.rolloutWideningDecisionAction
+    && typeof steadyStateDutyBoard.rolloutWideningDecisionAction === "object"
+    ? steadyStateDutyBoard.rolloutWideningDecisionAction
     : null;
   const currentLaunchReadinessNextGate = launchReadinessNextGate && typeof launchReadinessNextGate === "object"
     ? launchReadinessNextGate
@@ -28280,6 +28329,9 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
       item.format,
       item.summary
     ].map((value) => String(value || "").toLowerCase()).join(" ");
+    if (/review_rollout_widening_decision|rollout_widening_decision/.test(signal)) {
+      return "review_rollout_widening_decision";
+    }
     if (type === "download" || /download|format=|\.txt|\.csv|\.zip/.test(signal)) {
       return "download_asset";
     }
@@ -28343,6 +28395,11 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
       firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
       firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || "",
       firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
+      rolloutWideningDecisionStatus: rolloutWideningDecisionAction?.status || "",
+      rolloutWideningDecisionReady: rolloutWideningDecisionAction?.ready === true,
+      steadyStateQueueStatus: rolloutWideningDecisionAction?.queueStatus || steadyStateDutyBoard.queueStatus || "",
+      steadyStateQueueTotal: rolloutWideningDecisionAction?.queueTotal ?? steadyStateDutyBoard.queueTotal ?? "",
+      steadyStateAttentionCount: rolloutWideningDecisionAction?.attentionCount ?? steadyStateDutyBoard.attentionCount ?? "",
       ...hrefParams
     });
     if (intent === "download_asset") {
@@ -39778,6 +39835,16 @@ function appendDeveloperOpsSteadyStateDutyBoardLines(lines, board = null, {
       + ` | overview=${firstStableOperatingWindowAction.launchOpsOverviewDownloadFormat || "-"}`
     );
   }
+  const rolloutWideningDecisionAction = board.rolloutWideningDecisionAction || null;
+  if (rolloutWideningDecisionAction) {
+    lines.push(
+      `- rolloutWideningDecision=${rolloutWideningDecisionAction.status || "-"}`
+      + ` | action=${rolloutWideningDecisionAction.actionKey || "-"}`
+      + ` | ready=${rolloutWideningDecisionAction.ready === true}`
+      + ` | queue=${rolloutWideningDecisionAction.queueTotal ?? "-"}`
+      + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
+    );
+  }
   lines.push(
     `- boardDownload=${board.boardDownload?.fileName || "-"}`
     + ` | format=${board.boardDownload?.format || "-"}`
@@ -39916,6 +39983,11 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
         + (prefill.firstWaveLifecycleStatus ? ` | firstWaveLifecycleStatus=${prefill.firstWaveLifecycleStatus}` : "")
         + (prefill.firstWaveLifecycleNextOperation ? ` | firstWaveLifecycleNextOperation=${prefill.firstWaveLifecycleNextOperation}` : "")
         + (prefill.firstWaveLifecyclePrimaryDownloadKey ? ` | firstWaveLifecyclePrimaryDownloadKey=${prefill.firstWaveLifecyclePrimaryDownloadKey}` : "")
+        + (prefill.rolloutWideningDecisionStatus ? ` | rolloutWideningDecisionStatus=${prefill.rolloutWideningDecisionStatus}` : "")
+        + (prefill.rolloutWideningDecisionReady !== undefined ? ` | rolloutWideningDecisionReady=${prefill.rolloutWideningDecisionReady}` : "")
+        + (prefill.steadyStateQueueStatus ? ` | steadyStateQueueStatus=${prefill.steadyStateQueueStatus}` : "")
+        + (prefill.steadyStateQueueTotal !== undefined ? ` | steadyStateQueueTotal=${prefill.steadyStateQueueTotal}` : "")
+        + (prefill.steadyStateAttentionCount !== undefined ? ` | steadyStateAttentionCount=${prefill.steadyStateAttentionCount}` : "")
         + (prefill.launchOpsOverviewContextKind ? ` | launchOpsOverviewContextKind=${prefill.launchOpsOverviewContextKind}` : "")
         + (prefill.launchOpsOverviewDownloadKey ? ` | launchOpsOverviewDownloadKey=${prefill.launchOpsOverviewDownloadKey}` : "")
         + (prefill.launchOpsOverviewDownloadFileName ? ` | launchOpsOverviewDownloadFileName=${prefill.launchOpsOverviewDownloadFileName}` : "")

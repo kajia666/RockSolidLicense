@@ -19913,6 +19913,41 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         nextAction: "Keep the steady-state duty board open through the first stable operating window and attach the handoff brief plus overview status before widening rollout."
       }
     );
+    const rolloutWideningDecisionReady = steadyStateDutyBoard.readyForDuty === true
+      && Number(steadyStateDutyBoard.queueTotal || 0) === 0
+      && Number(steadyStateDutyBoard.attentionCount || 0) === 0;
+    const rolloutWideningDecisionStatus = rolloutWideningDecisionReady
+      ? "ready_for_rollout_widening_decision"
+      : "hold_first_stable_operating_window";
+    const rolloutWideningDecisionNextAction = rolloutWideningDecisionReady
+      ? "Review the first stable operating window evidence, confirm the queue remains clear, then decide whether to widen rollout."
+      : "Hold the first stable operating window until exception queue and attention signals are clear before widening rollout.";
+    assert.deepEqual(
+      steadyStateDutyBoard.rolloutWideningDecisionAction,
+      {
+        version: "developer-ops-steady-state-duty-board-rollout-widening-decision-action/v1",
+        status: rolloutWideningDecisionStatus,
+        ready: rolloutWideningDecisionReady,
+        actionKey: "review_rollout_widening_decision",
+        firstStableOperatingWindowStatus: steadyStateDutyBoard.firstStableOperatingWindowAction.status,
+        firstStableOperatingWindowActionKey: steadyStateDutyBoard.firstStableOperatingWindowAction.actionKey,
+        boardDownloadKey: "ops_steady_state_duty_board",
+        boardDownloadFormat: "steady-state-duty-board",
+        boardDownloadHref: steadyStateDutyBoard.boardDownload.href,
+        handoffBriefDownloadKey: "ops_steady_state_handoff_brief",
+        handoffBriefDownloadFormat: "steady-state-handoff-brief",
+        launchOpsOverviewContextKind: "launch_ops_overview_status",
+        launchOpsOverviewDownloadFormat: "launch-operations-overview-status",
+        queueStatus: steadyStateDutyBoard.queueStatus,
+        queueTotal: steadyStateDutyBoard.queueTotal,
+        attentionCount: steadyStateDutyBoard.attentionCount,
+        firstWaveLifecycleStatus: steadyStateDutyBoard.firstWaveLifecycleStatus,
+        firstWaveLifecycleNextOperation: steadyStateDutyBoard.firstWaveLifecycleNextOperation,
+        productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+        launchDayWatchEntry: "enter_after_production_signoff",
+        nextAction: rolloutWideningDecisionNextAction
+      }
+    );
     assert.ok(Array.isArray(steadyStateDutyBoard.quickActions));
     assert.ok(steadyStateDutyBoard.quickActions.length >= 1);
     assert.ok(steadyStateDutyBoard.quickActions.some((item) => (
@@ -19920,12 +19955,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.priority === "primary"
       && item.source === "first_stable_operating_window"
     )));
+    assert.ok(steadyStateDutyBoard.quickActions.some((item) => (
+      item.key === "review_rollout_widening_decision"
+      && item.priority === (rolloutWideningDecisionReady ? "primary" : "review")
+      && item.source === "rollout_widening_decision"
+    )));
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*firstStableWindow=ready_for_first_stable_operating_window \| action=monitor_first_stable_operating_window/);
+    assert.match(
+      steadyStateSnapshot.summaryText,
+      new RegExp(`Steady-State Duty Board:[\\s\\S]*rolloutWideningDecision=${rolloutWideningDecisionStatus} \\| action=review_rollout_widening_decision \\| ready=${rolloutWideningDecisionReady}`)
+    );
     assert.match(steadyStateSnapshot.summaryText, /readyForDuty=true/);
 
     const steadyStateDutyBoardDownload = await getText(
@@ -19944,8 +19988,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*firstStableWindow=ready_for_first_stable_operating_window \| action=monitor_first_stable_operating_window/);
+    assert.match(
+      steadyStateDutyBoardDownload.body,
+      new RegExp(`Duty Signals:[\\s\\S]*rolloutWideningDecision=${rolloutWideningDecisionStatus} \\| action=review_rollout_widening_decision \\| ready=${rolloutWideningDecisionReady}`)
+    );
     assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:/);
     assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:[\s\S]*Monitor First Stable Operating Window \| priority=primary \| source=first_stable_operating_window/);
+    assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:[\s\S]*Review Rollout Widening Decision \| priority=(primary|review) \| source=rollout_widening_decision/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:[\s\S]*format=launch-operations-overview-status/);
 
@@ -19965,10 +20014,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinks.actionLinksDownload.href, /format=steady-state-duty-action-links/);
     assert.ok(steadyStateDutyActionLinks.workspaceLinks.some((item) => /\/developer\/ops/.test(item.href || "")));
     assert.ok(steadyStateDutyActionLinks.downloadLinks.some((item) => item.format === "steady-state-duty-board"));
+    assert.ok(steadyStateDutyActionLinks.controlLinks.some((item) => (
+      item.key === "review_rollout_widening_decision"
+      && item.source === "rollout_widening_decision"
+    )));
     assert.ok(Array.isArray(steadyStateDutyActionLinks.controlIntents));
     assert.ok(steadyStateDutyActionLinks.controlIntents.length >= 1);
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => item.intent === "open_workspace"));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => item.intent === "download_asset"));
+    assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
+      item.intent === "review_rollout_widening_decision"
+      && item.executionPlan?.prefill?.rolloutWideningDecisionStatus === rolloutWideningDecisionStatus
+      && item.executionPlan?.prefill?.rolloutWideningDecisionReady === rolloutWideningDecisionReady
+      && Number(item.executionPlan?.prefill?.steadyStateQueueTotal) === Number(steadyStateDutyBoard.queueTotal || 0)
+      && Number(item.executionPlan?.prefill?.steadyStateAttentionCount) === Number(steadyStateDutyBoard.attentionCount || 0)
+    )));
     assert.ok(steadyStateDutyActionLinks.controlIntents.every((item) => item.executionPlan?.status === "ready"));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
       item.executionPlan?.prefill?.watchRecordDraftStatus === steadyStateWatchRecordDraftStatus
@@ -20022,6 +20082,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(steadyStateDutyActionLinksDownload.body, /launchDayWatchEntry=enter_after_production_signoff/);
     assert.match(steadyStateDutyActionLinksDownload.body, /intent=open_workspace/);
+    assert.match(steadyStateDutyActionLinksDownload.body, /intent=review_rollout_widening_decision/);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /kind=workspace/);
     assert.match(steadyStateDutyActionLinksDownload.body, /mode=download/);
@@ -20031,6 +20092,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchReadinessNextGateStatus=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchReadinessNextGateCurrentGate=/i);
+    assert.match(steadyStateDutyActionLinksDownload.body, new RegExp(`executionPlans:[\\s\\S]*rolloutWideningDecisionStatus=${rolloutWideningDecisionStatus}`));
+    assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*steadyStateQueueTotal=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, steadyStateLaunchDutyRecordIndexPattern);
 
     const steadyStateDutyDownloadIntent = steadyStateDutyActionLinks.controlIntents.find((item) => (

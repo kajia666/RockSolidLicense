@@ -15204,8 +15204,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ? ensureLaunchWorkflowDownloadHref({
           key: "ops_latest_steady_state_duty_receipt_asset",
           label: "Latest steady-state duty receipt asset",
-          fileName: latestSteadyStateDutyPlanReceipt.fileName || null,
-          format: latestSteadyStateDutyPlanReceipt.format || null,
+          fileName: latestSteadyStateDutyPlanReceipt.fileName || "developer-ops-steady-state-duty-board.txt",
+          format: latestSteadyStateDutyPlanReceipt.format || "steady-state-duty-board",
           href: latestSteadyStateDutyPlanReceipt.href || null,
           source: "developer-ops-steady-state-duty-plan-receipt"
         }, params)
@@ -20710,8 +20710,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       `- status=${steadyStateDutyReceiptReview.status || "-"}`
       + ` | audit=${steadyStateDutyReceiptReview.auditLogId || "-"}`
       + ` | action=${steadyStateDutyReceiptReview.action || "-"}`
-      + ` | file=${steadyStateDutyReceiptReview.fileName || steadyStateDutyReceiptReviewDownload?.fileName || "-"}`
-      + ` | format=${steadyStateDutyReceiptReview.format || steadyStateDutyReceiptReviewDownload?.format || "-"}`
+      + ` | file=${steadyStateDutyReceiptReview.fileName || steadyStateDutyReceiptReviewDownload?.fileName || "developer-ops-steady-state-duty-board.txt"}`
+      + ` | format=${steadyStateDutyReceiptReview.format || steadyStateDutyReceiptReviewDownload?.format || "steady-state-duty-board"}`
       + ` | href=${steadyStateDutyReceiptReview.href || steadyStateDutyReceiptReviewDownload?.href || "-"}`
     );
     lines.push(
@@ -28079,6 +28079,36 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
       summary: "Keep the production sign-off packet attached before entering or transferring steady-state duty."
     });
   }
+  const firstStableOperatingWindowAction = {
+    version: "developer-ops-steady-state-duty-board-first-stable-operating-window-action/v1",
+    status: readyForDuty ? "ready_for_first_stable_operating_window" : "blocked_until_ready_for_duty",
+    ready: readyForDuty,
+    actionKey: "monitor_first_stable_operating_window",
+    boardDownloadKey: boardDownload?.key || null,
+    boardDownloadFormat: boardDownload?.format || null,
+    boardDownloadHref: boardDownload?.href || null,
+    handoffBriefDownloadKey: steadyStateHandoffBrief?.handoffDownload?.key || null,
+    handoffBriefDownloadFormat: steadyStateHandoffBrief?.handoffDownload?.format || null,
+    launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || null,
+    launchOpsOverviewDownloadFormat: launchOpsOverviewContext?.downloadFormat || null,
+    watchRecordDraftStatus,
+    watchRecordDraftRecordCount,
+    productionSignoffPacket,
+    launchDayWatchEntry,
+    queueStatus: steadyStateExceptionDigest?.queueStatus || null,
+    queueTotal,
+    nextAction: readyForDuty
+      ? "Keep the steady-state duty board open through the first stable operating window and attach the handoff brief plus overview status before widening rollout."
+      : "Finish steady-state handoff readiness before entering the first stable operating window."
+  };
+  pushQuickAction({
+    key: firstStableOperatingWindowAction.actionKey,
+    label: "Monitor First Stable Operating Window",
+    priority: readyForDuty ? "primary" : "review",
+    href: boardDownload?.href || workspaceAction?.href || "",
+    source: "first_stable_operating_window",
+    summary: firstStableOperatingWindowAction.nextAction
+  });
   const handoffAssets = [];
   const seenAssets = new Set();
   for (const item of [
@@ -28142,6 +28172,7 @@ function buildDeveloperOpsSteadyStateDutyBoardPayload({
     reviewDownload: steadyStateOperationalReview?.reviewDownload || null,
     exceptionDigestDownload: steadyStateExceptionDigest?.digestDownload || null,
     quickActions,
+    firstStableOperatingWindowAction,
     handoffAssets,
     summary: readyForDuty
       ? "Steady-state duty board is active for the first stable operating lane."
@@ -39735,6 +39766,16 @@ function appendDeveloperOpsSteadyStateDutyBoardLines(lines, board = null, {
     lines.push(
       `- productionSignoffPacket=${board.productionSignoffPacket || "-"}`
       + ` | launchDayWatchEntry=${board.launchDayWatchEntry || "-"}`
+    );
+  }
+  const firstStableOperatingWindowAction = board.firstStableOperatingWindowAction || null;
+  if (firstStableOperatingWindowAction) {
+    lines.push(
+      `- firstStableWindow=${firstStableOperatingWindowAction.status || "-"}`
+      + ` | action=${firstStableOperatingWindowAction.actionKey || "-"}`
+      + ` | ready=${firstStableOperatingWindowAction.ready === true}`
+      + ` | board=${firstStableOperatingWindowAction.boardDownloadFormat || "-"}`
+      + ` | overview=${firstStableOperatingWindowAction.launchOpsOverviewDownloadFormat || "-"}`
     );
   }
   lines.push(
@@ -60058,6 +60099,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             productCodes: scopedProductCodes
           })
         : { items: [] };
+      const steadyStateDutyPlanReceiptAuditLogs = shouldBackfillProtectiveAuditRows
+        ? queryAuditLogRows(db, {
+            eventType: "developer.ops.steady-state-duty-plan.receipt",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
       const firstWaveRuntimeLoginAuditLogs = shouldBackfillProtectiveAuditRows
         ? queryAuditLogRows(db, {
             eventType: "session.login",
@@ -60095,6 +60144,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       if (stabilizationHandoffConfirmationAuditLogs.items?.length) {
         mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, stabilizationHandoffConfirmationAuditLogs.items);
       }
+      if (steadyStateDutyPlanReceiptAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, steadyStateDutyPlanReceiptAuditLogs.items);
+      }
       if (firstWaveRuntimeLoginAuditLogs.items?.length) {
         mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveRuntimeLoginAuditLogs.items);
       }
@@ -60108,6 +60160,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         || firstWaveHandoffAuditLogs.items?.length
         || firstWaveReadinessAuditLogs.items?.length
         || stabilizationHandoffConfirmationAuditLogs.items?.length
+        || steadyStateDutyPlanReceiptAuditLogs.items?.length
         || firstWaveRuntimeLoginAuditLogs.items?.length
         || firstWaveRuntimeCardRedeemAuditLogs.items?.length
         || firstWaveRuntimeDirectCardRedeemAuditLogs.items?.length;
@@ -60122,6 +60175,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
               firstWaveHandoffBackfill: firstWaveHandoffAuditLogs.items?.length || 0,
               firstWaveReadinessBackfill: firstWaveReadinessAuditLogs.items?.length || 0,
               stabilizationHandoffConfirmationBackfill: stabilizationHandoffConfirmationAuditLogs.items?.length || 0,
+              steadyStateDutyPlanReceiptBackfill: steadyStateDutyPlanReceiptAuditLogs.items?.length || 0,
               firstWaveRuntimeBackfill: (firstWaveRuntimeLoginAuditLogs.items?.length || 0)
                 + (firstWaveRuntimeCardRedeemAuditLogs.items?.length || 0)
                 + (firstWaveRuntimeDirectCardRedeemAuditLogs.items?.length || 0)

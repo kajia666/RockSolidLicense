@@ -19890,13 +19890,42 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(steadyStateDutyBoard.boardDownload.href, /format=steady-state-duty-board/);
     assert.match(steadyStateDutyBoard.handoffBriefDownload.href, /format=steady-state-handoff-brief/);
+    assert.deepEqual(
+      steadyStateDutyBoard.firstStableOperatingWindowAction,
+      {
+        version: "developer-ops-steady-state-duty-board-first-stable-operating-window-action/v1",
+        status: "ready_for_first_stable_operating_window",
+        ready: true,
+        actionKey: "monitor_first_stable_operating_window",
+        boardDownloadKey: "ops_steady_state_duty_board",
+        boardDownloadFormat: "steady-state-duty-board",
+        boardDownloadHref: steadyStateDutyBoard.boardDownload.href,
+        handoffBriefDownloadKey: "ops_steady_state_handoff_brief",
+        handoffBriefDownloadFormat: "steady-state-handoff-brief",
+        launchOpsOverviewContextKind: "launch_ops_overview_status",
+        launchOpsOverviewDownloadFormat: "launch-operations-overview-status",
+        watchRecordDraftStatus: steadyStateWatchRecordDraftStatus,
+        watchRecordDraftRecordCount: steadyStateWatchRecordDraftRecordCount,
+        productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+        launchDayWatchEntry: "enter_after_production_signoff",
+        queueStatus: steadyStateDutyBoard.queueStatus,
+        queueTotal: steadyStateDutyBoard.queueTotal,
+        nextAction: "Keep the steady-state duty board open through the first stable operating window and attach the handoff brief plus overview status before widening rollout."
+      }
+    );
     assert.ok(Array.isArray(steadyStateDutyBoard.quickActions));
     assert.ok(steadyStateDutyBoard.quickActions.length >= 1);
+    assert.ok(steadyStateDutyBoard.quickActions.some((item) => (
+      item.key === "monitor_first_stable_operating_window"
+      && item.priority === "primary"
+      && item.source === "first_stable_operating_window"
+    )));
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
+    assert.match(steadyStateSnapshot.summaryText, /Steady-State Duty Board:[\s\S]*firstStableWindow=ready_for_first_stable_operating_window \| action=monitor_first_stable_operating_window/);
     assert.match(steadyStateSnapshot.summaryText, /readyForDuty=true/);
 
     const steadyStateDutyBoardDownload = await getText(
@@ -19914,7 +19943,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*downloadFormat=launch-operations-overview-status/);
     assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
+    assert.match(steadyStateDutyBoardDownload.body, /Duty Signals:[\s\S]*firstStableWindow=ready_for_first_stable_operating_window \| action=monitor_first_stable_operating_window/);
     assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:/);
+    assert.match(steadyStateDutyBoardDownload.body, /Quick Actions:[\s\S]*Monitor First Stable Operating Window \| priority=primary \| source=first_stable_operating_window/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:/);
     assert.match(steadyStateDutyBoardDownload.body, /Handoff Assets:[\s\S]*format=launch-operations-overview-status/);
 

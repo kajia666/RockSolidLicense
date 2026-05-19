@@ -20060,6 +20060,29 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.deepEqual(rolloutWideningExecutionAction.blockedBy, rolloutWideningExecutionBlockedBy);
     assert.equal(rolloutWideningExecutionAction.operatorAction?.intent, "review_rollout_widening_decision");
     assert.equal(rolloutWideningExecutionAction.operatorAction?.executionPlan?.status, "ready");
+    assert.equal(rolloutWideningExecutionAction.receiptPlan?.method, "POST");
+    assert.equal(rolloutWideningExecutionAction.receiptPlan?.route, "/api/developer/ops/steady-state-duty-plan/receipt");
+    assert.equal(rolloutWideningExecutionAction.receiptPlan?.payload?.action, "review_rollout_widening_decision");
+    assert.equal(rolloutWideningExecutionAction.receiptPlan?.payload?.intent, "review_rollout_widening_decision");
+    assert.equal(rolloutWideningExecutionAction.receiptPlan?.payload?.planKind, "rollout_widening_decision");
+    assert.equal(rolloutWideningExecutionAction.receiptPlan?.payload?.planMode, "decision_review");
+    assert.equal(rolloutWideningExecutionAction.receiptPlan?.payload?.targetType, "steady_state_rollout");
+    assert.equal(
+      rolloutWideningExecutionAction.receiptPlan?.payload?.rolloutWideningDecisionStatus,
+      rolloutWideningDecisionStatus
+    );
+    assert.equal(
+      rolloutWideningExecutionAction.receiptPlan?.payload?.rolloutWideningDecisionReady,
+      rolloutWideningDecisionReady
+    );
+    assert.equal(
+      Number(rolloutWideningExecutionAction.receiptPlan?.payload?.steadyStateQueueTotal),
+      Number(steadyStateDutyBoard.queueTotal || 0)
+    );
+    assert.equal(
+      Number(rolloutWideningExecutionAction.receiptPlan?.payload?.steadyStateAttentionCount),
+      Number(steadyStateDutyBoard.attentionCount || 0)
+    );
     assert.ok(steadyStateDutyActionLinks.controlIntents.every((item) => item.executionPlan?.status === "ready"));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
       item.executionPlan?.prefill?.watchRecordDraftStatus === steadyStateWatchRecordDraftStatus
@@ -20131,6 +20154,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       steadyStateDutyActionLinksDownload.body,
       new RegExp(`Action Link Summary:[\\s\\S]*rolloutWideningExecution=${rolloutWideningDecisionStatus} \\| current=${rolloutWideningExecutionCurrent} \\| ready=${rolloutWideningDecisionReady}`)
+    );
+    assert.match(
+      steadyStateDutyActionLinksDownload.body,
+      /Action Link Summary:[\s\S]*rolloutWideningReceipt=POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt \| action=review_rollout_widening_decision \| intent=review_rollout_widening_decision/
     );
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*steadyStateQueueTotal=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, steadyStateLaunchDutyRecordIndexPattern);

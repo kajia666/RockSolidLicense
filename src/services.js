@@ -28798,6 +28798,49 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
       : steadyStateDutyBoard.readyForDuty === true
         ? "monitor_first_stable_operating_window"
         : "complete_steady_state_handoff";
+  const rolloutWideningReceiptPayload = rolloutWideningDecisionAction ? {
+    productCode,
+    channel,
+    action: "review_rollout_widening_decision",
+    intent: "review_rollout_widening_decision",
+    planKind: "rollout_widening_decision",
+    planMode: "decision_review",
+    targetType: "steady_state_rollout",
+    href: rolloutWideningDecisionAction.boardDownloadHref || steadyStateDutyBoard.boardDownload?.href || "",
+    fileName: steadyStateDutyBoard.boardDownload?.fileName || "developer-ops-steady-state-duty-board.txt",
+    format: rolloutWideningDecisionAction.boardDownloadFormat || steadyStateDutyBoard.boardDownload?.format || "steady-state-duty-board",
+    focusKind: "rollout_widening_decision",
+    focusReason: rolloutWideningDecisionAction.nextAction || "Review rollout widening decision after the first stable operating window.",
+    launchOpsOverviewContextKind: rolloutWideningDecisionAction.launchOpsOverviewContextKind || launchOpsOverviewContext?.kind || "",
+    launchOpsOverviewDownloadKey: launchOpsOverviewDownload?.key || launchOpsOverviewContext?.downloadKey || "",
+    launchOpsOverviewDownloadFileName: launchOpsOverviewDownload?.fileName || launchOpsOverviewContext?.downloadFileName || "",
+    launchOpsOverviewDownloadFormat: rolloutWideningDecisionAction.launchOpsOverviewDownloadFormat
+      || launchOpsOverviewDownload?.format
+      || launchOpsOverviewContext?.downloadFormat
+      || "",
+    launchOpsOverviewDownloadHref: launchOpsOverviewDownload?.href || launchOpsOverviewContext?.downloadHref || "",
+    launchOpsOverviewContextLaunchDutyRecordIndexPath: launchOpsOverviewContext?.launchDutyRecordIndexPath || "",
+    watchRecordDraftStatus: watchRecordDraftStatus || "",
+    watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
+    productionSignoffPacket: productionSignoffPacket || "",
+    launchDayWatchEntry: launchDayWatchEntry || "",
+    launchReadinessNextGateStatus: currentLaunchReadinessNextGate?.status || "",
+    launchReadinessNextGateDecision: currentLaunchReadinessNextGate?.decision || "",
+    launchReadinessNextGateCurrentGate: currentLaunchReadinessNextGate?.currentGate || "",
+    launchReadinessNextGateCanEnterInitialLaunch: currentLaunchReadinessNextGate?.canEnterInitialLaunch === true,
+    launchReadinessNextGateLaunchDutyRecordIndexPath: currentLaunchReadinessNextGate?.launchDutyRecordIndexPath || "",
+    firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
+    firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || "",
+    firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
+    firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || "",
+    firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
+    rolloutWideningDecisionStatus: rolloutWideningDecisionAction.status || "",
+    rolloutWideningDecisionReady: rolloutWideningDecisionAction.ready === true,
+    steadyStateQueueStatus: rolloutWideningDecisionAction.queueStatus || steadyStateDutyBoard.queueStatus || "",
+    steadyStateQueueTotal: rolloutWideningDecisionAction.queueTotal ?? steadyStateDutyBoard.queueTotal ?? "",
+    steadyStateAttentionCount: rolloutWideningDecisionAction.attentionCount ?? steadyStateDutyBoard.attentionCount ?? "",
+    note: "steady_state_rollout_widening_decision"
+  } : null;
   const rolloutWideningExecutionAction = rolloutWideningDecisionAction ? {
     version: "developer-ops-steady-state-duty-action-links-rollout-widening-execution-action/v1",
     key: "rollout_widening_decision_execution",
@@ -28839,6 +28882,15 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     ],
     blockedBy: rolloutWideningExecutionBlockedBy,
     operatorAction: rolloutWideningOperatorAction,
+    receiptPlan: {
+      status: productCode ? "ready" : "pending",
+      method: "POST",
+      route: "/api/developer/ops/steady-state-duty-plan/receipt",
+      eventType: "developer.ops.steady-state-duty-plan.receipt",
+      entityType: "developer_ops_steady_state_duty_plan",
+      payload: rolloutWideningReceiptPayload,
+      operatorHint: "Post this receipt payload after the rollout widening decision is reviewed so Developer Ops can attach audit evidence."
+    },
     operatorOrder: Array.isArray(rolloutWideningDecisionAction.operatorOrder)
       ? rolloutWideningDecisionAction.operatorOrder
       : LAUNCH_OPERATIONS_ROLLOUT_WIDENING_DECISION_OPERATOR_ORDER.slice(),
@@ -40934,6 +40986,15 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
       + ` | blockedBy=${blockedBy || "-"}`
       + ` | checks=${requiredChecks || "-"}`
     );
+    if (rolloutWideningExecutionAction.receiptPlan) {
+      const receiptPlan = rolloutWideningExecutionAction.receiptPlan;
+      lines.push(
+        `- rolloutWideningReceipt=${receiptPlan.method || "-"} ${receiptPlan.route || "-"}`
+        + ` | action=${receiptPlan.payload?.action || "-"}`
+        + ` | intent=${receiptPlan.payload?.intent || "-"}`
+        + ` | status=${receiptPlan.status || "-"}`
+      );
+    }
   }
   if (actionLinks.productionSignoffPacket || actionLinks.launchDayWatchEntry) {
     lines.push(

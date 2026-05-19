@@ -20029,6 +20029,37 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && Number(item.executionPlan?.prefill?.steadyStateQueueTotal) === Number(steadyStateDutyBoard.queueTotal || 0)
       && Number(item.executionPlan?.prefill?.steadyStateAttentionCount) === Number(steadyStateDutyBoard.attentionCount || 0)
     )));
+    const rolloutWideningExecutionAction = steadyStateDutyActionLinks.rolloutWideningExecutionAction;
+    const rolloutWideningExecutionCurrent = rolloutWideningDecisionReady
+      ? "review_rollout_widening_decision"
+      : steadyStateDutyActionLinks.readyForDuty
+        ? "monitor_first_stable_operating_window"
+        : "complete_steady_state_handoff";
+    const rolloutWideningExecutionBlockedBy = [
+      steadyStateDutyActionLinks.readyForDuty ? null : "steady_state_duty_ready",
+      Number(steadyStateDutyBoard.queueTotal || 0) > 0 ? "exception_queue" : null,
+      Number(steadyStateDutyBoard.attentionCount || 0) > 0 ? "attention_signals" : null
+    ].filter(Boolean);
+    assert.ok(rolloutWideningExecutionAction);
+    assert.equal(rolloutWideningExecutionAction.status, rolloutWideningDecisionStatus);
+    assert.equal(rolloutWideningExecutionAction.ready, rolloutWideningDecisionReady);
+    assert.equal(rolloutWideningExecutionAction.currentActionKey, rolloutWideningExecutionCurrent);
+    assert.equal(rolloutWideningExecutionAction.nextDownloadFormat, "steady-state-duty-board");
+    assert.equal(rolloutWideningExecutionAction.actionLinksDownloadFormat, "steady-state-duty-action-links");
+    assert.equal(rolloutWideningExecutionAction.queueTotal, steadyStateDutyBoard.queueTotal);
+    assert.equal(rolloutWideningExecutionAction.attentionCount, steadyStateDutyBoard.attentionCount);
+    assert.deepEqual(
+      rolloutWideningExecutionAction.requiredChecks,
+      [
+        "steady_state_duty_ready",
+        "first_stable_operating_window_reviewed",
+        "exception_queue_clear",
+        "attention_signals_clear"
+      ]
+    );
+    assert.deepEqual(rolloutWideningExecutionAction.blockedBy, rolloutWideningExecutionBlockedBy);
+    assert.equal(rolloutWideningExecutionAction.operatorAction?.intent, "review_rollout_widening_decision");
+    assert.equal(rolloutWideningExecutionAction.operatorAction?.executionPlan?.status, "ready");
     assert.ok(steadyStateDutyActionLinks.controlIntents.every((item) => item.executionPlan?.status === "ready"));
     assert.ok(steadyStateDutyActionLinks.controlIntents.some((item) => (
       item.executionPlan?.prefill?.watchRecordDraftStatus === steadyStateWatchRecordDraftStatus
@@ -20063,6 +20094,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateSnapshot.summaryText, /actionCount=\d+/);
     assert.match(steadyStateSnapshot.summaryText, /controlIntents=\d+/);
     assert.match(steadyStateSnapshot.summaryText, /executionPlans=\d+/);
+    assert.match(
+      steadyStateSnapshot.summaryText,
+      new RegExp(`Steady-State Duty Action Links:[\\s\\S]*rolloutWideningExecution=${rolloutWideningDecisionStatus} \\| current=${rolloutWideningExecutionCurrent} \\| ready=${rolloutWideningDecisionReady}`)
+    );
 
     const steadyStateDutyActionLinksDownload = await getText(
       baseUrl,
@@ -20093,6 +20128,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchReadinessNextGateStatus=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*launchReadinessNextGateCurrentGate=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, new RegExp(`executionPlans:[\\s\\S]*rolloutWideningDecisionStatus=${rolloutWideningDecisionStatus}`));
+    assert.match(
+      steadyStateDutyActionLinksDownload.body,
+      new RegExp(`Action Link Summary:[\\s\\S]*rolloutWideningExecution=${rolloutWideningDecisionStatus} \\| current=${rolloutWideningExecutionCurrent} \\| ready=${rolloutWideningDecisionReady}`)
+    );
     assert.match(steadyStateDutyActionLinksDownload.body, /executionPlans:[\s\S]*steadyStateQueueTotal=/i);
     assert.match(steadyStateDutyActionLinksDownload.body, steadyStateLaunchDutyRecordIndexPattern);
 

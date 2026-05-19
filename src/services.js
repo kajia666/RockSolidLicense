@@ -24487,6 +24487,39 @@ function normalizeLaunchDutyPacketReviewState(value = null) {
   };
 }
 
+function readDeveloperOpsOptionalBoolean(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) {
+      continue;
+    }
+    const text = String(value).trim().toLowerCase();
+    if (text === "") {
+      continue;
+    }
+    if (value === true || text === "true" || text === "1" || text === "yes") {
+      return true;
+    }
+    if (value === false || text === "false" || text === "0" || text === "no") {
+      return false;
+    }
+    return Boolean(value);
+  }
+  return null;
+}
+
+function readDeveloperOpsOptionalNonNegativeInteger(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null || String(value).trim() === "") {
+      continue;
+    }
+    const number = Number(value);
+    if (Number.isFinite(number)) {
+      return Math.max(0, Math.trunc(number));
+    }
+  }
+  return null;
+}
+
 function buildSteadyStateDutyPlanReceiptPayload(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -24581,6 +24614,26 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       || metadata.launchDutyPacketReviewSnapshot
       || null
   );
+  const rolloutWideningDecisionStatus = normalizeDeveloperOpsConfirmationToken(
+    item.rolloutWideningDecisionStatus || metadata.rolloutWideningDecisionStatus,
+    ""
+  );
+  const rolloutWideningDecisionReady = readDeveloperOpsOptionalBoolean(
+    item.rolloutWideningDecisionReady,
+    metadata.rolloutWideningDecisionReady
+  );
+  const steadyStateQueueStatus = normalizeDeveloperOpsConfirmationToken(
+    item.steadyStateQueueStatus || metadata.steadyStateQueueStatus,
+    ""
+  );
+  const steadyStateQueueTotal = readDeveloperOpsOptionalNonNegativeInteger(
+    item.steadyStateQueueTotal,
+    metadata.steadyStateQueueTotal
+  );
+  const steadyStateAttentionCount = readDeveloperOpsOptionalNonNegativeInteger(
+    item.steadyStateAttentionCount,
+    metadata.steadyStateAttentionCount
+  );
   const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
   const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
   const note = String(item.note ?? metadata.note ?? "").trim();
@@ -24614,6 +24667,11 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     launchOpsOverviewContextLaunchDutyRecordIndexPath,
     launchDutyRecordIndexState,
     launchDutyPacketReviewState,
+    rolloutWideningDecisionStatus,
+    rolloutWideningDecisionReady,
+    steadyStateQueueStatus,
+    steadyStateQueueTotal,
+    steadyStateAttentionCount,
     focusKind,
     focusReason,
     note,
@@ -24649,6 +24707,11 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       launchOpsOverviewContextLaunchDutyRecordIndexPath,
       launchDutyRecordIndexState,
       launchDutyPacketReviewState,
+      rolloutWideningDecisionStatus,
+      rolloutWideningDecisionReady,
+      steadyStateQueueStatus,
+      steadyStateQueueTotal,
+      steadyStateAttentionCount,
       focusKind,
       focusReason,
       note,
@@ -24688,6 +24751,11 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
     launchReadinessNextGateLaunchDutyRecordIndexPath: String(receipt.launchReadinessNextGateLaunchDutyRecordIndexPath || "").trim(),
     launchDutyRecordIndexState: normalizeLaunchDutyRecordIndexState(receipt.launchDutyRecordIndexState),
     launchDutyPacketReviewState: normalizeLaunchDutyPacketReviewState(receipt.launchDutyPacketReviewState),
+    rolloutWideningDecisionStatus: normalizeDeveloperOpsConfirmationToken(receipt.rolloutWideningDecisionStatus, ""),
+    rolloutWideningDecisionReady: readDeveloperOpsOptionalBoolean(receipt.rolloutWideningDecisionReady),
+    steadyStateQueueStatus: normalizeDeveloperOpsConfirmationToken(receipt.steadyStateQueueStatus, ""),
+    steadyStateQueueTotal: readDeveloperOpsOptionalNonNegativeInteger(receipt.steadyStateQueueTotal),
+    steadyStateAttentionCount: readDeveloperOpsOptionalNonNegativeInteger(receipt.steadyStateAttentionCount),
     focusKind: normalizeDeveloperOpsConfirmationToken(receipt.focusKind, ""),
     focusReason: String(receipt.focusReason || "").trim(),
     note: String(receipt.note || "").trim()
@@ -24984,6 +25052,31 @@ function selectSteadyStateDutyPlanPostSignoffArchiveReceiptForLaunchDuty(receipt
   const candidates = filterSteadyStateDutyPlanReceiptsForLaunchDuty(receipts, { productCode, channel })
     .map((item) => buildSteadyStateDutyPlanReceiptPayload(item))
     .filter((item) => item?.status === "recorded" && isSteadyStateDutyPlanPostSignoffArchiveReceipt(item));
+  return candidates
+    .slice()
+    .sort((left, right) => snapshotDateMs(right?.recordedAt || right?.createdAt) - snapshotDateMs(left?.recordedAt || left?.createdAt))
+    [0] || null;
+}
+
+function isSteadyStateDutyPlanRolloutWideningDecisionReceipt(receipt = null) {
+  const payload = buildSteadyStateDutyPlanReceiptPayload(receipt);
+  if (!payload) {
+    return false;
+  }
+  return payload.action === "review_rollout_widening_decision"
+    || payload.intent === "review_rollout_widening_decision"
+    || payload.planKind === "rollout_widening_decision"
+    || payload.focusKind === "rollout_widening_decision"
+    || (payload.planMode === "decision_review" && payload.targetType === "steady_state_rollout");
+}
+
+function selectSteadyStateDutyPlanRolloutWideningReceiptForLaunchDuty(receipts = [], {
+  productCode = "",
+  channel = ""
+} = {}) {
+  const candidates = filterSteadyStateDutyPlanReceiptsForLaunchDuty(receipts, { productCode, channel })
+    .map((item) => buildSteadyStateDutyPlanReceiptPayload(item))
+    .filter((item) => item?.status === "recorded" && isSteadyStateDutyPlanRolloutWideningDecisionReceipt(item));
   return candidates
     .slice()
     .sort((left, right) => snapshotDateMs(right?.recordedAt || right?.createdAt) - snapshotDateMs(left?.recordedAt || left?.createdAt))
@@ -28522,7 +28615,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
   scope = {},
   steadyStateDutyBoard = null,
   launchReadinessNextGate = null,
-  launchReadinessNextGateHandoff = null
+  launchReadinessNextGateHandoff = null,
+  rolloutWideningDecisionReceipt = null
 } = {}) {
   if (!steadyStateDutyBoard || typeof steadyStateDutyBoard !== "object") {
     return null;
@@ -28554,6 +28648,7 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     && typeof steadyStateDutyBoard.rolloutWideningDecisionAction === "object"
     ? steadyStateDutyBoard.rolloutWideningDecisionAction
     : null;
+  const rolloutWideningDecisionReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(rolloutWideningDecisionReceipt);
   const currentLaunchReadinessNextGate = launchReadinessNextGate && typeof launchReadinessNextGate === "object"
     ? launchReadinessNextGate
     : steadyStateDutyBoard.launchReadinessNextGate && typeof steadyStateDutyBoard.launchReadinessNextGate === "object"
@@ -28900,6 +28995,76 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
         ? "Keep monitoring the first stable operating window until queue and attention signals are clear."
         : "Complete steady-state duty readiness before opening rollout widening."
   } : null;
+  const rolloutWideningReceiptRecorded = Boolean(
+    rolloutWideningDecisionReceiptPayload?.auditLogId
+    && isSteadyStateDutyPlanRolloutWideningDecisionReceipt(rolloutWideningDecisionReceiptPayload)
+  );
+  const rolloutWideningReceiptNextDownload = productCode
+    ? buildDeveloperOpsLaunchOperationsShiftActionPlanDownload(linkScope)
+    : null;
+  const rolloutWideningReceiptReadbackAction = rolloutWideningDecisionAction ? {
+    version: "developer-ops-steady-state-duty-action-links-rollout-widening-receipt-readback-action/v1",
+    key: "rollout_widening_receipt_readback",
+    status: rolloutWideningReceiptRecorded
+      ? "recorded_ready_for_first_operating_result_handoff"
+      : "awaiting_rollout_widening_receipt",
+    ready: rolloutWideningReceiptRecorded,
+    receiptRecorded: rolloutWideningReceiptRecorded,
+    auditLogId: rolloutWideningDecisionReceiptPayload?.auditLogId || null,
+    recordedAt: rolloutWideningDecisionReceiptPayload?.recordedAt || rolloutWideningDecisionReceiptPayload?.createdAt || null,
+    recordedBy: rolloutWideningDecisionReceiptPayload?.recordedBy || null,
+    currentActionKey: rolloutWideningReceiptRecorded
+      ? "handoff_first_operating_result"
+      : "record_rollout_widening_decision",
+    receiptAction: rolloutWideningDecisionReceiptPayload?.action || null,
+    receiptIntent: rolloutWideningDecisionReceiptPayload?.intent || null,
+    receiptPlanKind: rolloutWideningDecisionReceiptPayload?.planKind || null,
+    receiptPlanMode: rolloutWideningDecisionReceiptPayload?.planMode || null,
+    receiptVisibilityStatus: rolloutWideningDecisionReceiptPayload?.receiptVisibility?.status || null,
+    rolloutWideningDecisionStatus: rolloutWideningDecisionReceiptPayload?.rolloutWideningDecisionStatus
+      || rolloutWideningDecisionAction.status
+      || null,
+    rolloutWideningDecisionReady: rolloutWideningDecisionReceiptPayload?.rolloutWideningDecisionReady ?? (rolloutWideningDecisionAction.ready === true),
+    queueStatus: rolloutWideningDecisionReceiptPayload?.steadyStateQueueStatus
+      || rolloutWideningDecisionAction.queueStatus
+      || steadyStateDutyBoard.queueStatus
+      || null,
+    queueTotal: rolloutWideningDecisionReceiptPayload?.steadyStateQueueTotal
+      ?? rolloutWideningDecisionAction.queueTotal
+      ?? steadyStateDutyBoard.queueTotal
+      ?? null,
+    attentionCount: rolloutWideningDecisionReceiptPayload?.steadyStateAttentionCount
+      ?? rolloutWideningDecisionAction.attentionCount
+      ?? steadyStateDutyBoard.attentionCount
+      ?? null,
+    nextDownloadKey: rolloutWideningReceiptRecorded
+      ? rolloutWideningReceiptNextDownload?.key || "ops_launch_operations_shift_action_plan"
+      : actionLinksDownload?.key || "ops_steady_state_duty_action_links",
+    nextDownloadFormat: rolloutWideningReceiptRecorded
+      ? rolloutWideningReceiptNextDownload?.format || "launch-operations-shift-action-plan"
+      : actionLinksDownload?.format || "steady-state-duty-action-links",
+    nextDownloadHref: rolloutWideningReceiptRecorded
+      ? rolloutWideningReceiptNextDownload?.href || null
+      : actionLinksDownload?.href || null,
+    receiptPlan: rolloutWideningReceiptRecorded
+      ? null
+      : rolloutWideningExecutionAction?.receiptPlan || null,
+    requiredChecks: rolloutWideningReceiptRecorded
+      ? [
+          "rollout_widening_receipt_recorded",
+          "receipt_visible_in_developer_ops",
+          "first_operating_result_handoff_ready"
+        ]
+      : [
+          "rollout_widening_decision_reviewed",
+          "steady_state_duty_ready",
+          "receipt_payload_ready"
+        ],
+    blockedBy: rolloutWideningReceiptRecorded ? [] : ["rollout_widening_receipt"],
+    nextAction: rolloutWideningReceiptRecorded
+      ? "Hand off the first operating result from the launch operations shift action plan."
+      : "Post the rollout widening receipt so Developer Ops can show the decision as recorded before first-result handoff."
+  } : null;
   return {
     version: "developer-ops-steady-state-duty-action-links/v1",
     projectCode: productCode,
@@ -28930,6 +29095,7 @@ function buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     downloadLinks,
     controlIntents,
     rolloutWideningExecutionAction,
+    rolloutWideningReceiptReadbackAction,
     primaryIntent: controlIntents[0] || null,
     primaryAction: workspaceLinks[0] || controlLinks[0] || downloadLinks[0] || null,
     actionLinks,
@@ -35297,6 +35463,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       channel: latestReceipt?.channel || scope.channel || "stable"
     }
   );
+  const rolloutWideningDecisionReceipt = selectSteadyStateDutyPlanRolloutWideningReceiptForLaunchDuty(
+    steadyStateDutyPlanReceipts,
+    {
+      productCode: latestReceipt?.productCode || scope.productCode || "",
+      channel: latestReceipt?.channel || scope.channel || "stable"
+    }
+  );
   const postSignoffArchiveReceipt = selectSteadyStateDutyPlanPostSignoffArchiveReceiptForLaunchDuty(
     steadyStateDutyPlanReceipts,
     {
@@ -35625,7 +35798,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     scope,
     steadyStateDutyBoard,
     launchReadinessNextGate,
-    launchReadinessNextGateHandoff
+    launchReadinessNextGateHandoff,
+    rolloutWideningDecisionReceipt
   });
   const launchOperationsEvidenceChain = buildDeveloperOpsLaunchOperationsEvidenceChain({
     scope,
@@ -36078,6 +36252,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     steadyStateDutyBoard,
     steadyStateDutyActionLinks,
     latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
+    rolloutWideningDecisionReceipt: buildSteadyStateDutyPlanReceiptPayload(rolloutWideningDecisionReceipt),
     postSignoffArchiveReceipt: buildSteadyStateDutyPlanReceiptPayload(postSignoffArchiveReceipt),
     launchDutyRecordIndexReceiptSelection,
     launchDutyPacketReviewReceiptSelection,
@@ -40996,6 +41171,27 @@ function appendDeveloperOpsSteadyStateDutyActionLinksLines(lines, actionLinks = 
       );
     }
   }
+  const rolloutWideningReceiptReadbackAction = actionLinks.rolloutWideningReceiptReadbackAction || null;
+  if (rolloutWideningReceiptReadbackAction) {
+    const blockedBy = Array.isArray(rolloutWideningReceiptReadbackAction.blockedBy)
+      ? rolloutWideningReceiptReadbackAction.blockedBy.join(",")
+      : "";
+    const requiredChecks = Array.isArray(rolloutWideningReceiptReadbackAction.requiredChecks)
+      ? rolloutWideningReceiptReadbackAction.requiredChecks.join(",")
+      : "";
+    lines.push(
+      `- rolloutWideningReceiptReadback=${rolloutWideningReceiptReadbackAction.status || "-"}`
+      + ` | receiptRecorded=${rolloutWideningReceiptReadbackAction.receiptRecorded === true}`
+      + ` | audit=${rolloutWideningReceiptReadbackAction.auditLogId || "-"}`
+      + ` | ready=${rolloutWideningReceiptReadbackAction.ready === true}`
+    );
+    lines.push(
+      `- rolloutWideningReceiptNext=${rolloutWideningReceiptReadbackAction.currentActionKey || "-"}`
+      + ` | nextDownload=${rolloutWideningReceiptReadbackAction.nextDownloadFormat || "-"}`
+      + ` | blockedBy=${blockedBy || "-"}`
+      + ` | checks=${requiredChecks || "-"}`
+    );
+  }
   if (actionLinks.productionSignoffPacket || actionLinks.launchDayWatchEntry) {
     lines.push(
       `- productionSignoffPacket=${actionLinks.productionSignoffPacket || "-"}`
@@ -43544,7 +43740,8 @@ function buildDeveloperOpsSteadyStateDutyActionLinksText(payload = {}) {
   });
   const actionLinks = readiness.steadyStateDutyActionLinks || buildDeveloperOpsSteadyStateDutyActionLinksPayload({
     scope,
-    steadyStateDutyBoard: readiness.steadyStateDutyBoard || null
+    steadyStateDutyBoard: readiness.steadyStateDutyBoard || null,
+    rolloutWideningDecisionReceipt: readiness.rolloutWideningDecisionReceipt || null
   });
   const lines = [
     "RockSolid Developer Ops Steady-State Duty Action Links",
@@ -61423,6 +61620,26 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           || body.launchDutyPacketReviewSnapshot
           || null
       );
+      const rolloutWideningDecisionStatus = normalizeDeveloperOpsConfirmationToken(
+        body.rolloutWideningDecisionStatus || body.dutyPlanRolloutWideningDecisionStatus,
+        ""
+      );
+      const rolloutWideningDecisionReady = readDeveloperOpsOptionalBoolean(
+        body.rolloutWideningDecisionReady,
+        body.dutyPlanRolloutWideningDecisionReady
+      );
+      const steadyStateQueueStatus = normalizeDeveloperOpsConfirmationToken(
+        body.steadyStateQueueStatus || body.dutyPlanSteadyStateQueueStatus,
+        ""
+      );
+      const steadyStateQueueTotal = readDeveloperOpsOptionalNonNegativeInteger(
+        body.steadyStateQueueTotal,
+        body.dutyPlanSteadyStateQueueTotal
+      );
+      const steadyStateAttentionCount = readDeveloperOpsOptionalNonNegativeInteger(
+        body.steadyStateAttentionCount,
+        body.dutyPlanSteadyStateAttentionCount
+      );
       const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
       const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
@@ -61473,6 +61690,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchOpsOverviewContextLaunchDutyRecordIndexPath,
           launchDutyRecordIndexState,
           launchDutyPacketReviewState,
+          rolloutWideningDecisionStatus,
+          rolloutWideningDecisionReady,
+          steadyStateQueueStatus,
+          steadyStateQueueTotal,
+          steadyStateAttentionCount,
           focusKind,
           focusReason,
           note,
@@ -61512,6 +61734,11 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           launchOpsOverviewContextLaunchDutyRecordIndexPath,
           launchDutyRecordIndexState,
           launchDutyPacketReviewState,
+          rolloutWideningDecisionStatus,
+          rolloutWideningDecisionReady,
+          steadyStateQueueStatus,
+          steadyStateQueueTotal,
+          steadyStateAttentionCount,
           focusKind,
           focusReason,
           note,

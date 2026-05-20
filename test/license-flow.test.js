@@ -23637,6 +23637,37 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(rolloutWideningReceiptReadbackAction.rolloutWideningDecisionReady, rolloutWideningDecisionReady);
     assert.deepEqual(rolloutWideningReceiptReadbackAction.blockedBy, []);
 
+    const rolloutWideningReceiptShiftActionPlan = rolloutWideningReceiptSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsShiftActionPlan;
+    assert.ok(rolloutWideningReceiptShiftActionPlan);
+    const firstOperatingResultHandoffAction = rolloutWideningReceiptShiftActionPlan.firstOperatingResultHandoffAction;
+    assert.ok(firstOperatingResultHandoffAction);
+    assert.equal(firstOperatingResultHandoffAction.status, "ready_for_first_operating_result_handoff");
+    assert.equal(firstOperatingResultHandoffAction.ready, true);
+    assert.equal(firstOperatingResultHandoffAction.currentActionKey, "handoff_first_operating_result");
+    assert.equal(firstOperatingResultHandoffAction.rolloutWideningDecisionReceiptAuditLogId, rolloutWideningDecisionReceipt.auditLogId);
+    assert.equal(firstOperatingResultHandoffAction.nextDownloadFormat, "launch-operations-overview-status");
+    assert.deepEqual(firstOperatingResultHandoffAction.blockedBy, []);
+    assert.equal(firstOperatingResultHandoffAction.operatorAction?.key, "handoff_first_operating_result");
+    assert.equal(firstOperatingResultHandoffAction.operatorAction?.priority, "primary");
+    assert.equal(firstOperatingResultHandoffAction.operatorAction?.source, "first_operating_result_handoff");
+    assert.equal(
+      firstOperatingResultHandoffAction.operatorAction?.executionPlan?.receiptPlan?.payload?.action,
+      "handoff_first_operating_result"
+    );
+    assert.equal(
+      firstOperatingResultHandoffAction.operatorAction?.executionPlan?.receiptPlan?.payload?.planKind,
+      "first_operating_result_handoff"
+    );
+    assert.equal(
+      firstOperatingResultHandoffAction.operatorAction?.executionPlan?.receiptPlan?.payload?.rolloutWideningDecisionReceiptAuditLogId,
+      rolloutWideningDecisionReceipt.auditLogId
+    );
+    assert.ok(rolloutWideningReceiptShiftActionPlan.operatorActions.some((item) => (
+      item.key === "handoff_first_operating_result"
+      && item.executionPlan?.prefill?.rolloutWideningDecisionReceiptAuditLogId === rolloutWideningDecisionReceipt.auditLogId
+    )));
+
     const rolloutWideningReceiptActionLinksDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=steady-state-duty-action-links",
@@ -23649,6 +23680,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       rolloutWideningReceiptActionLinksDownload.body,
       /rolloutWideningReceiptNext=handoff_first_operating_result \| nextDownload=launch-operations-shift-action-plan/
+    );
+    const rolloutWideningReceiptShiftActionPlanDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-shift-action-plan",
+      ownerSession.token
+    );
+    assert.match(
+      rolloutWideningReceiptShiftActionPlanDownload.body,
+      new RegExp(`firstOperatingResultHandoff=ready_for_first_operating_result_handoff \\| current=handoff_first_operating_result \\| receiptAudit=${rolloutWideningDecisionReceipt.auditLogId}`)
+    );
+    assert.match(
+      rolloutWideningReceiptShiftActionPlanDownload.body,
+      /Shift Actions:[\s\S]*handoff_first_operating_result[^\n]*priority=primary[^\n]*format=launch-operations-overview-status/
+    );
+    assert.match(
+      rolloutWideningReceiptShiftActionPlanDownload.body,
+      new RegExp(`Receipt Plans:[\\s\\S]*handoff_first_operating_result[^\\n]*action=handoff_first_operating_result[^\\n]*rolloutWideningDecisionReceiptAudit=${rolloutWideningDecisionReceipt.auditLogId}`)
     );
 
     const launchOperationsChecksumsDownload = await getText(

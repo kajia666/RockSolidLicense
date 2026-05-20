@@ -30314,6 +30314,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       || launchOperationsHandoffSummary?.rolloutWideningDecisionAction
       || null
   });
+  const rolloutWideningReceiptReadbackAction = steadyStateDutyActionLinks?.rolloutWideningReceiptReadbackAction
+    && typeof steadyStateDutyActionLinks.rolloutWideningReceiptReadbackAction === "object"
+      ? steadyStateDutyActionLinks.rolloutWideningReceiptReadbackAction
+      : null;
   const currentLaunchReadinessNextGate = launchReadinessNextGate
     || dailyBrief.launchReadinessNextGate
     || launchOperationsHandoffSummary?.launchReadinessNextGate
@@ -30342,7 +30346,13 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     format = "",
     source = "",
     summary = "",
-    confirmation = ""
+    confirmation = "",
+    receiptAction = "",
+    receiptIntent = "",
+    receiptPlanKind = "",
+    receiptPlanMode = "",
+    receiptTargetType = "",
+    receiptPayloadExtra = {}
   } = {}) => {
     const mode = kind === "download"
       ? "download"
@@ -30350,26 +30360,30 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         ? "open_workspace"
         : "review";
     const hasHref = Boolean(String(href || "").trim());
-    const receiptAction = mode === "download"
+    const resolvedReceiptAction = receiptAction || (mode === "download"
       ? "download"
       : mode === "open_workspace"
         ? "open"
-        : "review";
-    const receiptIntent = mode === "download"
+        : "review");
+    const resolvedReceiptIntent = receiptIntent || (mode === "download"
       ? "download_asset"
-      : mode;
+      : mode);
+    const resolvedReceiptPlanKind = receiptPlanKind || kind;
+    const resolvedReceiptPlanMode = receiptPlanMode || mode;
+    const resolvedReceiptTargetType = receiptTargetType || source || kind;
+    const rolloutWideningDecisionReceiptAuditLogId = rolloutWideningReceiptReadbackAction?.auditLogId || "";
     const receiptPayload = {
       productCode,
       channel,
-      action: receiptAction,
-      intent: receiptIntent,
-      planKind: kind,
-      planMode: mode,
-      targetType: source || kind,
+      action: resolvedReceiptAction,
+      intent: resolvedReceiptIntent,
+      planKind: resolvedReceiptPlanKind,
+      planMode: resolvedReceiptPlanMode,
+      targetType: resolvedReceiptTargetType,
       href: href || "",
       fileName: fileName || "",
       format: format || "",
-      focusKind: source || kind,
+      focusKind: resolvedReceiptTargetType,
       focusReason: summary || label || key || "",
       launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || "",
       launchOpsOverviewStatus: launchOpsOverviewContext?.status || "",
@@ -30394,9 +30408,11 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
       rolloutWideningDecisionStatus: rolloutWideningDecisionAction?.status || "",
       rolloutWideningDecisionReady: rolloutWideningDecisionAction?.ready === true,
+      rolloutWideningDecisionReceiptAuditLogId,
       steadyStateQueueStatus: rolloutWideningDecisionAction?.queueStatus || steadyStateDutyBoard?.queueStatus || "",
       steadyStateQueueTotal: rolloutWideningDecisionAction?.queueTotal ?? steadyStateDutyBoard?.queueTotal ?? "",
       steadyStateAttentionCount: rolloutWideningDecisionAction?.attentionCount ?? steadyStateDutyBoard?.attentionCount ?? "",
+      ...compactRouteParams(receiptPayloadExtra),
       note: `launch_operations_shift_action:${key || "shift_action"}`
     };
     return {
@@ -30436,6 +30452,7 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
         firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
         rolloutWideningDecisionStatus: rolloutWideningDecisionAction?.status || "",
         rolloutWideningDecisionReady: rolloutWideningDecisionAction?.ready === true,
+        rolloutWideningDecisionReceiptAuditLogId,
         steadyStateQueueStatus: rolloutWideningDecisionAction?.queueStatus || steadyStateDutyBoard?.queueStatus || "",
         steadyStateQueueTotal: rolloutWideningDecisionAction?.queueTotal ?? steadyStateDutyBoard?.queueTotal ?? "",
         steadyStateAttentionCount: rolloutWideningDecisionAction?.attentionCount ?? steadyStateDutyBoard?.attentionCount ?? ""
@@ -30466,7 +30483,13 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     source = "",
     summary = "",
     confirmation = "",
-    executionPlan = null
+    executionPlan = null,
+    receiptAction = "",
+    receiptIntent = "",
+    receiptPlanKind = "",
+    receiptPlanMode = "",
+    receiptTargetType = "",
+    receiptPayloadExtra = {}
   } = {}) => {
     const resolvedKey = String(key || label || "").trim();
     if (!resolvedKey || operatorActions.some((item) => item.key === resolvedKey)) {
@@ -30484,7 +30507,13 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
           format,
           source,
           summary,
-          confirmation
+          confirmation,
+          receiptAction,
+          receiptIntent,
+          receiptPlanKind,
+          receiptPlanMode,
+          receiptTargetType,
+          receiptPayloadExtra
         });
     operatorActions.push({
       key: resolvedKey,
@@ -30503,6 +30532,83 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       executionPlan: resolvedExecutionPlan
     });
   };
+  let firstOperatingResultHandoffAction = null;
+  if (rolloutWideningReceiptReadbackAction) {
+    const handoffReady = rolloutWideningReceiptReadbackAction.ready === true
+      && rolloutWideningReceiptReadbackAction.receiptRecorded === true;
+    const nextDownload = launchOpsOverviewDownload || actionPlanDownload || null;
+    firstOperatingResultHandoffAction = {
+      version: "developer-ops-launch-operations-first-operating-result-handoff-action/v1",
+      key: "first_operating_result_handoff",
+      status: handoffReady
+        ? "ready_for_first_operating_result_handoff"
+        : "awaiting_rollout_widening_receipt",
+      ready: handoffReady,
+      currentActionKey: handoffReady
+        ? "handoff_first_operating_result"
+        : "record_rollout_widening_decision",
+      rolloutWideningDecisionReceiptAuditLogId: rolloutWideningReceiptReadbackAction.auditLogId || null,
+      rolloutWideningReceiptStatus: rolloutWideningReceiptReadbackAction.status || null,
+      rolloutWideningDecisionStatus: rolloutWideningReceiptReadbackAction.rolloutWideningDecisionStatus
+        || rolloutWideningDecisionAction?.status
+        || null,
+      rolloutWideningDecisionReady: rolloutWideningReceiptReadbackAction.rolloutWideningDecisionReady
+        ?? (rolloutWideningDecisionAction?.ready === true),
+      queueStatus: rolloutWideningReceiptReadbackAction.queueStatus
+        || rolloutWideningDecisionAction?.queueStatus
+        || steadyStateDutyBoard?.queueStatus
+        || null,
+      queueTotal: rolloutWideningReceiptReadbackAction.queueTotal
+        ?? rolloutWideningDecisionAction?.queueTotal
+        ?? steadyStateDutyBoard?.queueTotal
+        ?? null,
+      attentionCount: rolloutWideningReceiptReadbackAction.attentionCount
+        ?? rolloutWideningDecisionAction?.attentionCount
+        ?? steadyStateDutyBoard?.attentionCount
+        ?? null,
+      nextDownloadKey: nextDownload?.key || null,
+      nextDownloadFormat: nextDownload?.format || null,
+      nextDownloadHref: nextDownload?.href || null,
+      requiredChecks: handoffReady
+        ? [
+            "rollout_widening_receipt_recorded",
+            "first_operating_result_ready",
+            "launch_operations_overview_attached"
+          ]
+        : [
+            "rollout_widening_receipt_recorded",
+            "receipt_visible_in_developer_ops"
+          ],
+      blockedBy: handoffReady ? [] : ["rollout_widening_receipt"],
+      nextAction: handoffReady
+        ? "Hand off the first operating result from the shift action plan and keep the launch operations overview attached."
+        : "Record the rollout widening receipt before handing off the first operating result."
+    };
+    if (handoffReady) {
+      pushOperatorAction({
+        key: "handoff_first_operating_result",
+        label: "Hand Off First Operating Result",
+        priority: "primary",
+        kind: "download",
+        status: "ready",
+        href: nextDownload?.href || "",
+        fileName: nextDownload?.fileName || "",
+        format: nextDownload?.format || "",
+        source: "first_operating_result_handoff",
+        summary: firstOperatingResultHandoffAction.nextAction,
+        confirmation: "Attach the rollout widening receipt audit id and launch operations overview before handing off first operating results.",
+        receiptAction: "handoff_first_operating_result",
+        receiptIntent: "handoff_first_operating_result",
+        receiptPlanKind: "first_operating_result_handoff",
+        receiptPlanMode: "handoff",
+        receiptTargetType: "steady_state_rollout",
+        receiptPayloadExtra: {
+          rolloutWideningDecisionReceiptAuditLogId: firstOperatingResultHandoffAction.rolloutWideningDecisionReceiptAuditLogId || "",
+          firstOperatingResultHandoffStatus: firstOperatingResultHandoffAction.status
+        }
+      });
+    }
+  }
   pushOperatorAction({
     key: "download_launch_operations_daily_brief",
     label: "Download Launch Operations Daily Brief",
@@ -30629,6 +30735,11 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
       confirmation: "Keep this file beside the daily brief and handoff summary."
     });
   }
+  if (firstOperatingResultHandoffAction) {
+    firstOperatingResultHandoffAction.operatorAction = operatorActions.find((item) => (
+      item.key === "handoff_first_operating_result"
+    )) || null;
+  }
   const supportingDownloads = [];
   const seenDownloads = new Set();
   for (const item of [
@@ -30683,6 +30794,8 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanPayload({
     launchReadinessNextGate: currentLaunchReadinessNextGate,
     launchReadinessNextGateHandoff: currentLaunchReadinessNextGateHandoff,
     rolloutWideningDecisionAction,
+    rolloutWideningReceiptReadbackAction,
+    firstOperatingResultHandoffAction,
     launchOpsOverviewContext,
     firstWaveLifecycle,
     firstWaveLifecycleStatus: firstWaveLifecycle?.status || null,
@@ -44546,6 +44659,10 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     && typeof actionPlan.rolloutWideningDecisionAction === "object"
       ? actionPlan.rolloutWideningDecisionAction
       : null;
+  const firstOperatingResultHandoffAction = actionPlan?.firstOperatingResultHandoffAction
+    && typeof actionPlan.firstOperatingResultHandoffAction === "object"
+      ? actionPlan.firstOperatingResultHandoffAction
+      : null;
   const supportingDownloadRecordIndexPath = actionPlan?.receiptVisibilitySummary?.launchDutyRecordIndexPath
     || actionPlan?.launchReadinessNextGate?.launchDutyRecordIndexPath
     || "";
@@ -44606,6 +44723,15 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
       + ` | ready=${rolloutWideningDecisionAction.ready === true}`
       + ` | queue=${rolloutWideningDecisionAction.queueTotal ?? "-"}`
       + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
+    );
+  }
+  if (firstOperatingResultHandoffAction) {
+    lines.push(
+      `- firstOperatingResultHandoff=${firstOperatingResultHandoffAction.status || "-"}`
+      + ` | current=${firstOperatingResultHandoffAction.currentActionKey || "-"}`
+      + ` | receiptAudit=${firstOperatingResultHandoffAction.rolloutWideningDecisionReceiptAuditLogId || "-"}`
+      + ` | nextDownload=${firstOperatingResultHandoffAction.nextDownloadFormat || "-"}`
+      + ` | ready=${firstOperatingResultHandoffAction.ready === true}`
     );
   }
   lines.push(
@@ -44708,6 +44834,12 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
         + ` | steadyStateQueueStatus=${payload.steadyStateQueueStatus || "-"}`
         + ` | steadyStateQueueTotal=${payload.steadyStateQueueTotal ?? "-"}`
         + ` | steadyStateAttentionCount=${payload.steadyStateAttentionCount ?? "-"}`
+        + (payload.rolloutWideningDecisionReceiptAuditLogId
+          ? ` | rolloutWideningDecisionReceiptAudit=${payload.rolloutWideningDecisionReceiptAuditLogId}`
+          : "")
+        + (payload.firstOperatingResultHandoffStatus
+          ? ` | firstOperatingResultHandoffStatus=${payload.firstOperatingResultHandoffStatus}`
+          : "")
       );
       lines.push(`  - note=${payload.note || "-"} | hint=${receiptPlan.operatorHint || "-"}`);
     }

@@ -12781,6 +12781,10 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           }))
         : [],
       [
+        { kind: "download", key: "ops_pre_staging_readiness_self_check" },
+        { kind: "workspace", key: "ops" },
+        { kind: "download", key: "ops_steady_state_duty_board" },
+        { kind: "workspace", key: "ops" },
         { kind: "setup", key: "launch_mainline_record_launch_rehearsal_run" },
         { kind: "download", key: "launch_mainline_rehearsal_guide" },
         ...(Array.isArray(actionResult.launchMainline?.mainlineSummary?.workspaceActions)
@@ -12883,7 +12887,7 @@ test("developer launch mainline action can bootstrap starter launch assets and r
           }))
         : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.overviewCards)
-        ? actionResult.launchMainline.mainlineSummary.overviewCards.map((item) => ({
+        ? actionResult.launchMainline.mainlineSummary.overviewCards.slice(0, 3).map((item) => ({
             key: item?.key || null,
             controls: Array.isArray(item?.controls)
               ? item.controls.map((control) => ({
@@ -13030,6 +13034,17 @@ test("developer launch mainline action can bootstrap starter launch assets and r
                     kind: item?.kind || null,
                     key: item?.workspaceAction?.key || item?.recommendedDownload?.key || item?.bootstrapAction?.key || item?.setupAction?.key || null
                   }))
+                : []
+            }]
+          : []),
+        ...(actionResult.receipt?.launchOpsOverviewContext
+          ? [{
+              key: "launch_ops_overview_context",
+              controls: actionResult.receipt.launchOpsOverviewContext.overviewDownload
+                ? [{
+                    kind: "download",
+                    key: actionResult.receipt.launchOpsOverviewContext.overviewDownload.key || null
+                  }]
                 : []
             }]
           : []),
@@ -13787,6 +13802,9 @@ test("developer launch mainline action can create first launch batches and retur
     assert.match(firstLaunchHandoffDownloadResponse.body, /Post-Launch Lifecycle:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
     assert.match(firstLaunchHandoffDownloadResponse.body, /Lifecycle Recommended Downloads:.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=operations-handoff/i);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /Receipt Visibility Summary Downloads:/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt \| href=.*source=launch-smoke.*handoff=first-wave.*format=summary/);
+    assert.match(firstLaunchHandoffDownloadResponse.body, /- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt \| href=.*operation=record_post_launch_ops_sweep.*downloadKey=launch_smoke_summary.*format=summary/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Batch Card Suggestions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Ops Actions:/);
     assert.match(firstLaunchHandoffDownloadResponse.body, /First Ops Actions:[\s\S]*download=.*href=.*\/api\/developer\//i);
@@ -14164,6 +14182,10 @@ test("developer launch mainline action can create first launch batches and retur
           }))
         : [],
       [
+        { kind: "download", key: "ops_pre_staging_readiness_self_check" },
+        { kind: "workspace", key: "ops" },
+        { kind: "download", key: "ops_steady_state_duty_board" },
+        { kind: "workspace", key: "ops" },
         { kind: "setup", key: "launch_mainline_record_launch_rehearsal_run" },
         { kind: "download", key: "launch_mainline_rehearsal_guide" },
         ...(Array.isArray(actionResult.launchMainline?.mainlineSummary?.workspaceActions)
@@ -14266,7 +14288,7 @@ test("developer launch mainline action can create first launch batches and retur
           }))
         : [],
       Array.isArray(actionResult.launchMainline?.mainlineSummary?.overviewCards)
-        ? actionResult.launchMainline.mainlineSummary.overviewCards.map((item) => ({
+        ? actionResult.launchMainline.mainlineSummary.overviewCards.slice(0, 3).map((item) => ({
             key: item?.key || null,
             controls: Array.isArray(item?.controls)
               ? item.controls.map((control) => ({
@@ -14413,6 +14435,17 @@ test("developer launch mainline action can create first launch batches and retur
                     kind: item?.kind || null,
                     key: item?.workspaceAction?.key || item?.recommendedDownload?.key || item?.bootstrapAction?.key || item?.setupAction?.key || null
                   }))
+                : []
+            }]
+          : []),
+        ...(actionResult.receipt?.launchOpsOverviewContext
+          ? [{
+              key: "launch_ops_overview_context",
+              controls: actionResult.receipt.launchOpsOverviewContext.overviewDownload
+                ? [{
+                    kind: "download",
+                    key: actionResult.receipt.launchOpsOverviewContext.overviewDownload.key || null
+                  }]
                 : []
             }]
           : []),

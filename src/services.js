@@ -23053,6 +23053,39 @@ function buildDeveloperLaunchMainlineFirstLaunchHandoffText({
     `- Duty Chain: ${dutyActionLabels.join(" -> ")}`
   ];
   appendPostLaunchLifecycleTextLines(lines, mainlineSummary);
+  const launchOperationsReceiptVisibilitySummaryDownloads = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadsFromPayload({
+    launchOperationsFileIndex: Array.isArray(mainlineSummary.launchOperationsFileIndex)
+      ? mainlineSummary.launchOperationsFileIndex
+      : [],
+    launchOperationsHandoffSummary: mainlineSummary.launchOperationsHandoffSummary || null,
+    launchOperationsDailyBrief: mainlineSummary.launchOperationsDailyBrief || null,
+    launchOperationsShiftActionPlan: mainlineSummary.launchOperationsShiftActionPlan || null,
+    launchOperationsOverviewStatus: mainlineSummary.launchOperationsOverviewStatus || null
+  });
+  const launchOperationsReceiptVisibilitySummaryRecordIndexPath = mainlineSummary.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || mainlineSummary.initialLaunchOpsReadiness?.launchDutyRecordIndexPath
+    || mainlineSummary.launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || "";
+  const launchReviewSummaryDownload = launchOperationsReceiptVisibilitySummaryDownloads.launchReviewSummaryDownload
+    && launchOperationsReceiptVisibilitySummaryRecordIndexPath
+    && !launchOperationsReceiptVisibilitySummaryDownloads.launchReviewSummaryDownload.launchDutyRecordIndexPath
+      ? {
+          ...launchOperationsReceiptVisibilitySummaryDownloads.launchReviewSummaryDownload,
+          launchDutyRecordIndexPath: launchOperationsReceiptVisibilitySummaryRecordIndexPath
+        }
+      : launchOperationsReceiptVisibilitySummaryDownloads.launchReviewSummaryDownload;
+  const launchSmokeSummaryDownload = launchOperationsReceiptVisibilitySummaryDownloads.launchSmokeSummaryDownload
+    && launchOperationsReceiptVisibilitySummaryRecordIndexPath
+    && !launchOperationsReceiptVisibilitySummaryDownloads.launchSmokeSummaryDownload.launchDutyRecordIndexPath
+      ? {
+          ...launchOperationsReceiptVisibilitySummaryDownloads.launchSmokeSummaryDownload,
+          launchDutyRecordIndexPath: launchOperationsReceiptVisibilitySummaryRecordIndexPath
+        }
+      : launchOperationsReceiptVisibilitySummaryDownloads.launchSmokeSummaryDownload;
+  appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  });
   if (firstWaveHandoffConfirmation) {
     lines.push("");
     appendFirstWaveHandoffConfirmationTextLines(lines, firstWaveHandoffConfirmation);

@@ -20923,6 +20923,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchReadinessNextGateStatus=/);
     assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary:[\s\S]*launchReadinessNextGateCurrentGate=/);
+    assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary Downloads:/);
+    assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsHandoffDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffDownload.body, steadyStateWatchRecordDraftPattern);
     assert.match(launchOperationsHandoffDownload.body, /Launch Operations Handoff Summary:[\s\S]*context=launch_ops_overview_status/);
     assert.match(launchOperationsHandoffDownload.body, /Launch Operations Handoff Summary:[\s\S]*downloadFormat=launch-operations-overview-status/);
@@ -23380,6 +23383,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorChecklistDownload.body, /1\. open_launch_operations_handoff_summary[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /5\. review_launch_review_receipt_visibility_summary[^\n]*launch-review\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /6\. review_launch_smoke_receipt_visibility_summary[^\n]*launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /Receipt Visibility Summary Downloads:/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /7\. open_launch_mainline_handoff_routes[^\n]*developer-ops-launch-mainline-handoff-routes\.txt/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /8\. continue_launch_duty_record_index_selection_handoff[^\n]*developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry/);
     assert.match(launchOperationsOperatorChecklistDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
@@ -23544,6 +23550,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.contentDisposition || "", /developer-ops-launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /RockSolid Developer Ops Launch Operations Operator Entry/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Primary Download: developer-ops-launch-operations-operator-entry\.txt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Current Action:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Plan: POST \/api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Confirmation:/);

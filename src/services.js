@@ -40915,6 +40915,40 @@ function formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVis
     + (launchSmokeSummary?.launchDutyRecordIndexPath ? ` | launchSmokeSummaryRecordIndex=${launchSmokeSummary.launchDutyRecordIndexPath}` : "");
 }
 
+function getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(launchOperationsFileIndex = []) {
+  const fileRows = Array.isArray(launchOperationsFileIndex) ? launchOperationsFileIndex : [];
+  const overviewRow = fileRows.find((item) => item?.key === "launch_operations_overview_status") || null;
+  const receiptVisibilitySummaryDownloads = overviewRow?.receiptVisibilitySummaryDownloads
+    || fileRows.find((item) => item?.receiptVisibilitySummaryDownloads)?.receiptVisibilitySummaryDownloads
+    || {};
+  return {
+    launchReviewSummaryDownload: receiptVisibilitySummaryDownloads.launchReviewSummary || null,
+    launchSmokeSummaryDownload: receiptVisibilitySummaryDownloads.launchSmokeSummary || null
+  };
+}
+
+function appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines = [], {
+  launchReviewSummaryDownload = null,
+  launchSmokeSummaryDownload = null,
+  title = "Receipt Visibility Summary Downloads:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  lines.push(title);
+  if (launchReviewSummaryDownload || launchSmokeSummaryDownload) {
+    lines.push(
+      `- Launch Review summary | ${formatLaunchHandoffDownloadText(launchReviewSummaryDownload, { fileSeparator: " | " })}`
+    );
+    lines.push(
+      `- Launch Smoke Kit summary | ${formatLaunchHandoffDownloadText(launchSmokeSummaryDownload, { fileSeparator: " | " })}`
+    );
+  } else {
+    lines.push("- none");
+  }
+  return true;
+}
+
 function appendDeveloperOpsCloseoutReadinessSummaryLines(lines, closeoutReadinessSummary = null, {
   title = "Closeout Readiness Summary:"
 } = {}) {
@@ -44378,6 +44412,18 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   const supportingDownloads = Array.isArray(handoffSummary?.supportingDownloads)
     ? handoffSummary.supportingDownloads
     : [];
+  const launchOperationsFileIndex = Array.isArray(readiness.launchOperationsFileIndex) && readiness.launchOperationsFileIndex.length
+    ? readiness.launchOperationsFileIndex
+    : buildDeveloperOpsLaunchOperationsFileIndex({
+        launchOperationsHandoffSummary: handoffSummary,
+        launchOperationsDailyBrief: readiness.launchOperationsDailyBrief || null,
+        launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
+        launchOperationsOverviewStatus: readiness.launchOperationsOverviewStatus || null
+      });
+  const {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  } = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(launchOperationsFileIndex);
   const rolloutWideningDecisionAction = handoffSummary?.rolloutWideningDecisionAction
     && typeof handoffSummary.rolloutWideningDecisionAction === "object"
       ? handoffSummary.rolloutWideningDecisionAction
@@ -44474,6 +44520,11 @@ function buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload = {}) {
   );
   lines.push("");
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, handoffSummary?.receiptVisibilitySummary);
+  lines.push("");
+  appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  });
   lines.push("");
   lines.push("Handoff Checklist:");
   if (checklist.length) {
@@ -46188,6 +46239,18 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklistText(payload = {}) {
     launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope),
     launchDutyRecordIndexReceiptSelection: readiness.launchDutyRecordIndexReceiptSelection || null
   });
+  const launchOperationsFileIndex = Array.isArray(readiness.launchOperationsFileIndex) && readiness.launchOperationsFileIndex.length
+    ? readiness.launchOperationsFileIndex
+    : buildDeveloperOpsLaunchOperationsFileIndex({
+        launchOperationsHandoffSummary: readiness.launchOperationsHandoffSummary || null,
+        launchOperationsDailyBrief: readiness.launchOperationsDailyBrief || null,
+        launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
+        launchOperationsOverviewStatus: readiness.launchOperationsOverviewStatus || null
+      });
+  const {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  } = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(launchOperationsFileIndex);
   const lines = [
     "RockSolid Developer Ops Launch Operations Operator Checklist",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -46218,6 +46281,11 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklistText(payload = {}) {
   } else {
     lines.push("- none");
   }
+  lines.push("");
+  appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  });
   lines.push("");
   lines.push("Operator Order:");
   if (readiness.latestSteadyStateDutyPlanReceipt || checklist.receiptVisibilityStatus === "visible") {
@@ -46267,6 +46335,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     launchOperationsFileIndex: fileIndex,
     launchMainlineHandoffRoutesDownload: buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope)
   });
+  const {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  } = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(fileIndex);
   const lines = [
     "RockSolid Developer Ops Launch Operations Operator Entry",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -46282,6 +46354,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     `Primary Download: ${entry.primaryDownload?.fileName || "-"} | format=${entry.primaryDownload?.format || "-"} | href=${entry.primaryDownload?.href || "-"}`,
     ""
   ];
+  appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  });
   const currentAction = entry.currentAction || null;
   if (currentAction) {
     const receiptPlan = currentAction.executionPlan?.receiptPlan || null;

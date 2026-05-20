@@ -19648,6 +19648,36 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const launchReceiptAuditBackfillStatus = payload.postLaunchHandoffTraceability?.launchReceiptAuditBackfillStatus
     || payload.opsSnapshot?.summary?.launchReceiptAuditBackfillStatus
     || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
+  const {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  } = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadsFromPayload({
+    launchOperationsFileIndex: Array.isArray(payload.launchOperationsFileIndex) ? payload.launchOperationsFileIndex : [],
+    launchOperationsHandoffSummary: mainlineSummary.launchOperationsHandoffSummary || null,
+    launchOperationsDailyBrief: mainlineSummary.launchOperationsDailyBrief || null,
+    launchOperationsShiftActionPlan: mainlineSummary.launchOperationsShiftActionPlan || null,
+    launchOperationsOverviewStatus: mainlineSummary.launchOperationsOverviewStatus || null
+  });
+  const launchOperationsReceiptVisibilitySummaryRecordIndexPath = mainlineSummary.launchReadinessNextGate?.launchDutyRecordIndexPath
+    || mainlineSummary.initialLaunchOpsReadiness?.launchDutyRecordIndexPath
+    || mainlineSummary.launchOperationsOverviewStatus?.receiptVisibilitySummary?.launchDutyRecordIndexPath
+    || "";
+  const launchReviewSummaryDownloadWithRecordIndex = launchOperationsReceiptVisibilitySummaryRecordIndexPath
+    && launchReviewSummaryDownload
+    && !launchReviewSummaryDownload.launchDutyRecordIndexPath
+    ? {
+        ...launchReviewSummaryDownload,
+        launchDutyRecordIndexPath: launchOperationsReceiptVisibilitySummaryRecordIndexPath
+      }
+    : launchReviewSummaryDownload;
+  const launchSmokeSummaryDownloadWithRecordIndex = launchOperationsReceiptVisibilitySummaryRecordIndexPath
+    && launchSmokeSummaryDownload
+    && !launchSmokeSummaryDownload.launchDutyRecordIndexPath
+    ? {
+        ...launchSmokeSummaryDownload,
+        launchDutyRecordIndexPath: launchOperationsReceiptVisibilitySummaryRecordIndexPath
+      }
+    : launchSmokeSummaryDownload;
   const formatWorkspaceActionParams = (params = null) => {
     const entries = params && typeof params === "object"
       ? Object.entries(params).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
@@ -20279,6 +20309,10 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
+    launchReviewSummaryDownload: launchReviewSummaryDownloadWithRecordIndex,
+    launchSmokeSummaryDownload: launchSmokeSummaryDownloadWithRecordIndex
+  });
   return lines.join("\n").trimEnd();
 }
 

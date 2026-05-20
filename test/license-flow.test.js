@@ -6472,7 +6472,13 @@ test("developer release package export bundles integration, versions, and notice
         Array.isArray(launchMainline.mainlineSummary.overviewCards)
           ? launchMainline.mainlineSummary.overviewCards.map((item) => item?.key || null)
           : [],
-        ["overall_gate", "workspace_path", "recommended_downloads"]
+        [
+          "overall_gate",
+          "workspace_path",
+          "pre_staging_readiness_self_check",
+          "rollout_widening_decision",
+          "recommended_downloads"
+        ]
       );
       assert.ok(
         launchMainline.mainlineSummary.overviewCards?.find((item) => item?.key === "overall_gate")?.controls?.some((control) => control?.workspaceAction?.key || control?.recommendedDownload?.key)
@@ -7232,6 +7238,13 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /- routeMapDownload: Launch Mainline handoff download routes/);
       assert.match(launchMainline.summaryText, /Open Release Workspace/);
       assert.match(launchMainline.summaryText, /Download Launch Mainline Summary/);
+      assert.match(launchMainline.summaryText, /Receipt Visibility Summary Downloads:/);
+      assert.match(launchMainline.summaryText, /- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt/);
+      assert.match(launchMainline.summaryText, /source=launch-smoke/);
+      assert.match(launchMainline.summaryText, /handoff=first-wave/);
+      assert.match(launchMainline.summaryText, /- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt/);
+      assert.match(launchMainline.summaryText, /operation=record_post_launch_ops_sweep/);
+      assert.match(launchMainline.summaryText, /downloadKey=launch_smoke_summary/);
       assert.match(launchMainline.summaryText, /Mainline Route Focus:/);
       assert.match(launchMainline.summaryText, /Continue post-launch sweep/);
       assert.match(launchMainline.summaryText, /operation=record_post_launch_ops_sweep/);
@@ -7351,6 +7364,13 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainlineSummaryDownload.body, /Production Stabilization Handoff:/);
       assert.match(launchMainlineSummaryDownload.body, /Post-Launch Lifecycle:/);
       assert.match(launchMainlineSummaryDownload.body, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
+      assert.match(launchMainlineSummaryDownload.body, /Receipt Visibility Summary Downloads:/);
+      assert.match(launchMainlineSummaryDownload.body, /- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt/);
+      assert.match(launchMainlineSummaryDownload.body, /source=launch-smoke/);
+      assert.match(launchMainlineSummaryDownload.body, /handoff=first-wave/);
+      assert.match(launchMainlineSummaryDownload.body, /- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt/);
+      assert.match(launchMainlineSummaryDownload.body, /operation=record_post_launch_ops_sweep/);
+      assert.match(launchMainlineSummaryDownload.body, /downloadKey=launch_smoke_summary/);
       assert.match(launchMainlineSummaryDownload.body, /Launch Mainline Rehearsal Guide:/);
 
       const initialLaunchOpsReadinessDownload = await getText(

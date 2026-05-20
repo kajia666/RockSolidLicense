@@ -35082,6 +35082,24 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
         launchDutyRecordIndexPath
       }
     : null;
+  const shiftPlanFirstOperatingResultHandoffAction = launchOperationsShiftActionPlan?.firstOperatingResultHandoffAction || null;
+  const overviewFirstOperatingResultHandoffAction = launchOperationsOverviewStatus?.firstOperatingResultHandoffAction || null;
+  const firstOperatingResultHandoffAction = shiftPlanFirstOperatingResultHandoffAction?.rolloutWideningDecisionReceiptAuditLogId
+    ? shiftPlanFirstOperatingResultHandoffAction
+    : overviewFirstOperatingResultHandoffAction?.rolloutWideningDecisionReceiptAuditLogId
+      ? overviewFirstOperatingResultHandoffAction
+      : buildLaunchOperationsFirstOperatingResultHandoffActionPayload({
+        rolloutWideningDecisionAction: launchOperationsShiftActionPlan?.rolloutWideningDecisionAction
+          || launchOperationsOverviewStatus?.rolloutWideningDecisionAction
+          || null,
+        rolloutWideningReceiptReadbackAction: launchOperationsShiftActionPlan?.rolloutWideningReceiptReadbackAction
+          || launchOperationsOverviewStatus?.rolloutWideningReceiptReadbackAction
+          || null,
+        steadyStateDutyBoard: launchOperationsShiftActionPlan?.rolloutWideningDecisionAction
+          || launchOperationsOverviewStatus?.rolloutWideningDecisionAction
+          || null,
+        nextDownload: launchOperationsOverviewStatus?.overviewDownload || null
+      });
   const launchDutyPacketReviewOperatorAction = launchDutyPacketReviewReceiptSelection?.operatorAction
     && typeof launchDutyPacketReviewReceiptSelection.operatorAction === "object"
       ? launchDutyPacketReviewReceiptSelection.operatorAction
@@ -35449,6 +35467,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchDutyRecordIndexReceiptSelection,
     launchDutyPacketReviewReceiptSelection,
     launchDutyStableOperationsTransitionAction,
+    firstOperatingResultHandoffAction,
     launchDutySteadyStateHandoffLanding,
     launchDutyRecordIndexOperatorActionKey: launchDutyRecordIndexOperatorAction?.key || null,
     launchDutyRecordIndexReviewRequired: launchDutyRecordIndexOperatorAction
@@ -45180,6 +45199,10 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const launchDutyStabilizationCloseoutExecutionState = launchDutyStabilizationReceiptQueue?.closeoutExecutionState || null;
   const launchDutyStableOperationsHandoffTail = launchDutyStabilizationReceiptQueue?.stableOperationsHandoffTail || null;
   const launchDutyStableOperationsTransitionAction = readiness.launchOperationsOperatorEntry?.launchDutyStableOperationsTransitionAction || null;
+  const firstOperatingResultHandoffAction = readiness.launchOperationsOperatorEntry?.firstOperatingResultHandoffAction || null;
+  const firstOperatingResultHandoffBlockedBy = Array.isArray(firstOperatingResultHandoffAction?.blockedBy)
+    ? firstOperatingResultHandoffAction.blockedBy.join(",")
+    : "";
   const launchDutyRecordIndexReceiptSelection = readiness.launchDutyRecordIndexReceiptSelection || null;
   const launchOperationsOperatorChecklist = readiness.launchOperationsOperatorChecklist || buildDeveloperOpsLaunchOperationsOperatorChecklist({
     scope,
@@ -45387,6 +45410,18 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | launchDutyRecordIndex=${readiness.launchOperationsOperatorEntry?.launchDutyRecordIndexPath || "-"}`,
     ""
   ];
+  if (firstOperatingResultHandoffAction) {
+    lines.push(
+      `Launch Operations First Operating Result Handoff: status=${firstOperatingResultHandoffAction.status || "-"}`
+      + ` | ready=${firstOperatingResultHandoffAction.ready === true ? "yes" : "no"}`
+      + ` | current=${firstOperatingResultHandoffAction.currentActionKey || "-"}`
+      + ` | receiptAudit=${firstOperatingResultHandoffAction.rolloutWideningDecisionReceiptAuditLogId || "-"}`
+      + ` | nextDownload=${firstOperatingResultHandoffAction.nextDownloadFormat || "-"}`
+      + ` | blockedBy=${firstOperatingResultHandoffBlockedBy || "-"}`
+      + ` | nextAction=${firstOperatingResultHandoffAction.nextAction || "-"}`
+    );
+    lines.push("");
+  }
 
   if (launchDutyRecordIndexReceiptSelection) {
     lines.push(
@@ -46268,6 +46303,22 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | launchDutyRecordIndex=${receiptPlan?.payload?.launchReadinessNextGateLaunchDutyRecordIndexPath || currentAction.launchDutyRecordIndexPath || "-"}`
     );
     lines.push(`Receipt Note: ${receiptPlan?.payload?.note || "-"}`);
+    lines.push("");
+  }
+  const firstOperatingResultHandoffAction = entry.firstOperatingResultHandoffAction || null;
+  if (firstOperatingResultHandoffAction) {
+    const blockedBy = Array.isArray(firstOperatingResultHandoffAction.blockedBy)
+      ? firstOperatingResultHandoffAction.blockedBy.join(",")
+      : "";
+    lines.push(
+      `First Operating Result Handoff: status=${firstOperatingResultHandoffAction.status || "-"}`
+      + ` | ready=${firstOperatingResultHandoffAction.ready === true ? "yes" : "no"}`
+      + ` | current=${firstOperatingResultHandoffAction.currentActionKey || "-"}`
+      + ` | receiptAudit=${firstOperatingResultHandoffAction.rolloutWideningDecisionReceiptAuditLogId || "-"}`
+      + ` | nextDownload=${firstOperatingResultHandoffAction.nextDownloadFormat || "-"}`
+      + ` | blockedBy=${blockedBy || "-"}`
+      + ` | nextAction=${firstOperatingResultHandoffAction.nextAction || "-"}`
+    );
     lines.push("");
   }
   const receiptConfirmation = entry.receiptConfirmation || null;

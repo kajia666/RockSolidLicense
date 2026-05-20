@@ -23343,6 +23343,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Duty Record Index Selection Checklist Step: [^\n]*key=continue_launch_duty_record_index_selection_handoff[^\n]*order=8[^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsHandoffIndexDownload.body, /launch-operations-operator-entry\.txt/);
+    const launchOperationsOperatorEntryPreReceiptDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
+      ownerSession.token
+    );
+    assert.match(
+      launchOperationsOperatorEntryPreReceiptDownload.body,
+      /First Operating Result Handoff:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision[\s\S]*nextDownload=launch-operations-overview-status[\s\S]*blockedBy=rollout_widening_receipt[\s\S]*nextAction=Record the rollout widening receipt before handing off the first operating result\./
+    );
+    assert.match(
+      launchOperationsHandoffIndexDownload.body,
+      /Launch Operations First Operating Result Handoff:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision[\s\S]*nextDownload=launch-operations-overview-status[\s\S]*blockedBy=rollout_widening_receipt[\s\S]*nextAction=Record the rollout widening receipt before handing off the first operating result\./
+    );
     assert.match(launchOperationsHandoffIndexDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsFileIndexDownload = await getText(
@@ -23849,6 +23862,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       rolloutWideningReceiptShiftActionPlanDownload.body,
       new RegExp(`Receipt Plans:[\\s\\S]*handoff_first_operating_result[^\\n]*action=handoff_first_operating_result[^\\n]*rolloutWideningDecisionReceiptAudit=${rolloutWideningDecisionReceipt.auditLogId}`)
+    );
+
+    const rolloutWideningReceiptOperatorEntryDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-operator-entry",
+      ownerSession.token
+    );
+    assert.match(
+      rolloutWideningReceiptOperatorEntryDownload.body,
+      /First Operating Result Handoff:[\s\S]*status=ready_for_first_operating_result_handoff \| ready=yes \| current=handoff_first_operating_result[\s\S]*nextDownload=launch-operations-overview-status[\s\S]*blockedBy=-[\s\S]*nextAction=Hand off the first operating result from the shift action plan and keep the launch operations overview attached\./
+    );
+
+    const rolloutWideningReceiptHandoffIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      rolloutWideningReceiptHandoffIndexDownload.body,
+      /Launch Operations First Operating Result Handoff:[\s\S]*status=ready_for_first_operating_result_handoff \| ready=yes \| current=handoff_first_operating_result[\s\S]*nextDownload=launch-operations-overview-status[\s\S]*blockedBy=-[\s\S]*nextAction=Hand off the first operating result from the shift action plan and keep the launch operations overview attached\./
     );
 
     const launchOperationsChecksumsDownload = await getText(

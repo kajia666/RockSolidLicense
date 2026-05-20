@@ -40927,6 +40927,24 @@ function getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(launch
   };
 }
 
+function getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadsFromPayload({
+  launchOperationsFileIndex = [],
+  launchOperationsHandoffSummary = null,
+  launchOperationsDailyBrief = null,
+  launchOperationsShiftActionPlan = null,
+  launchOperationsOverviewStatus = null
+} = {}) {
+  const resolvedFileIndex = Array.isArray(launchOperationsFileIndex) && launchOperationsFileIndex.length
+    ? launchOperationsFileIndex
+    : buildDeveloperOpsLaunchOperationsFileIndex({
+        launchOperationsHandoffSummary,
+        launchOperationsDailyBrief,
+        launchOperationsShiftActionPlan,
+        launchOperationsOverviewStatus
+      });
+  return getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(resolvedFileIndex);
+}
+
 function appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines = [], {
   launchReviewSummaryDownload = null,
   launchSmokeSummaryDownload = null,
@@ -44618,6 +44636,16 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
     || dailyBrief?.launchReadinessNextGate?.launchDutyRecordIndexPath
     || "";
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(dailyBrief?.launchOpsOverviewContext);
+  const {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  } = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadsFromPayload({
+    launchOperationsFileIndex: readiness.launchOperationsFileIndex || [],
+    launchOperationsHandoffSummary: handoffSummary,
+    launchOperationsDailyBrief: dailyBrief,
+    launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
+    launchOperationsOverviewStatus: readiness.launchOperationsOverviewStatus || null
+  });
   const lines = [
     "RockSolid Developer Ops Launch Operations Daily Brief",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -44678,6 +44706,11 @@ function buildDeveloperOpsLaunchOperationsDailyBriefText(payload = {}) {
   });
   lines.push("");
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, dailyBrief?.receiptVisibilitySummary);
+  lines.push("");
+  appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  });
   lines.push("");
   lines.push("Next Review:");
   lines.push(
@@ -44810,6 +44843,16 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
     || supportingDownloadRecordIndexPath
     || "";
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(actionPlan?.launchOpsOverviewContext);
+  const {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  } = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadsFromPayload({
+    launchOperationsFileIndex: readiness.launchOperationsFileIndex || [],
+    launchOperationsHandoffSummary: handoffSummary,
+    launchOperationsDailyBrief: dailyBrief,
+    launchOperationsShiftActionPlan: actionPlan,
+    launchOperationsOverviewStatus: readiness.launchOperationsOverviewStatus || null
+  });
   const lines = [
     "RockSolid Developer Ops Launch Operations Shift Action Plan",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -44895,6 +44938,11 @@ function buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload = {}) {
   });
   lines.push("");
   appendDeveloperOpsReceiptVisibilitySummaryLines(lines, actionPlan?.receiptVisibilitySummary);
+  lines.push("");
+  appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  });
   lines.push("");
   lines.push("Shift Actions:");
   if (actions.length) {
@@ -45038,6 +45086,16 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
       ? overview.rolloutWideningDecisionAction
       : null;
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(overview?.launchOpsOverviewContext);
+  const {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  } = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadsFromPayload({
+    launchOperationsFileIndex: readiness.launchOperationsFileIndex || [],
+    launchOperationsHandoffSummary: readiness.launchOperationsHandoffSummary || null,
+    launchOperationsDailyBrief: readiness.launchOperationsDailyBrief || null,
+    launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
+    launchOperationsOverviewStatus: overview
+  });
   const lines = [
     "RockSolid Developer Ops Launch Operations Overview Status",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -45122,6 +45180,11 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     + (receiptRecoveryContextRecordIndexPath ? ` | launchOpsOverviewContextRecordIndex=${receiptRecoveryContextRecordIndexPath}` : "")
     + (receiptRecoveryRecordIndexPath ? ` | launchDutyRecordIndex=${receiptRecoveryRecordIndexPath}` : "")
   );
+  lines.push("");
+  appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
+    launchReviewSummaryDownload,
+    launchSmokeSummaryDownload
+  });
   lines.push("");
   lines.push("Overview Download:");
   lines.push(

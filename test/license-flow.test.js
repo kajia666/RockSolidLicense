@@ -27304,6 +27304,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*confirmStatus=[^\n]*\| confirmReady=(yes|no)[^\n]*\| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*Review Downloads:[\s\S]*launch_review_summary[^\n]*launch-review\.txt[\s\S]*launch_smoke_summary[^\n]*launch-smoke-kit\.txt/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Mainline Action Plan:[\s\S]*Open steady-state handoff brief[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
     );
     assert.match(
@@ -27349,6 +27361,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*confirmStatus=[^\n]*\| confirmReady=(true|false)[^\n]*\| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
     );
     assert.match(
@@ -27383,6 +27403,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Stable Operations Transition:[\s\S]*recordReady=yes \| packetReady=yes \| tailReady=yes \| handoffReady=yes/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*confirmStatus=[^\n]*\| confirmReady=(yes|no)[^\n]*\| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
@@ -27436,6 +27464,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(primaryRouteReviewDownload.body, /Launch Receipt Audit Backfill Source: snapshot-audit-filter/);
     assert.match(primaryRouteReviewDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*No Launch Mainline action receipt backfill was needed/i);
     assert.match(primaryRouteReviewDownload.body, /action=Open Session Control/);
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*confirmStatus=[^\n]*\| confirmReady=(yes|no)[^\n]*\| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/(beta|stable)\/launch-duty-record-index\.json/
+    );
 
     const nextRouteReviewDownload = await getText(
       baseUrl,
@@ -27450,6 +27486,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(nextRouteReviewDownload.body, /Launch Receipt Audit Backfill Source: snapshot-audit-filter/);
     assert.match(nextRouteReviewDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*No Launch Mainline action receipt backfill was needed/i);
     assert.match(nextRouteReviewDownload.body, /action=Review Audit/);
+    assert.match(
+      nextRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*confirmStatus=[^\n]*\| confirmReady=(yes|no)[^\n]*\| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      nextRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/(beta|stable)\/launch-duty-record-index\.json/
+    );
 
     const remainingRouteReviewDownload = await getText(
       baseUrl,
@@ -27464,6 +27508,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(remainingRouteReviewDownload.body, /Launch Receipt Audit Backfill Source: snapshot-audit-filter/);
     assert.match(remainingRouteReviewDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*No Launch Mainline action receipt backfill was needed/i);
     assert.match(remainingRouteReviewDownload.body, /Review Audit/);
+    assert.match(
+      remainingRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*confirmStatus=[^\n]*\| confirmReady=(yes|no)[^\n]*\| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      remainingRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/(beta|stable)\/launch-duty-record-index\.json/
+    );
 
     const sectionRouteReviewDownload = await getText(
       baseUrl,
@@ -27478,6 +27530,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(sectionRouteReviewDownload.body, /Launch Receipt Audit Backfill Source: snapshot-audit-filter/);
     assert.match(sectionRouteReviewDownload.body, /Launch Receipt Audit Backfill Operator Hint: .*No Launch Mainline action receipt backfill was needed/i);
     assert.match(sectionRouteReviewDownload.body, /Open Session Control/);
+    assert.match(
+      sectionRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*confirmStatus=[^\n]*\| confirmReady=(yes|no)[^\n]*\| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      sectionRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/(beta|stable)\/launch-duty-record-index\.json/
+    );
 
     const firstLaunchHandoffDownload = await getText(
       baseUrl,

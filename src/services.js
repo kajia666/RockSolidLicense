@@ -19641,6 +19641,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const filters = payload.filters || {};
   const mainlineSummary = payload.mainlineSummary || {};
   const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const launchOperationsOperatorEntry =
+    mainlineSummary.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+    || initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+    || null;
+  const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
+  const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyActionOrder = mainlineSummary.launchDutyActionOrder
     || initialLaunchOpsReadiness?.launchDutyActionOrder
     || null;
@@ -19762,6 +19768,86 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Mainline Launch Duty Action Order:"
     });
+  }
+  if (launchSurfaceReviewCloseoutAction) {
+    const confirmationSubmission = launchSurfaceReviewCloseoutAction.confirmationSubmission
+      && typeof launchSurfaceReviewCloseoutAction.confirmationSubmission === "object"
+        ? launchSurfaceReviewCloseoutAction.confirmationSubmission
+        : (receiptVisibilityConfirmationQueue?.confirmationSubmissionPacket
+          && typeof receiptVisibilityConfirmationQueue.confirmationSubmissionPacket === "object"
+            ? receiptVisibilityConfirmationQueue.confirmationSubmissionPacket
+            : null);
+    const developerOpsOverviewRefresh = launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh
+      && typeof launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh === "object"
+        ? launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh
+        : (receiptVisibilityConfirmationQueue?.overviewRefreshAction
+          && typeof receiptVisibilityConfirmationQueue.overviewRefreshAction === "object"
+            ? receiptVisibilityConfirmationQueue.overviewRefreshAction
+            : null);
+    const postConfirmationSwitch = launchSurfaceReviewCloseoutAction.postConfirmationSwitch
+      && typeof launchSurfaceReviewCloseoutAction.postConfirmationSwitch === "object"
+        ? launchSurfaceReviewCloseoutAction.postConfirmationSwitch
+        : (receiptVisibilityConfirmationQueue?.postConfirmationSwitchPacket
+          && typeof receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket === "object"
+            ? receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket
+            : null);
+    const switchBlockingReasons = Array.isArray(postConfirmationSwitch?.blockingReasonKeys)
+      ? postConfirmationSwitch.blockingReasonKeys.join(",")
+      : "";
+    const reviewDownloads = Array.isArray(launchSurfaceReviewCloseoutAction.reviewDownloads)
+      ? launchSurfaceReviewCloseoutAction.reviewDownloads
+      : [];
+    const operatorOrder = Array.isArray(launchSurfaceReviewCloseoutAction.operatorOrder)
+      ? launchSurfaceReviewCloseoutAction.operatorOrder
+      : [];
+    lines.push("");
+    lines.push("Launch Mainline Surface Review Closeout:");
+    lines.push(
+      `- status=${launchSurfaceReviewCloseoutAction.status || "-"}`
+      + ` | current=${launchSurfaceReviewCloseoutAction.currentActionKey || "-"}`
+      + ` | decision=${launchSurfaceReviewCloseoutAction.decision || "-"}`
+      + ` | manualProgress=${launchSurfaceReviewCloseoutAction.manualCheckpointProgress || "-"}`
+      + ` | manualRemaining=${launchSurfaceReviewCloseoutAction.remainingManualCheckpoints ?? "-"}`
+      + ` | surfaces=${launchSurfaceReviewCloseoutAction.readyReviewSurfaceCount ?? 0}/${launchSurfaceReviewCloseoutAction.reviewSurfaceCount ?? 0}`
+      + ` | ready=${launchSurfaceReviewCloseoutAction.ready === true ? "yes" : "no"}`
+    );
+    lines.push(
+      `- confirmStatus=${confirmationSubmission?.status || "-"}`
+      + ` | confirmReady=${confirmationSubmission?.ready === true ? "yes" : "no"}`
+      + ` | confirm=${confirmationSubmission?.method || "-"} ${confirmationSubmission?.route || confirmationSubmission?.href || "-"}`
+    );
+    lines.push(
+      `- refreshStatus=${developerOpsOverviewRefresh?.status || "-"}`
+      + ` | refreshReady=${developerOpsOverviewRefresh?.ready === true ? "yes" : "no"}`
+      + ` | refreshHref=${developerOpsOverviewRefresh?.href || developerOpsOverviewRefresh?.route || "-"}`
+    );
+    lines.push(
+      `- switchStatus=${postConfirmationSwitch?.status || "-"}`
+      + ` | switchReady=${postConfirmationSwitch?.ready === true ? "yes" : "no"}`
+      + ` | switchBlockers=${switchBlockingReasons || "-"}`
+    );
+    lines.push(
+      `- launchDutyRecordIndex=${launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath || receiptVisibilityConfirmationQueue?.launchDutyRecordIndexPath || "-"}`
+      + ` | nextAction=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+    );
+    if (reviewDownloads.length) {
+      lines.push("Review Downloads:");
+      for (const item of reviewDownloads) {
+        lines.push(
+          `- ${item.key || "-"}`
+          + ` | status=${item.status || "-"}`
+          + ` | ready=${item.ready === true ? "yes" : "no"}`
+          + ` | file=${item.fileName || "-"}`
+          + ` | href=${item.href || "-"}`
+        );
+      }
+    }
+    if (operatorOrder.length) {
+      lines.push("Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
   }
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck || null;
   if (preStagingReadinessSelfCheck) {
@@ -20709,6 +20795,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const launchDutyStableOperationsTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
     ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
     : "";
+  const receiptVisibilityConfirmationQueue = initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
+  const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
     ? payload.opsSnapshot.scope
     : {};
@@ -20983,6 +21071,86 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       `- productionSignoffPacket=${launchOpsOverviewProductionSignoffPacket || "-"}`
       + ` | launchDayWatchEntry=${launchOpsOverviewWatchEntry || "-"}`
     );
+  }
+  if (launchSurfaceReviewCloseoutAction) {
+    const confirmationSubmission = launchSurfaceReviewCloseoutAction.confirmationSubmission
+      && typeof launchSurfaceReviewCloseoutAction.confirmationSubmission === "object"
+        ? launchSurfaceReviewCloseoutAction.confirmationSubmission
+        : (receiptVisibilityConfirmationQueue?.confirmationSubmissionPacket
+          && typeof receiptVisibilityConfirmationQueue.confirmationSubmissionPacket === "object"
+            ? receiptVisibilityConfirmationQueue.confirmationSubmissionPacket
+            : null);
+    const developerOpsOverviewRefresh = launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh
+      && typeof launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh === "object"
+        ? launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh
+        : (receiptVisibilityConfirmationQueue?.overviewRefreshAction
+          && typeof receiptVisibilityConfirmationQueue.overviewRefreshAction === "object"
+            ? receiptVisibilityConfirmationQueue.overviewRefreshAction
+            : null);
+    const postConfirmationSwitch = launchSurfaceReviewCloseoutAction.postConfirmationSwitch
+      && typeof launchSurfaceReviewCloseoutAction.postConfirmationSwitch === "object"
+        ? launchSurfaceReviewCloseoutAction.postConfirmationSwitch
+        : (receiptVisibilityConfirmationQueue?.postConfirmationSwitchPacket
+          && typeof receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket === "object"
+            ? receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket
+            : null);
+    const switchBlockingReasons = Array.isArray(postConfirmationSwitch?.blockingReasonKeys)
+      ? postConfirmationSwitch.blockingReasonKeys.join(",")
+      : "";
+    const reviewDownloads = Array.isArray(launchSurfaceReviewCloseoutAction.reviewDownloads)
+      ? launchSurfaceReviewCloseoutAction.reviewDownloads
+      : [];
+    const operatorOrder = Array.isArray(launchSurfaceReviewCloseoutAction.operatorOrder)
+      ? launchSurfaceReviewCloseoutAction.operatorOrder
+      : [];
+    lines.push("");
+    lines.push("Surface Review Closeout Route:");
+    lines.push(
+      `- status=${launchSurfaceReviewCloseoutAction.status || "-"}`
+      + ` | current=${launchSurfaceReviewCloseoutAction.currentActionKey || "-"}`
+      + ` | decision=${launchSurfaceReviewCloseoutAction.decision || "-"}`
+      + ` | manualProgress=${launchSurfaceReviewCloseoutAction.manualCheckpointProgress || "-"}`
+      + ` | manualRemaining=${launchSurfaceReviewCloseoutAction.remainingManualCheckpoints ?? "-"}`
+      + ` | surfaces=${launchSurfaceReviewCloseoutAction.readyReviewSurfaceCount ?? 0}/${launchSurfaceReviewCloseoutAction.reviewSurfaceCount ?? 0}`
+      + ` | ready=${launchSurfaceReviewCloseoutAction.ready === true}`
+    );
+    lines.push(
+      `- confirmStatus=${confirmationSubmission?.status || "-"}`
+      + ` | confirmReady=${confirmationSubmission?.ready === true}`
+      + ` | confirm=${confirmationSubmission?.method || "-"} ${confirmationSubmission?.route || confirmationSubmission?.href || "-"}`
+    );
+    lines.push(
+      `- refreshStatus=${developerOpsOverviewRefresh?.status || "-"}`
+      + ` | refreshReady=${developerOpsOverviewRefresh?.ready === true}`
+      + ` | refreshHref=${developerOpsOverviewRefresh?.href || developerOpsOverviewRefresh?.route || "-"}`
+    );
+    lines.push(
+      `- switchStatus=${postConfirmationSwitch?.status || "-"}`
+      + ` | switchReady=${postConfirmationSwitch?.ready === true}`
+      + ` | switchBlockers=${switchBlockingReasons || "-"}`
+    );
+    lines.push(
+      `- launchDutyRecordIndex=${launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath || receiptVisibilityConfirmationQueue?.launchDutyRecordIndexPath || "-"}`
+      + ` | nextAction=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+    );
+    if (reviewDownloads.length) {
+      lines.push("Surface Review Closeout Downloads:");
+      for (const item of reviewDownloads) {
+        lines.push(
+          `- ${item.key || "-"}`
+          + ` | status=${item.status || "-"}`
+          + ` | ready=${item.ready === true}`
+          + ` | file=${item.fileName || "-"}`
+          + ` | href=${item.href || "-"}`
+        );
+      }
+    }
+    if (operatorOrder.length) {
+      lines.push("Surface Review Closeout Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
   }
   if (preStagingReadinessSelfCheck) {
     const commandGroups = Array.isArray(preStagingReadinessSelfCheck.commandGroups)
@@ -22745,6 +22913,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchDutyStableOperationsTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
     ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
     : "";
+  const receiptVisibilityConfirmationQueue = initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
+  const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const handoffFiles = [
     ["Operations handoff", payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt"],
     ["Post-launch sweep handoff", payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt"],
@@ -22915,6 +23085,86 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | archiveRoot=${preStagingReadinessSelfCheck.archiveRoot || "-"}`
     );
     lines.push(`- nextAction=${preStagingReadinessSelfCheck.nextAction || "-"}`);
+  }
+  if (launchSurfaceReviewCloseoutAction) {
+    const confirmationSubmission = launchSurfaceReviewCloseoutAction.confirmationSubmission
+      && typeof launchSurfaceReviewCloseoutAction.confirmationSubmission === "object"
+        ? launchSurfaceReviewCloseoutAction.confirmationSubmission
+        : (receiptVisibilityConfirmationQueue?.confirmationSubmissionPacket
+          && typeof receiptVisibilityConfirmationQueue.confirmationSubmissionPacket === "object"
+            ? receiptVisibilityConfirmationQueue.confirmationSubmissionPacket
+            : null);
+    const developerOpsOverviewRefresh = launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh
+      && typeof launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh === "object"
+        ? launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh
+        : (receiptVisibilityConfirmationQueue?.overviewRefreshAction
+          && typeof receiptVisibilityConfirmationQueue.overviewRefreshAction === "object"
+            ? receiptVisibilityConfirmationQueue.overviewRefreshAction
+            : null);
+    const postConfirmationSwitch = launchSurfaceReviewCloseoutAction.postConfirmationSwitch
+      && typeof launchSurfaceReviewCloseoutAction.postConfirmationSwitch === "object"
+        ? launchSurfaceReviewCloseoutAction.postConfirmationSwitch
+        : (receiptVisibilityConfirmationQueue?.postConfirmationSwitchPacket
+          && typeof receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket === "object"
+            ? receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket
+            : null);
+    const switchBlockingReasons = Array.isArray(postConfirmationSwitch?.blockingReasonKeys)
+      ? postConfirmationSwitch.blockingReasonKeys.join(",")
+      : "";
+    const reviewDownloads = Array.isArray(launchSurfaceReviewCloseoutAction.reviewDownloads)
+      ? launchSurfaceReviewCloseoutAction.reviewDownloads
+      : [];
+    const operatorOrder = Array.isArray(launchSurfaceReviewCloseoutAction.operatorOrder)
+      ? launchSurfaceReviewCloseoutAction.operatorOrder
+      : [];
+    lines.push("");
+    lines.push("Surface Review Closeout:");
+    lines.push(
+      `- status=${launchSurfaceReviewCloseoutAction.status || "-"}`
+      + ` | current=${launchSurfaceReviewCloseoutAction.currentActionKey || "-"}`
+      + ` | decision=${launchSurfaceReviewCloseoutAction.decision || "-"}`
+      + ` | manualProgress=${launchSurfaceReviewCloseoutAction.manualCheckpointProgress || "-"}`
+      + ` | manualRemaining=${launchSurfaceReviewCloseoutAction.remainingManualCheckpoints ?? "-"}`
+      + ` | surfaces=${launchSurfaceReviewCloseoutAction.readyReviewSurfaceCount ?? 0}/${launchSurfaceReviewCloseoutAction.reviewSurfaceCount ?? 0}`
+      + ` | ready=${launchSurfaceReviewCloseoutAction.ready === true ? "yes" : "no"}`
+    );
+    lines.push(
+      `- confirmStatus=${confirmationSubmission?.status || "-"}`
+      + ` | confirmReady=${confirmationSubmission?.ready === true ? "yes" : "no"}`
+      + ` | confirm=${confirmationSubmission?.method || "-"} ${confirmationSubmission?.route || confirmationSubmission?.href || "-"}`
+    );
+    lines.push(
+      `- refreshStatus=${developerOpsOverviewRefresh?.status || "-"}`
+      + ` | refreshReady=${developerOpsOverviewRefresh?.ready === true ? "yes" : "no"}`
+      + ` | refreshHref=${developerOpsOverviewRefresh?.href || developerOpsOverviewRefresh?.route || "-"}`
+    );
+    lines.push(
+      `- switchStatus=${postConfirmationSwitch?.status || "-"}`
+      + ` | switchReady=${postConfirmationSwitch?.ready === true ? "yes" : "no"}`
+      + ` | switchBlockers=${switchBlockingReasons || "-"}`
+    );
+    lines.push(
+      `- launchDutyRecordIndex=${launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath || receiptVisibilityConfirmationQueue?.launchDutyRecordIndexPath || "-"}`
+      + ` | nextAction=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+    );
+    if (reviewDownloads.length) {
+      lines.push("Surface Review Closeout Downloads:");
+      for (const item of reviewDownloads) {
+        lines.push(
+          `- ${item.key || "-"}`
+          + ` | status=${item.status || "-"}`
+          + ` | ready=${item.ready === true ? "yes" : "no"}`
+          + ` | file=${item.fileName || "-"}`
+          + ` | href=${item.href || "-"}`
+        );
+      }
+    }
+    if (operatorOrder.length) {
+      lines.push("Surface Review Closeout Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
   }
   if (launchDutyStableOperationsTransitionAction) {
     const requiredChecks = Array.isArray(launchDutyStableOperationsTransitionAction.requiredChecks)
@@ -48622,6 +48872,118 @@ function buildDeveloperOpsRouteReviewMatchDescriptor(payload = {}, target = "pri
   };
 }
 
+function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
+  if (!Array.isArray(lines)) {
+    return;
+  }
+  const readiness = payload.summary?.initialLaunchOpsReadiness
+    && typeof payload.summary.initialLaunchOpsReadiness === "object"
+      ? payload.summary.initialLaunchOpsReadiness
+      : {};
+  const launchOperationsOperatorEntry = readiness.launchOperationsOperatorEntry
+    && typeof readiness.launchOperationsOperatorEntry === "object"
+      ? readiness.launchOperationsOperatorEntry
+      : {};
+  const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry.receiptVisibilityConfirmationQueue
+    && typeof launchOperationsOperatorEntry.receiptVisibilityConfirmationQueue === "object"
+      ? launchOperationsOperatorEntry.receiptVisibilityConfirmationQueue
+      : {};
+  const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction
+    && typeof receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction === "object"
+      ? receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction
+      : null;
+  if (!launchSurfaceReviewCloseoutAction) {
+    return;
+  }
+  const confirmationSubmission = launchSurfaceReviewCloseoutAction.confirmationSubmission
+    && typeof launchSurfaceReviewCloseoutAction.confirmationSubmission === "object"
+      ? launchSurfaceReviewCloseoutAction.confirmationSubmission
+      : (receiptVisibilityConfirmationQueue.confirmationSubmissionPacket
+        && typeof receiptVisibilityConfirmationQueue.confirmationSubmissionPacket === "object"
+          ? receiptVisibilityConfirmationQueue.confirmationSubmissionPacket
+          : null);
+  const developerOpsOverviewRefresh = launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh
+    && typeof launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh === "object"
+      ? launchSurfaceReviewCloseoutAction.developerOpsOverviewRefresh
+      : (receiptVisibilityConfirmationQueue.overviewRefreshAction
+        && typeof receiptVisibilityConfirmationQueue.overviewRefreshAction === "object"
+          ? receiptVisibilityConfirmationQueue.overviewRefreshAction
+          : null);
+  const postConfirmationSwitch = launchSurfaceReviewCloseoutAction.postConfirmationSwitch
+    && typeof launchSurfaceReviewCloseoutAction.postConfirmationSwitch === "object"
+      ? launchSurfaceReviewCloseoutAction.postConfirmationSwitch
+      : (receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket
+        && typeof receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket === "object"
+          ? receiptVisibilityConfirmationQueue.postConfirmationSwitchPacket
+          : null);
+  const switchBlockingReasons = Array.isArray(postConfirmationSwitch?.blockingReasonKeys)
+    ? postConfirmationSwitch.blockingReasonKeys.join(",")
+    : "";
+  const reviewDownloads = Array.isArray(launchSurfaceReviewCloseoutAction.reviewDownloads)
+    ? launchSurfaceReviewCloseoutAction.reviewDownloads
+    : [];
+  const operatorOrder = Array.isArray(launchSurfaceReviewCloseoutAction.operatorOrder)
+    ? launchSurfaceReviewCloseoutAction.operatorOrder
+    : [];
+  const launchDutyRecordIndexPath = launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath
+    || receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath
+    || launchOperationsOperatorEntry.launchDutyRecordIndexPath
+    || readiness.launchDutyActionOrder?.launchDutyRecordIndexPath
+    || readiness.launchOperationsOverviewStatus?.launchDutyRecordIndexPath
+    || readiness.stagingLaunchDutyArchive?.launchDutyRecordIndexPath
+    || readiness.nextFollowUp?.launchDutyRecordIndexPath
+    || "-";
+
+  lines.push("");
+  lines.push("Surface Review Closeout Bridge:");
+  lines.push(
+    `- status=${launchSurfaceReviewCloseoutAction.status || "-"}`
+    + ` | current=${launchSurfaceReviewCloseoutAction.currentActionKey || "-"}`
+    + ` | decision=${launchSurfaceReviewCloseoutAction.decision || "-"}`
+    + ` | manualProgress=${launchSurfaceReviewCloseoutAction.manualCheckpointProgress || "-"}`
+    + ` | manualRemaining=${launchSurfaceReviewCloseoutAction.remainingManualCheckpoints ?? "-"}`
+    + ` | surfaces=${launchSurfaceReviewCloseoutAction.readyReviewSurfaceCount ?? 0}/${launchSurfaceReviewCloseoutAction.reviewSurfaceCount ?? 0}`
+    + ` | ready=${launchSurfaceReviewCloseoutAction.ready === true ? "yes" : "no"}`
+  );
+  lines.push(
+    `- confirmStatus=${confirmationSubmission?.status || "-"}`
+    + ` | confirmReady=${confirmationSubmission?.ready === true ? "yes" : "no"}`
+    + ` | confirm=${confirmationSubmission?.method || "-"} ${confirmationSubmission?.route || confirmationSubmission?.href || "-"}`
+  );
+  lines.push(
+    `- refreshStatus=${developerOpsOverviewRefresh?.status || "-"}`
+    + ` | refreshReady=${developerOpsOverviewRefresh?.ready === true ? "yes" : "no"}`
+    + ` | refreshHref=${developerOpsOverviewRefresh?.href || developerOpsOverviewRefresh?.route || "-"}`
+  );
+  lines.push(
+    `- switchStatus=${postConfirmationSwitch?.status || "-"}`
+    + ` | switchReady=${postConfirmationSwitch?.ready === true ? "yes" : "no"}`
+    + ` | switchBlockers=${switchBlockingReasons || "-"}`
+  );
+  lines.push(
+    `- launchDutyRecordIndex=${launchDutyRecordIndexPath}`
+    + ` | nextAction=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+  );
+  if (reviewDownloads.length) {
+    lines.push("Surface Review Closeout Downloads:");
+    for (const item of reviewDownloads) {
+      lines.push(
+        `- ${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | ready=${item.ready === true ? "yes" : "no"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | href=${item.href || "-"}`
+      );
+    }
+  }
+  if (operatorOrder.length) {
+    lines.push("Surface Review Closeout Operator Order:");
+    for (const item of operatorOrder) {
+      lines.push(`- ${item}`);
+    }
+  }
+}
+
 function buildDeveloperOpsRouteReviewMatchSummaryText(payload = {}, target = "primary") {
   const descriptor = buildDeveloperOpsRouteReviewMatchDescriptor(payload, target);
   const scope = payload.scope || {};
@@ -48647,6 +49009,7 @@ function buildDeveloperOpsRouteReviewMatchSummaryText(payload = {}, target = "pr
   if (Array.isArray(routeReview.highlightedEvents) && routeReview.highlightedEvents.length) {
     lines.push(`Route Review Events: ${routeReview.highlightedEvents.join(", ")}`);
   }
+  appendRouteReviewSurfaceCloseoutBridgeText(lines, payload);
   lines.push("");
   lines.push(`${descriptor.title}:`);
   if (!match) {
@@ -48687,6 +49050,7 @@ function buildDeveloperOpsRouteReviewRemainingSummaryText(payload = {}) {
   if (Array.isArray(routeReview.highlightedEvents) && routeReview.highlightedEvents.length) {
     lines.push(`Route Review Events: ${routeReview.highlightedEvents.join(", ")}`);
   }
+  appendRouteReviewSurfaceCloseoutBridgeText(lines, payload);
   lines.push("");
   lines.push("Route Review Remaining Matches:");
   if (!remainingMatches.length) {
@@ -48753,6 +49117,7 @@ function buildDeveloperOpsRouteReviewSectionSummaryText(payload = {}, section = 
     `Section Count: ${sectionPayload.count ?? sectionMatches.length}`
   ];
   appendLaunchReceiptAuditBackfillStatusText(lines, payload);
+  appendRouteReviewSurfaceCloseoutBridgeText(lines, payload);
   lines.push("");
   lines.push("Section Matches:");
   if (!sectionMatches.length) {

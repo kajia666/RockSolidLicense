@@ -19921,7 +19921,29 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + ` | nextDownloadHref=${nextDownloadHref}`
       + ` | ready=${launchDutyStableOperationsTransitionAction.ready === true ? "yes" : "no"}`
     );
-    lines.push(`- checks=${requiredChecks || "-"} | nextAction=${launchDutyStableOperationsTransitionAction.nextAction || "-"}`);
+    lines.push(
+      `- recordReady=${launchDutyStableOperationsTransitionAction.recordReady === true ? "yes" : "no"}`
+      + ` | packetReady=${launchDutyStableOperationsTransitionAction.packetReady === true ? "yes" : "no"}`
+      + ` | tailReady=${launchDutyStableOperationsTransitionAction.tailReady === true ? "yes" : "no"}`
+      + ` | handoffReady=${launchDutyStableOperationsTransitionAction.handoffReady === true ? "yes" : "no"}`
+    );
+    lines.push(
+      `- recordIndex=${launchDutyStableOperationsTransitionAction.recordIndexStatus || "-"}`
+      + ` | recordProgress=${launchDutyStableOperationsTransitionAction.recordIndexProgress || "-"}`
+      + ` | packetReview=${launchDutyStableOperationsTransitionAction.packetReviewStatus || "-"}`
+      + ` | packetProgress=${launchDutyStableOperationsTransitionAction.packetReviewProgress || "-"}`
+    );
+    lines.push(
+      `- stableTail=${launchDutyStableOperationsTransitionAction.stableOperationsTailStatus || "-"}`
+      + ` | stableReadback=${launchDutyStableOperationsTransitionAction.stableOperationsReadbackStatus || "-"}`
+      + ` | landing=${launchDutyStableOperationsTransitionAction.landingStatus || "-"}`
+      + ` | landingHref=${launchDutyStableOperationsTransitionAction.landingHref || "-"}`
+    );
+    lines.push(
+      `- checks=${requiredChecks || "-"}`
+      + ` | launchDutyRecordIndex=${launchDutyStableOperationsTransitionAction.launchDutyRecordIndexPath || "-"}`
+      + ` | nextAction=${launchDutyStableOperationsTransitionAction.nextAction || "-"}`
+    );
     if (operatorOrder.length) {
       lines.push("Operator Order:");
       for (const item of operatorOrder) {
@@ -20998,6 +21020,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     lines.push(`- nextAction=${preStagingReadinessSelfCheck.nextAction || "-"}`);
   }
   if (launchDutyStableOperationsTransitionAction) {
+    const requiredChecks = Array.isArray(launchDutyStableOperationsTransitionAction.requiredChecks)
+      ? launchDutyStableOperationsTransitionAction.requiredChecks.join(",")
+      : "";
+    const operatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction.operatorOrder)
+      ? launchDutyStableOperationsTransitionAction.operatorOrder
+      : [];
     lines.push("");
     lines.push("Stable Operations Transition Route:");
     lines.push(
@@ -21011,7 +21039,23 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | nextDownloadHref=${launchDutyStableOperationsTransitionAction.nextDownloadHref || "-"}`
       + ` | ready=${launchDutyStableOperationsTransitionAction.ready === true}`
     );
+    lines.push(
+      `- recordReady=${launchDutyStableOperationsTransitionAction.recordReady === true}`
+      + ` | packetReady=${launchDutyStableOperationsTransitionAction.packetReady === true}`
+      + ` | tailReady=${launchDutyStableOperationsTransitionAction.tailReady === true}`
+      + ` | handoffReady=${launchDutyStableOperationsTransitionAction.handoffReady === true}`
+    );
+    lines.push(
+      `- checks=${requiredChecks || "-"}`
+      + ` | launchDutyRecordIndex=${launchDutyStableOperationsTransitionAction.launchDutyRecordIndexPath || "-"}`
+    );
     lines.push(`- nextAction=${launchDutyStableOperationsTransitionAction.nextAction || "-"}`);
+    if (operatorOrder.length) {
+      lines.push("Stable Operations Transition Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
   }
   if (steadyStateHandoffLanding) {
     lines.push("");
@@ -22873,6 +22917,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push(`- nextAction=${preStagingReadinessSelfCheck.nextAction || "-"}`);
   }
   if (launchDutyStableOperationsTransitionAction) {
+    const requiredChecks = Array.isArray(launchDutyStableOperationsTransitionAction.requiredChecks)
+      ? launchDutyStableOperationsTransitionAction.requiredChecks.join(",")
+      : "";
+    const operatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction.operatorOrder)
+      ? launchDutyStableOperationsTransitionAction.operatorOrder
+      : [];
     lines.push("");
     lines.push("Stable Operations Transition:");
     lines.push(
@@ -22886,7 +22936,23 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | nextDownloadHref=${launchDutyStableOperationsTransitionAction.nextDownloadHref || "-"}`
       + ` | ready=${launchDutyStableOperationsTransitionAction.ready === true ? "yes" : "no"}`
     );
+    lines.push(
+      `- recordReady=${launchDutyStableOperationsTransitionAction.recordReady === true ? "yes" : "no"}`
+      + ` | packetReady=${launchDutyStableOperationsTransitionAction.packetReady === true ? "yes" : "no"}`
+      + ` | tailReady=${launchDutyStableOperationsTransitionAction.tailReady === true ? "yes" : "no"}`
+      + ` | handoffReady=${launchDutyStableOperationsTransitionAction.handoffReady === true ? "yes" : "no"}`
+    );
+    lines.push(
+      `- checks=${requiredChecks || "-"}`
+      + ` | launchDutyRecordIndex=${launchDutyStableOperationsTransitionAction.launchDutyRecordIndexPath || "-"}`
+    );
     lines.push(`- nextAction=${launchDutyStableOperationsTransitionAction.nextAction || "-"}`);
+    if (operatorOrder.length) {
+      lines.push("Stable Operations Transition Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
   }
 
   if (steadyStateHandoffLanding) {

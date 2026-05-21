@@ -27296,6 +27296,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Stable Operations Transition:[\s\S]*recordReady=yes \| packetReady=yes \| tailReady=yes \| handoffReady=yes/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Stable Operations Transition:[\s\S]*checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Mainline Action Plan:[\s\S]*Open steady-state handoff brief[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
     );
     assert.match(
@@ -27337,6 +27345,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Stable Operations Transition Route:[\s\S]*recordReady=true \| packetReady=true \| tailReady=true \| handoffReady=true/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
     );
     assert.match(
@@ -27367,6 +27379,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Stable Operations Transition:[\s\S]*status=ready_for_steady_state_handoff[^\n]*current=open_steady_state_handoff_brief[^\n]*blockedBy=-[^\n]*operatorAction=continue_steady_state_handoff[^\n]*reviewRequired=no[^\n]*nextDownloadKey=ops_steady_state_handoff_brief[^\n]*nextDownload=steady-state-handoff-brief[^\n]*nextDownloadHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief[^\n]*ready=yes/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Stable Operations Transition:[\s\S]*recordReady=yes \| packetReady=yes \| tailReady=yes \| handoffReady=yes/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,

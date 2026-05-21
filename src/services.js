@@ -19893,6 +19893,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + ` | stabilizationRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
       + ` | stabilizationNextAction=${stabilizationNextActionTemplate?.afterActionKey || stabilizationNextActionTemplate?.actionKey || "-"}`
     );
+    lines.push(
+      `- stableTransitionStatus=${launchDutyStableOperationsTransitionAction?.status || "-"}`
+      + ` | stableTransitionReady=${launchDutyStableOperationsTransitionAction?.ready === true ? "yes" : "no"}`
+      + ` | stableTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
+      + ` | stableTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
+      + ` | stableTransitionNextHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
+    );
     if (reviewDownloads.length) {
       lines.push("Review Downloads:");
       for (const item of reviewDownloads) {
@@ -21259,6 +21266,13 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | stabilizationCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
       + ` | stabilizationRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
       + ` | stabilizationNextAction=${stabilizationNextActionTemplate?.afterActionKey || stabilizationNextActionTemplate?.actionKey || "-"}`
+    );
+    lines.push(
+      `- stableTransitionStatus=${launchDutyStableOperationsTransitionAction?.status || "-"}`
+      + ` | stableTransitionReady=${launchDutyStableOperationsTransitionAction?.ready === true}`
+      + ` | stableTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
+      + ` | stableTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
+      + ` | stableTransitionNextHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -23337,6 +23351,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | stabilizationCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
       + ` | stabilizationRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
       + ` | stabilizationNextAction=${stabilizationNextActionTemplate?.afterActionKey || stabilizationNextActionTemplate?.actionKey || "-"}`
+    );
+    lines.push(
+      `- stableTransitionStatus=${launchDutyStableOperationsTransitionAction?.status || "-"}`
+      + ` | stableTransitionReady=${launchDutyStableOperationsTransitionAction?.ready === true ? "yes" : "no"}`
+      + ` | stableTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
+      + ` | stableTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
+      + ` | stableTransitionNextHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -49155,6 +49176,10 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
     && typeof stabilizationExecutionAction.nextActionTemplate === "object"
       ? stabilizationExecutionAction.nextActionTemplate
       : null;
+  const launchDutyStableOperationsTransitionAction = launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction
+    && typeof launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction === "object"
+      ? launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction
+      : null;
   const launchDutyRecordIndexPath = launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath
     || receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath
     || launchOperationsOperatorEntry.launchDutyRecordIndexPath
@@ -49220,6 +49245,13 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
     + ` | stabilizationCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
     + ` | stabilizationRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
     + ` | stabilizationNextAction=${stabilizationNextActionTemplate?.afterActionKey || stabilizationNextActionTemplate?.actionKey || "-"}`
+  );
+  lines.push(
+    `- stableTransitionStatus=${launchDutyStableOperationsTransitionAction?.status || "-"}`
+    + ` | stableTransitionReady=${launchDutyStableOperationsTransitionAction?.ready === true ? "yes" : "no"}`
+    + ` | stableTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
+    + ` | stableTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
+    + ` | stableTransitionNextHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
   );
   if (reviewDownloads.length) {
     lines.push("Surface Review Closeout Downloads:");

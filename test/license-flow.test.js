@@ -27329,6 +27329,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Stable Operations Transition Route:[\s\S]*status=ready_for_steady_state_handoff[^\n]*current=open_steady_state_handoff_brief[^\n]*blockedBy=-[^\n]*operatorAction=continue_steady_state_handoff[^\n]*reviewRequired=false[^\n]*nextDownloadKey=ops_steady_state_handoff_brief[^\n]*nextDownload=steady-state-handoff-brief[^\n]*nextDownloadHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief[^\n]*ready=true/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
     );
     assert.match(
@@ -27355,6 +27359,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Steady-State Handoff Landing:[\s\S]*status=ready_for_steady_state_handoff \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Stable Operations Transition:[\s\S]*status=ready_for_steady_state_handoff[^\n]*current=open_steady_state_handoff_brief[^\n]*blockedBy=-[^\n]*operatorAction=continue_steady_state_handoff[^\n]*reviewRequired=no[^\n]*nextDownloadKey=ops_steady_state_handoff_brief[^\n]*nextDownload=steady-state-handoff-brief[^\n]*nextDownloadHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief[^\n]*ready=yes/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,

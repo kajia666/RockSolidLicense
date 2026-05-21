@@ -23698,6 +23698,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Downloads:[\s\S]*launch_review_summary \| status=aligned \| ready=yes \| file=launch-review\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Downloads:[\s\S]*launch_smoke_summary \| status=aligned \| ready=yes \| file=launch-smoke-kit\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Next:[\s\S]*action=confirm_first_wave_handoff \| method=POST \| route=\/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Launch Surface Review Closeout Action:[\s\S]*stableTransitionStatus=[^\n]*\| stableTransitionReady=(yes|no)[^\n]*\| stableTransitionCurrent=[^\n]*\| stableTransitionNextDownload=[^\n]*\| stableTransitionNextHref=[^\n]*/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Launch Surface Review Closeout Action:[\s\S]*stableTransitionBlockedBy=[^\n]*\| stableTransitionPacketReview=[^\n]*\| stableTransitionPacketProgress=[^\n]*\| stableTransitionLanding=[^\n]*\| stableTransitionLandingHref=[^\n]*/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Launch Surface Review Closeout Action:[\s\S]*stableTransitionOperatorAction=[^\n]*\| stableTransitionReviewRequired=(yes|no|-)[^\n]*\| stableTransitionNextDownloadKey=[^\n]*\| stableTransitionNextAction=[^\n]*/
+    );
     assert.match(launchOperationsOperatorEntryDownload.body, /Handoff Packet Evidence: receipt_visibility_parity=ready; first_wave_handoff_confirmation=pending; support_inspection_confirmation=confirmed; developer_ops_overview_refresh=pending_confirmation_receipt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*status=awaiting_first_wave_confirmation \| ready=no \| currentAction=confirm_first_wave_handoff[\s\S]*\| manualProgress=1\/2 \| manualRemaining=1 \| confirmPacket=ready_to_submit \| preflight=blocked_until_first_wave_confirmation[\s\S]*\| nextLaunchDutyPhase=archive_signoff_packet \| nextLaunchDutyAction=archive_production_signoff_packet/);

@@ -47711,6 +47711,13 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       const action = receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction;
       const reviewDownloads = Array.isArray(action.reviewDownloads) ? action.reviewDownloads : [];
       const nextActionTemplate = action.nextActionTemplate || {};
+      const stableTransitionAction = entry.launchDutyStableOperationsTransitionAction
+        && typeof entry.launchDutyStableOperationsTransitionAction === "object"
+          ? entry.launchDutyStableOperationsTransitionAction
+          : null;
+      const stableTransitionBlockedBy = Array.isArray(stableTransitionAction?.blockedBy)
+        ? stableTransitionAction.blockedBy.join(",")
+        : "";
       lines.push("Launch Surface Review Closeout Action:");
       lines.push(
         `- status=${action.status || "-"}`
@@ -47742,6 +47749,28 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         + ` | method=${nextActionTemplate.method || "-"}`
         + ` | route=${nextActionTemplate.route || "-"}`
         + ` | href=${nextActionTemplate.href || "-"}`
+      );
+      lines.push(
+        `- stableTransitionStatus=${stableTransitionAction?.status || "-"}`
+        + ` | stableTransitionReady=${stableTransitionAction?.ready === true ? "yes" : "no"}`
+        + ` | stableTransitionCurrent=${stableTransitionAction?.currentActionKey || "-"}`
+        + ` | stableTransitionNextDownload=${stableTransitionAction?.nextDownloadFormat || "-"}`
+        + ` | stableTransitionNextHref=${stableTransitionAction?.nextDownloadHref || "-"}`
+      );
+      lines.push(
+        `- stableTransitionBlockedBy=${stableTransitionBlockedBy || "-"}`
+        + ` | stableTransitionPacketReview=${stableTransitionAction?.packetReviewStatus || "-"}`
+        + ` | stableTransitionPacketProgress=${stableTransitionAction?.packetReviewProgress || "-"}`
+        + ` | stableTransitionLanding=${stableTransitionAction?.landingStatus || "-"}`
+        + ` | stableTransitionLandingHref=${stableTransitionAction?.landingHref || "-"}`
+      );
+      lines.push(
+        `- stableTransitionOperatorAction=${stableTransitionAction?.operatorAction?.key || "-"}`
+        + ` | stableTransitionReviewRequired=${stableTransitionAction?.operatorAction
+          ? stableTransitionAction.operatorAction.reviewRequired === true ? "yes" : "no"
+          : "-"}`
+        + ` | stableTransitionNextDownloadKey=${stableTransitionAction?.nextDownloadKey || "-"}`
+        + ` | stableTransitionNextAction=${stableTransitionAction?.operatorAction?.nextAction || stableTransitionAction?.nextAction || "-"}`
       );
     }
     if (receiptVisibilityConfirmationQueue.confirmationReceipt) {

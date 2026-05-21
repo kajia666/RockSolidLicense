@@ -32507,7 +32507,8 @@ function buildDeveloperOpsLaunchOperationsOperatorPostSignoffWatchReceiptPlan(
     operation,
     status: "pending_operator_receipt",
     artifact: record.artifact || null,
-    actionKey: record.actionKey || null
+    actionKey: record.actionKey || null,
+    command: record.command || null
   })));
   return {
     version: "developer-ops-launch-operations-operator-post-signoff-watch-receipt-plan/v1",
@@ -46732,14 +46733,21 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     );
     const records = Array.isArray(postSignoffWatchReceiptPlan.records) ? postSignoffWatchReceiptPlan.records : [];
     for (const item of records) {
+      const sourceRecordKeys = Array.isArray(item.sourceRecordKeys) ? item.sourceRecordKeys : [];
       lines.push(
         `${item.stepNumber || "-"}. ${item.key || "-"}`
         + ` | status=${item.status || "-"}`
         + ` | action=${item.actionKey || "-"}`
         + ` | artifact=${item.artifact || "-"}`
         + ` | receipts=${Array.isArray(item.receiptOperations) ? item.receiptOperations.join(",") : "-"}`
-        + (Array.isArray(item.sourceRecordKeys) && item.sourceRecordKeys.length
-          ? ` | sourceRecords=${item.sourceRecordKeys.join(",")}`
+        + (!sourceRecordKeys.length && item.command
+          ? ` | command=${item.command}`
+          : "")
+        + (sourceRecordKeys.length
+          ? ` | sourceRecords=${sourceRecordKeys.join(",")}`
+          : "")
+        + (sourceRecordKeys.length && item.command
+          ? ` | command=${item.command}`
           : "")
         + ` | expectedEvidence=${item.expectedEvidence || "-"}`
       );
@@ -46748,6 +46756,19 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       ? postSignoffWatchReceiptPlan.receiptQueue
       : [];
     lines.push(`Post-Signoff Receipt Queue: ${receiptQueue.map((item) => `${item.recordKey || "-"}=${item.operation || "-"}:${item.status || "-"}`).join("; ") || "-"}`);
+    const receiptQueueCommands = receiptQueue.filter((item) => item?.command);
+    if (receiptQueueCommands.length) {
+      lines.push("Post-Signoff Receipt Queue Commands:");
+      for (const item of receiptQueueCommands) {
+        const order = receiptQueue.indexOf(item) + 1;
+        lines.push(
+          `${order}. ${item.recordKey || "-"}`
+          + ` | operation=${item.operation || "-"}`
+          + ` | status=${item.status || "-"}`
+          + ` | command=${item.command || "-"}`
+        );
+      }
+    }
     lines.push("");
   }
   const postSignoffExecutionChecklist = entry.postSignoffExecutionChecklist || null;

@@ -19836,6 +19836,9 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       && typeof stabilizationExecutionAction.nextActionTemplate === "object"
         ? stabilizationExecutionAction.nextActionTemplate
         : null;
+    const stableTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
+      ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
+      : "";
     lines.push("");
     lines.push("Launch Mainline Surface Review Closeout:");
     lines.push(
@@ -19899,6 +19902,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + ` | stableTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
       + ` | stableTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
       + ` | stableTransitionNextHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
+    );
+    lines.push(
+      `- stableTransitionBlockedBy=${stableTransitionBlockedBy || "-"}`
+      + ` | stableTransitionPacketReview=${launchDutyStableOperationsTransitionAction?.packetReviewStatus || "-"}`
+      + ` | stableTransitionPacketProgress=${launchDutyStableOperationsTransitionAction?.packetReviewProgress || "-"}`
+      + ` | stableTransitionLanding=${launchDutyStableOperationsTransitionAction?.landingStatus || "-"}`
+      + ` | stableTransitionLandingHref=${launchDutyStableOperationsTransitionAction?.landingHref || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Review Downloads:");
@@ -21210,6 +21220,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       && typeof stabilizationExecutionAction.nextActionTemplate === "object"
         ? stabilizationExecutionAction.nextActionTemplate
         : null;
+    const stableTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
+      ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
+      : "";
     lines.push("");
     lines.push("Surface Review Closeout Route:");
     lines.push(
@@ -21273,6 +21286,13 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | stableTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
       + ` | stableTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
       + ` | stableTransitionNextHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
+    );
+    lines.push(
+      `- stableTransitionBlockedBy=${stableTransitionBlockedBy || "-"}`
+      + ` | stableTransitionPacketReview=${launchDutyStableOperationsTransitionAction?.packetReviewStatus || "-"}`
+      + ` | stableTransitionPacketProgress=${launchDutyStableOperationsTransitionAction?.packetReviewProgress || "-"}`
+      + ` | stableTransitionLanding=${launchDutyStableOperationsTransitionAction?.landingStatus || "-"}`
+      + ` | stableTransitionLandingHref=${launchDutyStableOperationsTransitionAction?.landingHref || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -23295,6 +23315,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       && typeof stabilizationExecutionAction.nextActionTemplate === "object"
         ? stabilizationExecutionAction.nextActionTemplate
         : null;
+    const stableTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
+      ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
+      : "";
     lines.push("");
     lines.push("Surface Review Closeout:");
     lines.push(
@@ -23358,6 +23381,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | stableTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
       + ` | stableTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
       + ` | stableTransitionNextHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
+    );
+    lines.push(
+      `- stableTransitionBlockedBy=${stableTransitionBlockedBy || "-"}`
+      + ` | stableTransitionPacketReview=${launchDutyStableOperationsTransitionAction?.packetReviewStatus || "-"}`
+      + ` | stableTransitionPacketProgress=${launchDutyStableOperationsTransitionAction?.packetReviewProgress || "-"}`
+      + ` | stableTransitionLanding=${launchDutyStableOperationsTransitionAction?.landingStatus || "-"}`
+      + ` | stableTransitionLandingHref=${launchDutyStableOperationsTransitionAction?.landingHref || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -49180,6 +49210,9 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
     && typeof launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction === "object"
       ? launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction
       : null;
+  const stableTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
+    ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
+    : "";
   const launchDutyRecordIndexPath = launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath
     || receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath
     || launchOperationsOperatorEntry.launchDutyRecordIndexPath
@@ -49252,6 +49285,13 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
     + ` | stableTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
     + ` | stableTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
     + ` | stableTransitionNextHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
+  );
+  lines.push(
+    `- stableTransitionBlockedBy=${stableTransitionBlockedBy || "-"}`
+    + ` | stableTransitionPacketReview=${launchDutyStableOperationsTransitionAction?.packetReviewStatus || "-"}`
+    + ` | stableTransitionPacketProgress=${launchDutyStableOperationsTransitionAction?.packetReviewProgress || "-"}`
+    + ` | stableTransitionLanding=${launchDutyStableOperationsTransitionAction?.landingStatus || "-"}`
+    + ` | stableTransitionLandingHref=${launchDutyStableOperationsTransitionAction?.landingHref || "-"}`
   );
   if (reviewDownloads.length) {
     lines.push("Surface Review Closeout Downloads:");

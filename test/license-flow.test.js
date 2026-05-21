@@ -27336,6 +27336,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*stableTransitionOperatorAction=[^\n]*\| stableTransitionReviewRequired=(yes|no|-)[^\n]*\| stableTransitionNextDownloadKey=[^\n]*\| stableTransitionNextAction=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Surface Review Closeout:[\s\S]*Review Downloads:[\s\S]*launch_review_summary[^\n]*launch-review\.txt[\s\S]*launch_smoke_summary[^\n]*launch-smoke-kit\.txt/
     );
     assert.match(
@@ -27417,6 +27421,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*stableTransitionOperatorAction=[^\n]*\| stableTransitionReviewRequired=(true|false|-)[^\n]*\| stableTransitionNextDownloadKey=[^\n]*\| stableTransitionNextAction=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
     );
     assert.match(
@@ -27483,6 +27491,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Surface Review Closeout:[\s\S]*stableTransitionBlockedBy=[^\n]*\| stableTransitionPacketReview=[^\n]*\| stableTransitionPacketProgress=[^\n]*\| stableTransitionLanding=[^\n]*\| stableTransitionLandingHref=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*stableTransitionOperatorAction=[^\n]*\| stableTransitionReviewRequired=(yes|no|-)[^\n]*\| stableTransitionNextDownloadKey=[^\n]*\| stableTransitionNextAction=[^\n]*/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
@@ -27567,6 +27579,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       primaryRouteReviewDownload.body,
       /Surface Review Closeout Bridge:[\s\S]*stableTransitionBlockedBy=[^\n]*\| stableTransitionPacketReview=[^\n]*\| stableTransitionPacketProgress=[^\n]*\| stableTransitionLanding=[^\n]*\| stableTransitionLandingHref=[^\n]*/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*stableTransitionOperatorAction=[^\n]*\| stableTransitionReviewRequired=(yes|no|-)[^\n]*\| stableTransitionNextDownloadKey=[^\n]*\| stableTransitionNextAction=[^\n]*/
     );
 
     const nextRouteReviewDownload = await getText(

@@ -35332,6 +35332,22 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
       : !launchDutyStableOperationsTransitionRecordReady
         ? "verify_launch_duty_record_writes"
         : "review_staging_packet_results";
+  const launchDutyStableOperationsTransitionPacketReviewFallbackAction = {
+    key: "continue_packet_result_review",
+    reviewRequired: false,
+    nextDownloadFormat: "launch-operations-operator-entry",
+    nextDownloadKey: "ops_launch_operations_operator_entry",
+    nextDownloadHref: buildLaunchWorkflowDownloadHref(
+      "developer-ops",
+      "launch-operations-operator-entry",
+      {
+        productCode,
+        channel,
+        limit: 80
+      }
+    ),
+    nextAction: "Continue packet result review from the launch operations operator entry."
+  };
   const launchDutyStableOperationsTransitionOperatorAction = launchDutyStableOperationsTransitionReady
     ? {
         key: "continue_steady_state_handoff",
@@ -35345,7 +35361,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
       ? null
       : !launchDutyStableOperationsTransitionRecordReady
         ? launchDutyRecordIndexOperatorAction
-        : launchDutyPacketReviewOperatorAction;
+        : launchDutyPacketReviewOperatorAction || launchDutyStableOperationsTransitionPacketReviewFallbackAction;
   const launchDutyStableOperationsTransitionNextDownloadFormat = launchDutyStableOperationsTransitionOperatorAction?.nextDownloadFormat
     || (launchDutyStableOperationsTransitionReady ? "steady-state-handoff-brief" : "launch-operations-operator-entry");
   const launchDutyStableOperationsTransitionNextDownloadKey = launchDutyStableOperationsTransitionOperatorAction?.nextDownloadKey
@@ -45381,6 +45397,9 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const launchDutyStabilizationCloseoutExecutionState = launchDutyStabilizationReceiptQueue?.closeoutExecutionState || null;
   const launchDutyStableOperationsHandoffTail = launchDutyStabilizationReceiptQueue?.stableOperationsHandoffTail || null;
   const launchDutyStableOperationsTransitionAction = readiness.launchOperationsOperatorEntry?.launchDutyStableOperationsTransitionAction || null;
+  const launchDutyStableOperationsTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
+    ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
+    : "";
   const firstOperatingResultHandoffAction = readiness.launchOperationsOperatorEntry?.firstOperatingResultHandoffAction || null;
   const firstOperatingResultHandoffBlockedBy = Array.isArray(firstOperatingResultHandoffAction?.blockedBy)
     ? firstOperatingResultHandoffAction.blockedBy.join(",")
@@ -45579,8 +45598,13 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | launchDutyStableOperationsReady=${launchDutyStableOperationsHandoffTail?.readyForHandoff === true}`
       + ` | launchDutyStableOpsTransition=${launchDutyStableOperationsTransitionAction?.status || "-"}`
       + ` | launchDutyStableOpsTransitionCurrent=${launchDutyStableOperationsTransitionAction?.currentActionKey || "-"}`
-      + ` | launchDutyStableOpsTransitionReady=${launchDutyStableOperationsTransitionAction?.ready === true}`
+      + ` | launchDutyStableOpsTransitionBlockedBy=${launchDutyStableOperationsTransitionBlockedBy || "-"}`
+      + ` | launchDutyStableOpsTransitionOperatorAction=${launchDutyStableOperationsTransitionAction?.operatorAction?.key || "-"}`
+      + ` | launchDutyStableOpsTransitionReviewRequired=${launchDutyStableOperationsTransitionAction?.operatorAction ? launchDutyStableOperationsTransitionAction.operatorAction.reviewRequired === true : "-"}`
+      + ` | launchDutyStableOpsTransitionNextDownloadKey=${launchDutyStableOperationsTransitionAction?.nextDownloadKey || "-"}`
       + ` | launchDutyStableOpsTransitionNextDownload=${launchDutyStableOperationsTransitionAction?.nextDownloadFormat || "-"}`
+      + ` | launchDutyStableOpsTransitionNextDownloadHref=${launchDutyStableOperationsTransitionAction?.nextDownloadHref || "-"}`
+      + ` | launchDutyStableOpsTransitionReady=${launchDutyStableOperationsTransitionAction?.ready === true}`
       + ` | launchDutyRecordIndexReceiptSelection=${launchDutyRecordIndexReceiptSelection?.status || "-"}`
       + ` | launchDutyRecordIndexSelectedProgress=${launchDutyRecordIndexReceiptSelection?.selectedProgress || "-"}`
       + ` | launchDutyRecordIndexLatestProgress=${launchDutyRecordIndexReceiptSelection?.latestProgress || "-"}`

@@ -26209,6 +26209,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       staleLaunchDutyReadbackHandoffIndexDownload.body,
       /Launch Operations Operator Entry: [^\n]*launchDutyStableOpsTransition=blocked_until_packet_result_review[^\n]*launchDutyStableOpsTransitionCurrent=review_staging_packet_results/
     );
+    assert.match(
+      staleLaunchDutyReadbackHandoffIndexDownload.body,
+      /Launch Operations Operator Entry: [^\n]*launchDutyStableOpsTransition=blocked_until_packet_result_review[^\n]*launchDutyStableOpsTransitionCurrent=review_staging_packet_results[^\n]*launchDutyStableOpsTransitionBlockedBy=packet_result_review[^\n]*launchDutyStableOpsTransitionOperatorAction=continue_packet_result_review[^\n]*launchDutyStableOpsTransitionReviewRequired=false[^\n]*launchDutyStableOpsTransitionNextDownloadKey=ops_launch_operations_operator_entry[^\n]*launchDutyStableOpsTransitionNextDownload=launch-operations-operator-entry[^\n]*launchDutyStableOpsTransitionNextDownloadHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry/
+    );
     const launchDutyPacketReviewReceipt = await postJson(
       baseUrl,
       "/api/developer/ops/steady-state-duty-plan/receipt",

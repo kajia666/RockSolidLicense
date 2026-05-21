@@ -42664,6 +42664,9 @@ function buildDeveloperOpsSummaryText(payload = {}) {
       }
       const launchDutyHandoffAction = launchOperationsOperatorEntry.launchDutyHandoffAction || null;
       const stableOperationsTransitionAction = launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction || null;
+      const stableOperationsTransitionBlockedBy = Array.isArray(stableOperationsTransitionAction?.blockedBy)
+        ? stableOperationsTransitionAction.blockedBy.join(",")
+        : "";
       if (launchDutyHandoffAction) {
         const firstReceiptWriteOps = Array.isArray(launchDutyHandoffAction.firstReceiptWriteOperations)
           ? launchDutyHandoffAction.firstReceiptWriteOperations.join(",")
@@ -42753,8 +42756,13 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyStableOperationsReadback=${stableOperationsReadbackPacket?.status || "-"}`
           + ` | launchDutyStableOpsTransition=${stableOperationsTransitionAction?.status || "-"}`
           + ` | launchDutyStableOpsTransitionCurrent=${stableOperationsTransitionAction?.currentActionKey || "-"}`
-          + ` | launchDutyStableOpsTransitionReady=${stableOperationsTransitionAction?.ready === true}`
+          + ` | launchDutyStableOpsTransitionBlockedBy=${stableOperationsTransitionBlockedBy || "-"}`
+          + ` | launchDutyStableOpsTransitionOperatorAction=${stableOperationsTransitionAction?.operatorAction?.key || "-"}`
+          + ` | launchDutyStableOpsTransitionReviewRequired=${stableOperationsTransitionAction?.operatorAction ? stableOperationsTransitionAction.operatorAction.reviewRequired === true : "-"}`
+          + ` | launchDutyStableOpsTransitionNextDownloadKey=${stableOperationsTransitionAction?.nextDownloadKey || "-"}`
           + ` | launchDutyStableOpsTransitionNextDownload=${stableOperationsTransitionAction?.nextDownloadFormat || "-"}`
+          + ` | launchDutyStableOpsTransitionNextDownloadHref=${stableOperationsTransitionAction?.nextDownloadHref || "-"}`
+          + ` | launchDutyStableOpsTransitionReady=${stableOperationsTransitionAction?.ready === true}`
           + ` | refresh=${launchDutyHandoffAction.overviewRefreshHref || "-"}`
           + ` | receiptAudit=${launchDutyHandoffAction.confirmationAuditLogId || "-"}`
           + ` | launchDutyRecordIndex=${launchDutyHandoffAction.launchDutyRecordIndexPath || "-"}`
@@ -43664,6 +43672,9 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
     }
     const launchDutyHandoffAction = launchOperationsOperatorEntry.launchDutyHandoffAction || null;
     const stableOperationsTransitionAction = launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction || null;
+    const stableOperationsTransitionBlockedBy = Array.isArray(stableOperationsTransitionAction?.blockedBy)
+      ? stableOperationsTransitionAction.blockedBy.join(",")
+      : "";
     if (launchDutyHandoffAction) {
       const firstReceiptWriteOps = Array.isArray(launchDutyHandoffAction.firstReceiptWriteOperations)
         ? launchDutyHandoffAction.firstReceiptWriteOperations.join(",")
@@ -43738,8 +43749,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | stableOperationsReadback=${stableOperationsReadbackPacket?.status || "-"}`
         + ` | stableOpsTransition=${stableOperationsTransitionAction?.status || "-"}`
         + ` | stableOpsTransitionCurrent=${stableOperationsTransitionAction?.currentActionKey || "-"}`
-        + ` | stableOpsTransitionReady=${stableOperationsTransitionAction?.ready === true ? "yes" : "no"}`
+        + ` | stableOpsTransitionBlockedBy=${stableOperationsTransitionBlockedBy || "-"}`
+        + ` | stableOpsTransitionOperatorAction=${stableOperationsTransitionAction?.operatorAction?.key || "-"}`
+        + ` | stableOpsTransitionReviewRequired=${stableOperationsTransitionAction?.operatorAction?.reviewRequired === true ? "yes" : "no"}`
+        + ` | stableOpsTransitionNextDownloadKey=${stableOperationsTransitionAction?.nextDownloadKey || "-"}`
         + ` | stableOpsTransitionNextDownload=${stableOperationsTransitionAction?.nextDownloadFormat || "-"}`
+        + ` | stableOpsTransitionNextDownloadHref=${stableOperationsTransitionAction?.nextDownloadHref || "-"}`
+        + ` | stableOpsTransitionReady=${stableOperationsTransitionAction?.ready === true ? "yes" : "no"}`
         + ` | refresh=${launchDutyHandoffAction.overviewRefreshHref || "-"}`
       );
     }

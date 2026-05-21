@@ -25918,6 +25918,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedSnapshot.summaryText,
+      /Launch Operations Operator Entry:[\s\S]*launchDutyStableOpsTransition=blocked_until_packet_result_review[^\n]*launchDutyStableOpsTransitionCurrent=review_staging_packet_results[^\n]*launchDutyStableOpsTransitionBlockedBy=packet_result_review[^\n]*launchDutyStableOpsTransitionOperatorAction=continue_packet_result_review[^\n]*launchDutyStableOpsTransitionReviewRequired=false[^\n]*launchDutyStableOpsTransitionNextDownloadKey=ops_launch_operations_operator_entry[^\n]*launchDutyStableOpsTransitionNextDownload=launch-operations-operator-entry[^\n]*launchDutyStableOpsTransitionNextDownloadHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedSnapshot.summaryText,
       /Launch Operations Operator Entry:[\s\S]*launchDutyFirstWaveCloseoutNext=reload_staging_rehearsal_for_stable_operations/
     );
     assert.match(
@@ -26162,6 +26166,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       staleLaunchDutyReadbackInitialReadinessDownload.body,
       /Launch Duty Handoff Action: [^\n]*stableOpsTransition=blocked_until_packet_result_review[^\n]*stableOpsTransitionCurrent=review_staging_packet_results/
+    );
+    assert.match(
+      staleLaunchDutyReadbackInitialReadinessDownload.body,
+      /Launch Duty Handoff Action: [^\n]*stableOpsTransition=blocked_until_packet_result_review[^\n]*stableOpsTransitionCurrent=review_staging_packet_results[^\n]*stableOpsTransitionBlockedBy=packet_result_review[^\n]*stableOpsTransitionOperatorAction=continue_packet_result_review[^\n]*stableOpsTransitionReviewRequired=no[^\n]*stableOpsTransitionNextDownloadKey=ops_launch_operations_operator_entry[^\n]*stableOpsTransitionNextDownload=launch-operations-operator-entry[^\n]*stableOpsTransitionNextDownloadHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry/
     );
     const staleLaunchDutyReadbackOperatorEntryDownload = await getText(
       baseUrl,

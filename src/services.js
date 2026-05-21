@@ -19644,6 +19644,10 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const launchDutyActionOrder = mainlineSummary.launchDutyActionOrder
     || initialLaunchOpsReadiness?.launchDutyActionOrder
     || null;
+  const launchDutyStableOperationsTransitionAction =
+    mainlineSummary.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchDutyStableOperationsTransitionAction
+    || initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchDutyStableOperationsTransitionAction
+    || null;
   const launchReceiptAuditBackfill = Number(payload.opsSnapshot?.auditLogs?.filters?.launchReceiptBackfill || 0);
   const launchReceiptAuditBackfillStatus = payload.postLaunchHandoffTraceability?.launchReceiptAuditBackfillStatus
     || payload.opsSnapshot?.summary?.launchReceiptAuditBackfillStatus
@@ -19874,6 +19878,50 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     const operatorOrder = Array.isArray(preStagingReadinessSelfCheck.operatorOrder)
       ? preStagingReadinessSelfCheck.operatorOrder
       : [];
+    if (operatorOrder.length) {
+      lines.push("Operator Order:");
+      for (const item of operatorOrder) {
+        lines.push(`- ${item}`);
+      }
+    }
+  }
+  if (launchDutyStableOperationsTransitionAction) {
+    const blockedBy = Array.isArray(launchDutyStableOperationsTransitionAction.blockedBy)
+      ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
+      : "";
+    const operatorAction = launchDutyStableOperationsTransitionAction.operatorAction
+      && typeof launchDutyStableOperationsTransitionAction.operatorAction === "object"
+        ? launchDutyStableOperationsTransitionAction.operatorAction
+        : null;
+    const nextDownloadKey = launchDutyStableOperationsTransitionAction.nextDownloadKey
+      || operatorAction?.nextDownloadKey
+      || "-";
+    const nextDownload = launchDutyStableOperationsTransitionAction.nextDownloadFormat
+      || operatorAction?.nextDownloadFormat
+      || "-";
+    const nextDownloadHref = launchDutyStableOperationsTransitionAction.nextDownloadHref
+      || operatorAction?.nextDownloadHref
+      || "-";
+    const requiredChecks = Array.isArray(launchDutyStableOperationsTransitionAction.requiredChecks)
+      ? launchDutyStableOperationsTransitionAction.requiredChecks.join(",")
+      : "";
+    const operatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction.operatorOrder)
+      ? launchDutyStableOperationsTransitionAction.operatorOrder
+      : [];
+    lines.push("");
+    lines.push("Launch Mainline Stable Operations Transition:");
+    lines.push(
+      `- status=${launchDutyStableOperationsTransitionAction.status || "-"}`
+      + ` | current=${launchDutyStableOperationsTransitionAction.currentActionKey || "-"}`
+      + ` | blockedBy=${blockedBy || "-"}`
+      + ` | operatorAction=${operatorAction?.key || "-"}`
+      + ` | reviewRequired=${operatorAction ? operatorAction.reviewRequired === true ? "yes" : "no" : "-"}`
+      + ` | nextDownloadKey=${nextDownloadKey}`
+      + ` | nextDownload=${nextDownload}`
+      + ` | nextDownloadHref=${nextDownloadHref}`
+      + ` | ready=${launchDutyStableOperationsTransitionAction.ready === true ? "yes" : "no"}`
+    );
+    lines.push(`- checks=${requiredChecks || "-"} | nextAction=${launchDutyStableOperationsTransitionAction.nextAction || "-"}`);
     if (operatorOrder.length) {
       lines.push("Operator Order:");
       for (const item of operatorOrder) {

@@ -19800,6 +19800,17 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     const operatorOrder = Array.isArray(launchSurfaceReviewCloseoutAction.operatorOrder)
       ? launchSurfaceReviewCloseoutAction.operatorOrder
       : [];
+    const nextActionTemplate = launchSurfaceReviewCloseoutAction.nextActionTemplate
+      && typeof launchSurfaceReviewCloseoutAction.nextActionTemplate === "object"
+        ? launchSurfaceReviewCloseoutAction.nextActionTemplate
+        : (postConfirmationSwitch?.nextActionTemplate
+          && typeof postConfirmationSwitch.nextActionTemplate === "object"
+            ? postConfirmationSwitch.nextActionTemplate
+            : null);
+    const operatorHandoffPacket = receiptVisibilityConfirmationQueue?.operatorHandoffPacket
+      && typeof receiptVisibilityConfirmationQueue.operatorHandoffPacket === "object"
+        ? receiptVisibilityConfirmationQueue.operatorHandoffPacket
+        : null;
     lines.push("");
     lines.push("Launch Mainline Surface Review Closeout:");
     lines.push(
@@ -19828,7 +19839,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     );
     lines.push(
       `- launchDutyRecordIndex=${launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath || receiptVisibilityConfirmationQueue?.launchDutyRecordIndexPath || "-"}`
-      + ` | nextAction=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+      + ` | nextAction=${nextActionTemplate?.actionKey || "-"}`
+    );
+    lines.push(
+      `- nextActionMethod=${nextActionTemplate?.method || "-"}`
+      + ` | nextActionRoute=${nextActionTemplate?.route || nextActionTemplate?.href || "-"}`
+      + ` | handoffPacketStatus=${operatorHandoffPacket?.status || "-"}`
+      + ` | handoffPacketReady=${operatorHandoffPacket?.ready === true ? "yes" : "no"}`
     );
     if (reviewDownloads.length) {
       lines.push("Review Downloads:");
@@ -21103,6 +21120,17 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     const operatorOrder = Array.isArray(launchSurfaceReviewCloseoutAction.operatorOrder)
       ? launchSurfaceReviewCloseoutAction.operatorOrder
       : [];
+    const nextActionTemplate = launchSurfaceReviewCloseoutAction.nextActionTemplate
+      && typeof launchSurfaceReviewCloseoutAction.nextActionTemplate === "object"
+        ? launchSurfaceReviewCloseoutAction.nextActionTemplate
+        : (postConfirmationSwitch?.nextActionTemplate
+          && typeof postConfirmationSwitch.nextActionTemplate === "object"
+            ? postConfirmationSwitch.nextActionTemplate
+            : null);
+    const operatorHandoffPacket = receiptVisibilityConfirmationQueue?.operatorHandoffPacket
+      && typeof receiptVisibilityConfirmationQueue.operatorHandoffPacket === "object"
+        ? receiptVisibilityConfirmationQueue.operatorHandoffPacket
+        : null;
     lines.push("");
     lines.push("Surface Review Closeout Route:");
     lines.push(
@@ -21131,7 +21159,13 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     );
     lines.push(
       `- launchDutyRecordIndex=${launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath || receiptVisibilityConfirmationQueue?.launchDutyRecordIndexPath || "-"}`
-      + ` | nextAction=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+      + ` | nextAction=${nextActionTemplate?.actionKey || "-"}`
+    );
+    lines.push(
+      `- nextActionMethod=${nextActionTemplate?.method || "-"}`
+      + ` | nextActionRoute=${nextActionTemplate?.route || nextActionTemplate?.href || "-"}`
+      + ` | handoffPacketStatus=${operatorHandoffPacket?.status || "-"}`
+      + ` | handoffPacketReady=${operatorHandoffPacket?.ready === true}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -23117,6 +23151,17 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     const operatorOrder = Array.isArray(launchSurfaceReviewCloseoutAction.operatorOrder)
       ? launchSurfaceReviewCloseoutAction.operatorOrder
       : [];
+    const nextActionTemplate = launchSurfaceReviewCloseoutAction.nextActionTemplate
+      && typeof launchSurfaceReviewCloseoutAction.nextActionTemplate === "object"
+        ? launchSurfaceReviewCloseoutAction.nextActionTemplate
+        : (postConfirmationSwitch?.nextActionTemplate
+          && typeof postConfirmationSwitch.nextActionTemplate === "object"
+            ? postConfirmationSwitch.nextActionTemplate
+            : null);
+    const operatorHandoffPacket = receiptVisibilityConfirmationQueue?.operatorHandoffPacket
+      && typeof receiptVisibilityConfirmationQueue.operatorHandoffPacket === "object"
+        ? receiptVisibilityConfirmationQueue.operatorHandoffPacket
+        : null;
     lines.push("");
     lines.push("Surface Review Closeout:");
     lines.push(
@@ -23145,7 +23190,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     );
     lines.push(
       `- launchDutyRecordIndex=${launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath || receiptVisibilityConfirmationQueue?.launchDutyRecordIndexPath || "-"}`
-      + ` | nextAction=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+      + ` | nextAction=${nextActionTemplate?.actionKey || "-"}`
+    );
+    lines.push(
+      `- nextActionMethod=${nextActionTemplate?.method || "-"}`
+      + ` | nextActionRoute=${nextActionTemplate?.route || nextActionTemplate?.href || "-"}`
+      + ` | handoffPacketStatus=${operatorHandoffPacket?.status || "-"}`
+      + ` | handoffPacketReady=${operatorHandoffPacket?.ready === true ? "yes" : "no"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -48925,6 +48976,17 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
   const operatorOrder = Array.isArray(launchSurfaceReviewCloseoutAction.operatorOrder)
     ? launchSurfaceReviewCloseoutAction.operatorOrder
     : [];
+  const nextActionTemplate = launchSurfaceReviewCloseoutAction.nextActionTemplate
+    && typeof launchSurfaceReviewCloseoutAction.nextActionTemplate === "object"
+      ? launchSurfaceReviewCloseoutAction.nextActionTemplate
+      : (postConfirmationSwitch?.nextActionTemplate
+        && typeof postConfirmationSwitch.nextActionTemplate === "object"
+          ? postConfirmationSwitch.nextActionTemplate
+          : null);
+  const operatorHandoffPacket = receiptVisibilityConfirmationQueue.operatorHandoffPacket
+    && typeof receiptVisibilityConfirmationQueue.operatorHandoffPacket === "object"
+      ? receiptVisibilityConfirmationQueue.operatorHandoffPacket
+      : null;
   const launchDutyRecordIndexPath = launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath
     || receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath
     || launchOperationsOperatorEntry.launchDutyRecordIndexPath
@@ -48962,7 +49024,13 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
   );
   lines.push(
     `- launchDutyRecordIndex=${launchDutyRecordIndexPath}`
-    + ` | nextAction=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+    + ` | nextAction=${nextActionTemplate?.actionKey || "-"}`
+  );
+  lines.push(
+    `- nextActionMethod=${nextActionTemplate?.method || "-"}`
+    + ` | nextActionRoute=${nextActionTemplate?.route || nextActionTemplate?.href || "-"}`
+    + ` | handoffPacketStatus=${operatorHandoffPacket?.status || "-"}`
+    + ` | handoffPacketReady=${operatorHandoffPacket?.ready === true ? "yes" : "no"}`
   );
   if (reviewDownloads.length) {
     lines.push("Surface Review Closeout Downloads:");

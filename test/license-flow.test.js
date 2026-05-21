@@ -27312,6 +27312,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*nextActionMethod=[^\n]*\| nextActionRoute=[^\n]*\| handoffPacketStatus=[^\n]*\| handoffPacketReady=(yes|no)/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Surface Review Closeout:[\s\S]*Review Downloads:[\s\S]*launch_review_summary[^\n]*launch-review\.txt[\s\S]*launch_smoke_summary[^\n]*launch-smoke-kit\.txt/
     );
     assert.match(
@@ -27369,6 +27373,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*nextActionMethod=[^\n]*\| nextActionRoute=[^\n]*\| handoffPacketStatus=[^\n]*\| handoffPacketReady=(true|false)/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
     );
     assert.match(
@@ -27411,6 +27419,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Surface Review Closeout:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*nextActionMethod=[^\n]*\| nextActionRoute=[^\n]*\| handoffPacketStatus=[^\n]*\| handoffPacketReady=(yes|no)/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
@@ -27471,6 +27483,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       primaryRouteReviewDownload.body,
       /Surface Review Closeout Bridge:[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_ALPHA\/(beta|stable)\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*nextActionMethod=[^\n]*\| nextActionRoute=[^\n]*\| handoffPacketStatus=[^\n]*\| handoffPacketReady=(yes|no)/
     );
 
     const nextRouteReviewDownload = await getText(

@@ -27320,6 +27320,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*cutoverStatus=[^\n]*\| cutoverReady=(yes|no)[^\n]*\| cutoverCurrent=[^\n]*\| cutoverRecord=[^\n]*\| cutoverNextAction=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*stabilizationStatus=[^\n]*\| stabilizationReady=(yes|no)[^\n]*\| stabilizationCurrent=[^\n]*\| stabilizationRecord=[^\n]*\| stabilizationNextAction=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Surface Review Closeout:[\s\S]*Review Downloads:[\s\S]*launch_review_summary[^\n]*launch-review\.txt[\s\S]*launch_smoke_summary[^\n]*launch-smoke-kit\.txt/
     );
     assert.match(
@@ -27385,6 +27393,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*cutoverStatus=[^\n]*\| cutoverReady=(true|false)[^\n]*\| cutoverCurrent=[^\n]*\| cutoverRecord=[^\n]*\| cutoverNextAction=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*stabilizationStatus=[^\n]*\| stabilizationReady=(true|false)[^\n]*\| stabilizationCurrent=[^\n]*\| stabilizationRecord=[^\n]*\| stabilizationNextAction=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
     );
     assert.match(
@@ -27435,6 +27451,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Surface Review Closeout:[\s\S]*preflightStatus=[^\n]*\| preflightReady=(yes|no)[^\n]*\| preflightDecision=[^\n]*\| preflightNextAction=[^\n]*\| preflightNextRoute=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*cutoverStatus=[^\n]*\| cutoverReady=(yes|no)[^\n]*\| cutoverCurrent=[^\n]*\| cutoverRecord=[^\n]*\| cutoverNextAction=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*stabilizationStatus=[^\n]*\| stabilizationReady=(yes|no)[^\n]*\| stabilizationCurrent=[^\n]*\| stabilizationRecord=[^\n]*\| stabilizationNextAction=[^\n]*/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
@@ -27503,6 +27527,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       primaryRouteReviewDownload.body,
       /Surface Review Closeout Bridge:[\s\S]*preflightStatus=[^\n]*\| preflightReady=(yes|no)[^\n]*\| preflightDecision=[^\n]*\| preflightNextAction=[^\n]*\| preflightNextRoute=[^\n]*/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*cutoverStatus=[^\n]*\| cutoverReady=(yes|no)[^\n]*\| cutoverCurrent=[^\n]*\| cutoverRecord=[^\n]*\| cutoverNextAction=[^\n]*/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*stabilizationStatus=[^\n]*\| stabilizationReady=(yes|no)[^\n]*\| stabilizationCurrent=[^\n]*\| stabilizationRecord=[^\n]*\| stabilizationNextAction=[^\n]*/
     );
 
     const nextRouteReviewDownload = await getText(

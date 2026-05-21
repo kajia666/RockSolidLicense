@@ -19820,6 +19820,22 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       && typeof preflightGate.nextActionTemplate === "object"
         ? preflightGate.nextActionTemplate
         : null;
+    const cutoverExecutionAction = launchDutyHandoffAction?.launchDutyCutoverExecutionAction
+      && typeof launchDutyHandoffAction.launchDutyCutoverExecutionAction === "object"
+        ? launchDutyHandoffAction.launchDutyCutoverExecutionAction
+        : null;
+    const cutoverNextActionTemplate = cutoverExecutionAction?.nextActionTemplate
+      && typeof cutoverExecutionAction.nextActionTemplate === "object"
+        ? cutoverExecutionAction.nextActionTemplate
+        : null;
+    const stabilizationExecutionAction = launchDutyHandoffAction?.launchDutyStabilizationExecutionAction
+      && typeof launchDutyHandoffAction.launchDutyStabilizationExecutionAction === "object"
+        ? launchDutyHandoffAction.launchDutyStabilizationExecutionAction
+        : null;
+    const stabilizationNextActionTemplate = stabilizationExecutionAction?.nextActionTemplate
+      && typeof stabilizationExecutionAction.nextActionTemplate === "object"
+        ? stabilizationExecutionAction.nextActionTemplate
+        : null;
     lines.push("");
     lines.push("Launch Mainline Surface Review Closeout:");
     lines.push(
@@ -19862,6 +19878,20 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + ` | preflightDecision=${preflightGate?.decision || "-"}`
       + ` | preflightNextAction=${preflightNextActionTemplate?.actionKey || "-"}`
       + ` | preflightNextRoute=${preflightNextActionTemplate?.route || preflightNextActionTemplate?.href || "-"}`
+    );
+    lines.push(
+      `- cutoverStatus=${cutoverExecutionAction?.status || "-"}`
+      + ` | cutoverReady=${cutoverExecutionAction?.ready === true ? "yes" : "no"}`
+      + ` | cutoverCurrent=${cutoverExecutionAction?.currentActionKey || "-"}`
+      + ` | cutoverRecord=${cutoverExecutionAction?.currentRecordKey || "-"}`
+      + ` | cutoverNextAction=${cutoverNextActionTemplate?.afterActionKey || cutoverNextActionTemplate?.actionKey || "-"}`
+    );
+    lines.push(
+      `- stabilizationStatus=${stabilizationExecutionAction?.status || "-"}`
+      + ` | stabilizationReady=${stabilizationExecutionAction?.ready === true ? "yes" : "no"}`
+      + ` | stabilizationCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
+      + ` | stabilizationRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
+      + ` | stabilizationNextAction=${stabilizationNextActionTemplate?.afterActionKey || stabilizationNextActionTemplate?.actionKey || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Review Downloads:");
@@ -21157,6 +21187,22 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       && typeof preflightGate.nextActionTemplate === "object"
         ? preflightGate.nextActionTemplate
         : null;
+    const cutoverExecutionAction = launchDutyHandoffAction?.launchDutyCutoverExecutionAction
+      && typeof launchDutyHandoffAction.launchDutyCutoverExecutionAction === "object"
+        ? launchDutyHandoffAction.launchDutyCutoverExecutionAction
+        : null;
+    const cutoverNextActionTemplate = cutoverExecutionAction?.nextActionTemplate
+      && typeof cutoverExecutionAction.nextActionTemplate === "object"
+        ? cutoverExecutionAction.nextActionTemplate
+        : null;
+    const stabilizationExecutionAction = launchDutyHandoffAction?.launchDutyStabilizationExecutionAction
+      && typeof launchDutyHandoffAction.launchDutyStabilizationExecutionAction === "object"
+        ? launchDutyHandoffAction.launchDutyStabilizationExecutionAction
+        : null;
+    const stabilizationNextActionTemplate = stabilizationExecutionAction?.nextActionTemplate
+      && typeof stabilizationExecutionAction.nextActionTemplate === "object"
+        ? stabilizationExecutionAction.nextActionTemplate
+        : null;
     lines.push("");
     lines.push("Surface Review Closeout Route:");
     lines.push(
@@ -21199,6 +21245,20 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | preflightDecision=${preflightGate?.decision || "-"}`
       + ` | preflightNextAction=${preflightNextActionTemplate?.actionKey || "-"}`
       + ` | preflightNextRoute=${preflightNextActionTemplate?.route || preflightNextActionTemplate?.href || "-"}`
+    );
+    lines.push(
+      `- cutoverStatus=${cutoverExecutionAction?.status || "-"}`
+      + ` | cutoverReady=${cutoverExecutionAction?.ready === true}`
+      + ` | cutoverCurrent=${cutoverExecutionAction?.currentActionKey || "-"}`
+      + ` | cutoverRecord=${cutoverExecutionAction?.currentRecordKey || "-"}`
+      + ` | cutoverNextAction=${cutoverNextActionTemplate?.afterActionKey || cutoverNextActionTemplate?.actionKey || "-"}`
+    );
+    lines.push(
+      `- stabilizationStatus=${stabilizationExecutionAction?.status || "-"}`
+      + ` | stabilizationReady=${stabilizationExecutionAction?.ready === true}`
+      + ` | stabilizationCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
+      + ` | stabilizationRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
+      + ` | stabilizationNextAction=${stabilizationNextActionTemplate?.afterActionKey || stabilizationNextActionTemplate?.actionKey || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -23205,6 +23265,22 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       && typeof preflightGate.nextActionTemplate === "object"
         ? preflightGate.nextActionTemplate
         : null;
+    const cutoverExecutionAction = launchDutyHandoffAction?.launchDutyCutoverExecutionAction
+      && typeof launchDutyHandoffAction.launchDutyCutoverExecutionAction === "object"
+        ? launchDutyHandoffAction.launchDutyCutoverExecutionAction
+        : null;
+    const cutoverNextActionTemplate = cutoverExecutionAction?.nextActionTemplate
+      && typeof cutoverExecutionAction.nextActionTemplate === "object"
+        ? cutoverExecutionAction.nextActionTemplate
+        : null;
+    const stabilizationExecutionAction = launchDutyHandoffAction?.launchDutyStabilizationExecutionAction
+      && typeof launchDutyHandoffAction.launchDutyStabilizationExecutionAction === "object"
+        ? launchDutyHandoffAction.launchDutyStabilizationExecutionAction
+        : null;
+    const stabilizationNextActionTemplate = stabilizationExecutionAction?.nextActionTemplate
+      && typeof stabilizationExecutionAction.nextActionTemplate === "object"
+        ? stabilizationExecutionAction.nextActionTemplate
+        : null;
     lines.push("");
     lines.push("Surface Review Closeout:");
     lines.push(
@@ -23247,6 +23323,20 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | preflightDecision=${preflightGate?.decision || "-"}`
       + ` | preflightNextAction=${preflightNextActionTemplate?.actionKey || "-"}`
       + ` | preflightNextRoute=${preflightNextActionTemplate?.route || preflightNextActionTemplate?.href || "-"}`
+    );
+    lines.push(
+      `- cutoverStatus=${cutoverExecutionAction?.status || "-"}`
+      + ` | cutoverReady=${cutoverExecutionAction?.ready === true ? "yes" : "no"}`
+      + ` | cutoverCurrent=${cutoverExecutionAction?.currentActionKey || "-"}`
+      + ` | cutoverRecord=${cutoverExecutionAction?.currentRecordKey || "-"}`
+      + ` | cutoverNextAction=${cutoverNextActionTemplate?.afterActionKey || cutoverNextActionTemplate?.actionKey || "-"}`
+    );
+    lines.push(
+      `- stabilizationStatus=${stabilizationExecutionAction?.status || "-"}`
+      + ` | stabilizationReady=${stabilizationExecutionAction?.ready === true ? "yes" : "no"}`
+      + ` | stabilizationCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
+      + ` | stabilizationRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
+      + ` | stabilizationNextAction=${stabilizationNextActionTemplate?.afterActionKey || stabilizationNextActionTemplate?.actionKey || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -49049,6 +49139,22 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
     && typeof preflightGate.nextActionTemplate === "object"
       ? preflightGate.nextActionTemplate
       : null;
+  const cutoverExecutionAction = launchDutyHandoffAction?.launchDutyCutoverExecutionAction
+    && typeof launchDutyHandoffAction.launchDutyCutoverExecutionAction === "object"
+      ? launchDutyHandoffAction.launchDutyCutoverExecutionAction
+      : null;
+  const cutoverNextActionTemplate = cutoverExecutionAction?.nextActionTemplate
+    && typeof cutoverExecutionAction.nextActionTemplate === "object"
+      ? cutoverExecutionAction.nextActionTemplate
+      : null;
+  const stabilizationExecutionAction = launchDutyHandoffAction?.launchDutyStabilizationExecutionAction
+    && typeof launchDutyHandoffAction.launchDutyStabilizationExecutionAction === "object"
+      ? launchDutyHandoffAction.launchDutyStabilizationExecutionAction
+      : null;
+  const stabilizationNextActionTemplate = stabilizationExecutionAction?.nextActionTemplate
+    && typeof stabilizationExecutionAction.nextActionTemplate === "object"
+      ? stabilizationExecutionAction.nextActionTemplate
+      : null;
   const launchDutyRecordIndexPath = launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath
     || receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath
     || launchOperationsOperatorEntry.launchDutyRecordIndexPath
@@ -49100,6 +49206,20 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
     + ` | preflightDecision=${preflightGate?.decision || "-"}`
     + ` | preflightNextAction=${preflightNextActionTemplate?.actionKey || "-"}`
     + ` | preflightNextRoute=${preflightNextActionTemplate?.route || preflightNextActionTemplate?.href || "-"}`
+  );
+  lines.push(
+    `- cutoverStatus=${cutoverExecutionAction?.status || "-"}`
+    + ` | cutoverReady=${cutoverExecutionAction?.ready === true ? "yes" : "no"}`
+    + ` | cutoverCurrent=${cutoverExecutionAction?.currentActionKey || "-"}`
+    + ` | cutoverRecord=${cutoverExecutionAction?.currentRecordKey || "-"}`
+    + ` | cutoverNextAction=${cutoverNextActionTemplate?.afterActionKey || cutoverNextActionTemplate?.actionKey || "-"}`
+  );
+  lines.push(
+    `- stabilizationStatus=${stabilizationExecutionAction?.status || "-"}`
+    + ` | stabilizationReady=${stabilizationExecutionAction?.ready === true ? "yes" : "no"}`
+    + ` | stabilizationCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
+    + ` | stabilizationRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
+    + ` | stabilizationNextAction=${stabilizationNextActionTemplate?.afterActionKey || stabilizationNextActionTemplate?.actionKey || "-"}`
   );
   if (reviewDownloads.length) {
     lines.push("Surface Review Closeout Downloads:");

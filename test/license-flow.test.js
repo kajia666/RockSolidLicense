@@ -16290,8 +16290,18 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && item.label === "Download Confirmed Runtime Evidence"
       && item.recommendedDownload?.format === "first-wave-runtime-evidence"
     ));
+    assert.ok(mainlineSupportInspectionCard.controls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download Support Inspection Confirmation"
+      && item.recommendedDownload?.format === "first-wave-support-inspection-confirmation"
+    ));
+    assert.ok(mainlineAfterSupportInspection.mainlineSummary.recommendedDownloads.some((item) =>
+      item.key === "launch_mainline_first_wave_support_inspection_confirmation"
+      && item.format === "first-wave-support-inspection-confirmation"
+    ));
     assert.match(mainlineAfterSupportInspection.summaryText, /Launch Mainline First-Wave Support Inspection Confirmation:/);
     assert.match(mainlineAfterSupportInspection.summaryText, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(mainlineAfterSupportInspection.summaryText, /confirmation=.*first-wave-support-inspection-confirmation\.txt/);
 
     const handoffConfirmation = await postJson(
       baseUrl,

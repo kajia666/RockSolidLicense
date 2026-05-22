@@ -3631,6 +3631,7 @@ function inferRouteDownloadFormat(key = "") {
   if (normalized.includes("launch_operations_overview_status") || normalized.includes("launch-operations-overview-status")) return "launch-operations-overview-status";
   if (normalized.includes("launch_operations_operator_entry") || normalized.includes("launch-operations-operator-entry")) return "launch-operations-operator-entry";
   if (normalized.includes("first_wave_runtime_evidence") || normalized.includes("first-wave-runtime-evidence")) return "first-wave-runtime-evidence";
+  if (normalized.includes("first_wave_support_inspection_confirmation") || normalized.includes("first-wave-support-inspection-confirmation")) return "first-wave-support-inspection-confirmation";
   if (normalized.includes("first_launch_handoff")) return "first-launch-handoff";
   if (normalized.includes("launch_receipt_next_follow_up")) return "launch-receipt-next-follow-up";
   if (normalized === "integration_env" || normalized.includes("integration-env")) return "env";
@@ -14810,13 +14811,24 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const opsOverviewFirstWaveSupportInspectionConfirmations = Array.isArray(opsOverview.latestFirstWaveSupportInspectionConfirmations)
     ? opsOverview.latestFirstWaveSupportInspectionConfirmations
     : [];
-  const firstWaveSupportInspectionConfirmation = initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
+  const firstWaveSupportInspectionConfirmationBase = initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
     || selectFirstWaveSupportInspectionConfirmation(opsOverviewFirstWaveSupportInspectionConfirmations, {
       latestReceipt: latestLaunchReceipt,
       productCode: params.productCode || latestLaunchReceipt?.productCode || "",
       channel: params.channel || latestLaunchReceipt?.channel || ""
     })
     || null;
+  const firstWaveSupportInspectionConfirmation = firstWaveSupportInspectionConfirmationBase
+    ? {
+        ...firstWaveSupportInspectionConfirmationBase,
+        confirmationDownload: createLaunchWorkflowDownloadShortcut(
+          "launch_mainline_first_wave_support_inspection_confirmation",
+          "developer-launch-mainline-first-wave-support-inspection-confirmation.txt",
+          "first-wave-support-inspection-confirmation",
+          params
+        )
+      }
+    : null;
   const firstWaveRuntimeEvidenceSource = firstWaveRuntimeEvidence || firstWaveSupportInspectionConfirmation || null;
   const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidenceSource
     ? createLaunchWorkflowWorkspaceShortcut(
@@ -17187,6 +17199,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstLaunchHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstWaveRuntimeEvidenceDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstWaveSupportInspectionConfirmation?.confirmationDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(initialLaunchOpsOverviewStatusDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(preStagingReadinessSelfCheck?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateHandoffLanding?.recommendedDownload || null, params));
@@ -17355,6 +17368,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             kind: "download",
             label: "Download Confirmed Runtime Evidence",
             recommendedDownload: firstWaveSupportInspectionConfirmation.runtimeEvidenceDownload
+          } : null,
+          firstWaveSupportInspectionConfirmation.confirmationDownload ? {
+            kind: "download",
+            label: "Download Support Inspection Confirmation",
+            recommendedDownload: firstWaveSupportInspectionConfirmation.confirmationDownload
           } : null
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
@@ -21009,6 +21027,36 @@ function buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload = {}) 
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const confirmation = payload.mainlineSummary?.firstWaveSupportInspectionConfirmation
+    && typeof payload.mainlineSummary.firstWaveSupportInspectionConfirmation === "object"
+    ? payload.mainlineSummary.firstWaveSupportInspectionConfirmation
+    : null;
+  const lines = [
+    "RockSolid Developer Launch Mainline First-Wave Support Inspection Confirmation",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (confirmation) {
+    appendFirstWaveSupportInspectionConfirmationLines(lines, confirmation);
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Use this file to review the support inspection confirmation without reopening Launch Mainline.");
+    lines.push("- Keep the runtime evidence download attached for the same first-wave lane.");
+  } else {
+    lines.push("First-Wave Support Inspection Confirmation:");
+    lines.push("- status=not_recorded | support=unknown | targets=0/0");
+    lines.push("- summary=Confirm first-wave support inspection before using this handoff.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlinePayload({
   generatedAt = nowIso(),
   releasePackage = null,
@@ -21060,6 +21108,7 @@ function buildDeveloperLaunchMainlinePayload({
   const postLaunchHandoffIndexFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-post-launch-handoff-index.txt`;
   const firstLaunchHandoffFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-first-launch-handoff.txt`;
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
+  const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
   const rehearsalGuideFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-rehearsal-guide.txt`;
   const initialLaunchOpsReadinessFileName = `rocksolid-developer-launch-mainline-${scopeTag}-${channel}-${timestampTag}-initial-launch-ops-readiness.txt`;
   const payload = {
@@ -21076,6 +21125,7 @@ function buildDeveloperLaunchMainlinePayload({
     postLaunchHandoffIndexFileName,
     firstLaunchHandoffFileName,
     firstWaveRuntimeEvidenceFileName,
+    firstWaveSupportInspectionConfirmationFileName,
     rehearsalGuideFileName,
     initialLaunchOpsReadinessFileName,
     manifest: {
@@ -21244,6 +21294,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const mainlineSummary = payload.mainlineSummary || {};
   const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
   const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
+  const firstWaveSupportInspectionConfirmation = mainlineSummary.firstWaveSupportInspectionConfirmation || null;
   const postLaunchLifecycle = traceability.postLaunchLifecycle || {};
   const lifecyclePrimaryRecommendedDownload = mainlineSummary.productionGate?.postLaunchLifecycle?.primaryRecommendedDownload
     && typeof mainlineSummary.productionGate.postLaunchLifecycle.primaryRecommendedDownload === "object"
@@ -21505,6 +21556,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       "Launch Mainline first-wave runtime evidence",
       payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
       firstWaveRuntimeEvidenceDownload
+    );
+  }
+  if (firstWaveSupportInspectionConfirmation?.confirmationDownload) {
+    pushRoute(
+      "launch-mainline-first-wave-support-inspection-confirmation",
+      "Launch Mainline first-wave support inspection confirmation",
+      payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-mainline-first-wave-support-inspection-confirmation.txt",
+      firstWaveSupportInspectionConfirmation.confirmationDownload
     );
   }
   pushRoute(
@@ -22209,6 +22268,13 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-mainline-first-wave-support-inspection-confirmation.txt",
+    payload.mainlineSummary?.firstWaveSupportInspectionConfirmation
+      ? buildDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.firstLaunchHandoffFileName || "developer-launch-mainline-first-launch-handoff.txt",
     payload.firstLaunchHandoffText || ""
   );
@@ -22228,7 +22294,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "first-launch-handoff", "first-wave-runtime-evidence", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -22337,6 +22403,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload)
+    };
+  }
+  if (normalizedFormat === "first-wave-support-inspection-confirmation") {
+    return {
+      fileName: payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-mainline-first-wave-support-inspection-confirmation.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationText(payload)
     };
   }
   if (normalizedFormat === "rehearsal-guide") {
@@ -23609,6 +23682,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["First-Wave audit backfill status", opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"],
     ...(mainlineSummary.firstWaveRuntimeEvidence || mainlineSummary.firstWaveSupportInspectionConfirmation
       ? [["First-wave runtime evidence", payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt"]]
+      : []),
+    ...(mainlineSummary.firstWaveSupportInspectionConfirmation
+      ? [["First-wave support inspection confirmation", payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-mainline-first-wave-support-inspection-confirmation.txt"]]
       : []),
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
     ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
@@ -25384,6 +25460,26 @@ function buildFirstWaveSupportInspectionRuntimeEvidenceDownload({
   );
 }
 
+function buildFirstWaveSupportInspectionConfirmationDownload({
+  productCode = "",
+  channel = "stable",
+  fileName = "developer-launch-mainline-first-wave-support-inspection-confirmation.txt"
+} = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "first_wave_support_inspection_confirmation",
+    fileName || "developer-launch-mainline-first-wave-support-inspection-confirmation.txt",
+    "First-wave support inspection confirmation",
+    {
+      source: "developer-launch-mainline",
+      format: "first-wave-support-inspection-confirmation",
+      params: {
+        productCode,
+        channel
+      }
+    }
+  );
+}
+
 function buildFirstWaveSupportInspectionConfirmationPayload(item = null) {
   if (!item || typeof item !== "object") {
     return null;
@@ -25419,6 +25515,10 @@ function buildFirstWaveSupportInspectionConfirmationPayload(item = null) {
     channel,
     fileName: evidenceFileName
   });
+  const confirmationDownload = buildFirstWaveSupportInspectionConfirmationDownload({
+    productCode,
+    channel
+  });
   return {
     version: "developer-ops-first-wave-support-inspection-confirmation/v1",
     auditLogId: item.auditLogId || item.id || null,
@@ -25438,6 +25538,7 @@ function buildFirstWaveSupportInspectionConfirmationPayload(item = null) {
       || metadata.allTargetsConfirmed === true
       || (targetCount > 0 && inspectedTargetCount >= targetCount),
     runtimeEvidenceDownload,
+    confirmationDownload,
     evidenceFileName,
     confirmedAt: item.confirmedAt || metadata.confirmedAt || item.createdAt || null,
     confirmedBy,
@@ -25558,6 +25659,11 @@ function appendFirstWaveSupportInspectionConfirmationLines(lines = [], confirmat
     `- runtimeEvidence=${confirmation.runtimeEvidenceDownload?.fileName || confirmation.evidenceFileName || "-"}`
     + ` | format=${confirmation.runtimeEvidenceDownload?.format || "-"}`
     + ` | href=${confirmation.runtimeEvidenceDownload?.href || "-"}`
+  );
+  lines.push(
+    `- confirmation=${confirmation.confirmationDownload?.fileName || "-"}`
+    + ` | format=${confirmation.confirmationDownload?.format || "-"}`
+    + ` | href=${confirmation.confirmationDownload?.href || "-"}`
   );
   lines.push(
     `- confirmedBy=${confirmation.confirmedBy?.username || "-"}`

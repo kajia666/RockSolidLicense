@@ -17107,6 +17107,23 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       item.key === "launch_mainline_first_wave_runtime_evidence"
       && item.format === "first-wave-runtime-evidence"
     ));
+    assert.ok(overflowLaunchMainline.postLaunchHandoffTraceability);
+    assert.equal(
+      overflowLaunchMainline.postLaunchHandoffTraceability.firstWaveSupportInspectionConfirmation?.runtimeEvidenceDownload?.key,
+      "first_wave_support_runtime_evidence"
+    );
+    assert.equal(
+      overflowLaunchMainline.postLaunchHandoffTraceability.firstWaveSupportInspectionConfirmation?.runtimeEvidenceDownload?.format,
+      "first-wave-runtime-evidence"
+    );
+    assert.match(
+      overflowLaunchMainline.summaryText,
+      /Post-Launch Handoff Traceability:[\s\S]*First-Wave Support Inspection Confirmation:/
+    );
+    assert.match(
+      overflowLaunchMainline.summaryText,
+      /Post-Launch Handoff Traceability:[\s\S]*runtimeEvidence=.*first-wave-runtime-evidence\.txt/
+    );
 
     const overflowLaunchMainlineRoutes = await getText(
       baseUrl,

@@ -19464,6 +19464,18 @@ function appendPostLaunchHandoffTraceabilityTextLines(lines = [], traceability =
       + (launchOpsOverviewContext ? ` | ${formatLaunchWorkflowActionContextText(launchOpsOverviewContext)}` : "")
     );
   }
+  if (traceability.firstWaveSupportInspectionConfirmation) {
+    lines.push("");
+    appendFirstWaveSupportInspectionConfirmationLines(lines, traceability.firstWaveSupportInspectionConfirmation, {
+      title: "First-Wave Support Inspection Confirmation:"
+    });
+  }
+  if (traceability.firstWaveRuntimeEvidence) {
+    lines.push("");
+    appendFirstWaveRuntimeEvidenceLines(lines, {
+      firstWaveRuntimeEvidence: traceability.firstWaveRuntimeEvidence
+    });
+  }
   appendInitialLaunchContractTraceabilityTextLines(lines, initialLaunchContract, opsFiles);
   appendInitialLaunchOperatorHeadlineTextLines(lines, initialLaunchOperatorHeadline);
   appendInitialLaunchOperatorNextActionTextLines(lines, initialLaunchOperatorNextAction);
@@ -23327,6 +23339,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
   const initialLaunchOperatorHeadline = initialLaunchOpsReadiness?.operatorHeadline || null;
   const initialLaunchOperatorNextAction = initialLaunchOpsReadiness?.operatorNextAction || null;
   const initialLaunchOperatorActionManifest = initialLaunchOpsReadiness?.operatorActionManifest || null;
+  const firstWaveRuntimeEvidence = mainlineSummary.firstWaveRuntimeEvidence || null;
+  const firstWaveSupportInspectionConfirmation = mainlineSummary.firstWaveSupportInspectionConfirmation || null;
   const launchDutyRecordIndexSelectionChecklistStep = findLaunchDutyRecordIndexSelectionChecklistStep(
     initialLaunchOpsReadiness,
     opsSnapshot.scope || {}
@@ -23362,6 +23376,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
   return {
     launchReceiptAuditBackfill,
     launchReceiptAuditBackfillStatus,
+    firstWaveRuntimeEvidence,
+    firstWaveSupportInspectionConfirmation,
     latestLaunchReceipt: latestLaunchReceipt
       ? {
           auditLogId: latestLaunchReceipt.auditLogId || null,

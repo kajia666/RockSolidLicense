@@ -23477,6 +23477,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /rollout-widening-decision: [^\n]*key=ops_steady_state_duty_board[^\n]*source=developer-ops[^\n]*queueTotal=0[^\n]*attention=0/
     );
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, rolloutWideningDecisionOperatorOrderPattern);
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /First Operating Result Handoff Route:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=false \| current=record_rollout_widening_decision[^\n]*receiptAudit=-[^\n]*nextDownload=launch-operations-overview-status[^\n]*blockedBy=rollout_widening_receipt/
+    );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /first-operating-result-handoff: [^\n]*key=ops_launch_operations_overview_status[^\n]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchMainlineHandoffDownloadRoutesSelectionDownload = await getText(
       baseUrl,
@@ -23503,6 +23511,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /rollout-widening-decision: [^\n]*key=ops_steady_state_duty_board[^\n]*source=developer-ops[^\n]*queueTotal=0[^\n]*attention=0/
     );
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, rolloutWideningDecisionOperatorOrderPattern);
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /First Operating Result Handoff Route:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=false \| current=record_rollout_widening_decision[^\n]*receiptAudit=-[^\n]*nextDownload=launch-operations-overview-status[^\n]*blockedBy=rollout_widening_receipt/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /first-operating-result-handoff: [^\n]*key=ops_launch_operations_overview_status[^\n]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchMainlineOpsRouteMirrorChecksumsDownload = await getText(
       baseUrl,
@@ -23592,6 +23608,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Included Handoff Files:[\s\S]*Rollout widening decision: ops\/steady-state-duty-board\.txt/
     );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, rolloutWideningDecisionOperatorOrderPattern);
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /First Operating Result Handoff:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision[^\n]*receiptAudit=-[^\n]*file=developer-ops-launch-operations-overview-status\.txt[^\n]*format=launch-operations-overview-status[^\n]*blockedBy=rollout_widening_receipt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*First operating result handoff: ops\/launch-operations-overview-status\.txt/
+    );
 
     const launchMainlineSummarySelectionDownload = await getText(
       baseUrl,
@@ -23602,6 +23626,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineSummarySelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
     assert.match(launchMainlineSummarySelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(launchMainlineSummarySelectionDownload.body, rolloutWideningDecisionOperatorOrderPattern);
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Launch Mainline First Operating Result Handoff:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision[^\n]*receiptAudit=-[^\n]*nextDownload=launch-operations-overview-status[^\n]*blockedBy=rollout_widening_receipt/
+    );
 
     const launchOperationsOperatorEntryDownload = await getText(
       baseUrl,

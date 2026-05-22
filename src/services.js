@@ -15340,6 +15340,99 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             : "Hold the first stable operating window until exception queue and attention signals are clear before widening rollout.")
       }
     : null;
+  const firstOperatingResultHandoffSource = [
+    launchOperationsOperatorEntry?.firstOperatingResultHandoffAction,
+    initialLaunchOpsReadiness?.launchOperationsShiftActionPlan?.firstOperatingResultHandoffAction,
+    initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.firstOperatingResultHandoffAction,
+    initialLaunchOpsReadiness?.launchOperationsDailyBrief?.firstOperatingResultHandoffAction
+  ].find((item) => item && typeof item === "object") || null;
+  const firstOperatingResultHandoffOperatorOrder = firstOperatingResultHandoffSource
+    ? [
+        firstOperatingResultHandoffSource.nextAction
+          || "Hand off the first operating result from Launch Mainline after the rollout widening receipt is recorded."
+      ]
+    : [];
+  const firstOperatingResultHandoffDownload = firstOperatingResultHandoffSource
+    ? ensureLaunchWorkflowDownloadHref({
+        key: firstOperatingResultHandoffSource.nextDownloadKey
+          || initialLaunchOpsOverviewStatusDownload?.key
+          || "ops_launch_operations_overview_status",
+        label: "Launch operations overview status",
+        fileName: firstOperatingResultHandoffSource.nextDownloadFileName
+          || initialLaunchOpsOverviewStatusDownload?.fileName
+          || "developer-ops-launch-operations-overview-status.txt",
+        format: firstOperatingResultHandoffSource.nextDownloadFormat
+          || initialLaunchOpsOverviewStatusDownload?.format
+          || "launch-operations-overview-status",
+        href: firstOperatingResultHandoffSource.nextDownloadHref
+          || initialLaunchOpsOverviewStatusDownload?.href
+          || null,
+        source: "developer-ops-launch-operations-first-operating-result-handoff",
+        launchDutyRecordIndexPath: firstOperatingResultHandoffSource.launchDutyRecordIndexPath
+          || firstOperatingResultHandoffSource.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || initialLaunchOpsOverviewStatusDownload?.launchDutyRecordIndexPath
+          || initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.launchDutyRecordIndexPath
+          || launchOperationsOperatorEntry?.launchDutyRecordIndexPath
+          || null
+      }, params)
+    : null;
+  const firstOperatingResultHandoffAction = firstOperatingResultHandoffSource
+    ? {
+        mode: "developer-launch-mainline-first-operating-result-handoff",
+        version: firstOperatingResultHandoffSource.version || "developer-ops-launch-operations-first-operating-result-handoff-action/v1",
+        key: firstOperatingResultHandoffSource.key || "first_operating_result_handoff",
+        status: firstOperatingResultHandoffSource.status || "awaiting_rollout_widening_receipt",
+        ready: firstOperatingResultHandoffSource.ready === true,
+        currentActionKey: firstOperatingResultHandoffSource.currentActionKey || "record_rollout_widening_decision",
+        rolloutWideningDecisionReceiptAuditLogId: firstOperatingResultHandoffSource.rolloutWideningDecisionReceiptAuditLogId || null,
+        rolloutWideningReceiptStatus: firstOperatingResultHandoffSource.rolloutWideningReceiptStatus || null,
+        rolloutWideningDecisionStatus: firstOperatingResultHandoffSource.rolloutWideningDecisionStatus
+          || rolloutWideningDecisionAction?.status
+          || null,
+        rolloutWideningDecisionReady: firstOperatingResultHandoffSource.rolloutWideningDecisionReady
+          ?? (rolloutWideningDecisionAction?.ready === true),
+        queueStatus: firstOperatingResultHandoffSource.queueStatus || rolloutWideningDecisionAction?.queueStatus || null,
+        queueTotal: firstOperatingResultHandoffSource.queueTotal ?? rolloutWideningDecisionAction?.queueTotal ?? null,
+        attentionCount: firstOperatingResultHandoffSource.attentionCount ?? rolloutWideningDecisionAction?.attentionCount ?? null,
+        nextDownloadKey: firstOperatingResultHandoffDownload?.key
+          || firstOperatingResultHandoffSource.nextDownloadKey
+          || null,
+        nextDownloadFileName: firstOperatingResultHandoffDownload?.fileName
+          || firstOperatingResultHandoffSource.nextDownloadFileName
+          || null,
+        nextDownloadFormat: firstOperatingResultHandoffDownload?.format
+          || firstOperatingResultHandoffSource.nextDownloadFormat
+          || null,
+        nextDownloadHref: firstOperatingResultHandoffDownload?.href
+          || firstOperatingResultHandoffSource.nextDownloadHref
+          || null,
+        launchDutyRecordIndexPath: firstOperatingResultHandoffDownload?.launchDutyRecordIndexPath
+          || firstOperatingResultHandoffSource.launchDutyRecordIndexPath
+          || firstOperatingResultHandoffSource.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || null,
+        launchOpsOverviewContextLaunchDutyRecordIndexPath:
+          firstOperatingResultHandoffSource.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || firstOperatingResultHandoffDownload?.launchDutyRecordIndexPath
+          || null,
+        requiredChecks: Array.isArray(firstOperatingResultHandoffSource.requiredChecks)
+          ? firstOperatingResultHandoffSource.requiredChecks.slice()
+          : [],
+        blockedBy: Array.isArray(firstOperatingResultHandoffSource.blockedBy)
+          ? firstOperatingResultHandoffSource.blockedBy.slice()
+          : [],
+        operatorAction: firstOperatingResultHandoffSource.operatorAction || null,
+        recommendedDownload: firstOperatingResultHandoffDownload
+          ? {
+              ...firstOperatingResultHandoffDownload,
+              operatorOrder: firstOperatingResultHandoffOperatorOrder
+            }
+          : null,
+        workspaceAction: createLaunchWorkflowWorkspaceShortcut("ops", "snapshot", "Open First Operating Result Handoff", params),
+        operatorOrder: firstOperatingResultHandoffOperatorOrder,
+        nextAction: firstOperatingResultHandoffSource.nextAction
+          || "Hand off the first operating result from Launch Mainline after the rollout widening receipt is recorded."
+      }
+    : null;
   const stagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations
     || (Array.isArray(launchDutyActionOrder?.steps)
       ? launchDutyActionOrder.steps.find((item) => item?.key === "staging_archive")?.nextOperations
@@ -16679,6 +16772,22 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
+  const firstOperatingResultHandoffHeroControls = firstOperatingResultHandoffAction
+    ? [
+        firstOperatingResultHandoffAction.recommendedDownload ? {
+          kind: "download",
+          label: "Open First Operating Result Handoff",
+          recommendedDownload: firstOperatingResultHandoffAction.recommendedDownload,
+          operatorOrder: firstOperatingResultHandoffOperatorOrder
+        } : null,
+        firstOperatingResultHandoffAction.workspaceAction ? {
+          kind: "workspace",
+          label: "Open First Operating Result Workspace",
+          workspaceAction: firstOperatingResultHandoffAction.workspaceAction,
+          operatorOrder: firstOperatingResultHandoffOperatorOrder
+        } : null
+      ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+    : [];
   const heroControls = [
     ...confirmedFirstWaveHeroControls,
     ...firstWaveHeroControls,
@@ -16687,6 +16796,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     ...steadyStateHandoffHeroControls,
     ...steadyStateDutyReceiptHeroControls,
     ...rolloutWideningDecisionHeroControls,
+    ...firstOperatingResultHandoffHeroControls,
     ...launchRunwayHeroControls,
     ...workspaceActions.map((item) => ({
       kind: "workspace",
@@ -16915,6 +17025,36 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ].filter(Boolean)
     });
   }
+  if (firstOperatingResultHandoffAction) {
+    const firstOperatingResultStep = createLaunchWorkflowActionPlanStep({
+      key: "launch_mainline_first_operating_result_handoff",
+      title: "Hand off first operating result",
+      summary: firstOperatingResultHandoffAction.nextAction
+        || "Hand off the first operating result from the shift action plan and keep the launch operations overview attached.",
+      status: firstOperatingResultHandoffAction.ready ? "pass" : "review",
+      priority: firstOperatingResultHandoffAction.ready ? "primary" : "secondary",
+      workspaceAction: firstOperatingResultHandoffAction.workspaceAction,
+      recommendedDownload: firstOperatingResultHandoffAction.recommendedDownload,
+      operatorOrder: firstOperatingResultHandoffAction.operatorOrder
+    });
+    actionPlan.push({
+      ...firstOperatingResultStep,
+      controls: [
+        firstOperatingResultStep.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+          kind: "download",
+          label: "Open First Operating Result Handoff",
+          recommendedDownload: firstOperatingResultStep.recommendedDownload,
+          operatorOrder: firstOperatingResultStep.operatorOrder
+        }, params) : null,
+        firstOperatingResultStep.workspaceAction ? ensureLaunchMainlineControlHrefs({
+          kind: "workspace",
+          label: firstOperatingResultStep.workspaceAction.label || "Open First Operating Result Workspace",
+          workspaceAction: firstOperatingResultStep.workspaceAction,
+          operatorOrder: firstOperatingResultStep.operatorOrder
+        }, params) : null
+      ].filter(Boolean)
+    });
+  }
   const recommendedDownloads = [];
   const recommendedDownloadKeys = new Set();
   const pushRecommendedDownload = (item) => {
@@ -16941,6 +17081,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateHandoffLanding?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateDutyReceiptReview?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(rolloutWideningDecisionAction?.recommendedDownload || null, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstOperatingResultHandoffAction?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(postLaunchSweepHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(closeoutHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(stabilizationHandoffDownload, params));
@@ -17505,6 +17646,52 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
+  const firstOperatingResultHandoffCard = firstOperatingResultHandoffAction
+    ? {
+        key: "first_operating_result_handoff",
+        title: "First Operating Result Handoff",
+        summary: firstOperatingResultHandoffAction.nextAction
+          || "Hand off the first operating result after rollout widening receipt review.",
+        operatorOrder: firstOperatingResultHandoffOperatorOrder,
+        tags: [
+          {
+            label: "status",
+            value: firstOperatingResultHandoffAction.status || "unknown",
+            strong: true
+          },
+          {
+            label: "ready",
+            value: firstOperatingResultHandoffAction.ready === true ? "yes" : "no",
+            strong: firstOperatingResultHandoffAction.ready === true
+          },
+          {
+            label: "current",
+            value: firstOperatingResultHandoffAction.currentActionKey || "-",
+            strong: false
+          }
+        ],
+        details: [
+          `Receipt audit: ${firstOperatingResultHandoffAction.rolloutWideningDecisionReceiptAuditLogId || "-"}`,
+          `Next download: ${firstOperatingResultHandoffAction.nextDownloadFormat || "-"}`,
+          `Launch duty record index: ${firstOperatingResultHandoffAction.launchDutyRecordIndexPath || "-"}`,
+          ...firstOperatingResultHandoffOperatorOrder.map((item) => `Operator order: ${item}`)
+        ],
+        controls: [
+          firstOperatingResultHandoffAction.recommendedDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open First Operating Result Handoff",
+            recommendedDownload: firstOperatingResultHandoffAction.recommendedDownload,
+            operatorOrder: firstOperatingResultHandoffOperatorOrder
+          }, params) : null,
+          firstOperatingResultHandoffAction.workspaceAction ? ensureLaunchMainlineControlHrefs({
+            kind: "workspace",
+            label: "Open First Operating Result Workspace",
+            workspaceAction: firstOperatingResultHandoffAction.workspaceAction,
+            operatorOrder: firstOperatingResultHandoffOperatorOrder
+          }, params) : null
+        ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -17596,6 +17783,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     steadyStateHandoffLandingCard,
     steadyStateDutyReceiptReviewCard,
     rolloutWideningDecisionCard,
+    firstOperatingResultHandoffCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -18145,6 +18333,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: overviewCards.filter((item) => item?.key === "rollout_widening_decision")
     },
     {
+      key: "first_operating_result_handoff",
+      title: "First Operating Result Handoff",
+      emptyState: "Record the rollout widening receipt to expose the first operating result handoff here.",
+      cards: overviewCards.filter((item) => item?.key === "first_operating_result_handoff")
+    },
+    {
       key: "workspace_path",
       title: "Workspace Path",
       emptyState: "Generate a launch mainline package to inspect the routed workspace path here.",
@@ -18535,6 +18729,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     steadyStateHandoffLanding,
     steadyStateDutyReceiptReview,
     rolloutWideningDecisionAction,
+    firstOperatingResultHandoffAction,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -20276,6 +20471,14 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       }
     }
   }
+  appendFirstOperatingResultHandoffLines(
+    lines,
+    mainlineSummary.firstOperatingResultHandoffAction || null,
+    {
+      title: "Launch Mainline First Operating Result Handoff",
+      readyStyle: "yes-no"
+    }
+  );
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
   lines.push(`Mainline Recommended Download: ${formatLaunchHandoffDownloadText(mainlineSummary.recommendedDownload, { fileSeparator: " | " })}`);
   if (mainlineSummary.continuation) {
@@ -20923,6 +21126,10 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     && typeof rolloutWideningDecisionAction.recommendedDownload === "object"
       ? rolloutWideningDecisionAction.recommendedDownload
       : null;
+  const firstOperatingResultHandoffAction = mainlineSummary.firstOperatingResultHandoffAction
+    && typeof mainlineSummary.firstOperatingResultHandoffAction === "object"
+      ? mainlineSummary.firstOperatingResultHandoffAction
+      : null;
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -21567,6 +21774,10 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     );
     lines.push(`- nextAction=${rolloutWideningDecisionAction.nextAction || "-"}`);
   }
+  appendFirstOperatingResultHandoffLines(lines, firstOperatingResultHandoffAction, {
+    title: "First Operating Result Handoff Route",
+    readyStyle: "boolean"
+  });
 
   appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(lines, launchDutyRecordIndexSelectionChecklistStep);
   lines.push("");
@@ -23182,6 +23393,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     && typeof rolloutWideningDecisionAction.recommendedDownload === "object"
       ? rolloutWideningDecisionAction.recommendedDownload
       : null;
+  const firstOperatingResultHandoffAction = mainlineSummary.firstOperatingResultHandoffAction
+    && typeof mainlineSummary.firstOperatingResultHandoffAction === "object"
+      ? mainlineSummary.firstOperatingResultHandoffAction
+      : null;
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -23233,6 +23448,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Rollout widening decision",
       "ops/steady-state-duty-board.txt"
+    ]);
+  }
+  if (firstOperatingResultHandoffAction) {
+    handoffFiles.push([
+      "First operating result handoff",
+      "ops/launch-operations-overview-status.txt"
     ]);
   }
   const lines = [
@@ -23682,6 +23903,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     );
     lines.push(`- nextAction=${rolloutWideningDecisionAction.nextAction || "-"}`);
   }
+  appendFirstOperatingResultHandoffLines(lines, firstOperatingResultHandoffAction, {
+    title: "First Operating Result Handoff",
+    readyStyle: "yes-no"
+  });
 
   lines.push("");
   lines.push("Receipt Visibility Summary Downloads:");
@@ -30776,6 +31001,71 @@ function buildLaunchOperationsFirstOperatingResultHandoffActionPayload({
       ? "Hand off the first operating result from the shift action plan and keep the launch operations overview attached."
       : "Record the rollout widening receipt before handing off the first operating result."
   };
+}
+
+function appendFirstOperatingResultHandoffLines(lines = [], action = null, {
+  title = "First Operating Result Handoff",
+  readyStyle = "yes-no",
+  entryLabel = "first-operating-result-handoff"
+} = {}) {
+  if (!action || typeof action !== "object") {
+    return false;
+  }
+  const download = action.recommendedDownload && typeof action.recommendedDownload === "object"
+    ? action.recommendedDownload
+    : null;
+  const blockedBy = Array.isArray(action.blockedBy)
+    ? action.blockedBy.join(",")
+    : "";
+  const requiredChecks = Array.isArray(action.requiredChecks)
+    ? action.requiredChecks.join(",")
+    : "";
+  const operatorOrder = Array.isArray(action.operatorOrder)
+    ? action.operatorOrder
+    : [];
+  const readyText = readyStyle === "boolean"
+    ? String(action.ready === true)
+    : action.ready === true ? "yes" : "no";
+  const fileName = action.nextDownloadFileName || download?.fileName || "-";
+  const format = action.nextDownloadFormat || download?.format || "-";
+  const href = action.nextDownloadHref || download?.href || "-";
+  const key = action.nextDownloadKey || download?.key || "-";
+  lines.push("");
+  lines.push(`${title}:`);
+  lines.push(
+    `- status=${action.status || "-"}`
+    + ` | ready=${readyText}`
+    + ` | current=${action.currentActionKey || "-"}`
+    + ` | receiptAudit=${action.rolloutWideningDecisionReceiptAuditLogId || "-"}`
+    + ` | file=${fileName}`
+    + ` | format=${format}`
+    + ` | nextDownload=${format}`
+    + ` | blockedBy=${blockedBy || "-"}`
+  );
+  lines.push(
+    `- ${entryLabel}: ${fileName}`
+    + ` | key=${key}`
+    + ` | format=${format}`
+    + ` | href=${href}`
+    + ` | source=${download?.source || action.source || "developer-ops-launch-operations-first-operating-result-handoff"}`
+    + ` | launchDutyRecordIndex=${action.launchDutyRecordIndexPath || download?.launchDutyRecordIndexPath || action.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(
+    `- rolloutReceiptStatus=${action.rolloutWideningReceiptStatus || "-"}`
+    + ` | rolloutDecision=${action.rolloutWideningDecisionStatus || "-"}`
+    + ` | rolloutReady=${action.rolloutWideningDecisionReady === true}`
+    + ` | queue=${action.queueTotal ?? "-"}`
+    + ` | attention=${action.attentionCount ?? "-"}`
+    + ` | checks=${requiredChecks || "-"}`
+  );
+  lines.push(`- nextAction=${action.nextAction || "-"}`);
+  if (operatorOrder.length) {
+    lines.push("First Operating Result Operator Order:");
+    for (const item of operatorOrder) {
+      lines.push(`- ${item}`);
+    }
+  }
+  return true;
 }
 
 function buildDeveloperOpsLaunchOperationsHandoffSummaryPayload({
@@ -45237,6 +45527,59 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
         source: steadyStateDutyBoardDownload?.source || "developer-ops"
       }
     : null;
+  const firstOperatingResultHandoffSource = [
+    readiness.launchOperationsOperatorEntry?.firstOperatingResultHandoffAction,
+    readiness.launchOperationsShiftActionPlan?.firstOperatingResultHandoffAction,
+    readiness.launchOperationsOverviewStatus?.firstOperatingResultHandoffAction,
+    readiness.launchOperationsDailyBrief?.firstOperatingResultHandoffAction
+  ].find((item) => item && typeof item === "object") || null;
+  const firstOperatingResultHandoffDownload = firstOperatingResultHandoffSource
+    ? {
+        ...(launchOpsOverviewDownload || {}),
+        key: firstOperatingResultHandoffSource.nextDownloadKey
+          || launchOpsOverviewDownload?.key
+          || "ops_launch_operations_overview_status",
+        label: launchOpsOverviewDownload?.label || "Launch operations overview status",
+        fileName: firstOperatingResultHandoffSource.nextDownloadFileName
+          || launchOpsOverviewDownload?.fileName
+          || "developer-ops-launch-operations-overview-status.txt",
+        format: firstOperatingResultHandoffSource.nextDownloadFormat
+          || launchOpsOverviewDownload?.format
+          || "launch-operations-overview-status",
+        href: firstOperatingResultHandoffSource.nextDownloadHref
+          || launchOpsOverviewDownload?.href
+          || null,
+        source: "developer-ops-launch-operations-first-operating-result-handoff",
+        launchDutyRecordIndexPath: firstOperatingResultHandoffSource.launchDutyRecordIndexPath
+          || firstOperatingResultHandoffSource.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || launchOpsOverviewDownload?.launchDutyRecordIndexPath
+          || receiptVisibilitySummaryRecordIndexPath
+          || readiness.launchOperationsOperatorEntry?.launchDutyRecordIndexPath
+          || null
+      }
+    : null;
+  const firstOperatingResultHandoffAction = firstOperatingResultHandoffSource
+    ? {
+        ...firstOperatingResultHandoffSource,
+        nextDownloadKey: firstOperatingResultHandoffDownload?.key
+          || firstOperatingResultHandoffSource.nextDownloadKey
+          || null,
+        nextDownloadFileName: firstOperatingResultHandoffDownload?.fileName
+          || firstOperatingResultHandoffSource.nextDownloadFileName
+          || null,
+        nextDownloadFormat: firstOperatingResultHandoffDownload?.format
+          || firstOperatingResultHandoffSource.nextDownloadFormat
+          || null,
+        nextDownloadHref: firstOperatingResultHandoffDownload?.href
+          || firstOperatingResultHandoffSource.nextDownloadHref
+          || null,
+        launchDutyRecordIndexPath: firstOperatingResultHandoffDownload?.launchDutyRecordIndexPath
+          || firstOperatingResultHandoffSource.launchDutyRecordIndexPath
+          || firstOperatingResultHandoffSource.launchOpsOverviewContextLaunchDutyRecordIndexPath
+          || null,
+        recommendedDownload: firstOperatingResultHandoffDownload
+      }
+    : null;
   if (receiptVisibilitySummaryDownloads.launchReviewSummary) {
     downloads.push([
       "launch-review-receipt-visibility-summary",
@@ -45314,6 +45657,10 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
     );
   }
+  appendFirstOperatingResultHandoffLines(lines, firstOperatingResultHandoffAction, {
+    title: "First Operating Result Handoff Route",
+    readyStyle: "boolean"
+  });
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);
   lines.push("");
   lines.push("Operator Order:");
@@ -45324,6 +45671,9 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
   }
   if (rolloutWideningDecisionAction) {
     lines.push("- Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached.");
+  }
+  if (firstOperatingResultHandoffAction) {
+    lines.push("- Hand off the first operating result from Launch Mainline after rollout widening receipt review.");
   }
   lines.push("- Keep this file beside handoff-index.txt so Ops and Launch Mainline reviewers share the same download hrefs.");
   return lines.join("\n");

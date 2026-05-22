@@ -19954,10 +19954,21 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
     );
     lines.push(
+      `- stableTransitionLandingDownloadHref=${closeoutSteadyStateHandoffLanding?.href || closeoutSteadyStateHandoffLanding?.recommendedDownload?.href || "-"}`
+      + ` | stableTransitionLandingSource=${closeoutSteadyStateHandoffLanding?.source || closeoutSteadyStateHandoffLanding?.recommendedDownload?.source || "-"}`
+      + ` | stableTransitionLandingRecordIndex=${closeoutSteadyStateHandoffLanding?.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(
       `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
       + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
       + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
       + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || closeoutSteadyStateReceiptReview?.recommendedDownload?.format || "-"}`
+    );
+    lines.push(
+      `- stableTransitionReceiptReviewFile=${closeoutSteadyStateReceiptReview?.fileName || closeoutSteadyStateReceiptReview?.recommendedDownload?.fileName || "-"}`
+      + ` | stableTransitionReceiptReviewHref=${closeoutSteadyStateReceiptReview?.href || closeoutSteadyStateReceiptReview?.recommendedDownload?.href || "-"}`
+      + ` | stableTransitionReceiptReviewVisibility=${closeoutSteadyStateReceiptReview?.receiptVisibilityStatus || "-"}`
+      + ` | stableTransitionReceiptReviewNext=${closeoutSteadyStateReceiptReview?.nextAction || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Review Downloads:");
@@ -21387,10 +21398,21 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
     );
     lines.push(
+      `- stableTransitionLandingDownloadHref=${closeoutSteadyStateHandoffLanding?.href || closeoutSteadyStateHandoffLanding?.recommendedDownload?.href || steadyStateHandoffLandingDownload?.href || "-"}`
+      + ` | stableTransitionLandingSource=${closeoutSteadyStateHandoffLanding?.source || closeoutSteadyStateHandoffLanding?.recommendedDownload?.source || steadyStateHandoffLandingDownload?.source || "-"}`
+      + ` | stableTransitionLandingRecordIndex=${closeoutSteadyStateHandoffLanding?.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(
       `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
       + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
       + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
       + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || closeoutSteadyStateReceiptReview?.recommendedDownload?.format || steadyStateDutyReceiptReviewDownload?.format || "-"}`
+    );
+    lines.push(
+      `- stableTransitionReceiptReviewFile=${closeoutSteadyStateReceiptReview?.fileName || closeoutSteadyStateReceiptReview?.recommendedDownload?.fileName || steadyStateDutyReceiptReviewDownload?.fileName || "-"}`
+      + ` | stableTransitionReceiptReviewHref=${closeoutSteadyStateReceiptReview?.href || closeoutSteadyStateReceiptReview?.recommendedDownload?.href || steadyStateDutyReceiptReviewDownload?.href || "-"}`
+      + ` | stableTransitionReceiptReviewVisibility=${closeoutSteadyStateReceiptReview?.receiptVisibilityStatus || "-"}`
+      + ` | stableTransitionReceiptReviewNext=${closeoutSteadyStateReceiptReview?.nextAction || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -23531,10 +23553,21 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
     );
     lines.push(
+      `- stableTransitionLandingDownloadHref=${closeoutSteadyStateHandoffLanding?.href || closeoutSteadyStateHandoffLanding?.recommendedDownload?.href || steadyStateHandoffLandingDownload?.href || "-"}`
+      + ` | stableTransitionLandingSource=${closeoutSteadyStateHandoffLanding?.source || closeoutSteadyStateHandoffLanding?.recommendedDownload?.source || steadyStateHandoffLandingDownload?.source || "-"}`
+      + ` | stableTransitionLandingRecordIndex=${closeoutSteadyStateHandoffLanding?.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(
       `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
       + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
       + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
       + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || closeoutSteadyStateReceiptReview?.recommendedDownload?.format || steadyStateDutyReceiptReviewDownload?.format || "-"}`
+    );
+    lines.push(
+      `- stableTransitionReceiptReviewFile=${closeoutSteadyStateReceiptReview?.fileName || closeoutSteadyStateReceiptReview?.recommendedDownload?.fileName || steadyStateDutyReceiptReviewDownload?.fileName || "-"}`
+      + ` | stableTransitionReceiptReviewHref=${closeoutSteadyStateReceiptReview?.href || closeoutSteadyStateReceiptReview?.recommendedDownload?.href || steadyStateDutyReceiptReviewDownload?.href || "-"}`
+      + ` | stableTransitionReceiptReviewVisibility=${closeoutSteadyStateReceiptReview?.receiptVisibilityStatus || "-"}`
+      + ` | stableTransitionReceiptReviewNext=${closeoutSteadyStateReceiptReview?.nextAction || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -47929,10 +47962,21 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
         + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
       );
       lines.push(
+        `- stableTransitionLandingDownloadHref=${closeoutSteadyStateHandoffLanding?.href || "-"}`
+        + ` | stableTransitionLandingSource=${closeoutSteadyStateHandoffLanding?.source || "-"}`
+        + ` | stableTransitionLandingRecordIndex=${closeoutSteadyStateHandoffLanding?.launchDutyRecordIndexPath || "-"}`
+      );
+      lines.push(
         `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
         + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
         + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
         + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || "-"}`
+      );
+      lines.push(
+        `- stableTransitionReceiptReviewFile=${closeoutSteadyStateReceiptReview?.fileName || "-"}`
+        + ` | stableTransitionReceiptReviewHref=${closeoutSteadyStateReceiptReview?.href || "-"}`
+        + ` | stableTransitionReceiptReviewVisibility=${closeoutSteadyStateReceiptReview?.receiptVisibilityStatus || "-"}`
+        + ` | stableTransitionReceiptReviewNext=${closeoutSteadyStateReceiptReview?.nextAction || "-"}`
       );
     }
     if (receiptVisibilityConfirmationQueue.confirmationReceipt) {
@@ -49550,10 +49594,21 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
     + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
   );
   lines.push(
+    `- stableTransitionLandingDownloadHref=${closeoutSteadyStateHandoffLanding?.href || "-"}`
+    + ` | stableTransitionLandingSource=${closeoutSteadyStateHandoffLanding?.source || "-"}`
+    + ` | stableTransitionLandingRecordIndex=${closeoutSteadyStateHandoffLanding?.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(
     `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
     + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
     + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
     + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || "-"}`
+  );
+  lines.push(
+    `- stableTransitionReceiptReviewFile=${closeoutSteadyStateReceiptReview?.fileName || "-"}`
+    + ` | stableTransitionReceiptReviewHref=${closeoutSteadyStateReceiptReview?.href || "-"}`
+    + ` | stableTransitionReceiptReviewVisibility=${closeoutSteadyStateReceiptReview?.receiptVisibilityStatus || "-"}`
+    + ` | stableTransitionReceiptReviewNext=${closeoutSteadyStateReceiptReview?.nextAction || "-"}`
   );
   if (reviewDownloads.length) {
     lines.push("Surface Review Closeout Downloads:");

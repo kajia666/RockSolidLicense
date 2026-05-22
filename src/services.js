@@ -13217,7 +13217,7 @@ function buildDeveloperLaunchReviewFiles(payload = {}) {
   appendLaunchWorkflowFileIfPresent(
     files,
     payload.firstWaveRuntimeEvidenceFileName || "developer-launch-review-first-wave-runtime-evidence.txt",
-    payload.reviewSummary?.firstWaveRuntimeEvidence
+    payload.reviewSummary?.firstWaveRuntimeEvidence || payload.reviewSummary?.firstWaveSupportInspectionConfirmation
       ? buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload)
       : ""
   );
@@ -14495,7 +14495,7 @@ function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
   appendLaunchWorkflowFileIfPresent(
     files,
     payload.firstWaveRuntimeEvidenceFileName || "developer-launch-smoke-kit-first-wave-runtime-evidence.txt",
-    payload.smokeSummary?.firstWaveRuntimeEvidence
+    payload.smokeSummary?.firstWaveRuntimeEvidence || payload.smokeSummary?.firstWaveSupportInspectionConfirmation
       ? buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload)
       : ""
   );
@@ -22128,7 +22128,7 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   appendLaunchWorkflowFileIfPresent(
     files,
     payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
-    payload.mainlineSummary?.firstWaveRuntimeEvidence
+    payload.mainlineSummary?.firstWaveRuntimeEvidence || payload.mainlineSummary?.firstWaveSupportInspectionConfirmation
       ? buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload)
       : ""
   );

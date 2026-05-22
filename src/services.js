@@ -19845,6 +19845,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     const stableTransitionOperatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction?.operatorOrder)
       ? launchDutyStableOperationsTransitionAction.operatorOrder.join(" -> ")
       : "";
+    const closeoutSteadyStateHandoffLanding = mainlineSummary.steadyStateHandoffLanding
+      && typeof mainlineSummary.steadyStateHandoffLanding === "object"
+        ? mainlineSummary.steadyStateHandoffLanding
+        : null;
+    const closeoutSteadyStateReceiptReview = closeoutSteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction
+      || mainlineSummary.steadyStateDutyReceiptReview
+      || null;
     lines.push("");
     lines.push("Launch Mainline Surface Review Closeout:");
     lines.push(
@@ -19939,6 +19946,18 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push(
       `- stableTransitionChecks=${stableTransitionChecks || "-"}`
       + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
+    );
+    lines.push(
+      `- stableTransitionLandingAction=${closeoutSteadyStateHandoffLanding?.actionKey || "-"}`
+      + ` | stableTransitionLandingFile=${closeoutSteadyStateHandoffLanding?.fileName || closeoutSteadyStateHandoffLanding?.recommendedDownload?.fileName || "-"}`
+      + ` | stableTransitionLandingFormat=${closeoutSteadyStateHandoffLanding?.format || closeoutSteadyStateHandoffLanding?.recommendedDownload?.format || "-"}`
+      + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
+    );
+    lines.push(
+      `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
+      + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
+      + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
+      + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || closeoutSteadyStateReceiptReview?.recommendedDownload?.format || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Review Downloads:");
@@ -21259,6 +21278,13 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     const stableTransitionOperatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction?.operatorOrder)
       ? launchDutyStableOperationsTransitionAction.operatorOrder.join(" -> ")
       : "";
+    const closeoutSteadyStateHandoffLanding = steadyStateHandoffLanding
+      && typeof steadyStateHandoffLanding === "object"
+        ? steadyStateHandoffLanding
+        : null;
+    const closeoutSteadyStateReceiptReview = closeoutSteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction
+      || steadyStateDutyReceiptReview
+      || null;
     lines.push("");
     lines.push("Surface Review Closeout Route:");
     lines.push(
@@ -21353,6 +21379,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     lines.push(
       `- stableTransitionChecks=${stableTransitionChecks || "-"}`
       + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
+    );
+    lines.push(
+      `- stableTransitionLandingAction=${closeoutSteadyStateHandoffLanding?.actionKey || "-"}`
+      + ` | stableTransitionLandingFile=${closeoutSteadyStateHandoffLanding?.fileName || closeoutSteadyStateHandoffLanding?.recommendedDownload?.fileName || steadyStateHandoffLandingDownload?.fileName || "-"}`
+      + ` | stableTransitionLandingFormat=${closeoutSteadyStateHandoffLanding?.format || closeoutSteadyStateHandoffLanding?.recommendedDownload?.format || steadyStateHandoffLandingDownload?.format || "-"}`
+      + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
+    );
+    lines.push(
+      `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
+      + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
+      + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
+      + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || closeoutSteadyStateReceiptReview?.recommendedDownload?.format || steadyStateDutyReceiptReviewDownload?.format || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -23384,6 +23422,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     const stableTransitionOperatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction?.operatorOrder)
       ? launchDutyStableOperationsTransitionAction.operatorOrder.join(" -> ")
       : "";
+    const closeoutSteadyStateHandoffLanding = steadyStateHandoffLanding
+      && typeof steadyStateHandoffLanding === "object"
+        ? steadyStateHandoffLanding
+        : null;
+    const closeoutSteadyStateReceiptReview = closeoutSteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction
+      || steadyStateDutyReceiptReview
+      || null;
     lines.push("");
     lines.push("Surface Review Closeout:");
     lines.push(
@@ -23478,6 +23523,18 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push(
       `- stableTransitionChecks=${stableTransitionChecks || "-"}`
       + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
+    );
+    lines.push(
+      `- stableTransitionLandingAction=${closeoutSteadyStateHandoffLanding?.actionKey || "-"}`
+      + ` | stableTransitionLandingFile=${closeoutSteadyStateHandoffLanding?.fileName || closeoutSteadyStateHandoffLanding?.recommendedDownload?.fileName || steadyStateHandoffLandingDownload?.fileName || "-"}`
+      + ` | stableTransitionLandingFormat=${closeoutSteadyStateHandoffLanding?.format || closeoutSteadyStateHandoffLanding?.recommendedDownload?.format || steadyStateHandoffLandingDownload?.format || "-"}`
+      + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
+    );
+    lines.push(
+      `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
+      + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
+      + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
+      + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || closeoutSteadyStateReceiptReview?.recommendedDownload?.format || steadyStateDutyReceiptReviewDownload?.format || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -47790,6 +47847,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       const stableTransitionOperatorOrder = Array.isArray(stableTransitionAction?.operatorOrder)
         ? stableTransitionAction.operatorOrder.join(" -> ")
         : "";
+      const closeoutSteadyStateHandoffLanding = entry.launchDutySteadyStateHandoffLanding
+        && typeof entry.launchDutySteadyStateHandoffLanding === "object"
+          ? entry.launchDutySteadyStateHandoffLanding
+          : null;
+      const closeoutSteadyStateReceiptReview = closeoutSteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction || null;
       lines.push("Launch Surface Review Closeout Action:");
       lines.push(
         `- status=${action.status || "-"}`
@@ -47859,6 +47921,18 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       lines.push(
         `- stableTransitionChecks=${stableTransitionChecks || "-"}`
         + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
+      );
+      lines.push(
+        `- stableTransitionLandingAction=${closeoutSteadyStateHandoffLanding?.actionKey || "-"}`
+        + ` | stableTransitionLandingFile=${closeoutSteadyStateHandoffLanding?.fileName || "-"}`
+        + ` | stableTransitionLandingFormat=${closeoutSteadyStateHandoffLanding?.format || "-"}`
+        + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
+      );
+      lines.push(
+        `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
+        + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
+        + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
+        + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || "-"}`
       );
     }
     if (receiptVisibilityConfirmationQueue.confirmationReceipt) {
@@ -49360,6 +49434,11 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
   const stableTransitionOperatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction?.operatorOrder)
     ? launchDutyStableOperationsTransitionAction.operatorOrder.join(" -> ")
     : "";
+  const closeoutSteadyStateHandoffLanding = launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding
+    && typeof launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding === "object"
+      ? launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding
+      : null;
+  const closeoutSteadyStateReceiptReview = closeoutSteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction || null;
   const launchDutyRecordIndexPath = launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath
     || receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath
     || launchOperationsOperatorEntry.launchDutyRecordIndexPath
@@ -49463,6 +49542,18 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
   lines.push(
     `- stableTransitionChecks=${stableTransitionChecks || "-"}`
     + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
+  );
+  lines.push(
+    `- stableTransitionLandingAction=${closeoutSteadyStateHandoffLanding?.actionKey || "-"}`
+    + ` | stableTransitionLandingFile=${closeoutSteadyStateHandoffLanding?.fileName || "-"}`
+    + ` | stableTransitionLandingFormat=${closeoutSteadyStateHandoffLanding?.format || "-"}`
+    + ` | stableTransitionLandingNext=${closeoutSteadyStateHandoffLanding?.nextAction || "-"}`
+  );
+  lines.push(
+    `- stableTransitionReceiptReviewStatus=${closeoutSteadyStateReceiptReview?.status || "-"}`
+    + ` | stableTransitionReceiptReviewAudit=${closeoutSteadyStateReceiptReview?.auditLogId || "-"}`
+    + ` | stableTransitionReceiptReviewAction=${closeoutSteadyStateReceiptReview?.action || "-"}`
+    + ` | stableTransitionReceiptReviewFormat=${closeoutSteadyStateReceiptReview?.format || "-"}`
   );
   if (reviewDownloads.length) {
     lines.push("Surface Review Closeout Downloads:");

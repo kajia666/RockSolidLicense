@@ -23722,6 +23722,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsOperatorEntryDownload.body,
       /Launch Surface Review Closeout Action:[\s\S]*stableTransitionChecks=[^\n]*\| stableTransitionOperatorOrder=[^\n]*/
     );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Launch Surface Review Closeout Action:[\s\S]*stableTransitionLandingAction=[^\n]*\| stableTransitionLandingFile=[^\n]*\| stableTransitionLandingFormat=[^\n]*\| stableTransitionLandingNext=[^\n]*/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Launch Surface Review Closeout Action:[\s\S]*stableTransitionReceiptReviewStatus=[^\n]*\| stableTransitionReceiptReviewAudit=[^\n]*\| stableTransitionReceiptReviewAction=[^\n]*\| stableTransitionReceiptReviewFormat=[^\n]*/
+    );
     assert.match(launchOperationsOperatorEntryDownload.body, /Handoff Packet Evidence: receipt_visibility_parity=ready; first_wave_handoff_confirmation=pending; support_inspection_confirmation=confirmed; developer_ops_overview_refresh=pending_confirmation_receipt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Duty Handoff Action:[\s\S]*status=awaiting_first_wave_confirmation \| ready=no \| currentAction=confirm_first_wave_handoff[\s\S]*\| manualProgress=1\/2 \| manualRemaining=1 \| confirmPacket=ready_to_submit \| preflight=blocked_until_first_wave_confirmation[\s\S]*\| nextLaunchDutyPhase=archive_signoff_packet \| nextLaunchDutyAction=archive_production_signoff_packet/);
@@ -27376,6 +27384,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*stableTransitionLandingAction=[^\n]*\| stableTransitionLandingFile=[^\n]*\| stableTransitionLandingFormat=[^\n]*\| stableTransitionLandingNext=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*stableTransitionReceiptReviewStatus=[^\n]*\| stableTransitionReceiptReviewAudit=[^\n]*\| stableTransitionReceiptReviewAction=[^\n]*\| stableTransitionReceiptReviewFormat=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Surface Review Closeout:[\s\S]*Review Downloads:[\s\S]*launch_review_summary[^\n]*launch-review\.txt[\s\S]*launch_smoke_summary[^\n]*launch-smoke-kit\.txt/
     );
     assert.match(
@@ -27473,6 +27489,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*stableTransitionLandingAction=[^\n]*\| stableTransitionLandingFile=[^\n]*\| stableTransitionLandingFormat=[^\n]*\| stableTransitionLandingNext=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*stableTransitionReceiptReviewStatus=[^\n]*\| stableTransitionReceiptReviewAudit=[^\n]*\| stableTransitionReceiptReviewAction=[^\n]*\| stableTransitionReceiptReviewFormat=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
     );
     assert.match(
@@ -27555,6 +27579,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Surface Review Closeout:[\s\S]*stableTransitionChecks=[^\n]*\| stableTransitionOperatorOrder=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*stableTransitionLandingAction=[^\n]*\| stableTransitionLandingFile=[^\n]*\| stableTransitionLandingFormat=[^\n]*\| stableTransitionLandingNext=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*stableTransitionReceiptReviewStatus=[^\n]*\| stableTransitionReceiptReviewAudit=[^\n]*\| stableTransitionReceiptReviewAction=[^\n]*\| stableTransitionReceiptReviewFormat=[^\n]*/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
@@ -27655,6 +27687,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       primaryRouteReviewDownload.body,
       /Surface Review Closeout Bridge:[\s\S]*stableTransitionChecks=[^\n]*\| stableTransitionOperatorOrder=[^\n]*/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*stableTransitionLandingAction=[^\n]*\| stableTransitionLandingFile=[^\n]*\| stableTransitionLandingFormat=[^\n]*\| stableTransitionLandingNext=[^\n]*/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*stableTransitionReceiptReviewStatus=[^\n]*\| stableTransitionReceiptReviewAudit=[^\n]*\| stableTransitionReceiptReviewAction=[^\n]*\| stableTransitionReceiptReviewFormat=[^\n]*/
     );
 
     const nextRouteReviewDownload = await getText(

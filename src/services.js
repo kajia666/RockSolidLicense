@@ -13448,6 +13448,18 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         }
       )
     : null;
+  const latestLaunchReceipt = Array.isArray(opsSnapshot?.overview?.latestLaunchReceipts)
+    ? opsSnapshot.overview.latestLaunchReceipts[0] || null
+    : null;
+  const firstWaveSupportInspectionConfirmation = opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
+    || selectFirstWaveSupportInspectionConfirmation(
+      opsSnapshot?.overview?.latestFirstWaveSupportInspectionConfirmations,
+      {
+        latestReceipt: latestLaunchReceipt,
+        productCode: routeProductCode || "",
+        channel: routeChannel || ""
+      }
+    );
 
   const accountLoginReady = accountLoginEnabled && (registerEnabled || accountCandidates.length > 0);
   const directCardReady = cardLoginEnabled && directCardCandidates.length > 0;
@@ -14153,6 +14165,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     workspaceActions,
     launchDutyActionOrder,
     firstWaveRuntimeEvidence,
+    firstWaveSupportInspectionConfirmation,
     launchReadinessNextGate,
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
@@ -14222,6 +14235,10 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     appendFirstWaveRuntimeEvidenceLines(lines, {
       firstWaveRuntimeEvidence: smokeSummary.firstWaveRuntimeEvidence
     });
+  }
+  if (smokeSummary.firstWaveSupportInspectionConfirmation) {
+    lines.push("");
+    appendFirstWaveSupportInspectionConfirmationLines(lines, smokeSummary.firstWaveSupportInspectionConfirmation);
   }
 
   if (smokeSummary.routeFocus && typeof smokeSummary.routeFocus === "object") {
@@ -14387,6 +14404,10 @@ function buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload = {}) 
     && typeof payload.smokeSummary.firstWaveRuntimeEvidence === "object"
     ? payload.smokeSummary.firstWaveRuntimeEvidence
     : null;
+  const supportInspectionConfirmation = payload.smokeSummary?.firstWaveSupportInspectionConfirmation
+    && typeof payload.smokeSummary.firstWaveSupportInspectionConfirmation === "object"
+      ? payload.smokeSummary.firstWaveSupportInspectionConfirmation
+      : null;
   const lines = [
     "RockSolid Developer Launch Smoke Kit First-Wave Runtime Evidence",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -14399,6 +14420,10 @@ function buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload = {}) 
     appendFirstWaveRuntimeEvidenceLines(lines, {
       firstWaveRuntimeEvidence: evidence
     });
+    if (supportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, supportInspectionConfirmation);
+    }
     lines.push("");
     lines.push("Operator Notes:");
     lines.push("- Use this file while reviewing Launch Smoke without reopening Developer Ops.");
@@ -14745,10 +14770,14 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       ? opsOverview.latestFirstWaveHandoffConfirmations[0]
       : null)
     || null;
+  const opsOverviewFirstWaveSupportInspectionConfirmations = Array.isArray(opsOverview.latestFirstWaveSupportInspectionConfirmations)
+    ? opsOverview.latestFirstWaveSupportInspectionConfirmations
+    : [];
   const firstWaveSupportInspectionConfirmation = initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
-    || (Array.isArray(opsOverview.latestFirstWaveSupportInspectionConfirmations)
-      ? opsOverview.latestFirstWaveSupportInspectionConfirmations[0]
-      : null)
+    || selectFirstWaveSupportInspectionConfirmation(opsOverviewFirstWaveSupportInspectionConfirmations, {
+      productCode: params.productCode || firstWaveReadinessBridge?.productCode || "",
+      channel: params.channel || firstWaveReadinessBridge?.channel || ""
+    })
     || null;
   const firstWaveConfirmationChain = initialLaunchOpsReadiness?.firstWaveConfirmationChain
     || initialLaunchOpsReadiness?.traceability?.firstWaveConfirmationChain
@@ -25288,6 +25317,44 @@ function buildFirstWaveSupportInspectionConfirmationPayload(item = null) {
   };
 }
 
+function isDurableFirstWaveSupportInspectionConfirmation(item = null) {
+  if (!item || typeof item !== "object") {
+    return false;
+  }
+  const targetCount = Number(item.targetCount || 0);
+  const inspectedTargetCount = Number(item.inspectedTargetCount || 0);
+  return item.allTargetsConfirmed === true
+    || (targetCount > 0 && inspectedTargetCount >= targetCount)
+    || normalizeDeveloperOpsConfirmationToken(item.supportInspectionStatus, "") === "ready_for_support_inspection";
+}
+
+function selectFirstWaveSupportInspectionConfirmation(confirmations = [], {
+  productCode = "",
+  channel = "",
+  latestReceipt = null
+} = {}) {
+  const items = Array.isArray(confirmations)
+    ? confirmations.filter((item) => item && typeof item === "object")
+    : [];
+  if (!items.length) {
+    return null;
+  }
+  const targetProductCode = String(latestReceipt?.productCode || productCode || "").trim();
+  const targetChannel = String(latestReceipt?.channel || channel || "").trim();
+  const matchesScope = (item) => {
+    const productMatches = !targetProductCode || item.productCode === targetProductCode;
+    const channelMatches = !targetChannel
+      || normalizeChannel(item.channel, "stable") === normalizeChannel(targetChannel, "stable");
+    return productMatches && channelMatches;
+  };
+  const scopedItems = items.filter(matchesScope);
+  return scopedItems.find(isDurableFirstWaveSupportInspectionConfirmation)
+    || scopedItems[0]
+    || items.find(isDurableFirstWaveSupportInspectionConfirmation)
+    || items[0]
+    || null;
+}
+
 function buildSnapshotLatestFirstWaveSupportInspectionConfirmations(auditLogs = [], limit = 5) {
   const confirmations = auditLogs
     .map((item) => {
@@ -25330,9 +25397,7 @@ function buildSnapshotLatestFirstWaveSupportInspectionConfirmations(auditLogs = 
     limit,
     (item) => item?.auditLogId || `${item?.productCode || ""}:${item?.channel || ""}:${item?.confirmedAt || item?.createdAt || ""}`,
     [
-      (item) => item?.allTargetsConfirmed === true,
-      (item) => Number(item?.targetCount || 0) > 0 && Number(item?.inspectedTargetCount || 0) >= Number(item?.targetCount || 0),
-      (item) => item?.supportInspectionStatus === "ready_for_support_inspection"
+      isDurableFirstWaveSupportInspectionConfirmation
     ]
   );
 }
@@ -37164,16 +37229,14 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     const channelMatches = !targetChannel || item.channel === targetChannel;
     return productMatches && channelMatches;
   }) || firstWaveHandoffConfirmations[0] || null;
-  const firstWaveSupportInspectionConfirmation = firstWaveSupportInspectionConfirmations.find((item) => {
-    if (!item || typeof item !== "object") {
-      return false;
+  const firstWaveSupportInspectionConfirmation = selectFirstWaveSupportInspectionConfirmation(
+    firstWaveSupportInspectionConfirmations,
+    {
+      latestReceipt,
+      productCode: scope.productCode || "",
+      channel: scope.channel || ""
     }
-    const targetProductCode = latestReceipt?.productCode || scope.productCode || "";
-    const targetChannel = latestReceipt?.channel || scope.channel || item.channel || "stable";
-    const productMatches = !targetProductCode || item.productCode === targetProductCode;
-    const channelMatches = !targetChannel || normalizeChannel(item.channel, "stable") === normalizeChannel(targetChannel, "stable");
-    return productMatches && channelMatches;
-  }) || firstWaveSupportInspectionConfirmations[0] || null;
+  );
   const firstWaveReadinessBridge = firstWaveReadinessBridges.find((item) => {
     if (!item || typeof item !== "object") {
       return false;
@@ -39332,9 +39395,14 @@ function buildDeveloperOpsFirstWaveRecommendationsPayload({
     ? opsSnapshot.overview.latestLaunchReceipts[0] || null
     : null;
   const firstWaveSupportInspectionConfirmation = readiness.firstWaveSupportInspectionConfirmation
-    || (Array.isArray(opsSnapshot?.overview?.latestFirstWaveSupportInspectionConfirmations)
-      ? opsSnapshot.overview.latestFirstWaveSupportInspectionConfirmations[0] || null
-      : null);
+    || selectFirstWaveSupportInspectionConfirmation(
+      opsSnapshot?.overview?.latestFirstWaveSupportInspectionConfirmations,
+      {
+        latestReceipt: latestLaunchReceipt,
+        productCode,
+        channel
+      }
+    );
   const fallbackFirstRoundDownload = readiness.firstLaunchHandoffDownload
     || opsSnapshot?.mainlineHandoff?.downloads?.firstLaunchHandoff
     || null;

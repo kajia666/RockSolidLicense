@@ -17009,6 +17009,24 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     ));
     assert.ok(supportInspectionOverflowConfirmations[0].allTargetsConfirmed === false);
 
+    const overflowLaunchReviewSummary = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(overflowLaunchReviewSummary.body, /First-Wave Support Inspection Confirmation:/);
+    assert.match(overflowLaunchReviewSummary.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(overflowLaunchReviewSummary.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
+
+    const overflowLaunchSmokeSummary = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTWAVE&channel=stable&format=summary",
+      ownerSession.token
+    );
+    assert.match(overflowLaunchSmokeSummary.body, /First-Wave Support Inspection Confirmation:/);
+    assert.match(overflowLaunchSmokeSummary.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(overflowLaunchSmokeSummary.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE_BETA",

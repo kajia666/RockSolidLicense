@@ -24028,6 +24028,136 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Launch Operations First Operating Result Handoff:[\s\S]*status=ready_for_first_operating_result_handoff \| ready=yes \| current=handoff_first_operating_result[\s\S]*nextDownload=launch-operations-overview-status[\s\S]*blockedBy=-[\s\S]*nextAction=Hand off the first operating result from the shift action plan and keep the launch operations overview attached\./
     );
 
+    const firstOperatingResultHandoffReceiptPayload = firstOperatingResultHandoffAction.operatorAction
+      ?.executionPlan?.receiptPlan?.payload;
+    assert.ok(firstOperatingResultHandoffReceiptPayload);
+    const firstOperatingResultHandoffReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        ...firstOperatingResultHandoffReceiptPayload,
+        note: "first operating result handed off after rollout widening receipt readback"
+      },
+      ownerSession.token
+    );
+    assert.equal(firstOperatingResultHandoffReceipt.version, "developer-ops-steady-state-duty-plan-receipt/v1");
+    assert.equal(firstOperatingResultHandoffReceipt.status, "recorded");
+    assert.equal(firstOperatingResultHandoffReceipt.action, "handoff_first_operating_result");
+    assert.equal(firstOperatingResultHandoffReceipt.intent, "handoff_first_operating_result");
+    assert.equal(firstOperatingResultHandoffReceipt.planKind, "first_operating_result_handoff");
+    assert.equal(firstOperatingResultHandoffReceipt.planMode, "handoff");
+    assert.equal(firstOperatingResultHandoffReceipt.targetType, "steady_state_rollout");
+    assert.equal(
+      firstOperatingResultHandoffReceipt.rolloutWideningDecisionReceiptAuditLogId,
+      rolloutWideningDecisionReceipt.auditLogId
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceipt.firstOperatingResultHandoffStatus,
+      "ready_for_first_operating_result_handoff"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceipt.receiptVisibility.failureRecovery.payload.rolloutWideningDecisionReceiptAuditLogId,
+      rolloutWideningDecisionReceipt.auditLogId
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceipt.receiptVisibility.failureRecovery.payload.firstOperatingResultHandoffStatus,
+      "ready_for_first_operating_result_handoff"
+    );
+    assert.ok(firstOperatingResultHandoffReceipt.auditLogId);
+
+    const firstOperatingResultHandoffReceiptSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const latestFirstOperatingResultHandoffReceipt = firstOperatingResultHandoffReceiptSnapshot.overview
+      .latestSteadyStateDutyPlanReceipts
+      ?.find((item) => item.auditLogId === firstOperatingResultHandoffReceipt.auditLogId);
+    assert.ok(latestFirstOperatingResultHandoffReceipt);
+    assert.equal(latestFirstOperatingResultHandoffReceipt.action, "handoff_first_operating_result");
+    assert.equal(
+      latestFirstOperatingResultHandoffReceipt.rolloutWideningDecisionReceiptAuditLogId,
+      rolloutWideningDecisionReceipt.auditLogId
+    );
+    assert.equal(
+      latestFirstOperatingResultHandoffReceipt.firstOperatingResultHandoffStatus,
+      "ready_for_first_operating_result_handoff"
+    );
+
+    const firstOperatingResultHandoffReceiptReadbackAction = firstOperatingResultHandoffReceiptSnapshot.summary
+      .initialLaunchOpsReadiness.steadyStateDutyActionLinks.firstOperatingResultHandoffReceiptReadbackAction;
+    assert.ok(firstOperatingResultHandoffReceiptReadbackAction);
+    assert.equal(firstOperatingResultHandoffReceiptReadbackAction.status, "recorded_ready_for_first_operating_result_review");
+    assert.equal(firstOperatingResultHandoffReceiptReadbackAction.ready, true);
+    assert.equal(firstOperatingResultHandoffReceiptReadbackAction.receiptRecorded, true);
+    assert.equal(firstOperatingResultHandoffReceiptReadbackAction.auditLogId, firstOperatingResultHandoffReceipt.auditLogId);
+    assert.equal(firstOperatingResultHandoffReceiptReadbackAction.currentActionKey, "review_first_operating_result_handoff");
+    assert.equal(firstOperatingResultHandoffReceiptReadbackAction.nextDownloadFormat, "launch-operations-overview-status");
+    assert.equal(
+      firstOperatingResultHandoffReceiptReadbackAction.rolloutWideningDecisionReceiptAuditLogId,
+      rolloutWideningDecisionReceipt.auditLogId
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptReadbackAction.firstOperatingResultHandoffStatus,
+      "ready_for_first_operating_result_handoff"
+    );
+    assert.deepEqual(firstOperatingResultHandoffReceiptReadbackAction.blockedBy, []);
+
+    const firstOperatingResultHandoffReceiptDailyBrief = firstOperatingResultHandoffReceiptSnapshot.summary
+      .initialLaunchOpsReadiness.launchOperationsDailyBrief.firstOperatingResultHandoffReceiptReadbackAction;
+    assert.ok(firstOperatingResultHandoffReceiptDailyBrief);
+    assert.equal(firstOperatingResultHandoffReceiptDailyBrief.auditLogId, firstOperatingResultHandoffReceipt.auditLogId);
+    assert.equal(firstOperatingResultHandoffReceiptDailyBrief.currentActionKey, "review_first_operating_result_handoff");
+
+    const firstOperatingResultHandoffReceiptShiftPlan = firstOperatingResultHandoffReceiptSnapshot.summary
+      .initialLaunchOpsReadiness.launchOperationsShiftActionPlan.firstOperatingResultHandoffReceiptReadbackAction;
+    assert.ok(firstOperatingResultHandoffReceiptShiftPlan);
+    assert.equal(firstOperatingResultHandoffReceiptShiftPlan.auditLogId, firstOperatingResultHandoffReceipt.auditLogId);
+    assert.equal(firstOperatingResultHandoffReceiptShiftPlan.nextDownloadFormat, "launch-operations-overview-status");
+
+    const firstOperatingResultHandoffReceiptOverview = firstOperatingResultHandoffReceiptSnapshot.summary
+      .initialLaunchOpsReadiness.launchOperationsOverviewStatus;
+    assert.ok(firstOperatingResultHandoffReceiptOverview.firstOperatingResultHandoffReceiptReadbackAction);
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultHandoffReceiptReadbackAction.auditLogId,
+      firstOperatingResultHandoffReceipt.auditLogId
+    );
+    assert.ok(firstOperatingResultHandoffReceiptOverview.panels.some((item) => (
+      item.key === "first_operating_result_handoff_receipt"
+      && item.status === "recorded_ready_for_first_operating_result_review"
+      && item.ready === true
+      && item.fileName === "developer-ops-launch-operations-overview-status.txt"
+      && /format=launch-operations-overview-status/.test(item.href || "")
+    )));
+
+    const firstOperatingResultHandoffReceiptActionLinksDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=steady-state-duty-action-links",
+      ownerSession.token
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptActionLinksDownload.body,
+      new RegExp(`firstOperatingResultHandoffReceiptReadback=recorded_ready_for_first_operating_result_review \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId}`)
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptActionLinksDownload.body,
+      /firstOperatingResultHandoffReceiptNext=review_first_operating_result_handoff \| nextDownload=launch-operations-overview-status/
+    );
+
+    const firstOperatingResultHandoffReceiptOverviewStatusDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-overview-status",
+      ownerSession.token
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
+      new RegExp(`firstOperatingResultHandoffReceiptReadback=recorded_ready_for_first_operating_result_review \\| current=review_first_operating_result_handoff \\| audit=${firstOperatingResultHandoffReceipt.auditLogId}`)
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
+      /Panels:[\s\S]*- first_operating_result_handoff_receipt[^\n]*status=recorded_ready_for_first_operating_result_review[^\n]*ready=yes[^\n]*file=developer-ops-launch-operations-overview-status\.txt/
+    );
+
     const launchOperationsChecksumsDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=checksums",

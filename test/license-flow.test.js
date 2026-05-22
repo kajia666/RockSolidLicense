@@ -17088,6 +17088,26 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchMainlineRuntimeEvidence.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
     assert.match(overflowLaunchMainlineRuntimeEvidence.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 
+    const overflowLaunchMainline = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=FIRSTWAVE&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    const overflowLaunchMainlineRuntimeEvidenceCard = overflowLaunchMainline.mainlineSummary.overviewCards.find((item) =>
+      item.key === "first_wave_runtime_evidence"
+    );
+    assert.ok(overflowLaunchMainlineRuntimeEvidenceCard);
+    assert.equal(
+      overflowLaunchMainlineRuntimeEvidenceCard.controls.some((control) =>
+        control.recommendedDownload?.key === "launch_mainline_first_wave_runtime_evidence"
+      ),
+      true
+    );
+    assert.ok(overflowLaunchMainline.mainlineSummary.recommendedDownloads.some((item) =>
+      item.key === "launch_mainline_first_wave_runtime_evidence"
+      && item.format === "first-wave-runtime-evidence"
+    ));
+
     const overflowLaunchMainlineRoutes = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=handoff-download-routes",

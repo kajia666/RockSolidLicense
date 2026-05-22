@@ -14790,24 +14790,8 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     && typeof opsOverview.firstWaveRuntimeEvidence === "object"
     ? { ...opsOverview.firstWaveRuntimeEvidence }
     : null;
-  const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidence
-    ? createLaunchWorkflowWorkspaceShortcut(
-        "ops",
-        "sessions",
-        "Review First-Wave Runtime Evidence",
-        {
-          ...params,
-          reviewMode: "matched"
-        }
-      )
-    : null;
-  const firstWaveRuntimeEvidenceDownload = firstWaveRuntimeEvidence
-    ? createLaunchMainlineDownloadShortcut(
-        "First-wave runtime evidence",
-        "first-wave-runtime-evidence.txt",
-        "first-wave-runtime-evidence",
-        params
-      )
+  const latestLaunchReceipt = Array.isArray(opsOverview.latestLaunchReceipts)
+    ? opsOverview.latestLaunchReceipts[0] || null
     : null;
   const opsPrimaryDownload = createOpsMainlineDownload(opsRouteReview.downloads?.primary || null);
   const opsRemainingDownload = createOpsMainlineDownload(opsRouteReview.downloads?.remaining || null);
@@ -14828,10 +14812,31 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     : [];
   const firstWaveSupportInspectionConfirmation = initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
     || selectFirstWaveSupportInspectionConfirmation(opsOverviewFirstWaveSupportInspectionConfirmations, {
-      productCode: params.productCode || firstWaveReadinessBridge?.productCode || "",
-      channel: params.channel || firstWaveReadinessBridge?.channel || ""
+      latestReceipt: latestLaunchReceipt,
+      productCode: params.productCode || latestLaunchReceipt?.productCode || "",
+      channel: params.channel || latestLaunchReceipt?.channel || ""
     })
     || null;
+  const firstWaveRuntimeEvidenceSource = firstWaveRuntimeEvidence || firstWaveSupportInspectionConfirmation || null;
+  const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidenceSource
+    ? createLaunchWorkflowWorkspaceShortcut(
+        "ops",
+        "sessions",
+        "Review First-Wave Runtime Evidence",
+        {
+          ...params,
+          reviewMode: "matched"
+        }
+      )
+    : null;
+  const firstWaveRuntimeEvidenceDownload = firstWaveRuntimeEvidenceSource
+    ? createLaunchMainlineDownloadShortcut(
+        "First-wave runtime evidence",
+        "first-wave-runtime-evidence.txt",
+        "first-wave-runtime-evidence",
+        params
+      )
+    : null;
   const firstWaveConfirmationChain = initialLaunchOpsReadiness?.firstWaveConfirmationChain
     || initialLaunchOpsReadiness?.traceability?.firstWaveConfirmationChain
     || firstWaveHandoffConfirmation?.firstWaveConfirmationChain
@@ -16792,13 +16797,18 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         } : null
       ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
     : [];
-  const firstWaveRuntimeEvidenceHeroControls = firstWaveRuntimeEvidence
+  const firstWaveRuntimeEvidenceReady = firstWaveRuntimeEvidence?.ready === true
+    || firstWaveSupportInspectionConfirmation?.allTargetsConfirmed === true
+    || normalizeDeveloperOpsConfirmationToken(firstWaveSupportInspectionConfirmation?.supportInspectionStatus, "") === "ready_for_support_inspection";
+  const firstWaveRuntimeEvidenceHeroControls = firstWaveRuntimeEvidenceSource
     ? [
         firstWaveRuntimeEvidenceWorkspaceAction ? {
           kind: "workspace",
-          label: firstWaveRuntimeEvidence.ready === true
+          label: firstWaveRuntimeEvidence?.ready === true
             ? "Review Recorded Runtime Evidence"
-            : "Review Runtime Evidence Status",
+            : firstWaveSupportInspectionConfirmation
+              ? "Review Support Inspection Evidence"
+              : "Review Runtime Evidence Status",
           workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction
         } : null,
         firstWaveRuntimeEvidenceDownload ? {
@@ -17176,6 +17186,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(productionHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(operationsHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstLaunchHandoffDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstWaveRuntimeEvidenceDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(initialLaunchOpsOverviewStatusDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(preStagingReadinessSelfCheck?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateHandoffLanding?.recommendedDownload || null, params));
@@ -17348,44 +17359,69 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.workspaceAction?.key || item?.recommendedDownload?.key)
       }
     : null;
-  const firstWaveRuntimeEvidenceCard = firstWaveRuntimeEvidence
+  const firstWaveRuntimeEvidenceCard = firstWaveRuntimeEvidenceSource
     ? {
         key: "first_wave_runtime_evidence",
         title: "First-Wave Runtime Evidence",
-        summary: firstWaveRuntimeEvidence.summary
-          || `Runtime evidence status is ${firstWaveRuntimeEvidence.status || "unknown"}.`,
-        tags: [
-          {
-            label: "status",
-            value: firstWaveRuntimeEvidence.status || "unknown",
-            strong: true
-          },
-          {
-            label: "ready",
-            value: firstWaveRuntimeEvidence.ready === true,
-            strong: true
-          },
-          {
-            label: "sessions",
-            value: firstWaveRuntimeEvidence.activeSessionCount ?? 0,
-            strong: false
-          },
-          {
-            label: "logins",
-            value: firstWaveRuntimeEvidence.loginAuditCount ?? 0,
-            strong: false
-          },
-          {
-            label: "cardRedemptions",
-            value: firstWaveRuntimeEvidence.cardRedemptionAuditCount ?? 0,
-            strong: false
-          },
-          {
-            label: "heartbeatSeen",
-            value: firstWaveRuntimeEvidence.heartbeatSeenCount ?? 0,
-            strong: false
-          }
-        ],
+        summary: firstWaveRuntimeEvidence?.summary
+          || (firstWaveSupportInspectionConfirmation
+            ? "First-wave support inspection confirmation is ready for runtime evidence handoff."
+            : `Runtime evidence status is ${firstWaveRuntimeEvidence?.status || "unknown"}.`),
+        tags: firstWaveRuntimeEvidence
+          ? [
+              {
+                label: "status",
+                value: firstWaveRuntimeEvidence.status || "unknown",
+                strong: true
+              },
+              {
+                label: "ready",
+                value: firstWaveRuntimeEvidence.ready === true,
+                strong: true
+              },
+              {
+                label: "sessions",
+                value: firstWaveRuntimeEvidence.activeSessionCount ?? 0,
+                strong: false
+              },
+              {
+                label: "logins",
+                value: firstWaveRuntimeEvidence.loginAuditCount ?? 0,
+                strong: false
+              },
+              {
+                label: "cardRedemptions",
+                value: firstWaveRuntimeEvidence.cardRedemptionAuditCount ?? 0,
+                strong: false
+              },
+              {
+                label: "heartbeatSeen",
+                value: firstWaveRuntimeEvidence.heartbeatSeenCount ?? 0,
+                strong: false
+              }
+            ]
+          : [
+              {
+                label: "status",
+                value: firstWaveSupportInspectionConfirmation?.supportInspectionStatus || "unknown",
+                strong: true
+              },
+              {
+                label: "ready",
+                value: firstWaveRuntimeEvidenceReady,
+                strong: true
+              },
+              {
+                label: "support",
+                value: firstWaveSupportInspectionConfirmation?.supportInspectionStatus || "unknown",
+                strong: false
+              },
+              {
+                label: "targets",
+                value: `${firstWaveSupportInspectionConfirmation?.inspectedTargetCount ?? 0}/${firstWaveSupportInspectionConfirmation?.targetCount ?? 0}`,
+                strong: false
+              }
+            ],
         controls: [
           firstWaveRuntimeEvidenceWorkspaceAction ? ensureLaunchMainlineControlHrefs({
             kind: "workspace",

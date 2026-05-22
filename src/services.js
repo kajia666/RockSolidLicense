@@ -15346,6 +15346,21 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.firstOperatingResultHandoffAction,
     initialLaunchOpsReadiness?.launchOperationsDailyBrief?.firstOperatingResultHandoffAction
   ].find((item) => item && typeof item === "object") || null;
+  const firstOperatingResultHandoffReceiptReadbackActionSources = [
+    initialLaunchOpsReadiness?.launchOperationsShiftActionPlan?.firstOperatingResultHandoffReceiptReadbackAction,
+    initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.firstOperatingResultHandoffReceiptReadbackAction,
+    initialLaunchOpsReadiness?.launchOperationsDailyBrief?.firstOperatingResultHandoffReceiptReadbackAction,
+    launchOperationsOperatorEntry?.firstOperatingResultHandoffAction?.receiptReadbackAction
+  ];
+  const firstOperatingResultHandoffReceiptReadbackAction = firstOperatingResultHandoffReceiptReadbackActionSources.find((item) => (
+    item
+    && typeof item === "object"
+    && (
+      item.receiptRecorded === true
+      || String(item.status || "").startsWith("recorded_")
+      || String(item.status || "").startsWith("ready_")
+    )
+  )) || firstOperatingResultHandoffReceiptReadbackActionSources.find((item) => item && typeof item === "object") || null;
   const firstOperatingResultHandoffOperatorOrder = firstOperatingResultHandoffSource
     ? [
         firstOperatingResultHandoffSource.nextAction
@@ -15433,6 +15448,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           || "Hand off the first operating result from Launch Mainline after the rollout widening receipt is recorded."
       }
     : null;
+  if (firstOperatingResultHandoffAction && !firstOperatingResultHandoffAction.receiptReadbackAction) {
+    firstOperatingResultHandoffAction.receiptReadbackAction = firstOperatingResultHandoffReceiptReadbackAction;
+  }
   const stagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations
     || (Array.isArray(launchDutyActionOrder?.steps)
       ? launchDutyActionOrder.steps.find((item) => item?.key === "staging_archive")?.nextOperations
@@ -18730,6 +18748,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     steadyStateDutyReceiptReview,
     rolloutWideningDecisionAction,
     firstOperatingResultHandoffAction,
+    firstOperatingResultHandoffReceiptReadbackAction,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -25985,7 +26004,7 @@ function buildDeveloperOpsReceiptVisibilitySummary(latestSteadyStateDutyPlanRece
 }
 
 function buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs = [], limit = 5) {
-  return auditLogs
+  const receipts = auditLogs
     .map((item) => {
       const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
       const eventType = item?.eventType || item?.event_type || "";
@@ -26024,8 +26043,27 @@ function buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs = [], limit = 
       });
     })
     .filter(Boolean)
-    .sort((left, right) => snapshotDateMs(right.recordedAt || right.createdAt) - snapshotDateMs(left.recordedAt || left.createdAt))
-    .slice(0, Math.max(1, Number(limit || 5)));
+    .sort((left, right) => snapshotDateMs(right.recordedAt || right.createdAt) - snapshotDateMs(left.recordedAt || left.createdAt));
+  const selected = receipts.slice(0, Math.max(1, Number(limit || 5)));
+  const seen = new Set(selected.map((item) => item.auditLogId || item.id || `${item.action}:${item.recordedAt || item.createdAt}`));
+  const appendFirstMatch = (predicate = null) => {
+    if (typeof predicate !== "function") {
+      return;
+    }
+    const match = receipts.find((item) => predicate(item));
+    const key = match ? match.auditLogId || match.id || `${match.action}:${match.recordedAt || match.createdAt}` : "";
+    if (!match || !key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    selected.push(match);
+  };
+  appendFirstMatch(isSteadyStateDutyPlanRolloutWideningDecisionReceipt);
+  appendFirstMatch(isSteadyStateDutyPlanFirstOperatingResultHandoffReceipt);
+  appendFirstMatch(isSteadyStateDutyPlanPostSignoffArchiveReceipt);
+  appendFirstMatch((item) => getLaunchDutyRecordIndexStateProgressScore(item).hasState);
+  appendFirstMatch((item) => getLaunchDutyPacketReviewStateProgressScore(item).hasState);
+  return selected;
 }
 
 function getLaunchDutyRecordIndexStateProgressScore(receipt = null) {

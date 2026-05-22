@@ -27596,6 +27596,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateHandoff.summaryText,
       /Mainline Recommended Downloads:[\s\S]*Launch duty steady-state handoff[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
     );
+    assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.firstOperatingResultHandoffAction?.receiptReadbackAction);
+    assert.equal(
+      launchMainlineSteadyStateHandoff.mainlineSummary.firstOperatingResultHandoffAction.receiptReadbackAction.status,
+      "recorded_ready_for_first_operating_result_review"
+    );
+    assert.equal(
+      launchMainlineSteadyStateHandoff.mainlineSummary.firstOperatingResultHandoffAction.receiptReadbackAction.currentActionKey,
+      "review_first_operating_result_handoff"
+    );
+    assert.equal(
+      launchMainlineSteadyStateHandoff.mainlineSummary.firstOperatingResultHandoffAction.receiptReadbackAction.auditLogId,
+      firstOperatingResultHandoffReceipt.auditLogId
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      new RegExp(
+        `Launch Mainline First Operating Result Handoff:[\\s\\S]*receiptReadback=recorded_ready_for_first_operating_result_review \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| nextDownload=launch-operations-overview-status`
+      )
+    );
     const launchMainlineSteadyStateRoutesDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
@@ -27697,6 +27716,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateRoutesDownload.body,
       /Pre-Staging Readiness Self-Check Route:[\s\S]*2\. readiness_refresh \| status=current \| command=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
     );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      new RegExp(
+        `First Operating Result Handoff Route:[\\s\\S]*receiptReadback=recorded_ready_for_first_operating_result_review \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| nextDownload=launch-operations-overview-status`
+      )
+    );
     const launchMainlineSteadyStatePostLaunchIndexDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -27797,6 +27822,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Included Handoff Files:[\s\S]*Pre-staging readiness self-check: ops\/pre-staging-readiness-self-check\.txt/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      new RegExp(
+        `First Operating Result Handoff:[\\s\\S]*receiptReadback=recorded_ready_for_first_operating_result_review \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| nextDownload=launch-operations-overview-status`
+      )
     );
 
     const forbiddenExport = await getJsonExpectError(

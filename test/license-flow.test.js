@@ -17099,6 +17099,30 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchMainlineZipText, /First-Wave Support Inspection Confirmation:/);
     assert.match(overflowLaunchMainlineZipText, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 
+    const overflowOpsRuntimeEvidence = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&channel=stable&format=first-wave-runtime-evidence",
+      operatorSession.token
+    );
+    assert.match(overflowOpsRuntimeEvidence.body, /First-Wave Support Inspection Confirmation:/);
+    assert.match(overflowOpsRuntimeEvidence.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(overflowOpsRuntimeEvidence.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
+
+    const overflowOpsChecksums = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&channel=stable&format=checksums",
+      operatorSession.token
+    );
+    assert.match(overflowOpsChecksums.body, /first-wave-runtime-evidence\.txt/);
+    const overflowOpsZip = await getBinary(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&channel=stable&format=zip",
+      operatorSession.token
+    );
+    const overflowOpsZipText = overflowOpsZip.body.toString("latin1");
+    assert.match(overflowOpsZipText, /First-Wave Support Inspection Confirmation:/);
+    assert.match(overflowOpsZipText, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE_BETA",

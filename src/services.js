@@ -23202,6 +23202,14 @@ function buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload = {}) {
     && typeof payload.overview.firstWaveRuntimeEvidence === "object"
     ? payload.overview.firstWaveRuntimeEvidence
     : null;
+  const supportInspectionConfirmation = payload.summary?.initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
+    || selectFirstWaveSupportInspectionConfirmation(
+      payload.overview?.latestFirstWaveSupportInspectionConfirmations,
+      {
+        productCode: scope.productCode || evidence?.productCode || project.code || "",
+        channel: scope.channel || evidence?.channel || ""
+      }
+    );
   const lines = [
     "RockSolid Developer Ops First-Wave Runtime Evidence",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -23214,6 +23222,10 @@ function buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload = {}) {
     appendFirstWaveRuntimeEvidenceLines(lines, {
       firstWaveRuntimeEvidence: evidence
     });
+    if (supportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, supportInspectionConfirmation);
+    }
     lines.push("");
     lines.push("Operator Notes:");
     lines.push("- Use this file as the Developer Ops source-of-truth runtime evidence handoff.");
@@ -23223,6 +23235,10 @@ function buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload = {}) {
     lines.push("First-Wave Runtime Evidence:");
     lines.push("- status=not_recorded | ready=false");
     lines.push("- summary=Run the first real card-login path and heartbeat before using this evidence handoff.");
+    if (supportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, supportInspectionConfirmation);
+    }
   }
   return lines.join("\n").trimEnd();
 }

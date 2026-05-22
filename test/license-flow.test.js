@@ -17045,6 +17045,15 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchSmokeRuntimeEvidence.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
     assert.match(overflowLaunchSmokeRuntimeEvidence.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 
+    const overflowLaunchMainlineRuntimeEvidence = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=first-wave-runtime-evidence",
+      ownerSession.token
+    );
+    assert.match(overflowLaunchMainlineRuntimeEvidence.body, /First-Wave Support Inspection Confirmation:/);
+    assert.match(overflowLaunchMainlineRuntimeEvidence.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(overflowLaunchMainlineRuntimeEvidence.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE_BETA",

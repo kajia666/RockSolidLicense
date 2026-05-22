@@ -20900,6 +20900,10 @@ function buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload = {}) 
     && typeof payload.mainlineSummary.firstWaveRuntimeEvidence === "object"
     ? payload.mainlineSummary.firstWaveRuntimeEvidence
     : null;
+  const supportInspectionConfirmation = payload.mainlineSummary?.firstWaveSupportInspectionConfirmation
+    && typeof payload.mainlineSummary.firstWaveSupportInspectionConfirmation === "object"
+      ? payload.mainlineSummary.firstWaveSupportInspectionConfirmation
+      : null;
   const lines = [
     "RockSolid Developer Launch Mainline First-Wave Runtime Evidence",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -20912,6 +20916,10 @@ function buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload = {}) 
     appendFirstWaveRuntimeEvidenceLines(lines, {
       firstWaveRuntimeEvidence: evidence
     });
+    if (supportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, supportInspectionConfirmation);
+    }
     lines.push("");
     lines.push("Operator Notes:");
     lines.push("- Use this file to review first real-user runtime evidence without reopening Developer Ops.");
@@ -20921,6 +20929,10 @@ function buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload = {}) 
     lines.push("First-Wave Runtime Evidence:");
     lines.push("- status=not_recorded | ready=false");
     lines.push("- summary=Run the first real card-login path and heartbeat before using this evidence handoff.");
+    if (supportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, supportInspectionConfirmation);
+    }
   }
   return lines.join("\n").trimEnd();
 }

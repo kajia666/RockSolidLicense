@@ -24737,7 +24737,7 @@ function latestSnapshotTimestamp(values = []) {
 
 function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = null) {
   const normalizedChannel = channel ? normalizeChannel(channel, "stable") : null;
-  return auditLogs
+  const receipts = auditLogs
     .map((item) => {
       const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
       const receipt = metadata.launchReceipt && typeof metadata.launchReceipt === "object"
@@ -24889,8 +24889,62 @@ function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = 
       }
       return normalizeChannel(item.channel, "stable") === normalizedChannel;
     })
-    .sort((left, right) => snapshotDateMs(right.createdAt || right.handoffGeneratedAt) - snapshotDateMs(left.createdAt || left.handoffGeneratedAt))
-    .slice(0, Math.max(1, Number(limit || 5)));
+    .sort((left, right) => snapshotDateMs(right.createdAt || right.handoffGeneratedAt) - snapshotDateMs(left.createdAt || left.handoffGeneratedAt));
+  const selected = receipts.slice(0, Math.max(1, Number(limit || 5)));
+  const seen = new Set(selected.map((item) => item.auditLogId || `${item.operation}:${item.createdAt || item.handoffGeneratedAt}`));
+  const appendFirstMatch = (predicate = null) => {
+    if (typeof predicate !== "function") {
+      return;
+    }
+    const match = receipts.find((item) => predicate(item));
+    const key = match ? match.auditLogId || `${match.operation}:${match.createdAt || match.handoffGeneratedAt}` : "";
+    if (!match || !key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    selected.push(match);
+  };
+  const durableOperations = [
+    "bootstrap",
+    "first_batch_setup",
+    "record_launch_rehearsal_run",
+    "record_deploy_verification",
+    "record_health_verification",
+    "record_backup_verification",
+    "record_recovery_drill",
+    "record_operations_walkthrough",
+    "record_rollback_walkthrough",
+    "record_cutover_walkthrough",
+    "record_launch_day_readiness_review",
+    "record_post_launch_ops_sweep",
+    "record_launch_closeout_review",
+    "record_launch_stabilization_review"
+  ];
+  for (const operation of durableOperations) {
+    appendFirstMatch((item) => item.operation === operation);
+  }
+  appendFirstMatch((item) => (
+    item.firstLaunchDutyActionCount !== null
+    || item.firstLaunchDutyPrimaryDownloadKey
+    || item.firstLaunchDutyDeliveryExportStatus
+  ));
+  appendFirstMatch((item) => (
+    item.postLaunchLifecycleStatus
+    || item.postLaunchLifecycleNextOperation
+    || item.postLaunchLifecyclePrimaryDownloadKey
+  ));
+  appendFirstMatch((item) => (
+    item.operationalReadinessStatus
+    || item.operationalReadinessNextOperation
+    || item.operationalReadinessPrimaryDownloadKey
+  ));
+  appendFirstMatch((item) => (
+    item.launchReadinessNextGateStatus
+    || item.launchReadinessNextGateCurrentGate
+    || item.launchReadinessNextGateLaunchDutyRecordIndexPath
+  ));
+  appendFirstMatch((item) => item.launchOpsOverviewContext);
+  return selected;
 }
 
 function buildStabilizationHandoffConfirmationPayload(item = null) {

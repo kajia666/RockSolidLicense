@@ -28136,6 +28136,48 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineRouteReviewZipText, /recordWriteSteps/);
     assert.match(launchMainlineRouteReviewZipText, /review_staging_packet_results/);
     assert.match(launchMainlineRouteReviewZipText, /verify_launch_duty_record_writes/);
+
+    const launchReceiptOverflowOperations = [
+      "record_launch_rehearsal_run",
+      "record_deploy_verification",
+      "record_health_verification",
+      "record_backup_verification",
+      "record_recovery_drill",
+      "record_cutover_walkthrough"
+    ];
+    for (const operation of launchReceiptOverflowOperations) {
+      const overflowAction = await postJson(
+        baseUrl,
+        "/api/developer/launch-mainline/action",
+        {
+          productCode: "EXPORT_ALPHA",
+          channel: "stable",
+          operation
+        },
+        ownerSession.token
+      );
+      assert.equal(overflowAction.receipt?.operation, operation);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+
+    const launchReceiptOverflowSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_ALPHA&channel=stable&limit=80",
+      operatorSession.token
+    );
+    const launchReceiptOverflowOperationsSeen = launchReceiptOverflowSnapshot.overview?.latestLaunchReceipts
+      ?.map((item) => item.operation)
+      .filter(Boolean) || [];
+    assert.ok(launchReceiptOverflowOperationsSeen.length > 5);
+    assert.ok(launchReceiptOverflowOperationsSeen.includes("record_post_launch_ops_sweep"));
+    assert.ok(launchReceiptOverflowOperationsSeen.includes("record_cutover_walkthrough"));
+    const retainedPostLaunchOpsSweepReceipt = launchReceiptOverflowSnapshot.overview?.latestLaunchReceipts?.find((item) =>
+      item.operation === "record_post_launch_ops_sweep"
+    );
+    assert.ok(retainedPostLaunchOpsSweepReceipt);
+    assert.equal(retainedPostLaunchOpsSweepReceipt.handoffFileName, latestLaunchReceipt.handoffFileName);
+    assert.equal(retainedPostLaunchOpsSweepReceipt.postLaunchLifecycleNextOperation, latestLaunchReceipt.postLaunchLifecycleNextOperation);
+    assert.equal(retainedPostLaunchOpsSweepReceipt.operationalReadinessNextOperation, latestLaunchReceipt.operationalReadinessNextOperation);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

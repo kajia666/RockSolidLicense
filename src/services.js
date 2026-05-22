@@ -24735,6 +24735,34 @@ function latestSnapshotTimestamp(values = []) {
   return latest;
 }
 
+function selectLatestSnapshotWindowWithDurableMatches(items = [], limit = 5, keyFn = null, predicates = []) {
+  const normalizedLimit = Math.max(1, Number(limit || 5));
+  const selected = items.slice(0, normalizedLimit);
+  const keyFor = (item = null) => {
+    if (typeof keyFn === "function") {
+      return String(keyFn(item) || "");
+    }
+    return String(item?.auditLogId || item?.id || item?.createdAt || "");
+  };
+  const seen = new Set(selected.map(keyFor).filter(Boolean));
+  const appendFirstMatch = (predicate = null) => {
+    if (typeof predicate !== "function") {
+      return;
+    }
+    const match = items.find((item) => predicate(item));
+    const key = keyFor(match);
+    if (!match || !key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    selected.push(match);
+  };
+  for (const predicate of Array.isArray(predicates) ? predicates : []) {
+    appendFirstMatch(predicate);
+  }
+  return selected;
+}
+
 function buildSnapshotLatestLaunchReceipts(auditLogs = [], limit = 5, channel = null) {
   const normalizedChannel = channel ? normalizeChannel(channel, "stable") : null;
   const receipts = auditLogs
@@ -24989,7 +25017,7 @@ function buildStabilizationHandoffConfirmationPayload(item = null) {
 }
 
 function buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs = [], limit = 5) {
-  return auditLogs
+  const confirmations = auditLogs
     .map((item) => {
       const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
       const eventType = item?.eventType || item?.event_type || "";
@@ -25023,8 +25051,16 @@ function buildSnapshotLatestStabilizationHandoffConfirmations(auditLogs = [], li
       });
     })
     .filter(Boolean)
-    .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt))
-    .slice(0, Math.max(1, Number(limit || 5)));
+    .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt));
+  return selectLatestSnapshotWindowWithDurableMatches(
+    confirmations,
+    limit,
+    (item) => item?.auditLogId || `${item?.productCode || ""}:${item?.channel || ""}:${item?.confirmedAt || item?.createdAt || ""}`,
+    [
+      (item) => item?.status === "confirmed" && item?.decision === "confirmed" && item?.launchOpsOverviewContext,
+      (item) => item?.status === "confirmed" && item?.decision === "confirmed"
+    ]
+  );
 }
 
 function buildFirstWaveHandoffConfirmationPayload(item = null) {
@@ -25101,7 +25137,7 @@ function buildFirstWaveHandoffConfirmationPayload(item = null) {
 }
 
 function buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs = [], limit = 5) {
-  return auditLogs
+  const confirmations = auditLogs
     .map((item) => {
       const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
       const eventType = item?.eventType || item?.event_type || "";
@@ -25133,8 +25169,17 @@ function buildSnapshotLatestFirstWaveHandoffConfirmations(auditLogs = [], limit 
       });
     })
     .filter(Boolean)
-    .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt))
-    .slice(0, Math.max(1, Number(limit || 5)));
+    .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt));
+  return selectLatestSnapshotWindowWithDurableMatches(
+    confirmations,
+    limit,
+    (item) => item?.auditLogId || `${item?.productCode || ""}:${item?.channel || ""}:${item?.confirmedAt || item?.createdAt || ""}`,
+    [
+      (item) => item?.firstWaveConfirmationChain?.allSegmentsConfirmed === true,
+      (item) => item?.postLaunchLifecycleHandoff,
+      (item) => item?.sourceRecommendation?.latestLaunchReceiptOperation
+    ]
+  );
 }
 
 const FIRST_WAVE_SUPPORT_INSPECTION_TARGET_KEYS = [
@@ -25244,7 +25289,7 @@ function buildFirstWaveSupportInspectionConfirmationPayload(item = null) {
 }
 
 function buildSnapshotLatestFirstWaveSupportInspectionConfirmations(auditLogs = [], limit = 5) {
-  return auditLogs
+  const confirmations = auditLogs
     .map((item) => {
       const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
       const eventType = item?.eventType || item?.event_type || "";
@@ -25279,8 +25324,17 @@ function buildSnapshotLatestFirstWaveSupportInspectionConfirmations(auditLogs = 
       });
     })
     .filter(Boolean)
-    .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt))
-    .slice(0, Math.max(1, Number(limit || 5)));
+    .sort((left, right) => snapshotDateMs(right.confirmedAt || right.createdAt) - snapshotDateMs(left.confirmedAt || left.createdAt));
+  return selectLatestSnapshotWindowWithDurableMatches(
+    confirmations,
+    limit,
+    (item) => item?.auditLogId || `${item?.productCode || ""}:${item?.channel || ""}:${item?.confirmedAt || item?.createdAt || ""}`,
+    [
+      (item) => item?.allTargetsConfirmed === true,
+      (item) => Number(item?.targetCount || 0) > 0 && Number(item?.inspectedTargetCount || 0) >= Number(item?.targetCount || 0),
+      (item) => item?.supportInspectionStatus === "ready_for_support_inspection"
+    ]
+  );
 }
 
 function appendFirstWaveSupportInspectionConfirmationLines(lines = [], confirmation = null, {
@@ -25493,7 +25547,7 @@ function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
 
 function buildSnapshotLatestFirstWaveReadinessBridges(auditLogs = [], limit = 5, channel = null) {
   const normalizedChannel = channel ? normalizeChannel(channel, "stable") : null;
-  return auditLogs
+  const bridges = auditLogs
     .map((item) => {
       const metadata = item?.metadata && typeof item.metadata === "object" ? item.metadata : {};
       const eventType = item?.eventType || item?.event_type || "";
@@ -25526,8 +25580,18 @@ function buildSnapshotLatestFirstWaveReadinessBridges(auditLogs = [], limit = 5,
       }
       return normalizeChannel(item.channel, "stable") === normalizedChannel;
     })
-    .sort((left, right) => snapshotDateMs(right.createdAt) - snapshotDateMs(left.createdAt))
-    .slice(0, Math.max(1, Number(limit || 5)));
+    .sort((left, right) => snapshotDateMs(right.createdAt) - snapshotDateMs(left.createdAt));
+  return selectLatestSnapshotWindowWithDurableMatches(
+    bridges,
+    limit,
+    (item) => item?.auditLogId || `${item?.productCode || ""}:${item?.channel || ""}:${item?.createdAt || ""}`,
+    [
+      (item) => item?.status === "ready_for_first_wave_handoff",
+      (item) => item?.operatingChain?.status && item.operatingChain.status !== "unknown",
+      (item) => item?.supportInspectionPlan?.status === "ready_for_support_inspection",
+      (item) => item?.latestLaunchReceipt?.operation
+    ]
+  );
 }
 
 const LAUNCH_DUTY_RECORD_INDEX_SEQUENCE = [
@@ -64251,6 +64315,14 @@ export function createServices(db, config, runtimeState = null, mainStore = null
             productCodes: scopedProductCodes
           })
         : { items: [] };
+      const firstWaveSupportInspectionAuditLogs = shouldBackfillProtectiveAuditRows
+        ? queryAuditLogRows(db, {
+            eventType: "developer.ops.first-wave.support-inspection.confirm",
+            limit: 10,
+            developerId: null,
+            productCodes: scopedProductCodes
+          })
+        : { items: [] };
       const stabilizationHandoffConfirmationAuditLogs = shouldBackfillProtectiveAuditRows
         ? queryAuditLogRows(db, {
             eventType: "developer.ops.stabilization-handoff.confirm",
@@ -64301,6 +64373,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       if (firstWaveReadinessAuditLogs.items?.length) {
         mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveReadinessAuditLogs.items);
       }
+      if (firstWaveSupportInspectionAuditLogs.items?.length) {
+        mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, firstWaveSupportInspectionAuditLogs.items);
+      }
       if (stabilizationHandoffConfirmationAuditLogs.items?.length) {
         mergedAuditLogItems = mergeAuditLogRows(mergedAuditLogItems, stabilizationHandoffConfirmationAuditLogs.items);
       }
@@ -64319,6 +64394,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const usedProtectiveAuditBackfill = launchReceiptAuditLogs.items?.length
         || firstWaveHandoffAuditLogs.items?.length
         || firstWaveReadinessAuditLogs.items?.length
+        || firstWaveSupportInspectionAuditLogs.items?.length
         || stabilizationHandoffConfirmationAuditLogs.items?.length
         || steadyStateDutyPlanReceiptAuditLogs.items?.length
         || firstWaveRuntimeLoginAuditLogs.items?.length
@@ -64334,6 +64410,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
               launchReceiptBackfill: launchReceiptAuditLogs.items?.length || 0,
               firstWaveHandoffBackfill: firstWaveHandoffAuditLogs.items?.length || 0,
               firstWaveReadinessBackfill: firstWaveReadinessAuditLogs.items?.length || 0,
+              firstWaveSupportInspectionBackfill: firstWaveSupportInspectionAuditLogs.items?.length || 0,
               stabilizationHandoffConfirmationBackfill: stabilizationHandoffConfirmationAuditLogs.items?.length || 0,
               steadyStateDutyPlanReceiptBackfill: steadyStateDutyPlanReceiptAuditLogs.items?.length || 0,
               firstWaveRuntimeBackfill: (firstWaveRuntimeLoginAuditLogs.items?.length || 0)

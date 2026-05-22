@@ -16972,6 +16972,43 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(betaAfterBetaReceipt.firstRoundOps.primaryAction.downloadHref || "", /channel=beta/);
     assert.doesNotMatch(betaAfterBetaReceipt.firstRoundOps.primaryAction.downloadHref || "", /channel=stable/);
 
+    for (const [index, targetKey] of ["accounts", "entitlements", "sessions", "cards", "devices", "audit_logs"].entries()) {
+      const overflowSupportInspection = await postJson(
+        baseUrl,
+        "/api/developer/ops/first-wave/support-inspection/confirm",
+        {
+          productCode: "FIRSTWAVE",
+          channel: "stable",
+          decision: "confirmed",
+          note: `partial support inspection refresh ${index + 1}`,
+          supportInspectionStatus: "partial_support_review",
+          inspectedTargetKeys: [targetKey],
+          targetCount: 6,
+          readyTargetCount: 1,
+          runtimeEvidenceFormat: "first-wave-runtime-evidence",
+          evidenceFileName: `partial-first-wave-runtime-evidence-${index + 1}.txt`
+        },
+        operatorSession.token
+      );
+      assert.equal(overflowSupportInspection.allTargetsConfirmed, false);
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+
+    const supportInspectionOverflowSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=FIRSTWAVE&channel=stable&limit=80",
+      operatorSession.token
+    );
+    assert.ok(Number(supportInspectionOverflowSnapshot.auditLogs.filters.firstWaveSupportInspectionBackfill || 0) >= 7);
+    const supportInspectionOverflowConfirmations = supportInspectionOverflowSnapshot.overview.latestFirstWaveSupportInspectionConfirmations || [];
+    assert.ok(supportInspectionOverflowConfirmations.length > 5);
+    assert.ok(supportInspectionOverflowConfirmations.some((item) =>
+      item.auditLogId === supportInspectionConfirmation.auditLogId
+      && item.allTargetsConfirmed === true
+      && item.inspectedTargetCount === 6
+    ));
+    assert.ok(supportInspectionOverflowConfirmations[0].allTargetsConfirmed === false);
+
     const forbidden = await getJsonExpectError(
       baseUrl,
       "/api/developer/ops/first-wave/recommendations?productCode=FIRSTWAVE_BETA",

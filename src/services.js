@@ -12290,6 +12290,18 @@ function buildDeveloperLaunchReviewSummaryPayload({
     && typeof opsOverview.firstWaveRuntimeEvidence === "object"
     ? { ...opsOverview.firstWaveRuntimeEvidence }
     : null;
+  const latestLaunchReceipt = Array.isArray(opsOverview.latestLaunchReceipts)
+    ? opsOverview.latestLaunchReceipts[0] || null
+    : null;
+  const firstWaveSupportInspectionConfirmation = opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
+    || selectFirstWaveSupportInspectionConfirmation(
+      opsOverview.latestFirstWaveSupportInspectionConfirmations,
+      {
+        latestReceipt: latestLaunchReceipt,
+        productCode: routeProductCode || "",
+        channel: routeChannel || ""
+      }
+    );
   const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidence
     ? createLaunchWorkflowWorkspaceShortcut(
         "ops",
@@ -13058,6 +13070,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     launchOperationsOverviewStatus,
     launchReadinessNextGate,
     firstWaveRuntimeEvidence,
+    firstWaveSupportInspectionConfirmation,
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads,
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
@@ -13133,6 +13146,10 @@ function buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload = {}) {
     && typeof payload.reviewSummary.firstWaveRuntimeEvidence === "object"
     ? payload.reviewSummary.firstWaveRuntimeEvidence
     : null;
+  const supportInspectionConfirmation = payload.reviewSummary?.firstWaveSupportInspectionConfirmation
+    && typeof payload.reviewSummary.firstWaveSupportInspectionConfirmation === "object"
+      ? payload.reviewSummary.firstWaveSupportInspectionConfirmation
+      : null;
   const lines = [
     "RockSolid Developer Launch Review First-Wave Runtime Evidence",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -13145,6 +13162,10 @@ function buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload = {}) {
     appendFirstWaveRuntimeEvidenceLines(lines, {
       firstWaveRuntimeEvidence: evidence
     });
+    if (supportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, supportInspectionConfirmation);
+    }
     lines.push("");
     lines.push("Operator Notes:");
     lines.push("- Use this file while reviewing Launch Review without reopening Developer Ops.");
@@ -13154,6 +13175,10 @@ function buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload = {}) {
     lines.push("First-Wave Runtime Evidence:");
     lines.push("- status=not_recorded | ready=false");
     lines.push("- summary=Run the first real card-login path and heartbeat before using this evidence handoff.");
+    if (supportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, supportInspectionConfirmation);
+    }
   }
   return lines.join("\n").trimEnd();
 }
@@ -14433,6 +14458,10 @@ function buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload = {}) 
     lines.push("First-Wave Runtime Evidence:");
     lines.push("- status=not_recorded | ready=false");
     lines.push("- summary=Run the first real card-login path and heartbeat before using this evidence handoff.");
+    if (supportInspectionConfirmation) {
+      lines.push("");
+      appendFirstWaveSupportInspectionConfirmationLines(lines, supportInspectionConfirmation);
+    }
   }
   return lines.join("\n").trimEnd();
 }

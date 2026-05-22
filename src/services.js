@@ -19839,6 +19839,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     const stableTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
       ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
       : "";
+    const stableTransitionChecks = Array.isArray(launchDutyStableOperationsTransitionAction?.requiredChecks)
+      ? launchDutyStableOperationsTransitionAction.requiredChecks.join(",")
+      : "";
+    const stableTransitionOperatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction?.operatorOrder)
+      ? launchDutyStableOperationsTransitionAction.operatorOrder.join(" -> ")
+      : "";
     lines.push("");
     lines.push("Launch Mainline Surface Review Closeout:");
     lines.push(
@@ -19917,6 +19923,16 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
         : "-"}`
       + ` | stableTransitionNextDownloadKey=${launchDutyStableOperationsTransitionAction?.nextDownloadKey || "-"}`
       + ` | stableTransitionNextAction=${launchDutyStableOperationsTransitionAction?.operatorAction?.nextAction || launchDutyStableOperationsTransitionAction?.nextAction || "-"}`
+    );
+    lines.push(
+      `- stableTransitionRecordReady=${launchDutyStableOperationsTransitionAction?.recordReady === true ? "yes" : "no"}`
+      + ` | stableTransitionPacketReady=${launchDutyStableOperationsTransitionAction?.packetReady === true ? "yes" : "no"}`
+      + ` | stableTransitionTailReady=${launchDutyStableOperationsTransitionAction?.tailReady === true ? "yes" : "no"}`
+      + ` | stableTransitionHandoffReady=${launchDutyStableOperationsTransitionAction?.handoffReady === true ? "yes" : "no"}`
+    );
+    lines.push(
+      `- stableTransitionChecks=${stableTransitionChecks || "-"}`
+      + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Review Downloads:");
@@ -21231,6 +21247,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     const stableTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
       ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
       : "";
+    const stableTransitionChecks = Array.isArray(launchDutyStableOperationsTransitionAction?.requiredChecks)
+      ? launchDutyStableOperationsTransitionAction.requiredChecks.join(",")
+      : "";
+    const stableTransitionOperatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction?.operatorOrder)
+      ? launchDutyStableOperationsTransitionAction.operatorOrder.join(" -> ")
+      : "";
     lines.push("");
     lines.push("Surface Review Closeout Route:");
     lines.push(
@@ -21309,6 +21331,16 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
         : "-"}`
       + ` | stableTransitionNextDownloadKey=${launchDutyStableOperationsTransitionAction?.nextDownloadKey || "-"}`
       + ` | stableTransitionNextAction=${launchDutyStableOperationsTransitionAction?.operatorAction?.nextAction || launchDutyStableOperationsTransitionAction?.nextAction || "-"}`
+    );
+    lines.push(
+      `- stableTransitionRecordReady=${launchDutyStableOperationsTransitionAction?.recordReady === true}`
+      + ` | stableTransitionPacketReady=${launchDutyStableOperationsTransitionAction?.packetReady === true}`
+      + ` | stableTransitionTailReady=${launchDutyStableOperationsTransitionAction?.tailReady === true}`
+      + ` | stableTransitionHandoffReady=${launchDutyStableOperationsTransitionAction?.handoffReady === true}`
+    );
+    lines.push(
+      `- stableTransitionChecks=${stableTransitionChecks || "-"}`
+      + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -23334,6 +23366,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     const stableTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
       ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
       : "";
+    const stableTransitionChecks = Array.isArray(launchDutyStableOperationsTransitionAction?.requiredChecks)
+      ? launchDutyStableOperationsTransitionAction.requiredChecks.join(",")
+      : "";
+    const stableTransitionOperatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction?.operatorOrder)
+      ? launchDutyStableOperationsTransitionAction.operatorOrder.join(" -> ")
+      : "";
     lines.push("");
     lines.push("Surface Review Closeout:");
     lines.push(
@@ -23412,6 +23450,16 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
         : "-"}`
       + ` | stableTransitionNextDownloadKey=${launchDutyStableOperationsTransitionAction?.nextDownloadKey || "-"}`
       + ` | stableTransitionNextAction=${launchDutyStableOperationsTransitionAction?.operatorAction?.nextAction || launchDutyStableOperationsTransitionAction?.nextAction || "-"}`
+    );
+    lines.push(
+      `- stableTransitionRecordReady=${launchDutyStableOperationsTransitionAction?.recordReady === true ? "yes" : "no"}`
+      + ` | stableTransitionPacketReady=${launchDutyStableOperationsTransitionAction?.packetReady === true ? "yes" : "no"}`
+      + ` | stableTransitionTailReady=${launchDutyStableOperationsTransitionAction?.tailReady === true ? "yes" : "no"}`
+      + ` | stableTransitionHandoffReady=${launchDutyStableOperationsTransitionAction?.handoffReady === true ? "yes" : "no"}`
+    );
+    lines.push(
+      `- stableTransitionChecks=${stableTransitionChecks || "-"}`
+      + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
     );
     if (reviewDownloads.length) {
       lines.push("Surface Review Closeout Downloads:");
@@ -47718,6 +47766,12 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       const stableTransitionBlockedBy = Array.isArray(stableTransitionAction?.blockedBy)
         ? stableTransitionAction.blockedBy.join(",")
         : "";
+      const stableTransitionChecks = Array.isArray(stableTransitionAction?.requiredChecks)
+        ? stableTransitionAction.requiredChecks.join(",")
+        : "";
+      const stableTransitionOperatorOrder = Array.isArray(stableTransitionAction?.operatorOrder)
+        ? stableTransitionAction.operatorOrder.join(" -> ")
+        : "";
       lines.push("Launch Surface Review Closeout Action:");
       lines.push(
         `- status=${action.status || "-"}`
@@ -47771,6 +47825,16 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
           : "-"}`
         + ` | stableTransitionNextDownloadKey=${stableTransitionAction?.nextDownloadKey || "-"}`
         + ` | stableTransitionNextAction=${stableTransitionAction?.operatorAction?.nextAction || stableTransitionAction?.nextAction || "-"}`
+      );
+      lines.push(
+        `- stableTransitionRecordReady=${stableTransitionAction?.recordReady === true ? "yes" : "no"}`
+        + ` | stableTransitionPacketReady=${stableTransitionAction?.packetReady === true ? "yes" : "no"}`
+        + ` | stableTransitionTailReady=${stableTransitionAction?.tailReady === true ? "yes" : "no"}`
+        + ` | stableTransitionHandoffReady=${stableTransitionAction?.handoffReady === true ? "yes" : "no"}`
+      );
+      lines.push(
+        `- stableTransitionChecks=${stableTransitionChecks || "-"}`
+        + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
       );
     }
     if (receiptVisibilityConfirmationQueue.confirmationReceipt) {
@@ -49266,6 +49330,12 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
   const stableTransitionBlockedBy = Array.isArray(launchDutyStableOperationsTransitionAction?.blockedBy)
     ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
     : "";
+  const stableTransitionChecks = Array.isArray(launchDutyStableOperationsTransitionAction?.requiredChecks)
+    ? launchDutyStableOperationsTransitionAction.requiredChecks.join(",")
+    : "";
+  const stableTransitionOperatorOrder = Array.isArray(launchDutyStableOperationsTransitionAction?.operatorOrder)
+    ? launchDutyStableOperationsTransitionAction.operatorOrder.join(" -> ")
+    : "";
   const launchDutyRecordIndexPath = launchSurfaceReviewCloseoutAction.launchDutyRecordIndexPath
     || receiptVisibilityConfirmationQueue.launchDutyRecordIndexPath
     || launchOperationsOperatorEntry.launchDutyRecordIndexPath
@@ -49353,6 +49423,16 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
       : "-"}`
     + ` | stableTransitionNextDownloadKey=${launchDutyStableOperationsTransitionAction?.nextDownloadKey || "-"}`
     + ` | stableTransitionNextAction=${launchDutyStableOperationsTransitionAction?.operatorAction?.nextAction || launchDutyStableOperationsTransitionAction?.nextAction || "-"}`
+  );
+  lines.push(
+    `- stableTransitionRecordReady=${launchDutyStableOperationsTransitionAction?.recordReady === true ? "yes" : "no"}`
+    + ` | stableTransitionPacketReady=${launchDutyStableOperationsTransitionAction?.packetReady === true ? "yes" : "no"}`
+    + ` | stableTransitionTailReady=${launchDutyStableOperationsTransitionAction?.tailReady === true ? "yes" : "no"}`
+    + ` | stableTransitionHandoffReady=${launchDutyStableOperationsTransitionAction?.handoffReady === true ? "yes" : "no"}`
+  );
+  lines.push(
+    `- stableTransitionChecks=${stableTransitionChecks || "-"}`
+    + ` | stableTransitionOperatorOrder=${stableTransitionOperatorOrder || "-"}`
   );
   if (reviewDownloads.length) {
     lines.push("Surface Review Closeout Downloads:");

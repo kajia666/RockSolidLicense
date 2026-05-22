@@ -17027,6 +17027,40 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchSmokeSummary.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
     assert.match(overflowLaunchSmokeSummary.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 
+    const overflowLaunchReview = await getJson(
+      baseUrl,
+      "/api/developer/launch-review?productCode=FIRSTWAVE&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    const overflowLaunchReviewRuntimeEvidenceAction = overflowLaunchReview.reviewSummary.actionPlan.find((item) =>
+      item.key === "launch_review_first_wave_runtime_evidence"
+    );
+    assert.ok(overflowLaunchReviewRuntimeEvidenceAction);
+    assert.equal(overflowLaunchReviewRuntimeEvidenceAction.recommendedDownload?.key, "launch_review_first_wave_runtime_evidence");
+    assert.equal(overflowLaunchReviewRuntimeEvidenceAction.recommendedDownload?.format, "first-wave-runtime-evidence");
+    assert.match(overflowLaunchReviewRuntimeEvidenceAction.recommendedDownload?.href || "", /format=first-wave-runtime-evidence/);
+    assert.ok(overflowLaunchReview.reviewSummary.recommendedDownloads.some((item) =>
+      item.key === "launch_review_first_wave_runtime_evidence"
+      && item.format === "first-wave-runtime-evidence"
+    ));
+
+    const overflowLaunchSmoke = await getJson(
+      baseUrl,
+      "/api/developer/launch-smoke-kit?productCode=FIRSTWAVE&channel=stable",
+      ownerSession.token
+    );
+    const overflowLaunchSmokeRuntimeEvidenceAction = overflowLaunchSmoke.smokeSummary.actionPlan.find((item) =>
+      item.key === "launch_smoke_first_wave_runtime_evidence"
+    );
+    assert.ok(overflowLaunchSmokeRuntimeEvidenceAction);
+    assert.equal(overflowLaunchSmokeRuntimeEvidenceAction.recommendedDownload?.key, "launch_smoke_first_wave_runtime_evidence");
+    assert.equal(overflowLaunchSmokeRuntimeEvidenceAction.recommendedDownload?.format, "first-wave-runtime-evidence");
+    assert.match(overflowLaunchSmokeRuntimeEvidenceAction.recommendedDownload?.href || "", /format=first-wave-runtime-evidence/);
+    assert.ok(overflowLaunchSmoke.smokeSummary.recommendedDownloads.some((item) =>
+      item.key === "launch_smoke_first_wave_runtime_evidence"
+      && item.format === "first-wave-runtime-evidence"
+    ));
+
     const overflowLaunchReviewRuntimeEvidence = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=first-wave-runtime-evidence",

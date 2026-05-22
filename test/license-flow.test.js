@@ -23712,6 +23712,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsOperatorEntryDownload.body,
+      /Launch Surface Review Closeout Action:[\s\S]*stableTransitionRecordIndex=[^\n]*\| stableTransitionRecordProgress=[^\n]*\| stableTransitionStableTail=[^\n]*\| stableTransitionStableReadback=[^\n]*/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
       /Launch Surface Review Closeout Action:[\s\S]*stableTransitionRecordReady=(yes|no)[^\n]*\| stableTransitionPacketReady=(yes|no)[^\n]*\| stableTransitionTailReady=(yes|no)[^\n]*\| stableTransitionHandoffReady=(yes|no)/
     );
     assert.match(
@@ -27360,6 +27364,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout:[\s\S]*stableTransitionRecordIndex=[^\n]*\| stableTransitionRecordProgress=[^\n]*\| stableTransitionStableTail=[^\n]*\| stableTransitionStableReadback=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Surface Review Closeout:[\s\S]*stableTransitionRecordReady=(yes|no)[^\n]*\| stableTransitionPacketReady=(yes|no)[^\n]*\| stableTransitionTailReady=(yes|no)[^\n]*\| stableTransitionHandoffReady=(yes|no)/
     );
     assert.match(
@@ -27453,6 +27461,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Surface Review Closeout Route:[\s\S]*stableTransitionRecordIndex=[^\n]*\| stableTransitionRecordProgress=[^\n]*\| stableTransitionStableTail=[^\n]*\| stableTransitionStableReadback=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /Surface Review Closeout Route:[\s\S]*stableTransitionRecordReady=(true|false)[^\n]*\| stableTransitionPacketReady=(true|false)[^\n]*\| stableTransitionTailReady=(true|false)[^\n]*\| stableTransitionHandoffReady=(true|false)/
     );
     assert.match(
@@ -27531,6 +27543,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Surface Review Closeout:[\s\S]*stableTransitionOperatorAction=[^\n]*\| stableTransitionReviewRequired=(yes|no|-)[^\n]*\| stableTransitionNextDownloadKey=[^\n]*\| stableTransitionNextAction=[^\n]*/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Surface Review Closeout:[\s\S]*stableTransitionRecordIndex=[^\n]*\| stableTransitionRecordProgress=[^\n]*\| stableTransitionStableTail=[^\n]*\| stableTransitionStableReadback=[^\n]*/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
@@ -27627,6 +27643,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       primaryRouteReviewDownload.body,
       /Surface Review Closeout Bridge:[\s\S]*stableTransitionOperatorAction=[^\n]*\| stableTransitionReviewRequired=(yes|no|-)[^\n]*\| stableTransitionNextDownloadKey=[^\n]*\| stableTransitionNextAction=[^\n]*/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge:[\s\S]*stableTransitionRecordIndex=[^\n]*\| stableTransitionRecordProgress=[^\n]*\| stableTransitionStableTail=[^\n]*\| stableTransitionStableReadback=[^\n]*/
     );
     assert.match(
       primaryRouteReviewDownload.body,

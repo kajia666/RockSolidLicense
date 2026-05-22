@@ -21314,7 +21314,10 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "zip",
     mainlineRouteParams
   );
-  const firstWaveRuntimeEvidenceDownload = mainlineSummary.firstWaveRuntimeEvidence
+  const firstWaveRuntimeEvidenceSource = mainlineSummary.firstWaveRuntimeEvidence
+    || mainlineSummary.firstWaveSupportInspectionConfirmation
+    || null;
+  const firstWaveRuntimeEvidenceDownload = firstWaveRuntimeEvidenceSource
     ? createLaunchMainlineDownloadShortcut(
         "Launch Mainline first-wave runtime evidence",
         payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
@@ -23528,6 +23531,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Launch operations overview status", opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"],
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
     ["First-Wave audit backfill status", opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"],
+    ...(mainlineSummary.firstWaveRuntimeEvidence || mainlineSummary.firstWaveSupportInspectionConfirmation
+      ? [["First-wave runtime evidence", payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt"]]
+      : []),
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
     ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
   ];

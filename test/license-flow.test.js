@@ -17054,6 +17054,22 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchMainlineRuntimeEvidence.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
     assert.match(overflowLaunchMainlineRuntimeEvidence.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 
+    const overflowLaunchMainlineRoutes = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(overflowLaunchMainlineRoutes.body, /launch-mainline-first-wave-runtime-evidence/);
+    assert.match(overflowLaunchMainlineRoutes.body, /format=first-wave-runtime-evidence/);
+    assert.match(overflowLaunchMainlineRoutes.body, /\| file=.*first-wave-runtime-evidence\.txt/);
+
+    const overflowLaunchMainlinePostLaunchIndex = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(overflowLaunchMainlinePostLaunchIndex.body, /first-wave-runtime-evidence\.txt/);
+
     const overflowLaunchReviewChecksums = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=checksums",

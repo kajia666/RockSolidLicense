@@ -17380,6 +17380,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       ownerSession.token
     );
     assert.match(overflowLaunchMainlineChecksums.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(overflowLaunchMainlineChecksums.body, /ops\/first-wave-recommendations-download\.txt/);
     assert.match(overflowLaunchMainlineChecksums.body, /ops\/first-wave-support-inspection-confirmation\.txt/);
     const overflowLaunchMainlineZip = await getBinary(
       baseUrl,
@@ -17387,6 +17388,10 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       ownerSession.token
     );
     const overflowLaunchMainlineZipText = overflowLaunchMainlineZip.body.toString("latin1");
+    assert.match(overflowLaunchMainlineZipText, /ops\/first-wave-recommendations-download\.txt/);
+    assert.match(overflowLaunchMainlineZipText, /RockSolid Launch First-Wave Recommendations Zip Download/);
+    assert.match(overflowLaunchMainlineZipText, /Source Surface: launch-mainline/);
+    assert.match(overflowLaunchMainlineZipText, /href=.*\/api\/developer\/ops\/first-wave\/recommendations\/download\?.*format=zip/);
     assert.match(overflowLaunchMainlineZipText, /ops\/first-wave-support-inspection-confirmation\.txt/);
     assert.match(overflowLaunchMainlineZipText, /RockSolid Developer Ops First-Wave Support Inspection Confirmation/);
     assert.match(overflowLaunchMainlineZipText, /First-Wave Support Inspection Confirmation:/);

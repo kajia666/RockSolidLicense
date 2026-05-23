@@ -21345,6 +21345,31 @@ function buildDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationText(
   return lines.join("\n").trimEnd();
 }
 
+function getDeveloperLaunchMainlineFirstWaveRecommendationsZipDownload(payload = {}) {
+  const firstWaveReadinessBridge = payload.mainlineSummary?.firstWaveReadinessBridge
+    && typeof payload.mainlineSummary.firstWaveReadinessBridge === "object"
+    ? payload.mainlineSummary.firstWaveReadinessBridge
+    : null;
+  return firstWaveReadinessBridge?.downloads?.zip
+    && typeof firstWaveReadinessBridge.downloads.zip === "object"
+      ? firstWaveReadinessBridge.downloads.zip
+      : null;
+}
+
+function buildDeveloperLaunchMainlineFirstWaveRecommendationsZipDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  return buildLaunchFirstWaveRecommendationsZipDownloadText({
+    generatedAt: payload.generatedAt || "",
+    projectCode: project.code || filters.productCode || "",
+    projectName: project.name || "",
+    channel: manifest.channel || filters.channel || "",
+    sourceSurface: "launch-mainline",
+    download: getDeveloperLaunchMainlineFirstWaveRecommendationsZipDownload(payload)
+  });
+}
+
 function buildDeveloperLaunchMainlinePayload({
   generatedAt = nowIso(),
   releasePackage = null,
@@ -22587,6 +22612,13 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt",
     payload.mainlineSummary?.firstWaveRuntimeEvidence || payload.mainlineSummary?.firstWaveSupportInspectionConfirmation
       ? buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/first-wave-recommendations-download.txt",
+    getDeveloperLaunchMainlineFirstWaveRecommendationsZipDownload(payload)
+      ? buildDeveloperLaunchMainlineFirstWaveRecommendationsZipDownloadText(payload)
       : ""
   );
   appendLaunchWorkflowFileIfPresent(

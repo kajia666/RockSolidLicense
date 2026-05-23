@@ -21450,6 +21450,38 @@ function getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payloa
   return opsDownloadScope ? buildDeveloperOpsLaunchOperationsOverviewStatusDownload(opsDownloadScope) : null;
 }
 
+function getDeveloperLaunchMainlineLaunchReceiptNextFollowUp(payload = {}) {
+  const traceabilityNextFollowUp = payload.postLaunchHandoffTraceability?.nextFollowUp
+    && typeof payload.postLaunchHandoffTraceability.nextFollowUp === "object"
+      ? payload.postLaunchHandoffTraceability.nextFollowUp
+      : null;
+  if (traceabilityNextFollowUp) {
+    return traceabilityNextFollowUp;
+  }
+  return payload.opsSnapshot?.summary?.launchReceiptNextFollowUp
+    && typeof payload.opsSnapshot.summary.launchReceiptNextFollowUp === "object"
+      ? payload.opsSnapshot.summary.launchReceiptNextFollowUp
+      : null;
+}
+
+function getDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownload(payload = {}) {
+  const nextFollowUp = getDeveloperLaunchMainlineLaunchReceiptNextFollowUp(payload);
+  const recommendedDownload = nextFollowUp?.recommendedDownload
+    && typeof nextFollowUp.recommendedDownload === "object"
+      ? nextFollowUp.recommendedDownload
+      : null;
+  if (recommendedDownload) {
+    return recommendedDownload;
+  }
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchReceiptNextFollowUpDownload(opsDownloadScope, nextFollowUp) : null;
+}
+
+function getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchReceiptBackfillStatusDownload(opsDownloadScope) : null;
+}
+
 function buildDeveloperLaunchMainlineStableOperationsDownloadText({
   payload = {},
   title = "",
@@ -21574,6 +21606,40 @@ function buildDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownloadText(
     notes: [
       "Use this route to re-fetch the launch operations overview status for first operating result handoff and receipt readback.",
       "Keep it beside launch-operations-overview-status.txt so the first stable operating result review can jump back to the exact backend/API view."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownloadText(payload = {}) {
+  const nextFollowUp = getDeveloperLaunchMainlineLaunchReceiptNextFollowUp(payload);
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Receipt Next Follow-Up Download",
+    download: getDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownload(payload),
+    status: nextFollowUp?.stage || nextFollowUp?.priority || "",
+    action: nextFollowUp?.actionKey || nextFollowUp?.operationToRecord || nextFollowUp?.operation || "",
+    operatorOrder: ["Open the launch receipt next follow-up route before recording the next Launch Mainline operation."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops launch receipt next follow-up file from the offline Mainline package.",
+      "Keep it beside launch-receipt-next-follow-up.txt so operators do not reconstruct the format or scoped href by hand."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownloadText(payload = {}) {
+  const traceability = payload.postLaunchHandoffTraceability || {};
+  const launchReceiptAuditBackfillStatus = traceability.launchReceiptAuditBackfillStatus
+    || buildLaunchReceiptAuditBackfillStatus(Number(traceability.launchReceiptAuditBackfill || 0));
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Receipt Backfill Status Download",
+    download: getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload),
+    status: launchReceiptAuditBackfillStatus.used ? "USED" : "NOT_USED",
+    action: "inspect_launch_receipt_audit_backfill",
+    operatorOrder: ["Open the launch receipt backfill status route when receipt context looks stale or filtered."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops launch receipt backfill diagnostic without reopening the full Mainline JSON.",
+      "Keep it beside launch-receipt-backfill-status.txt so launch duty can verify protective audit backfill from the offline package."
     ]
   });
 }
@@ -22673,8 +22739,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-receipt-next-follow-up-download.txt",
+    getDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-receipt-backfill-status.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchReceiptBackfillStatusText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-receipt-backfill-status-download.txt",
+    getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -24180,6 +24260,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOverviewStatus: "ops/launch-operations-overview-status.txt",
       launchOperationsOverviewStatusDownloadRoute: "ops/launch-operations-overview-status-download.txt",
       launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
+      launchReceiptNextFollowUpDownloadRoute: "ops/launch-receipt-next-follow-up-download.txt",
+      launchReceiptBackfillStatus: "ops/launch-receipt-backfill-status.txt",
+      launchReceiptBackfillStatusDownloadRoute: "ops/launch-receipt-backfill-status-download.txt",
       firstWaveAuditBackfillStatus: "ops/first-wave-audit-backfill-status.txt",
       firstWaveRecommendationsZip: "ops/first-wave-recommendations.zip",
       firstWaveSupportInspectionConfirmation: "ops/first-wave-support-inspection-confirmation.txt",
@@ -24297,6 +24380,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       ? mainlineSummary.firstOperatingResultHandoffAction
       : null;
   const launchOperationsOverviewStatusDownload = getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload);
+  const launchReceiptNextFollowUpDownload = getDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownload(payload);
+  const launchReceiptBackfillStatusDownload = getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload);
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -24322,6 +24407,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Ops handoff index", opsFiles.handoffIndex || "ops/handoff-index.txt"],
     ["Launch operations overview status", opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"],
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
+    ["Launch receipt backfill status", opsFiles.launchReceiptBackfillStatus || "ops/launch-receipt-backfill-status.txt"],
     ["First-Wave audit backfill status", opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"],
     ...(firstWaveRecommendationsZipDownload
       ? [["Developer Ops first-wave recommendations zip", opsFiles.firstWaveRecommendationsZip || "ops/first-wave-recommendations.zip"]]
@@ -24394,6 +24480,18 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       opsFiles.launchOperationsOverviewStatusDownloadRoute || "ops/launch-operations-overview-status-download.txt"
     ]);
   }
+  if (launchReceiptNextFollowUpDownload) {
+    handoffFiles.push([
+      "Launch receipt next follow-up download route",
+      opsFiles.launchReceiptNextFollowUpDownloadRoute || "ops/launch-receipt-next-follow-up-download.txt"
+    ]);
+  }
+  if (launchReceiptBackfillStatusDownload) {
+    handoffFiles.push([
+      "Launch receipt backfill status download route",
+      opsFiles.launchReceiptBackfillStatusDownloadRoute || "ops/launch-receipt-backfill-status-download.txt"
+    ]);
+  }
   const lines = [
     "RockSolid Developer Launch Mainline Post-Launch Handoff Index",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -24454,6 +24552,23 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"} | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
   lines.push(`- Next Follow-up Record Index: ${resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp) || "-"}`);
+  if (launchReceiptNextFollowUpDownload) {
+    lines.push(
+      `- Launch Receipt Next Follow-up Download Route: ${opsFiles.launchReceiptNextFollowUpDownloadRoute || "ops/launch-receipt-next-follow-up-download.txt"}`
+      + ` | file=${launchReceiptNextFollowUpDownload.fileName || "-"}`
+      + ` | format=${launchReceiptNextFollowUpDownload.format || "-"}`
+      + ` | href=${launchReceiptNextFollowUpDownload.href || "-"}`
+    );
+  }
+  if (launchReceiptBackfillStatusDownload) {
+    lines.push(
+      `- Launch Receipt Backfill Status: ${opsFiles.launchReceiptBackfillStatus || "ops/launch-receipt-backfill-status.txt"}`
+      + ` | route=${opsFiles.launchReceiptBackfillStatusDownloadRoute || "ops/launch-receipt-backfill-status-download.txt"}`
+      + ` | file=${launchReceiptBackfillStatusDownload.fileName || "-"}`
+      + ` | format=${launchReceiptBackfillStatusDownload.format || "-"}`
+      + ` | href=${launchReceiptBackfillStatusDownload.href || "-"}`
+    );
+  }
   lines.push(
     `- First-Wave Audit Backfill Status: ${opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"}`
     + ` | file=${opsFirstWaveAuditBackfillStatusDownload.fileName || "-"}`

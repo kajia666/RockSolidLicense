@@ -21385,6 +21385,16 @@ function getDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownloa
     : null;
 }
 
+function getDeveloperLaunchMainlineInitialLaunchOpsReadinessDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsInitialLaunchReadinessDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineStagingLaunchDutyArchiveDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsStagingLaunchDutyArchiveDownload(opsDownloadScope) : null;
+}
+
 function getDeveloperLaunchMainlineOpsDownloadScope(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -21659,6 +21669,43 @@ function buildDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownl
     notes: [
       "Use this route to re-fetch the Developer Ops support inspection confirmation from the offline Mainline package.",
       "Keep it beside first-wave-support-inspection-confirmation.txt so support readiness can be verified without manual format lookup."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineInitialLaunchOpsReadinessDownloadText(payload = {}) {
+  const readiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Initial Launch Ops Readiness Download",
+    download: getDeveloperLaunchMainlineInitialLaunchOpsReadinessDownload(payload),
+    status: readiness?.status || readiness?.gate?.status || "",
+    action: readiness?.currentActionKey || readiness?.goNoGo?.current || "review_initial_launch_readiness",
+    operatorOrder: [
+      "Open the initial launch ops readiness route before deciding whether the launch lane can enter initial launch."
+    ],
+    notes: [
+      "Use this route to re-fetch the Developer Ops initial launch readiness file from the offline Mainline package.",
+      "Keep it beside initial-launch-ops-readiness.txt so launch duty can verify the current gate without reconstructing the export format."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineStagingLaunchDutyArchiveDownloadText(payload = {}) {
+  const readiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const archive = readiness?.stagingLaunchDutyArchive || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Staging Launch-Duty Archive Download",
+    download: getDeveloperLaunchMainlineStagingLaunchDutyArchiveDownload(payload),
+    status: archive?.status || readiness?.launchDutyActionOrder?.status || "",
+    action: archive?.nextAction || readiness?.launchDutyActionOrder?.stagingArchiveNextOperations?.currentActionKey || "download_staging_launch_duty_archive",
+    operatorOrder: [
+      "Open the staging launch-duty archive route before reviewing packet paths, closeout reload, and full-test-window entry."
+    ],
+    notes: [
+      "Use this route to re-fetch the Developer Ops staging launch-duty archive from the offline Mainline package.",
+      "Keep it beside staging-launch-duty-archive.txt so launch duty can re-open the staging archive without manual format lookup."
     ]
   });
 }
@@ -22851,8 +22898,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/initial-launch-ops-readiness-download.txt",
+    getDeveloperLaunchMainlineInitialLaunchOpsReadinessDownload(payload)
+      ? buildDeveloperLaunchMainlineInitialLaunchOpsReadinessDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/staging-launch-duty-archive.txt",
     payload.opsSnapshot ? buildDeveloperOpsStagingLaunchDutyArchiveText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/staging-launch-duty-archive-download.txt",
+    getDeveloperLaunchMainlineStagingLaunchDutyArchiveDownload(payload)
+      ? buildDeveloperLaunchMainlineStagingLaunchDutyArchiveDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -24330,6 +24391,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
       handoffIndex: "ops/handoff-index.txt",
       initialLaunchOpsReadiness: "ops/initial-launch-ops-readiness.txt",
+      initialLaunchOpsReadinessDownloadRoute: "ops/initial-launch-ops-readiness-download.txt",
+      stagingLaunchDutyArchive: "ops/staging-launch-duty-archive.txt",
+      stagingLaunchDutyArchiveDownloadRoute: "ops/staging-launch-duty-archive-download.txt",
       launchOperationsOverviewStatus: "ops/launch-operations-overview-status.txt",
       launchOperationsOverviewStatusDownloadRoute: "ops/launch-operations-overview-status-download.txt",
       launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
@@ -24456,6 +24520,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchOperationsOverviewStatusDownload = getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload);
   const launchReceiptNextFollowUpDownload = getDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownload(payload);
   const launchReceiptBackfillStatusDownload = getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload);
+  const initialLaunchOpsReadinessDownload = getDeveloperLaunchMainlineInitialLaunchOpsReadinessDownload(payload);
+  const stagingLaunchDutyArchiveDownload = getDeveloperLaunchMainlineStagingLaunchDutyArchiveDownload(payload);
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -24497,6 +24563,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       ? [["Developer Ops first-wave support inspection confirmation", opsFiles.firstWaveSupportInspectionConfirmation || "ops/first-wave-support-inspection-confirmation.txt"]]
       : []),
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
+    ["Staging launch-duty archive", opsFiles.stagingLaunchDutyArchive || "ops/staging-launch-duty-archive.txt"],
     ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
   ];
   if (steadyStateHandoffLanding) {
@@ -24579,6 +24646,18 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       opsFiles.firstWaveSupportInspectionConfirmationDownloadRoute || "ops/first-wave-support-inspection-confirmation-download.txt"
     ]);
   }
+  if (initialLaunchOpsReadinessDownload) {
+    handoffFiles.push([
+      "Initial launch ops readiness download route",
+      opsFiles.initialLaunchOpsReadinessDownloadRoute || "ops/initial-launch-ops-readiness-download.txt"
+    ]);
+  }
+  if (stagingLaunchDutyArchiveDownload) {
+    handoffFiles.push([
+      "Staging launch-duty archive download route",
+      opsFiles.stagingLaunchDutyArchiveDownloadRoute || "ops/staging-launch-duty-archive-download.txt"
+    ]);
+  }
   const lines = [
     "RockSolid Developer Launch Mainline Post-Launch Handoff Index",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -24637,6 +24716,23 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   );
   lines.push(`- Ops Handoff Index: ${opsFiles.handoffIndex || "ops/handoff-index.txt"}`);
   lines.push(`- Initial Launch Ops Readiness: ${opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"}`);
+  if (initialLaunchOpsReadinessDownload) {
+    lines.push(
+      `- Initial Launch Ops Readiness Download Route: ${opsFiles.initialLaunchOpsReadinessDownloadRoute || "ops/initial-launch-ops-readiness-download.txt"}`
+      + ` | file=${initialLaunchOpsReadinessDownload.fileName || "-"}`
+      + ` | format=${initialLaunchOpsReadinessDownload.format || "-"}`
+      + ` | href=${initialLaunchOpsReadinessDownload.href || "-"}`
+    );
+  }
+  if (stagingLaunchDutyArchiveDownload) {
+    lines.push(
+      `- Staging Launch-Duty Archive: ${opsFiles.stagingLaunchDutyArchive || "ops/staging-launch-duty-archive.txt"}`
+      + ` | route=${opsFiles.stagingLaunchDutyArchiveDownloadRoute || "ops/staging-launch-duty-archive-download.txt"}`
+      + ` | file=${stagingLaunchDutyArchiveDownload.fileName || "-"}`
+      + ` | format=${stagingLaunchDutyArchiveDownload.format || "-"}`
+      + ` | href=${stagingLaunchDutyArchiveDownload.href || "-"}`
+    );
+  }
   lines.push(`- Launch Receipt Next Follow-up: ${opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"} | ${formatLaunchReceiptNextFollowUp(launchReceiptNextFollowUp)}`);
   lines.push(`- Next Follow-up Record Index: ${resolveLaunchReadinessGateRecordIndexPath(launchReceiptNextFollowUp) || "-"}`);
   if (launchReceiptNextFollowUpDownload) {

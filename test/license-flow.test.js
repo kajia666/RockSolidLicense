@@ -23989,7 +23989,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-runtime-evidence\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-runtime-evidence-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-support-inspection-confirmation-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/initial-launch-ops-readiness-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/staging-launch-duty-archive\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/staging-launch-duty-archive-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-operational-review\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-exception-digest\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-handoff-brief\.txt/);
@@ -24035,7 +24037,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-runtime-evidence\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-runtime-evidence-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-support-inspection-confirmation-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/initial-launch-ops-readiness-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/staging-launch-duty-archive\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/staging-launch-duty-archive-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-operational-review\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-exception-digest\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-handoff-brief\.txt/);
@@ -24050,7 +24054,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=first-wave-runtime-evidence/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid First-Wave Support Inspection Confirmation Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=first-wave-support-inspection-confirmation/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Initial Launch Ops Readiness Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=initial-launch-ops-readiness/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Staging Launch-Duty Archive/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Staging Launch-Duty Archive Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=staging-launch-duty-archive/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Operational Review/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Exception Digest/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Handoff Brief/);
@@ -24129,6 +24137,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*First-wave support inspection confirmation download route: ops\/first-wave-support-inspection-confirmation-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Initial launch ops readiness download route: ops\/initial-launch-ops-readiness-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Staging launch-duty archive download route: ops\/staging-launch-duty-archive-download\.txt/
     );
 
     const launchMainlineSummarySelectionDownload = await getText(

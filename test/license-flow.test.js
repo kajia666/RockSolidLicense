@@ -23988,6 +23988,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-operational-review\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-exception-digest\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-handoff-brief\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-board\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-action-links\.txt/);
 
@@ -24020,6 +24021,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-operational-review\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-exception-digest\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-handoff-brief\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-board\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-action-links\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Receipt Backfill Status/);
@@ -24028,6 +24030,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Operational Review/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Exception Digest/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Handoff Brief/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Stable Operations Handoff Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Source Surface: launch-mainline/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=steady-state-handoff-brief/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Board/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Action Links/);
     assert.match(launchMainlineOpsRouteMirrorZipText, steadyStateDutyReceiptOperatorOrderPattern);
@@ -24046,6 +24051,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Steady-state duty receipt review: ops\/steady-state-duty-board\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Steady-state handoff download route: ops\/steady-state-handoff-download\.txt/
     );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(

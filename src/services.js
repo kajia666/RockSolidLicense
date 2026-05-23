@@ -12303,6 +12303,15 @@ function buildDeveloperLaunchReviewSummaryPayload({
         channel: routeChannel || ""
       }
     );
+  const firstWaveReadinessBridge = opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstWaveReadinessBridge
+    || (Array.isArray(opsOverview.latestFirstWaveReadinessBridges)
+      ? opsOverview.latestFirstWaveReadinessBridges[0]
+      : null)
+    || null;
+  const firstWaveRecommendationsZipDownload = firstWaveReadinessBridge?.downloads?.zip
+    && typeof firstWaveReadinessBridge.downloads.zip === "object"
+      ? ensureLaunchWorkflowDownloadHref(firstWaveReadinessBridge.downloads.zip, scopedOpsParams)
+      : null;
   const firstWaveRuntimeEvidenceSource = firstWaveRuntimeEvidence || firstWaveSupportInspectionConfirmation || null;
   const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidenceSource
     ? createLaunchWorkflowWorkspaceShortcut(
@@ -12816,6 +12825,17 @@ function buildDeveloperLaunchReviewSummaryPayload({
       recommendedDownload: firstWaveRuntimeEvidenceDownload || opsSummaryDownload
     }));
   }
+  if (firstWaveRecommendationsZipDownload) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_first_wave_recommendations_zip",
+      title: "Download first-wave recommendations package",
+      summary: "Keep the reviewed first-wave inventory, delivery, support, and runtime handoff package attached while Launch Review continues.",
+      status: "pass",
+      priority: "secondary",
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: firstWaveRecommendationsZipDownload
+    }));
+  }
   if (firstWaveSupportInspectionConfirmation) {
     const firstWaveSupportInspectionConfirmationReady = firstWaveSupportInspectionConfirmation.allTargetsConfirmed === true
       || normalizeDeveloperOpsConfirmationToken(firstWaveSupportInspectionConfirmation.supportInspectionStatus, "") === "ready_for_support_inspection";
@@ -12946,6 +12966,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
     });
   };
   pushRecommendedDownload(reviewDownload);
+  if (firstWaveRecommendationsZipDownload) {
+    pushRecommendedDownload(firstWaveRecommendationsZipDownload);
+  }
   if (firstWaveSupportInspectionConfirmationDownload) {
     pushRecommendedDownload(firstWaveSupportInspectionConfirmationDownload);
   }
@@ -13043,6 +13066,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
             kind: "download",
             label: "Download Launch Ops Overview",
             recommendedDownload: launchOperationsOverviewDownload
+          }
+        : null,
+      firstWaveRecommendationsZipDownload
+        ? {
+            kind: "download",
+            label: "Download First-Wave Zip",
+            recommendedDownload: firstWaveRecommendationsZipDownload
           }
         : null,
       routeFocusDownload
@@ -13554,6 +13584,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         channel: routeChannel || ""
       }
     );
+  const firstWaveReadinessBridge = opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstWaveReadinessBridge
+    || (Array.isArray(opsSnapshot?.overview?.latestFirstWaveReadinessBridges)
+      ? opsSnapshot.overview.latestFirstWaveReadinessBridges[0]
+      : null)
+    || null;
+  const firstWaveRecommendationsZipDownload = firstWaveReadinessBridge?.downloads?.zip
+    && typeof firstWaveReadinessBridge.downloads.zip === "object"
+      ? ensureLaunchWorkflowDownloadHref(firstWaveReadinessBridge.downloads.zip, smokeRouteParams)
+      : null;
   const firstWaveRuntimeEvidenceSource = firstWaveRuntimeEvidence || firstWaveSupportInspectionConfirmation || null;
   const firstWaveRuntimeEvidenceWorkspaceAction = firstWaveRuntimeEvidenceSource
     ? createLaunchWorkflowWorkspaceShortcut(
@@ -13720,6 +13759,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   );
   const recommendedDownloads = [
     launchSmokeKitSummaryDownload,
+    firstWaveRecommendationsZipDownload,
     firstWaveSupportInspectionConfirmationDownload,
     firstWaveRuntimeEvidenceDownload,
     launchMainlineSummaryDownload,
@@ -14099,6 +14139,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-smoke", "summary", "Open Launch Smoke"),
       recommendedDownload: createLaunchWorkflowSmokeKitDownloadShortcut("Launch smoke kit summary", "launch-smoke-kit.txt", "summary", smokeRouteParams)
     } : null,
+    firstWaveRecommendationsZipDownload ? {
+      key: "launch_smoke_first_wave_recommendations_zip",
+      title: "Download first-wave recommendations package",
+      priority: "secondary",
+      status: "pass",
+      summary: "Keep the reviewed first-wave inventory, delivery, support, and runtime handoff package attached while Launch Smoke continues.",
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: firstWaveRecommendationsZipDownload
+    } : null,
     firstWaveRuntimeEvidenceSource ? {
       key: "launch_smoke_first_wave_runtime_evidence",
       title: firstWaveRuntimeEvidence?.ready === true
@@ -14278,6 +14327,13 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         label: "Download Smoke Summary",
         recommendedDownload: launchSmokeKitSummaryDownload
       },
+      firstWaveRecommendationsZipDownload
+        ? {
+            kind: "download",
+            label: "Download First-Wave Zip",
+            recommendedDownload: firstWaveRecommendationsZipDownload
+          }
+        : null,
       routeFocusDownload
         ? {
             kind: "download",

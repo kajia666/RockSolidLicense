@@ -17113,6 +17113,25 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       item.key === "launch_review_first_wave_runtime_evidence"
       && item.format === "first-wave-runtime-evidence"
     ));
+    const overflowLaunchReviewFirstWaveZipAction = overflowLaunchReview.reviewSummary.actionPlan.find((item) =>
+      item.key === "launch_review_first_wave_recommendations_zip"
+    );
+    assert.ok(overflowLaunchReviewFirstWaveZipAction);
+    assert.equal(overflowLaunchReviewFirstWaveZipAction.recommendedDownload?.key, "first_wave_recommendations_zip");
+    assert.equal(overflowLaunchReviewFirstWaveZipAction.recommendedDownload?.format, "zip");
+    assert.match(
+      overflowLaunchReviewFirstWaveZipAction.recommendedDownload?.href || "",
+      /\/api\/developer\/ops\/first-wave\/recommendations\/download\?.*format=zip/
+    );
+    assert.ok(overflowLaunchReview.reviewSummary.recommendedDownloads.some((item) =>
+      item.key === "first_wave_recommendations_zip"
+      && item.format === "zip"
+      && /format=zip/.test(item.href || "")
+    ));
+    assert.match(
+      overflowLaunchReview.summaryText,
+      /Launch Review Action Plan:[\s\S]*Download first-wave recommendations package[\s\S]*format=zip/
+    );
     const overflowLaunchReviewSupportConfirmationAction = overflowLaunchReview.reviewSummary.actionPlan.find((item) =>
       item.key === "launch_review_first_wave_support_inspection_confirmation"
     );
@@ -17150,6 +17169,25 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       item.key === "launch_smoke_first_wave_runtime_evidence"
       && item.format === "first-wave-runtime-evidence"
     ));
+    const overflowLaunchSmokeFirstWaveZipAction = overflowLaunchSmoke.smokeSummary.actionPlan.find((item) =>
+      item.key === "launch_smoke_first_wave_recommendations_zip"
+    );
+    assert.ok(overflowLaunchSmokeFirstWaveZipAction);
+    assert.equal(overflowLaunchSmokeFirstWaveZipAction.recommendedDownload?.key, "first_wave_recommendations_zip");
+    assert.equal(overflowLaunchSmokeFirstWaveZipAction.recommendedDownload?.format, "zip");
+    assert.match(
+      overflowLaunchSmokeFirstWaveZipAction.recommendedDownload?.href || "",
+      /\/api\/developer\/ops\/first-wave\/recommendations\/download\?.*format=zip/
+    );
+    assert.ok(overflowLaunchSmoke.smokeSummary.recommendedDownloads.some((item) =>
+      item.key === "first_wave_recommendations_zip"
+      && item.format === "zip"
+      && /format=zip/.test(item.href || "")
+    ));
+    assert.match(
+      overflowLaunchSmoke.summaryText,
+      /Launch Smoke Action Plan:[\s\S]*Download first-wave recommendations package[\s\S]*format=zip/
+    );
     const overflowLaunchSmokeSupportConfirmationAction = overflowLaunchSmoke.smokeSummary.actionPlan.find((item) =>
       item.key === "launch_smoke_first_wave_support_inspection_confirmation"
     );

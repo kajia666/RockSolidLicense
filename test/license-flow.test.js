@@ -17155,6 +17155,8 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchMainlineRoutes.body, /launch-mainline-first-wave-runtime-evidence/);
     assert.match(overflowLaunchMainlineRoutes.body, /format=first-wave-runtime-evidence/);
     assert.match(overflowLaunchMainlineRoutes.body, /\| file=.*first-wave-runtime-evidence\.txt/);
+    assert.match(overflowLaunchMainlineRoutes.body, /ops-first-wave-support-inspection-confirmation/);
+    assert.match(overflowLaunchMainlineRoutes.body, /ops\/first-wave-support-inspection-confirmation\.txt.*format=first-wave-support-inspection-confirmation/);
 
     const overflowLaunchMainlinePostLaunchIndex = await getText(
       baseUrl,
@@ -17199,12 +17201,15 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       ownerSession.token
     );
     assert.match(overflowLaunchMainlineChecksums.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(overflowLaunchMainlineChecksums.body, /ops\/first-wave-support-inspection-confirmation\.txt/);
     const overflowLaunchMainlineZip = await getBinary(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=zip",
       ownerSession.token
     );
     const overflowLaunchMainlineZipText = overflowLaunchMainlineZip.body.toString("latin1");
+    assert.match(overflowLaunchMainlineZipText, /ops\/first-wave-support-inspection-confirmation\.txt/);
+    assert.match(overflowLaunchMainlineZipText, /RockSolid Developer Ops First-Wave Support Inspection Confirmation/);
     assert.match(overflowLaunchMainlineZipText, /First-Wave Support Inspection Confirmation:/);
     assert.match(overflowLaunchMainlineZipText, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 

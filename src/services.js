@@ -21392,6 +21392,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
     ...opsDownloadScope
   });
+  const opsFirstWaveSupportInspectionConfirmationDownload = firstWaveSupportInspectionConfirmation
+    ? buildFirstWaveSupportInspectionConfirmationDownload({
+        ...opsDownloadScope,
+        fileName: "first-wave-support-inspection-confirmation.txt"
+      })
+    : null;
   const mainlineRouteParams = compactRouteParams({
     productCode: payload.filters?.productCode || project.code || "",
     channel: payload.filters?.channel || manifest.channel || "stable",
@@ -21512,6 +21518,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt",
     opsFirstWaveAuditBackfillStatusDownload || {}
   );
+  if (opsFirstWaveSupportInspectionConfirmationDownload) {
+    pushRoute(
+      "ops-first-wave-support-inspection-confirmation",
+      "Developer Ops first-wave support inspection confirmation",
+      opsFiles.firstWaveSupportInspectionConfirmation || "ops/first-wave-support-inspection-confirmation.txt",
+      opsFirstWaveSupportInspectionConfirmationDownload
+    );
+  }
   if (launchOpsOverviewDownload) {
     pushRoute(
       "launch-ops-overview-status",
@@ -22137,6 +22151,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     "ops/first-wave-runtime-evidence.txt",
     payload.opsSnapshot ? buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/first-wave-support-inspection-confirmation.txt",
+    payload.opsSnapshot ? buildDeveloperOpsFirstWaveSupportInspectionConfirmationText(payload.opsSnapshot) : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -23592,6 +23611,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOverviewStatus: "ops/launch-operations-overview-status.txt",
       launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
       firstWaveAuditBackfillStatus: "ops/first-wave-audit-backfill-status.txt",
+      firstWaveSupportInspectionConfirmation: "ops/first-wave-support-inspection-confirmation.txt",
       stabilizationHandoff: "ops/stabilization-handoff.txt"
     },
     packageFiles: {

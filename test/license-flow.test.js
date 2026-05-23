@@ -23968,6 +23968,42 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /first-operating-result-handoff: [^\n]*key=ops_launch_operations_overview_status[^\n]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-production-handoff: [^\n]*format=production-handoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-cutover-handoff: [^\n]*format=cutover-handoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-recovery-drill-handoff: [^\n]*format=recovery-drill-handoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-operations-handoff: [^\n]*format=operations-handoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-post-launch-sweep-handoff: [^\n]*format=post-launch-sweep-handoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-closeout-handoff: [^\n]*format=closeout-handoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-stabilization-handoff: [^\n]*format=stabilization-handoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-first-launch-handoff: [^\n]*format=first-launch-handoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-mainline-rehearsal-guide: [^\n]*format=rehearsal-guide/
+    );
 
     const launchMainlineOpsRouteMirrorChecksumsDownload = await getText(
       baseUrl,
@@ -24012,6 +24048,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-board-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-action-links\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-action-links-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /production-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /cutover-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /recovery-drill-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /operations-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /post-launch-sweep-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /closeout-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /stabilization-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /first-launch-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /rehearsal-guide-download\.txt/);
 
     const launchMainlineOpsRouteMirrorZipDownload = await getBinary(
       baseUrl,
@@ -24119,6 +24164,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Action Links/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Steady-State Duty Action Links Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=steady-state-duty-action-links/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /production-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /cutover-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /recovery-drill-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /operations-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /post-launch-sweep-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /closeout-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /stabilization-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /first-launch-handoff-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /rehearsal-guide-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
@@ -24221,6 +24275,42 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Staging launch-duty archive download route: ops\/staging-launch-duty-archive-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Production handoff download route: production-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Cutover handoff download route: cutover-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Recovery drill handoff download route: recovery-drill-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Operations handoff download route: operations-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Post-launch sweep handoff download route: post-launch-sweep-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Closeout handoff download route: closeout-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Stabilization handoff download route: stabilization-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*First launch handoff download route: first-launch-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Rehearsal guide download route: rehearsal-guide-download\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,

@@ -21466,6 +21466,139 @@ function getDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownload(paylo
   return opsDownloadScope ? buildDeveloperOpsLaunchOperationsShiftActionPlanDownload(opsDownloadScope) : null;
 }
 
+function getDeveloperLaunchMainlineRouteDownloadParams(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const productCode = filters.productCode || project.code || "";
+  if (!productCode) {
+    return null;
+  }
+  return compactRouteParams({
+    productCode,
+    channel: filters.channel || manifest.channel || "stable",
+    username: filters.username || "",
+    search: filters.search || "",
+    eventType: filters.eventType || "",
+    actorType: filters.actorType || "",
+    entityType: filters.entityType || "",
+    reviewMode: filters.reviewMode || "",
+    operation: filters.operation || "",
+    actionKey: filters.actionKey || "",
+    downloadKey: filters.downloadKey || "",
+    routeTitle: filters.routeTitle || "",
+    routeReason: filters.routeReason || ""
+  });
+}
+
+function getDeveloperLaunchMainlineProductionHandoffDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline production handoff",
+        payload.productionHandoffFileName || "developer-launch-mainline-production-handoff.txt",
+        "production-handoff",
+        params
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlineCutoverHandoffDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline cutover handoff",
+        payload.cutoverHandoffFileName || "developer-launch-mainline-cutover-handoff.txt",
+        "cutover-handoff",
+        params
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline recovery drill handoff",
+        payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt",
+        "recovery-drill-handoff",
+        params
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlineOperationsHandoffDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline operations handoff",
+        payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
+        "operations-handoff",
+        params
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlinePostLaunchSweepHandoffDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline post-launch sweep handoff",
+        payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt",
+        "post-launch-sweep-handoff",
+        params
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlineCloseoutHandoffDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline closeout handoff",
+        payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt",
+        "closeout-handoff",
+        params
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlinePackageStabilizationHandoffDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline stabilization handoff",
+        payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
+        "stabilization-handoff",
+        params
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlineFirstLaunchHandoffDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline first launch handoff",
+        payload.firstLaunchHandoffFileName || "developer-launch-mainline-first-launch-handoff.txt",
+        "first-launch-handoff",
+        params
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlineRehearsalGuideDownload(payload = {}) {
+  const params = getDeveloperLaunchMainlineRouteDownloadParams(payload);
+  return params
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch mainline rehearsal guide",
+        payload.rehearsalGuideFileName || "developer-launch-mainline-rehearsal-guide.txt",
+        "rehearsal-guide",
+        params
+      )
+    : null;
+}
+
 function getDeveloperLaunchMainlineOpsDownloadScope(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -22011,6 +22144,161 @@ function buildDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownloadText(pay
   });
 }
 
+function buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+  payload = {},
+  title = "",
+  download = null,
+  status = "",
+  action = "",
+  operatorOrder = [],
+  notes = []
+} = {}) {
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title,
+    download,
+    status,
+    action,
+    operatorOrder,
+    notes
+  });
+}
+
+function buildDeveloperLaunchMainlineProductionHandoffDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline Production Handoff Download",
+    download: getDeveloperLaunchMainlineProductionHandoffDownload(payload),
+    status: payload.productionHandoffText ? "READY" : "MISSING",
+    action: "review_production_handoff",
+    operatorOrder: ["Open the production handoff route before launch-day gate review and owner signoff."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline production handoff from the offline package.",
+      "Keep it beside developer-launch-mainline-production-handoff.txt so production gate context stays recoverable."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineCutoverHandoffDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline Cutover Handoff Download",
+    download: getDeveloperLaunchMainlineCutoverHandoffDownload(payload),
+    status: payload.cutoverHandoffText ? "READY" : "MISSING",
+    action: "review_cutover_handoff",
+    operatorOrder: ["Open the cutover handoff route before the launch window switches into live cutover execution."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline cutover handoff from the offline package.",
+      "Keep it beside developer-launch-mainline-cutover-handoff.txt so cutover checklist review does not need manual URL reconstruction."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineRecoveryDrillHandoffDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline Recovery Drill Handoff Download",
+    download: getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload),
+    status: payload.recoveryDrillHandoffText ? "READY" : "MISSING",
+    action: "review_recovery_drill_handoff",
+    operatorOrder: ["Open the recovery drill handoff route before rollback and recovery checks are rehearsed."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline recovery drill handoff from the offline package.",
+      "Keep it beside developer-launch-mainline-recovery-drill-handoff.txt so recovery readiness stays traceable."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineOperationsHandoffDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline Operations Handoff Download",
+    download: getDeveloperLaunchMainlineOperationsHandoffDownload(payload),
+    status: payload.operationsHandoffText ? "READY" : "MISSING",
+    action: "review_operations_handoff",
+    operatorOrder: ["Open the operations handoff route before first-wave launch-day watch and operator relay."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline operations handoff from the offline package.",
+      "Keep it beside developer-launch-mainline-operations-handoff.txt so operator execution context can be recovered quickly."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlinePostLaunchSweepHandoffDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline Post-Launch Sweep Handoff Download",
+    download: getDeveloperLaunchMainlinePostLaunchSweepHandoffDownload(payload),
+    status: payload.postLaunchSweepHandoffText ? "READY" : "MISSING",
+    action: "review_post_launch_sweep_handoff",
+    operatorOrder: ["Open the post-launch sweep handoff route before recording first-wave ops sweep evidence."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline post-launch sweep handoff from the offline package.",
+      "Keep it beside developer-launch-mainline-post-launch-sweep-handoff.txt so first-wave sweep continuity is not blocked by URL rebuild."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineCloseoutHandoffDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline Closeout Handoff Download",
+    download: getDeveloperLaunchMainlineCloseoutHandoffDownload(payload),
+    status: payload.closeoutHandoffText ? "READY" : "MISSING",
+    action: "review_closeout_handoff",
+    operatorOrder: ["Open the closeout handoff route before launch-day closeout and duty transfer."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline closeout handoff from the offline package.",
+      "Keep it beside developer-launch-mainline-closeout-handoff.txt so closeout review can resume without recreating query parameters."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlinePackageStabilizationHandoffDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline Stabilization Handoff Download",
+    download: getDeveloperLaunchMainlinePackageStabilizationHandoffDownload(payload),
+    status: payload.stabilizationHandoffText ? "READY" : "MISSING",
+    action: "review_stabilization_handoff",
+    operatorOrder: ["Open the stabilization handoff route before stable-operations transition review."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline stabilization handoff from the offline package.",
+      "Keep it beside developer-launch-mainline-stabilization-handoff.txt so stabilization readiness handoff remains verifiable."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineFirstLaunchHandoffDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline First Launch Handoff Download",
+    download: getDeveloperLaunchMainlineFirstLaunchHandoffDownload(payload),
+    status: payload.firstLaunchHandoffText ? "READY" : "MISSING",
+    action: "review_first_launch_handoff",
+    operatorOrder: ["Open the first launch handoff route before handing the first real-user chain to the next operator."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline first launch handoff from the offline package.",
+      "Keep it beside developer-launch-mainline-first-launch-handoff.txt so first-wave operator context can be restored immediately."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineRehearsalGuideDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineCoreHandoffDownloadRouteText({
+    payload,
+    title: "RockSolid Launch Mainline Rehearsal Guide Download",
+    download: getDeveloperLaunchMainlineRehearsalGuideDownload(payload),
+    status: payload.rehearsalGuideText ? "READY" : "MISSING",
+    action: "review_rehearsal_guide",
+    operatorOrder: ["Open the rehearsal guide route before launch smoke, recovery drill, and evidence rehearsal passes."],
+    notes: [
+      "Use this route to re-fetch the Launch Mainline rehearsal guide from the offline package.",
+      "Keep it beside developer-launch-mainline-rehearsal-guide.txt so rehearsal entrypoints remain one click away during launch duty."
+    ]
+  });
+}
+
 function buildDeveloperLaunchMainlinePayload({
   generatedAt = nowIso(),
   releasePackage = null,
@@ -22400,6 +22688,15 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "zip",
     mainlineRouteParams
   );
+  const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
+  const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
+  const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
+  const operationsHandoffDownload = getDeveloperLaunchMainlineOperationsHandoffDownload(payload);
+  const postLaunchSweepHandoffDownload = getDeveloperLaunchMainlinePostLaunchSweepHandoffDownload(payload);
+  const closeoutHandoffDownload = getDeveloperLaunchMainlineCloseoutHandoffDownload(payload);
+  const packageStabilizationHandoffDownload = getDeveloperLaunchMainlinePackageStabilizationHandoffDownload(payload);
+  const firstLaunchHandoffDownload = getDeveloperLaunchMainlineFirstLaunchHandoffDownload(payload);
+  const rehearsalGuideDownload = getDeveloperLaunchMainlineRehearsalGuideDownload(payload);
   const firstWaveRuntimeEvidenceSource = mainlineSummary.firstWaveRuntimeEvidence
     || mainlineSummary.firstWaveSupportInspectionConfirmation
     || null;
@@ -22513,6 +22810,78 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
     postLaunchHandoffIndexDownload || {}
   );
+  if (productionHandoffDownload) {
+    pushRoute(
+      "launch-mainline-production-handoff",
+      "Launch Mainline production handoff",
+      payload.productionHandoffFileName || "developer-launch-mainline-production-handoff.txt",
+      productionHandoffDownload
+    );
+  }
+  if (cutoverHandoffDownload) {
+    pushRoute(
+      "launch-mainline-cutover-handoff",
+      "Launch Mainline cutover handoff",
+      payload.cutoverHandoffFileName || "developer-launch-mainline-cutover-handoff.txt",
+      cutoverHandoffDownload
+    );
+  }
+  if (recoveryDrillHandoffDownload) {
+    pushRoute(
+      "launch-mainline-recovery-drill-handoff",
+      "Launch Mainline recovery drill handoff",
+      payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt",
+      recoveryDrillHandoffDownload
+    );
+  }
+  if (operationsHandoffDownload) {
+    pushRoute(
+      "launch-mainline-operations-handoff",
+      "Launch Mainline operations handoff",
+      payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
+      operationsHandoffDownload
+    );
+  }
+  if (postLaunchSweepHandoffDownload) {
+    pushRoute(
+      "launch-mainline-post-launch-sweep-handoff",
+      "Launch Mainline post-launch sweep handoff",
+      payload.postLaunchSweepHandoffFileName || "developer-launch-mainline-post-launch-sweep-handoff.txt",
+      postLaunchSweepHandoffDownload
+    );
+  }
+  if (closeoutHandoffDownload) {
+    pushRoute(
+      "launch-mainline-closeout-handoff",
+      "Launch Mainline closeout handoff",
+      payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt",
+      closeoutHandoffDownload
+    );
+  }
+  if (packageStabilizationHandoffDownload) {
+    pushRoute(
+      "launch-mainline-stabilization-handoff",
+      "Launch Mainline stabilization handoff",
+      payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
+      packageStabilizationHandoffDownload
+    );
+  }
+  if (firstLaunchHandoffDownload) {
+    pushRoute(
+      "launch-mainline-first-launch-handoff",
+      "Launch Mainline first launch handoff",
+      payload.firstLaunchHandoffFileName || "developer-launch-mainline-first-launch-handoff.txt",
+      firstLaunchHandoffDownload
+    );
+  }
+  if (rehearsalGuideDownload) {
+    pushRoute(
+      "launch-mainline-rehearsal-guide",
+      "Launch Mainline rehearsal guide",
+      payload.rehearsalGuideFileName || "developer-launch-mainline-rehearsal-guide.txt",
+      rehearsalGuideDownload
+    );
+  }
   pushRoute(
     "launch-mainline-json",
     "Launch Mainline JSON",
@@ -23367,8 +23736,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "production-handoff-download.txt",
+    getDeveloperLaunchMainlineProductionHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlineProductionHandoffDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.cutoverHandoffFileName || "developer-launch-mainline-cutover-handoff.txt",
     payload.cutoverHandoffText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "cutover-handoff-download.txt",
+    getDeveloperLaunchMainlineCutoverHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlineCutoverHandoffDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -23377,8 +23760,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "recovery-drill-handoff-download.txt",
+    getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlineRecoveryDrillHandoffDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.operationsHandoffFileName || "developer-launch-mainline-operations-handoff.txt",
     payload.operationsHandoffText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "operations-handoff-download.txt",
+    getDeveloperLaunchMainlineOperationsHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlineOperationsHandoffDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -23387,13 +23784,34 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "post-launch-sweep-handoff-download.txt",
+    getDeveloperLaunchMainlinePostLaunchSweepHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlinePostLaunchSweepHandoffDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.closeoutHandoffFileName || "developer-launch-mainline-closeout-handoff.txt",
     payload.closeoutHandoffText || ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "closeout-handoff-download.txt",
+    getDeveloperLaunchMainlineCloseoutHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlineCloseoutHandoffDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt",
     payload.stabilizationHandoffText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "stabilization-handoff-download.txt",
+    getDeveloperLaunchMainlinePackageStabilizationHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlinePackageStabilizationHandoffDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -23433,8 +23851,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "first-launch-handoff-download.txt",
+    getDeveloperLaunchMainlineFirstLaunchHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlineFirstLaunchHandoffDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     payload.rehearsalGuideFileName || "developer-launch-mainline-rehearsal-guide.txt",
     payload.rehearsalGuideText || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "rehearsal-guide-download.txt",
+    getDeveloperLaunchMainlineRehearsalGuideDownload(payload)
+      ? buildDeveloperLaunchMainlineRehearsalGuideDownloadText(payload)
+      : ""
   );
   return files;
 }
@@ -24906,6 +25338,15 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchOperationsHandoffSummaryDownload = getDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownload(payload);
   const launchOperationsDailyBriefDownload = getDeveloperLaunchMainlineLaunchOperationsDailyBriefDownload(payload);
   const launchOperationsShiftActionPlanDownload = getDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownload(payload);
+  const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
+  const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
+  const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
+  const operationsHandoffDownload = getDeveloperLaunchMainlineOperationsHandoffDownload(payload);
+  const postLaunchSweepHandoffDownload = getDeveloperLaunchMainlinePostLaunchSweepHandoffDownload(payload);
+  const closeoutHandoffDownload = getDeveloperLaunchMainlineCloseoutHandoffDownload(payload);
+  const packageStabilizationHandoffDownload = getDeveloperLaunchMainlinePackageStabilizationHandoffDownload(payload);
+  const firstLaunchHandoffDownload = getDeveloperLaunchMainlineFirstLaunchHandoffDownload(payload);
+  const rehearsalGuideDownload = getDeveloperLaunchMainlineRehearsalGuideDownload(payload);
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -24949,6 +25390,33 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       : []),
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
     ["Staging launch-duty archive", opsFiles.stagingLaunchDutyArchive || "ops/staging-launch-duty-archive.txt"],
+    ...(productionHandoffDownload
+      ? [["Production handoff download route", "production-handoff-download.txt"]]
+      : []),
+    ...(cutoverHandoffDownload
+      ? [["Cutover handoff download route", "cutover-handoff-download.txt"]]
+      : []),
+    ...(recoveryDrillHandoffDownload
+      ? [["Recovery drill handoff download route", "recovery-drill-handoff-download.txt"]]
+      : []),
+    ...(operationsHandoffDownload
+      ? [["Operations handoff download route", "operations-handoff-download.txt"]]
+      : []),
+    ...(postLaunchSweepHandoffDownload
+      ? [["Post-launch sweep handoff download route", "post-launch-sweep-handoff-download.txt"]]
+      : []),
+    ...(closeoutHandoffDownload
+      ? [["Closeout handoff download route", "closeout-handoff-download.txt"]]
+      : []),
+    ...(packageStabilizationHandoffDownload
+      ? [["Stabilization handoff download route", "stabilization-handoff-download.txt"]]
+      : []),
+    ...(firstLaunchHandoffDownload
+      ? [["First launch handoff download route", "first-launch-handoff-download.txt"]]
+      : []),
+    ...(rehearsalGuideDownload
+      ? [["Rehearsal guide download route", "rehearsal-guide-download.txt"]]
+      : []),
     ["Launch operations operator checklist", opsFiles.launchOperationsOperatorChecklist || "ops/launch-operations-operator-checklist.txt"],
     ["Launch operations operator entry", opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"],
     ["Launch operations handoff summary", opsFiles.launchOperationsHandoffSummary || "ops/launch-operations-handoff-summary.txt"],

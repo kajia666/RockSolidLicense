@@ -15984,6 +15984,12 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       preConfirmOpsSnapshot.summary.initialLaunchOpsReadiness.firstWaveReadinessBridge.readySegmentCount,
       2
     );
+    assert.ok(Array.isArray(preConfirmOpsSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads));
+    assert.ok(preConfirmOpsSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
+      item.key === "first_wave_recommendations_zip"
+      && item.format === "zip"
+      && /format=zip/.test(item.href || "")
+    ));
     assert.match(preConfirmOpsSnapshot.summaryText, /First-Wave Readiness Bridge:/);
     assert.match(preConfirmOpsSnapshot.summaryText, /status=ready_for_first_wave_handoff \| gate=first_round_ops \| ready=2\/3/);
     assert.match(preConfirmOpsSnapshot.summaryText, /First-Wave Support Inspection Plan:/);
@@ -16109,6 +16115,12 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && /format=checksums/.test(item.recommendedDownload?.href || "")
     ));
     assert.ok(mainlineFirstWaveBridgeCard.controls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download First-Wave Zip"
+      && item.recommendedDownload?.format === "zip"
+      && /format=zip/.test(item.recommendedDownload?.href || "")
+    ));
+    assert.ok(mainlineFirstWaveBridgeCard.controls.some((item) =>
       item.kind === "confirm"
       && item.label === "Confirm First-Wave Handoff"
       && item.confirmation?.endpoint === "/api/developer/ops/first-wave/recommendations/confirm"
@@ -16144,6 +16156,12 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       && /format=summary/.test(item.recommendedDownload?.href || "")
     ));
     assert.ok(mainlineAfterRecommendation.mainlineSummary.heroControls.some((item) =>
+      item.kind === "download"
+      && item.label === "Download First-Wave Zip"
+      && item.recommendedDownload?.format === "zip"
+      && /format=zip/.test(item.recommendedDownload?.href || "")
+    ));
+    assert.ok(mainlineAfterRecommendation.mainlineSummary.heroControls.some((item) =>
       item.kind === "confirm"
       && item.label === "Confirm First-Wave Handoff"
       && item.confirmation?.endpoint === "/api/developer/ops/first-wave/recommendations/confirm"
@@ -16175,6 +16193,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineAfterRecommendation.summaryText, /confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(mainlineAfterRecommendation.summaryText, /First-Wave Readiness Bridge \| First-wave handoff is ready_for_first_wave_handoff at first_round_ops/);
     assert.match(mainlineAfterRecommendation.summaryText, /control: Download First-Wave JSON \| download=.*format=json/);
+    assert.match(mainlineAfterRecommendation.summaryText, /control: Download First-Wave Zip \| download=.*format=zip/);
     assert.match(mainlineAfterRecommendation.summaryText, /control: Open First-Wave Support Inspection \| workspace=Open First-Wave Accounts@accounts\?productCode=FIRSTWAVE,channel=stable,routeAction=review-accounts/);
     assert.match(mainlineAfterRecommendation.summaryText, /control: Download First-Wave Runtime Evidence \| download=First-wave runtime evidence:developer-ops-first-wave-runtime-evidence\.txt \| href=.*format=first-wave-runtime-evidence/);
     assert.match(mainlineAfterRecommendation.summaryText, /control: Confirm First-Wave Support Inspection \| confirm=POST \/api\/developer\/ops\/first-wave\/support-inspection\/confirm \| draft=confirmed\/ready_for_support_inspection\/6\/6/);
@@ -16197,6 +16216,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(mainlineSummaryAfterRecommendation.body, /download=.*format=summary/);
     assert.match(mainlineSummaryAfterRecommendation.body, /First-Wave Readiness Bridge \| First-wave handoff is ready_for_first_wave_handoff at first_round_ops/);
     assert.match(mainlineSummaryAfterRecommendation.body, /control: Download First-Wave Checksums \| download=.*format=checksums/);
+    assert.match(mainlineSummaryAfterRecommendation.body, /control: Download First-Wave Zip \| download=.*format=zip/);
     assert.match(mainlineSummaryAfterRecommendation.body, /control: Open First-Wave Support Inspection \| workspace=Open First-Wave Accounts@accounts\?productCode=FIRSTWAVE,channel=stable,routeAction=review-accounts/);
     assert.match(mainlineSummaryAfterRecommendation.body, /control: Confirm First-Wave Support Inspection \| confirm=POST \/api\/developer\/ops\/first-wave\/support-inspection\/confirm \| draft=confirmed\/ready_for_support_inspection\/6\/6/);
     assert.match(mainlineSummaryAfterRecommendation.body, /Open First-Wave Support Inspection \| workspace=Open First-Wave Accounts@accounts\?productCode=FIRSTWAVE,channel=stable,routeAction=review-accounts/);

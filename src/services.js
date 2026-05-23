@@ -16929,6 +16929,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           label: "Download First-Wave Recommendations",
           recommendedDownload: firstWaveReadinessBridge.downloads.summary
         } : null,
+        firstWaveReadinessBridge.downloads?.zip ? {
+          kind: "download",
+          label: "Download First-Wave Zip",
+          recommendedDownload: firstWaveReadinessBridge.downloads.zip
+        } : null,
         ...firstWaveSupportInspectionControls,
         firstWaveReadinessBridge.confirmation?.endpoint ? {
           kind: "confirm",
@@ -17423,6 +17428,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
             kind: "download",
             label: "Download First-Wave Checksums",
             recommendedDownload: firstWaveReadinessBridge.downloads.checksums
+          } : null,
+          firstWaveReadinessBridge.downloads?.zip ? {
+            kind: "download",
+            label: "Download First-Wave Zip",
+            recommendedDownload: firstWaveReadinessBridge.downloads.zip
           } : null,
           ...firstWaveSupportInspectionControls,
           firstWaveReadinessBridge.confirmation?.endpoint ? {
@@ -37875,6 +37885,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchMainlineHandoffRoutesDownload,
     stagingLaunchDutyArchiveDownload,
     initialLaunchReadinessDownload,
+    firstWaveReadinessBridge?.downloads?.zip,
     firstWaveSupportInspectionConfirmationPayload?.runtimeEvidenceDownload,
     firstWaveSupportInspectionConfirmationPayload?.confirmationDownload,
     mainlineHandoff?.downloads?.checksums,

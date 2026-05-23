@@ -37765,6 +37765,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     }
   );
   const firstWaveConfirmationChain = buildFirstWaveConfirmationChainPayload(firstWaveHandoffConfirmation);
+  const firstWaveSupportInspectionConfirmationPayload = buildFirstWaveSupportInspectionConfirmationPayload(firstWaveSupportInspectionConfirmation);
   const operatorActionReceipts = buildDeveloperOpsInitialLaunchOperatorActionReceipts(overview.latestLaunchReceipts, 5);
   const primaryWorkspaceAction = launchReceiptNextFollowUp?.recommendedAction?.workspaceAction
     || mainlineHandoff?.workspaceAction
@@ -37873,6 +37874,8 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchMainlineHandoffRoutesDownload,
     stagingLaunchDutyArchiveDownload,
     initialLaunchReadinessDownload,
+    firstWaveSupportInspectionConfirmationPayload?.runtimeEvidenceDownload,
+    firstWaveSupportInspectionConfirmationPayload?.confirmationDownload,
     mainlineHandoff?.downloads?.checksums,
     mainlineHandoff?.downloads?.zip
   ]) {
@@ -38535,7 +38538,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     firstLaunchOperatingChain,
     firstWaveReadinessBridge: currentFirstWaveReadinessBridge,
     firstWaveHandoffConfirmation: buildFirstWaveHandoffConfirmationPayload(firstWaveHandoffConfirmation),
-    firstWaveSupportInspectionConfirmation: buildFirstWaveSupportInspectionConfirmationPayload(firstWaveSupportInspectionConfirmation),
+    firstWaveSupportInspectionConfirmation: firstWaveSupportInspectionConfirmationPayload,
     firstWaveConfirmationChain,
     traceability,
     nextSteps
@@ -38724,6 +38727,10 @@ function buildDeveloperOpsFirstWaveSupportInspectionPlan({
         params: scopedParams
       }
     ),
+    buildFirstWaveSupportInspectionConfirmationDownload({
+      productCode,
+      channel
+    }),
     createLaunchWorkflowDownloadShortcut(
       "first_wave_support_ops_zip",
       "developer-ops-first-wave-support.zip",

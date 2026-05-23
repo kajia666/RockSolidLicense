@@ -15947,6 +15947,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       [
         ["first_wave_support_ops_summary", "summary", "developer-ops"],
         ["first_wave_support_runtime_evidence", "first-wave-runtime-evidence", "developer-ops"],
+        ["first_wave_support_inspection_confirmation", "first-wave-support-inspection-confirmation", "developer-ops"],
         ["first_wave_support_ops_zip", "zip", "developer-ops"]
       ]
     );
@@ -16024,7 +16025,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(handoffDownload.body, /status=ready_for_support_inspection \| owner=support \| current=accounts \| targets=6/);
     assert.match(handoffDownload.body, /1\. accounts \| status=ready \| count=\d+ \| workspace=\/developer\/ops\?productCode=FIRSTWAVE&channel=stable&routeAction=review-accounts&autofocus=accounts/);
     assert.match(handoffDownload.body, /4\. cards \| status=ready \| count=\d+ \| workspace=\/developer\/licenses\?productCode=FIRSTWAVE&channel=stable&routeAction=review-cards&autofocus=cards/);
-    assert.match(handoffDownload.body, /downloads=first_wave_support_ops_summary:summary, first_wave_support_runtime_evidence:first-wave-runtime-evidence, first_wave_support_ops_zip:zip/);
+    assert.match(handoffDownload.body, /downloads=first_wave_support_ops_summary:summary, first_wave_support_runtime_evidence:first-wave-runtime-evidence, first_wave_support_inspection_confirmation:first-wave-support-inspection-confirmation, first_wave_support_ops_zip:zip/);
     assert.match(handoffDownload.body, /First Launch Operating Chain:/);
     assert.match(handoffDownload.body, /status=ready_for_handoff_confirmation \| ready=false \| current=handoff_review \| phases=2\/5/);
     assert.match(handoffDownload.body, /next=confirm_first_wave_handoff \| phase=handoff_review \| operation=confirm_first_wave_handoff/);
@@ -16657,6 +16658,16 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       item.key === "ops_first_wave_audit_backfill_status"
       && item.format === "first-wave-audit-backfill-status"
       && /format=first-wave-audit-backfill-status/.test(item.href || "")
+    ));
+    assert.ok(confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
+      item.key === "first_wave_support_runtime_evidence"
+      && item.format === "first-wave-runtime-evidence"
+      && /format=first-wave-runtime-evidence/.test(item.href || "")
+    ));
+    assert.ok(confirmedOpsSnapshot.summary.initialLaunchOpsReadiness.recommendedDownloads.some((item) =>
+      item.key === "first_wave_support_inspection_confirmation"
+      && item.format === "first-wave-support-inspection-confirmation"
+      && /format=first-wave-support-inspection-confirmation/.test(item.href || "")
     ));
     assert.match(confirmedOpsSnapshot.summaryText, /First-Wave Handoff Confirmation:/);
     assert.match(confirmedOpsSnapshot.summaryText, new RegExp(`audit=${handoffConfirmation.auditLogId}`));

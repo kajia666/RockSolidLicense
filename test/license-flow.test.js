@@ -17164,6 +17164,14 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       ownerSession.token
     );
     assert.match(overflowLaunchMainlinePostLaunchIndex.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(
+      overflowLaunchMainlinePostLaunchIndex.body,
+      /Included Handoff Files:[\s\S]*Developer Ops first-wave support inspection confirmation: ops\/first-wave-support-inspection-confirmation\.txt/
+    );
+    assert.match(
+      overflowLaunchMainlinePostLaunchIndex.body,
+      /First-Wave Support Inspection Confirmation: ops\/first-wave-support-inspection-confirmation\.txt \| file=first-wave-support-inspection-confirmation\.txt \| format=first-wave-support-inspection-confirmation \| href=.*format=first-wave-support-inspection-confirmation/
+    );
 
     const overflowLaunchReviewChecksums = await getText(
       baseUrl,

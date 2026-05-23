@@ -23672,12 +23672,22 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
     ? payload.opsSnapshot.scope
     : {};
-  const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
+  const opsDownloadScope = {
     ...filters,
     ...opsScope,
     productCode: opsScope.productCode || filters.productCode || project.code || "",
     channel: opsScope.channel || filters.channel || manifest.channel || "stable"
+  };
+  const firstWaveSupportInspectionConfirmation = mainlineSummary.firstWaveSupportInspectionConfirmation || null;
+  const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
+    ...opsDownloadScope
   });
+  const opsFirstWaveSupportInspectionConfirmationDownload = firstWaveSupportInspectionConfirmation
+    ? buildFirstWaveSupportInspectionConfirmationDownload({
+        ...opsDownloadScope,
+        fileName: "first-wave-support-inspection-confirmation.txt"
+      })
+    : null;
   const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
   const steadyStateHandoffLanding = mainlineSummary.steadyStateHandoffLanding
     && typeof mainlineSummary.steadyStateHandoffLanding === "object"
@@ -23736,8 +23746,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ...(mainlineSummary.firstWaveRuntimeEvidence || mainlineSummary.firstWaveSupportInspectionConfirmation
       ? [["First-wave runtime evidence", payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt"]]
       : []),
-    ...(mainlineSummary.firstWaveSupportInspectionConfirmation
+    ...(firstWaveSupportInspectionConfirmation
       ? [["First-wave support inspection confirmation", payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-mainline-first-wave-support-inspection-confirmation.txt"]]
+      : []),
+    ...(firstWaveSupportInspectionConfirmation
+      ? [["Developer Ops first-wave support inspection confirmation", opsFiles.firstWaveSupportInspectionConfirmation || "ops/first-wave-support-inspection-confirmation.txt"]]
       : []),
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
     ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
@@ -23838,6 +23851,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | format=${opsFirstWaveAuditBackfillStatusDownload.format || "-"}`
     + ` | href=${opsFirstWaveAuditBackfillStatusDownload.href || "-"}`
   );
+  if (opsFirstWaveSupportInspectionConfirmationDownload) {
+    lines.push(
+      `- First-Wave Support Inspection Confirmation: ${opsFiles.firstWaveSupportInspectionConfirmation || "ops/first-wave-support-inspection-confirmation.txt"}`
+      + ` | file=${opsFirstWaveSupportInspectionConfirmationDownload.fileName || "-"}`
+      + ` | format=${opsFirstWaveSupportInspectionConfirmationDownload.format || "-"}`
+      + ` | href=${opsFirstWaveSupportInspectionConfirmationDownload.href || "-"}`
+    );
+  }
   lines.push(
     `- Launch Operations Overview Status: ${opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"}`
     + ` | status=${launchOperationsOverviewStatus?.status || "-"}`

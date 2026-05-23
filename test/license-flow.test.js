@@ -23975,8 +23975,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-mainline-handoff-routes\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-mainline-handoff-routes-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-file-index\.json/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/handoff-index-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/pre-staging-readiness-self-check\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/pre-staging-readiness-self-check-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-checklist\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-checklist-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
@@ -23991,6 +23994,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-receipt-next-follow-up-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-receipt-backfill-status\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-receipt-backfill-status-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-audit-backfill-status-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-runtime-evidence\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-runtime-evidence-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-support-inspection-confirmation-download\.txt/);
@@ -23998,7 +24002,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/staging-launch-duty-archive\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/staging-launch-duty-archive-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-operational-review\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-operational-review-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-exception-digest\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-exception-digest-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/stabilization-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-handoff-brief\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-board\.txt/);
@@ -24013,11 +24020,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const launchMainlineOpsRouteMirrorZipText = launchMainlineOpsRouteMirrorZipDownload.body.toString("latin1");
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-mainline-handoff-routes\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-mainline-handoff-routes-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Mainline Handoff Routes Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-mainline-handoff-routes/);
     assert.match(launchMainlineOpsRouteMirrorZipText, latestLaunchDutySelectionChecklistStepPattern);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/handoff-index-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Handoff Index Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=handoff-index/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-file-index\.json/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/pre-staging-readiness-self-check\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/pre-staging-readiness-self-check-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Pre-Staging Readiness Self-Check/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Pre-Staging Readiness Self-Check Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=pre-staging-readiness-self-check/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-checklist\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-checklist-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry\.txt/);
@@ -24054,6 +24070,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Receipt Backfill Status Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-receipt-backfill-status/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-receipt-backfill-status\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-audit-backfill-status-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid First-Wave Audit Backfill Status Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=first-wave-audit-backfill-status/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-runtime-evidence\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-runtime-evidence-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-support-inspection-confirmation-download\.txt/);
@@ -24061,7 +24080,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/staging-launch-duty-archive\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/staging-launch-duty-archive-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-operational-review\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-operational-review-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-exception-digest\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-exception-digest-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/stabilization-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-handoff-brief\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-board\.txt/);
@@ -24080,7 +24102,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Staging Launch-Duty Archive Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=staging-launch-duty-archive/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Operational Review/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Steady-State Operational Review Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=steady-state-operational-review/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Exception Digest/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Steady-State Exception Digest Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=steady-state-exception-digest/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Stabilization Handoff Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=stabilization-handoff/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Handoff Brief/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Stable Operations Handoff Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Source Surface: launch-mainline/);
@@ -24119,6 +24147,34 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Steady-state duty action links download route: ops\/steady-state-duty-action-links-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Ops handoff index download route: ops\/handoff-index-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Pre-staging readiness self-check download route: ops\/pre-staging-readiness-self-check-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Launch Mainline handoff routes download route: ops\/launch-mainline-handoff-routes-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*First-Wave audit backfill status download route: ops\/first-wave-audit-backfill-status-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Ops stabilization handoff download route: ops\/stabilization-handoff-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Steady-state operational review download route: ops\/steady-state-operational-review-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Steady-state exception digest download route: ops\/steady-state-exception-digest-download\.txt/
     );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(

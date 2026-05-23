@@ -21395,6 +21395,52 @@ function getDeveloperLaunchMainlineStagingLaunchDutyArchiveDownload(payload = {}
   return opsDownloadScope ? buildDeveloperOpsStagingLaunchDutyArchiveDownload(opsDownloadScope) : null;
 }
 
+function getDeveloperLaunchMainlineOpsHandoffIndexDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope
+    ? createLaunchWorkflowDownloadShortcut(
+        "ops_handoff_index",
+        "developer-ops-handoff-index.txt",
+        "Developer Ops handoff index",
+        {
+          source: "developer-ops",
+          format: "handoff-index",
+          params: buildDeveloperOpsRouteReviewBaseDownloadParams(opsDownloadScope)
+        }
+      )
+    : null;
+}
+
+function getDeveloperLaunchMainlinePreStagingReadinessSelfCheckDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsPreStagingReadinessSelfCheckDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineLaunchMainlineHandoffRoutesDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineFirstWaveAuditBackfillStatusDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsFirstWaveAuditBackfillStatusDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineStabilizationHandoffDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsStabilizationHandoffDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineSteadyStateOperationalReviewDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsSteadyStateOperationalReviewDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineSteadyStateExceptionDigestDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsSteadyStateExceptionDigestDownload(opsDownloadScope) : null;
+}
+
 function getDeveloperLaunchMainlineLaunchOperationsOperatorChecklistDownload(payload = {}) {
   const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
   return opsDownloadScope ? buildDeveloperOpsLaunchOperationsOperatorChecklistDownload(opsDownloadScope) : null;
@@ -21731,6 +21777,122 @@ function buildDeveloperLaunchMainlineStagingLaunchDutyArchiveDownloadText(payloa
     notes: [
       "Use this route to re-fetch the Developer Ops staging launch-duty archive from the offline Mainline package.",
       "Keep it beside staging-launch-duty-archive.txt so launch duty can re-open the staging archive without manual format lookup."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineOpsHandoffIndexDownloadText(payload = {}) {
+  const readiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Developer Ops Handoff Index Download",
+    download: getDeveloperLaunchMainlineOpsHandoffIndexDownload(payload),
+    status: readiness?.status || readiness?.gate?.status || "",
+    action: "review_developer_ops_handoff_index",
+    operatorOrder: ["Open the handoff index route before walking the offline Developer Ops package file list."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops handoff index from the offline Mainline package.",
+      "Keep it beside ops/handoff-index.txt so launch duty can verify the package map without manual format lookup."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlinePreStagingReadinessSelfCheckDownloadText(payload = {}) {
+  const preStagingReadinessSelfCheck = payload.mainlineSummary?.preStagingReadinessSelfCheck
+    || payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.preStagingReadinessSelfCheck
+    || payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket
+    || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Pre-Staging Readiness Self-Check Download",
+    download: getDeveloperLaunchMainlinePreStagingReadinessSelfCheckDownload(payload),
+    status: preStagingReadinessSelfCheck?.status || "",
+    action: preStagingReadinessSelfCheck?.currentActionKey || "review_pre_staging_readiness_self_check",
+    operatorOrder: ["Open the pre-staging self-check route before readiness refresh or rehearsal reload decisions."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops pre-staging readiness self-check from the offline Mainline package.",
+      "Keep it beside pre-staging-readiness-self-check.txt so operators can review readiness commands without reconstructing the export format."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchMainlineHandoffRoutesDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Developer Ops Launch Mainline Handoff Routes Download",
+    download: getDeveloperLaunchMainlineLaunchMainlineHandoffRoutesDownload(payload),
+    status: payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.status || "",
+    action: "review_launch_mainline_handoff_routes",
+    operatorOrder: ["Open the Developer Ops Launch Mainline handoff routes before comparing Mainline, Review, Smoke, and Ops entrypoints."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops Launch Mainline handoff routes from the offline Mainline package.",
+      "Keep it beside launch-mainline-handoff-routes.txt so reviewers can validate cross-surface download hrefs without reopening Developer Ops."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineFirstWaveAuditBackfillStatusDownloadText(payload = {}) {
+  const auditBackfillStatus = payload.opsSnapshot?.summary?.firstWaveAuditBackfillStatus || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid First-Wave Audit Backfill Status Download",
+    download: getDeveloperLaunchMainlineFirstWaveAuditBackfillStatusDownload(payload),
+    status: auditBackfillStatus?.used ? "USED" : auditBackfillStatus ? "NOT_USED" : "",
+    action: "review_first_wave_audit_backfill_status",
+    operatorOrder: ["Open the first-wave audit backfill status route before investigating missing first-wave receipts."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops first-wave audit backfill diagnostic from the offline Mainline package.",
+      "Keep it beside first-wave-audit-backfill-status.txt so receipt durability can be verified without manual format lookup."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineStabilizationHandoffDownloadText(payload = {}) {
+  const stabilizationHandoffConfirmation = payload.postLaunchHandoffTraceability?.stabilizationHandoffConfirmation
+    || payload.mainlineSummary?.stabilizationHandoffPanel
+    || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Developer Ops Stabilization Handoff Download",
+    download: getDeveloperLaunchMainlineStabilizationHandoffDownload(payload),
+    status: stabilizationHandoffConfirmation?.status || stabilizationHandoffConfirmation?.confirmationStatus || "",
+    action: "review_ops_stabilization_handoff",
+    operatorOrder: ["Open the Developer Ops stabilization handoff route before closing stabilization or transferring to steady-state operators."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops stabilization handoff from the offline Mainline package.",
+      "Keep it beside ops/stabilization-handoff.txt so stabilization confirmation can be reviewed without reconstructing format parameters."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineSteadyStateOperationalReviewDownloadText(payload = {}) {
+  const review = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.steadyStateOperationalReview || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Steady-State Operational Review Download",
+    download: getDeveloperLaunchMainlineSteadyStateOperationalReviewDownload(payload),
+    status: review?.status || "",
+    action: review?.currentActionKey || "review_steady_state_operational_review",
+    operatorOrder: ["Open the steady-state operational review route before widening rollout or handing off stable operations."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops steady-state operational review from the offline Mainline package.",
+      "Keep it beside steady-state-operational-review.txt so first stable-window review can be repeated safely."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineSteadyStateExceptionDigestDownloadText(payload = {}) {
+  const digest = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.steadyStateExceptionDigest || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Steady-State Exception Digest Download",
+    download: getDeveloperLaunchMainlineSteadyStateExceptionDigestDownload(payload),
+    status: digest?.status || digest?.queueSummary?.status || "",
+    action: digest?.currentActionKey || "review_steady_state_exception_digest",
+    operatorOrder: ["Open the steady-state exception digest route before stable-window exception or attention review."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops steady-state exception digest from the offline Mainline package.",
+      "Keep it beside steady-state-exception-digest.txt so operators can verify exceptions without reconstructing the export URL."
     ]
   });
 }
@@ -22910,8 +23072,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/handoff-index-download.txt",
+    getDeveloperLaunchMainlineOpsHandoffIndexDownload(payload)
+      ? buildDeveloperLaunchMainlineOpsHandoffIndexDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/pre-staging-readiness-self-check.txt",
     payload.opsSnapshot ? buildDeveloperOpsPreStagingReadinessSelfCheckText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/pre-staging-readiness-self-check-download.txt",
+    getDeveloperLaunchMainlinePreStagingReadinessSelfCheckDownload(payload)
+      ? buildDeveloperLaunchMainlinePreStagingReadinessSelfCheckDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -23009,6 +23185,13 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/first-wave-audit-backfill-status-download.txt",
+    getDeveloperLaunchMainlineFirstWaveAuditBackfillStatusDownload(payload)
+      ? buildDeveloperLaunchMainlineFirstWaveAuditBackfillStatusDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/first-wave-runtime-evidence.txt",
     payload.opsSnapshot ? buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload.opsSnapshot) : ""
   );
@@ -23074,8 +23257,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-mainline-handoff-routes-download.txt",
+    getDeveloperLaunchMainlineLaunchMainlineHandoffRoutesDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchMainlineHandoffRoutesDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/stabilization-handoff.txt",
     payload.opsSnapshot ? buildDeveloperOpsStabilizationHandoffText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/stabilization-handoff-download.txt",
+    getDeveloperLaunchMainlineStabilizationHandoffDownload(payload)
+      ? buildDeveloperLaunchMainlineStabilizationHandoffDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -23084,8 +23281,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/steady-state-operational-review-download.txt",
+    getDeveloperLaunchMainlineSteadyStateOperationalReviewDownload(payload)
+      ? buildDeveloperLaunchMainlineSteadyStateOperationalReviewDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/steady-state-exception-digest.txt",
     payload.opsSnapshot ? buildDeveloperOpsSteadyStateExceptionDigestText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/steady-state-exception-digest-download.txt",
+    getDeveloperLaunchMainlineSteadyStateExceptionDigestDownload(payload)
+      ? buildDeveloperLaunchMainlineSteadyStateExceptionDigestDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -24530,6 +24741,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
     opsFiles: {
       summary: `ops/${opsSnapshot.summaryFileName || "developer-ops-summary.txt"}`,
       handoffIndex: "ops/handoff-index.txt",
+      handoffIndexDownloadRoute: "ops/handoff-index-download.txt",
+      preStagingReadinessSelfCheck: "ops/pre-staging-readiness-self-check.txt",
+      preStagingReadinessSelfCheckDownloadRoute: "ops/pre-staging-readiness-self-check-download.txt",
       initialLaunchOpsReadiness: "ops/initial-launch-ops-readiness.txt",
       initialLaunchOpsReadinessDownloadRoute: "ops/initial-launch-ops-readiness-download.txt",
       stagingLaunchDutyArchive: "ops/staging-launch-duty-archive.txt",
@@ -24551,11 +24765,19 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchReceiptBackfillStatus: "ops/launch-receipt-backfill-status.txt",
       launchReceiptBackfillStatusDownloadRoute: "ops/launch-receipt-backfill-status-download.txt",
       firstWaveAuditBackfillStatus: "ops/first-wave-audit-backfill-status.txt",
+      firstWaveAuditBackfillStatusDownloadRoute: "ops/first-wave-audit-backfill-status-download.txt",
       firstWaveRuntimeEvidence: "ops/first-wave-runtime-evidence.txt",
       firstWaveRuntimeEvidenceDownloadRoute: "ops/first-wave-runtime-evidence-download.txt",
       firstWaveRecommendationsZip: "ops/first-wave-recommendations.zip",
       firstWaveSupportInspectionConfirmation: "ops/first-wave-support-inspection-confirmation.txt",
       firstWaveSupportInspectionConfirmationDownloadRoute: "ops/first-wave-support-inspection-confirmation-download.txt",
+      launchMainlineHandoffRoutes: "ops/launch-mainline-handoff-routes.txt",
+      launchMainlineHandoffRoutesDownloadRoute: "ops/launch-mainline-handoff-routes-download.txt",
+      stabilizationHandoffDownloadRoute: "ops/stabilization-handoff-download.txt",
+      steadyStateOperationalReview: "ops/steady-state-operational-review.txt",
+      steadyStateOperationalReviewDownloadRoute: "ops/steady-state-operational-review-download.txt",
+      steadyStateExceptionDigest: "ops/steady-state-exception-digest.txt",
+      steadyStateExceptionDigestDownloadRoute: "ops/steady-state-exception-digest-download.txt",
       steadyStateHandoffDownloadRoute: "ops/steady-state-handoff-download.txt",
       steadyStateDutyBoardDownloadRoute: "ops/steady-state-duty-board-download.txt",
       steadyStateDutyActionLinksDownloadRoute: "ops/steady-state-duty-action-links-download.txt",
@@ -24672,6 +24894,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchReceiptBackfillStatusDownload = getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload);
   const initialLaunchOpsReadinessDownload = getDeveloperLaunchMainlineInitialLaunchOpsReadinessDownload(payload);
   const stagingLaunchDutyArchiveDownload = getDeveloperLaunchMainlineStagingLaunchDutyArchiveDownload(payload);
+  const opsHandoffIndexDownload = getDeveloperLaunchMainlineOpsHandoffIndexDownload(payload);
+  const preStagingReadinessSelfCheckRouteDownload = getDeveloperLaunchMainlinePreStagingReadinessSelfCheckDownload(payload);
+  const launchMainlineHandoffRoutesDownload = getDeveloperLaunchMainlineLaunchMainlineHandoffRoutesDownload(payload);
+  const firstWaveAuditBackfillStatusDownload = getDeveloperLaunchMainlineFirstWaveAuditBackfillStatusDownload(payload);
+  const stabilizationHandoffDownload = getDeveloperLaunchMainlineStabilizationHandoffDownload(payload);
+  const steadyStateOperationalReviewDownload = getDeveloperLaunchMainlineSteadyStateOperationalReviewDownload(payload);
+  const steadyStateExceptionDigestDownload = getDeveloperLaunchMainlineSteadyStateExceptionDigestDownload(payload);
   const launchOperationsOperatorChecklistDownload = getDeveloperLaunchMainlineLaunchOperationsOperatorChecklistDownload(payload);
   const launchOperationsOperatorEntryDownload = getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload);
   const launchOperationsHandoffSummaryDownload = getDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownload(payload);
@@ -24700,6 +24929,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Stabilization handoff", payload.stabilizationHandoffFileName || "developer-launch-mainline-stabilization-handoff.txt"],
     ["Recovery drill handoff", payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt"],
     ["Ops handoff index", opsFiles.handoffIndex || "ops/handoff-index.txt"],
+    ["Launch Mainline handoff routes", opsFiles.launchMainlineHandoffRoutes || "ops/launch-mainline-handoff-routes.txt"],
     ["Launch operations overview status", opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"],
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
     ["Launch receipt backfill status", opsFiles.launchReceiptBackfillStatus || "ops/launch-receipt-backfill-status.txt"],
@@ -24724,6 +24954,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Launch operations handoff summary", opsFiles.launchOperationsHandoffSummary || "ops/launch-operations-handoff-summary.txt"],
     ["Launch operations daily brief", opsFiles.launchOperationsDailyBrief || "ops/launch-operations-daily-brief.txt"],
     ["Launch operations shift action plan", opsFiles.launchOperationsShiftActionPlan || "ops/launch-operations-shift-action-plan.txt"],
+    ["Steady-state operational review", opsFiles.steadyStateOperationalReview || "ops/steady-state-operational-review.txt"],
+    ["Steady-state exception digest", opsFiles.steadyStateExceptionDigest || "ops/steady-state-exception-digest.txt"],
     ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
   ];
   if (steadyStateHandoffLanding) {
@@ -24816,6 +25048,48 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Staging launch-duty archive download route",
       opsFiles.stagingLaunchDutyArchiveDownloadRoute || "ops/staging-launch-duty-archive-download.txt"
+    ]);
+  }
+  if (opsHandoffIndexDownload) {
+    handoffFiles.push([
+      "Ops handoff index download route",
+      opsFiles.handoffIndexDownloadRoute || "ops/handoff-index-download.txt"
+    ]);
+  }
+  if (preStagingReadinessSelfCheckRouteDownload) {
+    handoffFiles.push([
+      "Pre-staging readiness self-check download route",
+      opsFiles.preStagingReadinessSelfCheckDownloadRoute || "ops/pre-staging-readiness-self-check-download.txt"
+    ]);
+  }
+  if (launchMainlineHandoffRoutesDownload) {
+    handoffFiles.push([
+      "Launch Mainline handoff routes download route",
+      opsFiles.launchMainlineHandoffRoutesDownloadRoute || "ops/launch-mainline-handoff-routes-download.txt"
+    ]);
+  }
+  if (firstWaveAuditBackfillStatusDownload) {
+    handoffFiles.push([
+      "First-Wave audit backfill status download route",
+      opsFiles.firstWaveAuditBackfillStatusDownloadRoute || "ops/first-wave-audit-backfill-status-download.txt"
+    ]);
+  }
+  if (stabilizationHandoffDownload) {
+    handoffFiles.push([
+      "Ops stabilization handoff download route",
+      opsFiles.stabilizationHandoffDownloadRoute || "ops/stabilization-handoff-download.txt"
+    ]);
+  }
+  if (steadyStateOperationalReviewDownload) {
+    handoffFiles.push([
+      "Steady-state operational review download route",
+      opsFiles.steadyStateOperationalReviewDownloadRoute || "ops/steady-state-operational-review-download.txt"
+    ]);
+  }
+  if (steadyStateExceptionDigestDownload) {
+    handoffFiles.push([
+      "Steady-state exception digest download route",
+      opsFiles.steadyStateExceptionDigestDownloadRoute || "ops/steady-state-exception-digest-download.txt"
     ]);
   }
   if (launchOperationsOperatorChecklistDownload) {
@@ -28573,6 +28847,19 @@ function buildDeveloperOpsFirstWaveRuntimeEvidenceDownload(scope = {}) {
     {
       source: "developer-ops",
       format: "first-wave-runtime-evidence",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
+function buildDeveloperOpsStabilizationHandoffDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_stabilization_handoff",
+    "developer-ops-stabilization-handoff.txt",
+    "Developer Ops stabilization handoff",
+    {
+      source: "developer-ops",
+      format: "stabilization-handoff",
       params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
     }
   );

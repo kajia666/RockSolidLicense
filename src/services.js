@@ -21370,6 +21370,34 @@ function buildDeveloperLaunchMainlineFirstWaveRecommendationsZipDownloadText(pay
   });
 }
 
+function getDeveloperLaunchMainlineOpsDownloadScope(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
+    ? payload.opsSnapshot.scope
+    : {};
+  const productCode = opsScope.productCode || filters.productCode || project.code || "";
+  if (!productCode) {
+    return null;
+  }
+  return {
+    ...filters,
+    ...opsScope,
+    productCode,
+    channel: opsScope.channel || filters.channel || manifest.channel || "stable"
+  };
+}
+
+function getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload = {}, steadyStateHandoffLanding = null) {
+  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  return steadyStateHandoffLanding?.launchDutyRecordIndexPath
+    || initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchDutyRecordIndexPath
+    || initialLaunchOpsReadiness?.launchDutyActionOrder?.stagingArchiveNextOperations?.launchDutyRecordIndexPath
+    || initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.launchOpsOverviewContext?.launchDutyRecordIndexPath
+    || "-";
+}
+
 function getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload = {}) {
   const steadyStateHandoffLanding = payload.mainlineSummary?.steadyStateHandoffLanding
     && typeof payload.mainlineSummary.steadyStateHandoffLanding === "object"
@@ -21382,25 +21410,43 @@ function getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload = {}) {
   if (steadyStateHandoffLandingDownload) {
     return steadyStateHandoffLandingDownload;
   }
-  const manifest = payload.manifest || {};
-  const project = manifest.project || {};
-  const filters = payload.filters || {};
-  const opsScope = payload.opsSnapshot?.scope && typeof payload.opsSnapshot.scope === "object"
-    ? payload.opsSnapshot.scope
-    : {};
-  const productCode = opsScope.productCode || filters.productCode || project.code || "";
-  if (!productCode) {
-    return null;
-  }
-  return buildDeveloperOpsSteadyStateHandoffBriefDownload({
-    ...filters,
-    ...opsScope,
-    productCode,
-    channel: opsScope.channel || filters.channel || manifest.channel || "stable"
-  });
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsSteadyStateHandoffBriefDownload(opsDownloadScope) : null;
 }
 
-function buildDeveloperLaunchMainlineSteadyStateHandoffDownloadText(payload = {}) {
+function getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload = {}) {
+  const steadyStateDutyReceiptReviewDownload = payload.mainlineSummary?.steadyStateDutyReceiptReview?.recommendedDownload
+    && typeof payload.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload === "object"
+      ? payload.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload
+      : null;
+  if (steadyStateDutyReceiptReviewDownload) {
+    return steadyStateDutyReceiptReviewDownload;
+  }
+  const rolloutWideningDecisionDownload = payload.mainlineSummary?.rolloutWideningDecisionAction?.recommendedDownload
+    && typeof payload.mainlineSummary.rolloutWideningDecisionAction.recommendedDownload === "object"
+      ? payload.mainlineSummary.rolloutWideningDecisionAction.recommendedDownload
+      : null;
+  if (rolloutWideningDecisionDownload) {
+    return rolloutWideningDecisionDownload;
+  }
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsSteadyStateDutyBoardDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineSteadyStateDutyActionLinksDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsSteadyStateDutyActionLinksDownload(opsDownloadScope) : null;
+}
+
+function buildDeveloperLaunchMainlineStableOperationsDownloadText({
+  payload = {},
+  title = "",
+  download = null,
+  status = "",
+  action = "",
+  operatorOrder = [],
+  notes = []
+} = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
   const filters = payload.filters || {};
@@ -21408,49 +21454,99 @@ function buildDeveloperLaunchMainlineSteadyStateHandoffDownloadText(payload = {}
     && typeof payload.mainlineSummary.steadyStateHandoffLanding === "object"
     ? payload.mainlineSummary.steadyStateHandoffLanding
     : null;
-  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
-  const launchDutyRecordIndexPath = steadyStateHandoffLanding?.launchDutyRecordIndexPath
-    || initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchDutyRecordIndexPath
-    || initialLaunchOpsReadiness?.launchDutyActionOrder?.stagingArchiveNextOperations?.launchDutyRecordIndexPath
-    || initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.launchOpsOverviewContext?.launchDutyRecordIndexPath
-    || "-";
-  const download = getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload);
-  const operatorOrder = Array.isArray(steadyStateHandoffLanding?.operatorOrder)
-    && steadyStateHandoffLanding.operatorOrder.length
-      ? steadyStateHandoffLanding.operatorOrder
-      : ["Open the steady-state handoff brief from the Mainline offline package before transferring launch duty into stable operations."];
+  const launchDutyRecordIndexPath = getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload, steadyStateHandoffLanding);
+  const normalizedOperatorOrder = Array.isArray(operatorOrder) ? operatorOrder.filter(Boolean) : [];
   const lines = [
-    "RockSolid Launch Stable Operations Handoff Download",
+    title || "RockSolid Launch Stable Operations Download",
     `Generated At: ${payload.generatedAt || ""}`,
     `Project Code: ${project.code || filters.productCode || "-"}`,
     `Project Name: ${project.name || "-"}`,
     `Channel: ${manifest.channel || filters.channel || "-"}`,
     "Source Surface: launch-mainline",
-    `Status: ${steadyStateHandoffLanding?.status || "-"}`,
-    `Action: ${steadyStateHandoffLanding?.actionKey || "-"}`,
+    `Status: ${status || "-"}`,
+    `Action: ${action || "-"}`,
     `Launch Duty Record Index: ${launchDutyRecordIndexPath}`,
     "",
     "Download:",
     `- key=${download?.key || "-"}`,
     `- label=${download?.label || "-"}`,
-    `- file=${download?.fileName || steadyStateHandoffLanding?.fileName || "-"}`,
-    `- format=${download?.format || steadyStateHandoffLanding?.format || "-"}`,
-    `- source=${download?.source || steadyStateHandoffLanding?.source || "-"}`,
-    `- href=${download?.href || steadyStateHandoffLanding?.href || "-"}`,
+    `- file=${download?.fileName || "-"}`,
+    `- format=${download?.format || "-"}`,
+    `- source=${download?.source || "-"}`,
+    `- href=${download?.href || "-"}`,
     ""
   ];
-  if (operatorOrder.length) {
+  if (normalizedOperatorOrder.length) {
     lines.push("Operator Order:");
-    for (const item of operatorOrder) {
+    for (const item of normalizedOperatorOrder) {
       lines.push(`- ${item}`);
     }
     lines.push("");
   }
   lines.push("Operator Notes:");
-  lines.push("- Keep this route beside the steady-state handoff brief during stable operations handoff.");
-  lines.push("- Use the href to refresh the Developer Ops handoff brief if the nested offline file needs to be re-fetched.");
-  lines.push("- Keep this file with SHA256SUMS.txt so reviewers can verify the handoff download route without reopening Launch Mainline.");
+  for (const note of notes) {
+    lines.push(`- ${note}`);
+  }
+  lines.push("- Keep this file with SHA256SUMS.txt so reviewers can verify the download route without reopening Launch Mainline.");
   return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchMainlineSteadyStateHandoffDownloadText(payload = {}) {
+  const steadyStateHandoffLanding = payload.mainlineSummary?.steadyStateHandoffLanding
+    && typeof payload.mainlineSummary.steadyStateHandoffLanding === "object"
+    ? payload.mainlineSummary.steadyStateHandoffLanding
+    : null;
+  const operatorOrder = Array.isArray(steadyStateHandoffLanding?.operatorOrder)
+    && steadyStateHandoffLanding.operatorOrder.length
+      ? steadyStateHandoffLanding.operatorOrder
+      : ["Open the steady-state handoff brief from the Mainline offline package before transferring launch duty into stable operations."];
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Stable Operations Handoff Download",
+    download: getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload),
+    status: steadyStateHandoffLanding?.status || "",
+    action: steadyStateHandoffLanding?.actionKey || "",
+    operatorOrder,
+    notes: [
+      "Keep this route beside the steady-state handoff brief during stable operations handoff.",
+      "Use the href to refresh the Developer Ops handoff brief if the nested offline file needs to be re-fetched."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineSteadyStateDutyBoardDownloadText(payload = {}) {
+  const steadyStateDutyReceiptReview = payload.mainlineSummary?.steadyStateDutyReceiptReview || null;
+  const rolloutWideningDecisionAction = payload.mainlineSummary?.rolloutWideningDecisionAction || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Steady-State Duty Board Download",
+    download: getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload),
+    status: steadyStateDutyReceiptReview?.status || rolloutWideningDecisionAction?.status || "",
+    action: steadyStateDutyReceiptReview?.action || rolloutWideningDecisionAction?.actionKey || "",
+    operatorOrder: [
+      ...(Array.isArray(steadyStateDutyReceiptReview?.operatorOrder) ? steadyStateDutyReceiptReview.operatorOrder : []),
+      ...(Array.isArray(rolloutWideningDecisionAction?.operatorOrder) ? rolloutWideningDecisionAction.operatorOrder : [])
+    ],
+    notes: [
+      "Use this route to re-fetch the Developer Ops duty board for first stable operating window and rollout widening decisions.",
+      "Keep it beside steady-state-duty-board.txt when reviewing duty receipts or rollout readiness offline."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineSteadyStateDutyActionLinksDownloadText(payload = {}) {
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Steady-State Duty Action Links Download",
+    download: getDeveloperLaunchMainlineSteadyStateDutyActionLinksDownload(payload),
+    status: payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.steadyStateDutyActionLinks?.status || "",
+    action: payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.steadyStateDutyActionLinks?.rolloutWideningExecutionAction?.currentActionKey || "",
+    operatorOrder: ["Open the steady-state duty action links before recording rollout or first operating result receipts."],
+    notes: [
+      "Use this route to re-fetch action links for rollout widening, first operating result handoff, and receipt readback.",
+      "Keep it beside steady-state-duty-action-links.txt so operators can jump from offline review back into the exact backend/API actions."
+    ]
+  });
 }
 
 function buildDeveloperLaunchMainlinePayload({
@@ -22620,8 +22716,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/steady-state-duty-board-download.txt",
+    getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload)
+      ? buildDeveloperLaunchMainlineSteadyStateDutyBoardDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/steady-state-duty-action-links.txt",
     payload.opsSnapshot ? buildDeveloperOpsSteadyStateDutyActionLinksText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/steady-state-duty-action-links-download.txt",
+    getDeveloperLaunchMainlineSteadyStateDutyActionLinksDownload(payload)
+      ? buildDeveloperLaunchMainlineSteadyStateDutyActionLinksDownloadText(payload)
+      : ""
   );
   if (payload.opsSnapshot) {
     for (const item of buildDeveloperOpsRouteReviewExportFiles(payload.opsSnapshot)) {
@@ -24037,6 +24147,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       firstWaveRecommendationsZip: "ops/first-wave-recommendations.zip",
       firstWaveSupportInspectionConfirmation: "ops/first-wave-support-inspection-confirmation.txt",
       steadyStateHandoffDownloadRoute: "ops/steady-state-handoff-download.txt",
+      steadyStateDutyBoardDownloadRoute: "ops/steady-state-duty-board-download.txt",
+      steadyStateDutyActionLinksDownloadRoute: "ops/steady-state-duty-action-links-download.txt",
       stabilizationHandoff: "ops/stabilization-handoff.txt"
     },
     packageFiles: {
@@ -24210,6 +24322,20 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Steady-state duty receipt review",
       "ops/steady-state-duty-board.txt"
+    ]);
+  }
+  const steadyStateDutyBoardDownload = getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload);
+  if (steadyStateDutyBoardDownload) {
+    handoffFiles.push([
+      "Steady-state duty board download route",
+      opsFiles.steadyStateDutyBoardDownloadRoute || "ops/steady-state-duty-board-download.txt"
+    ]);
+  }
+  const steadyStateDutyActionLinksDownload = getDeveloperLaunchMainlineSteadyStateDutyActionLinksDownload(payload);
+  if (steadyStateDutyActionLinksDownload) {
+    handoffFiles.push([
+      "Steady-state duty action links download route",
+      opsFiles.steadyStateDutyActionLinksDownloadRoute || "ops/steady-state-duty-action-links-download.txt"
     ]);
   }
   if (rolloutWideningDecisionAction) {

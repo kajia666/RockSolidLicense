@@ -27589,6 +27589,43 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         nextAction: "Run readiness status, confirm stable_operations_handoff, reload rehearsal, then open the steady-state handoff brief once packet and record readbacks are complete."
       }
     );
+    assert.deepEqual(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionShortcut,
+      {
+        version: "developer-launch-mainline-stable-operations-transition-shortcut/v1",
+        status: "blocked_until_packet_result_review",
+        ready: false,
+        currentActionKey: "review_staging_packet_results",
+        blockedBy: ["packet_result_review"],
+        operatorActionKey: "continue_packet_result_review",
+        reviewRequired: false,
+        nextDownloadKey: "ops_launch_operations_operator_entry",
+        nextDownloadFormat: "launch-operations-operator-entry",
+        nextDownloadHref: "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry",
+        recordReady: true,
+        packetReady: false,
+        tailReady: true,
+        handoffReady: false,
+        recordIndexStatus: "selected_latest_readback",
+        recordIndexProgress: "6/6",
+        packetReviewStatus: null,
+        packetReviewProgress: null,
+        stableOperationsTailStatus: "ready_for_stable_operations_handoff",
+        stableOperationsReadbackStatus: "awaiting_readiness_and_rehearsal_readback",
+        landingStatus: null,
+        landingHref: null,
+        landingBridgeStatus: null,
+        requiredChecks: [
+          "readiness_gate_stable_operations_handoff",
+          "rehearsal_ready_for_stable_operations_handoff",
+          "packet_result_review_complete",
+          "record_index_complete"
+        ],
+        operatorOrder: ["Review the launch-duty packet results, then refresh Developer Ops."],
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        nextAction: "Complete packet result review before opening the steady-state handoff brief."
+      }
+    );
     assert.ok(launchMainlineCloseoutRecordedReadback.mainlineSummary.overviewCards.some((item) => (
       item.key === "first_wave_closeout_record_readback"
       && item.tags.some((tag) => tag.label === "next" && tag.value === "reload_staging_rehearsal_for_stable_operations")
@@ -27597,6 +27634,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       item.key === "first_wave_closeout_stable_operations_shortcut"
       && item.tags.some((tag) => tag.label === "current" && tag.value === "refresh_staging_readiness_after_first_wave_closeout")
       && item.tags.some((tag) => tag.label === "next" && tag.value === "reload_staging_rehearsal_for_stable_operations")
+    )));
+    assert.ok(launchMainlineCloseoutRecordedReadback.mainlineSummary.overviewCards.some((item) => (
+      item.key === "stable_operations_transition_shortcut"
+      && item.tags.some((tag) => tag.label === "current" && tag.value === "review_staging_packet_results")
+      && item.tags.some((tag) => tag.label === "next" && tag.value === "launch-operations-operator-entry")
     )));
     const launchMainlineCloseoutRecordedSummaryDownload = await getText(
       baseUrl,
@@ -27627,6 +27669,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline First-Wave Closeout Stable Operations Shortcut:[\s\S]*rehearsalStatus=ready_for_stable_operations_handoff \| rehearsalCurrent=stable_operations_handoff \| confirmationPoints=launch_duty_record_index,first_wave_closeout/
     );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*recordReady=yes \| packetReady=no \| tailReady=yes \| handoffReady=no \| blockedBy=packet_result_review/
+    );
     const launchMainlineCloseoutRecordedRoutesDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
@@ -27648,6 +27698,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineCloseoutRecordedRoutesDownload.body,
       /first-wave-closeout-stable-operations-shortcut: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
+      /Launch Mainline Stable Operations Transition Shortcut Route:[\s\S]*status=blocked_until_packet_result_review \| current=review_staging_packet_results \| nextDownload=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
+      /stable-operations-transition-shortcut: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
     const launchMainlineCloseoutRecordedIndexDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -27663,11 +27721,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
+      /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| nextDownload=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
       /Included Handoff Files:[\s\S]*First-wave closeout record readback: ops\/launch-operations-operator-entry\.txt/
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
       /Included Handoff Files:[\s\S]*First-wave closeout stable-operations shortcut: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Stable operations transition shortcut: ops\/launch-operations-operator-entry\.txt/
     );
     const staleLaunchDutyReadbackReceipt = await postJson(
       baseUrl,
@@ -28248,6 +28314,48 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
       ownerSession.token
     );
+    assert.deepEqual(
+      launchMainlineSteadyStateHandoff.mainlineSummary.stableOperationsTransitionShortcut,
+      {
+        version: "developer-launch-mainline-stable-operations-transition-shortcut/v1",
+        status: "ready_for_steady_state_handoff",
+        ready: true,
+        currentActionKey: "open_steady_state_handoff_brief",
+        blockedBy: [],
+        operatorActionKey: "continue_steady_state_handoff",
+        reviewRequired: false,
+        nextDownloadKey: "ops_steady_state_handoff_brief",
+        nextDownloadFormat: "steady-state-handoff-brief",
+        nextDownloadHref: "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief",
+        recordReady: true,
+        packetReady: true,
+        tailReady: true,
+        handoffReady: true,
+        recordIndexStatus: "selected_latest_readback",
+        recordIndexProgress: "6/6",
+        packetReviewStatus: "selected_latest_packet_review_readback",
+        packetReviewProgress: "6/6",
+        stableOperationsTailStatus: "ready_for_stable_operations_handoff",
+        stableOperationsReadbackStatus: "awaiting_readiness_and_rehearsal_readback",
+        landingStatus: "ready_for_steady_state_handoff",
+        landingHref: "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief",
+        landingBridgeStatus: "ready_for_steady_state_handoff_brief",
+        requiredChecks: [
+          "readiness_gate_stable_operations_handoff",
+          "rehearsal_ready_for_stable_operations_handoff",
+          "packet_result_review_complete",
+          "record_index_complete"
+        ],
+        operatorOrder: expectedSteadyStateHandoffOperatorOrder,
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        nextAction: "Open the steady-state handoff brief and complete stable-operations handoff."
+      }
+    );
+    assert.ok(launchMainlineSteadyStateHandoff.mainlineSummary.overviewCards.some((item) => (
+      item.key === "stable_operations_transition_shortcut"
+      && item.tags.some((tag) => tag.label === "current" && tag.value === "open_steady_state_handoff_brief")
+      && item.tags.some((tag) => tag.label === "next" && tag.value === "steady-state-handoff-brief")
+    )));
     const expectedPreStagingSelfCheckOperatorOrder = [
       "Confirm the pre-staging readiness self-check packet, run readiness refresh, then reload rehearsal before entering full-test/signoff."
     ];
@@ -28970,6 +29078,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Stable Operations Transition:[\s\S]*checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*status=ready_for_steady_state_handoff \| ready=yes \| current=open_steady_state_handoff_brief \| operatorAction=continue_steady_state_handoff \| reviewRequired=no \| nextDownload=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*recordReady=yes \| packetReady=yes \| tailReady=yes \| handoffReady=yes \| blockedBy=-/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,

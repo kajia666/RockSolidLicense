@@ -15612,6 +15612,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const firstWaveCloseoutStableOperationsShortcut = getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(
     launchOperationsOperatorEntry
   );
+  const stableOperationsTransitionShortcut = getStableOperationsTransitionShortcutFromOperatorEntry(
+    launchOperationsOperatorEntry
+  );
   const preStagingReadinessSelfCheckSource = launchOperationsOperatorEntry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket
     && typeof launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket === "object"
       ? launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket
@@ -18887,6 +18890,57 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.recommendedDownload?.key)
       }
     : null;
+  const stableOperationsTransitionShortcutCard = stableOperationsTransitionShortcut
+    ? {
+        key: "stable_operations_transition_shortcut",
+        title: "Stable Operations Transition Shortcut",
+        summary: stableOperationsTransitionShortcut.nextAction
+          || "Continue stable-operations transition from the current launch-duty action.",
+        tags: [
+          {
+            label: "status",
+            value: stableOperationsTransitionShortcut.status || "unknown",
+            strong: true
+          },
+          {
+            label: "current",
+            value: stableOperationsTransitionShortcut.currentActionKey || "-",
+            strong: false
+          },
+          {
+            label: "next",
+            value: stableOperationsTransitionShortcut.nextDownloadFormat || "-",
+            strong: false
+          }
+        ],
+        details: [
+          `Operator action: ${stableOperationsTransitionShortcut.operatorActionKey || "-"}`,
+          `Review required: ${stableOperationsTransitionShortcut.reviewRequired === true ? "yes" : "no"}`,
+          `Blocked by: ${Array.isArray(stableOperationsTransitionShortcut.blockedBy) && stableOperationsTransitionShortcut.blockedBy.length ? stableOperationsTransitionShortcut.blockedBy.join(",") : "-"}`,
+          `Record/packet readiness: ${stableOperationsTransitionShortcut.recordReady === true ? "yes" : "no"}/${stableOperationsTransitionShortcut.packetReady === true ? "yes" : "no"}`,
+          `Launch duty record index: ${stableOperationsTransitionShortcut.launchDutyRecordIndexPath || "-"}`
+        ],
+        controls: [
+          stableOperationsTransitionShortcut.nextDownloadKey ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open Stable Operations Transition Download",
+            recommendedDownload: {
+              key: stableOperationsTransitionShortcut.nextDownloadKey,
+              label: "Stable operations transition download",
+              fileName: stableOperationsTransitionShortcut.nextDownloadFormat === "steady-state-handoff-brief"
+                ? "developer-ops-steady-state-handoff-brief.txt"
+                : stableOperationsTransitionShortcut.nextDownloadFormat === "handoff-index"
+                  ? "developer-ops-handoff-index.txt"
+                  : "developer-ops-launch-operations-operator-entry.txt",
+              format: stableOperationsTransitionShortcut.nextDownloadFormat || "launch-operations-operator-entry",
+              href: stableOperationsTransitionShortcut.nextDownloadHref || null,
+              source: "developer-launch-mainline-stable-operations-transition-shortcut",
+              launchDutyRecordIndexPath: stableOperationsTransitionShortcut.launchDutyRecordIndexPath || null
+            }
+          }, params) : null
+        ].filter((item) => item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -18987,6 +19041,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     stabilizationOwnerHandoffRecordReadbackCard,
     firstWaveCloseoutRecordReadbackCard,
     firstWaveCloseoutStableOperationsShortcutCard,
+    stableOperationsTransitionShortcutCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -19978,6 +20033,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     stabilizationOwnerHandoffRecordReadback,
     firstWaveCloseoutRecordReadback,
     firstWaveCloseoutStableOperationsShortcut,
+    stableOperationsTransitionShortcut,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -22077,6 +22133,170 @@ function appendFirstWaveCloseoutStableOperationsShortcutLines(lines = [], shortc
   return true;
 }
 
+function normalizeStableOperationsTransitionShortcut(shortcut = null) {
+  const source = shortcut && typeof shortcut === "object" ? shortcut : null;
+  if (!source) {
+    return null;
+  }
+  const blockedBy = Array.isArray(source.blockedBy)
+    ? source.blockedBy.filter((item) => String(item || "").trim() !== "")
+    : [];
+  const requiredChecks = Array.isArray(source.requiredChecks)
+    ? source.requiredChecks.filter((item) => String(item || "").trim() !== "")
+    : [];
+  const operatorOrder = Array.isArray(source.operatorOrder)
+    ? source.operatorOrder.filter((item) => String(item || "").trim() !== "")
+    : [];
+  return {
+    version: source.version || "developer-launch-mainline-stable-operations-transition-shortcut/v1",
+    status: source.status || null,
+    ready: source.ready === true,
+    currentActionKey: source.currentActionKey || null,
+    blockedBy,
+    operatorActionKey: source.operatorActionKey || null,
+    reviewRequired: source.reviewRequired === true,
+    nextDownloadKey: source.nextDownloadKey || null,
+    nextDownloadFormat: source.nextDownloadFormat || null,
+    nextDownloadHref: source.nextDownloadHref || null,
+    recordReady: source.recordReady === true,
+    packetReady: source.packetReady === true,
+    tailReady: source.tailReady === true,
+    handoffReady: source.handoffReady === true,
+    recordIndexStatus: source.recordIndexStatus || null,
+    recordIndexProgress: source.recordIndexProgress || null,
+    packetReviewStatus: source.packetReviewStatus || null,
+    packetReviewProgress: source.packetReviewProgress || null,
+    stableOperationsTailStatus: source.stableOperationsTailStatus || null,
+    stableOperationsReadbackStatus: source.stableOperationsReadbackStatus || null,
+    landingStatus: source.landingStatus || null,
+    landingHref: source.landingHref || null,
+    landingBridgeStatus: source.landingBridgeStatus || null,
+    requiredChecks,
+    operatorOrder,
+    launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    nextAction: source.nextAction || null
+  };
+}
+
+function getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry = null) {
+  const entry = launchOperationsOperatorEntry && typeof launchOperationsOperatorEntry === "object"
+    ? launchOperationsOperatorEntry
+    : null;
+  const transitionAction = entry?.launchDutyStableOperationsTransitionAction
+    && typeof entry.launchDutyStableOperationsTransitionAction === "object"
+      ? entry.launchDutyStableOperationsTransitionAction
+      : null;
+  if (!transitionAction) {
+    return null;
+  }
+  const operatorAction = transitionAction.operatorAction
+    && typeof transitionAction.operatorAction === "object"
+      ? transitionAction.operatorAction
+      : null;
+  const landing = entry?.launchDutySteadyStateHandoffLanding
+    && typeof entry.launchDutySteadyStateHandoffLanding === "object"
+      ? entry.launchDutySteadyStateHandoffLanding
+      : null;
+  return normalizeStableOperationsTransitionShortcut({
+    status: transitionAction.status || null,
+    ready: transitionAction.ready === true,
+    currentActionKey: transitionAction.currentActionKey || null,
+    blockedBy: Array.isArray(transitionAction.blockedBy) ? transitionAction.blockedBy.slice() : [],
+    operatorActionKey: operatorAction?.key || null,
+    reviewRequired: operatorAction ? operatorAction.reviewRequired === true : false,
+    nextDownloadKey: transitionAction.nextDownloadKey || operatorAction?.nextDownloadKey || null,
+    nextDownloadFormat: transitionAction.nextDownloadFormat || operatorAction?.nextDownloadFormat || null,
+    nextDownloadHref: transitionAction.nextDownloadHref || operatorAction?.nextDownloadHref || null,
+    recordReady: transitionAction.recordReady === true,
+    packetReady: transitionAction.packetReady === true,
+    tailReady: transitionAction.tailReady === true,
+    handoffReady: transitionAction.handoffReady === true,
+    recordIndexStatus: transitionAction.recordIndexStatus || null,
+    recordIndexProgress: transitionAction.recordIndexProgress || null,
+    packetReviewStatus: transitionAction.packetReviewStatus || null,
+    packetReviewProgress: transitionAction.packetReviewProgress || null,
+    stableOperationsTailStatus: transitionAction.stableOperationsTailStatus || null,
+    stableOperationsReadbackStatus: transitionAction.stableOperationsReadbackStatus || null,
+    landingStatus: transitionAction.landingStatus || landing?.status || null,
+    landingHref: transitionAction.landingHref || landing?.href || landing?.recommendedDownload?.href || null,
+    landingBridgeStatus: landing?.stableOperationsLandingBridge?.status || null,
+    requiredChecks: Array.isArray(transitionAction.requiredChecks) ? transitionAction.requiredChecks.slice() : [],
+    operatorOrder: Array.isArray(transitionAction.operatorOrder) ? transitionAction.operatorOrder.slice() : [],
+    launchDutyRecordIndexPath: transitionAction.launchDutyRecordIndexPath || entry?.launchDutyRecordIndexPath || null,
+    nextAction: transitionAction.nextAction || operatorAction?.nextAction || null
+  });
+}
+
+function appendStableOperationsTransitionShortcutLines(lines = [], shortcut = null, {
+  title = "Stable Operations Transition Shortcut:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const item = normalizeStableOperationsTransitionShortcut(shortcut);
+  if (!item) {
+    return false;
+  }
+  const blockedBy = Array.isArray(item.blockedBy) ? item.blockedBy.join(",") : "";
+  const requiredChecks = Array.isArray(item.requiredChecks) ? item.requiredChecks.join(",") : "";
+  lines.push(title);
+  lines.push(
+    `- status=${item.status || "-"}`
+    + ` | ready=${item.ready === true ? "yes" : "no"}`
+    + ` | current=${item.currentActionKey || "-"}`
+    + ` | operatorAction=${item.operatorActionKey || "-"}`
+    + ` | reviewRequired=${item.operatorActionKey ? item.reviewRequired === true ? "yes" : "no" : "-"}`
+    + ` | nextDownload=${item.nextDownloadFormat || "-"}`
+  );
+  lines.push(
+    `- status=${item.status || "-"}`
+    + ` | ready=${item.ready === true ? "yes" : "no"}`
+    + ` | current=${item.currentActionKey || "-"}`
+    + ` | operatorAction=${item.operatorActionKey || "-"}`
+    + ` | nextDownload=${item.nextDownloadFormat || "-"}`
+  );
+  lines.push(
+    `- status=${item.status || "-"}`
+    + ` | current=${item.currentActionKey || "-"}`
+    + ` | nextDownload=${item.nextDownloadFormat || "-"}`
+    + ` | href=${item.nextDownloadHref || "-"}`
+  );
+  lines.push(
+    `- recordReady=${item.recordReady === true ? "yes" : "no"}`
+    + ` | packetReady=${item.packetReady === true ? "yes" : "no"}`
+    + ` | tailReady=${item.tailReady === true ? "yes" : "no"}`
+    + ` | handoffReady=${item.handoffReady === true ? "yes" : "no"}`
+    + ` | blockedBy=${blockedBy || "-"}`
+  );
+  lines.push(
+    `- nextDownloadKey=${item.nextDownloadKey || "-"}`
+    + ` | href=${item.nextDownloadHref || "-"}`
+    + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(
+    `- recordIndex=${item.recordIndexStatus || "-"}`
+    + ` | recordProgress=${item.recordIndexProgress || "-"}`
+    + ` | packetReview=${item.packetReviewStatus || "-"}`
+    + ` | packetProgress=${item.packetReviewProgress || "-"}`
+  );
+  lines.push(
+    `- stableTail=${item.stableOperationsTailStatus || "-"}`
+    + ` | stableReadback=${item.stableOperationsReadbackStatus || "-"}`
+    + ` | landing=${item.landingStatus || "-"}`
+    + ` | landingHref=${item.landingHref || "-"}`
+    + ` | landingBridge=${item.landingBridgeStatus || "-"}`
+  );
+  lines.push(`- checks=${requiredChecks || "-"}`);
+  lines.push(`Stable Operations Transition Shortcut Next: ${item.nextAction || "-"}`);
+  if (Array.isArray(item.operatorOrder) && item.operatorOrder.length) {
+    lines.push("Stable Operations Transition Shortcut Operator Order:");
+    for (const step of item.operatorOrder) {
+      lines.push(`- ${step}`);
+    }
+  }
+  return true;
+}
+
 function appendLaunchSwitchOperatorRunbookLines(lines = [], launchSwitchOperatorRunbook = null, {
   title = "Launch Switch Operator Runbook:"
 } = {}) {
@@ -22138,6 +22358,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
+  const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
+    || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -22362,6 +22584,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendFirstWaveCloseoutStableOperationsShortcutLines(lines, firstWaveCloseoutStableOperationsShortcut, {
       title: "Launch Mainline First-Wave Closeout Stable Operations Shortcut:"
+    });
+  }
+  if (stableOperationsTransitionShortcut) {
+    lines.push("");
+    appendStableOperationsTransitionShortcutLines(lines, stableOperationsTransitionShortcut, {
+      title: "Launch Mainline Stable Operations Transition Shortcut:"
     });
   }
   if (launchSurfaceReviewCloseoutAction) {
@@ -24565,6 +24793,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
+  const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
+    || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -25423,6 +25653,37 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${firstWaveCloseoutStableOperationsShortcut.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+  if (stableOperationsTransitionShortcut) {
+    const shortcutDownloadFormat = stableOperationsTransitionShortcut.nextDownloadFormat || "launch-operations-operator-entry";
+    const shortcutDownloadKey = stableOperationsTransitionShortcut.nextDownloadKey
+      || (shortcutDownloadFormat === "steady-state-handoff-brief"
+        ? "ops_steady_state_handoff_brief"
+        : "ops_launch_operations_operator_entry");
+    const shortcutDownloadFileName = shortcutDownloadFormat === "steady-state-handoff-brief"
+      ? "developer-ops-steady-state-handoff-brief.txt"
+      : shortcutDownloadFormat === "handoff-index"
+        ? "developer-ops-handoff-index.txt"
+        : "developer-ops-launch-operations-operator-entry.txt";
+    const shortcutDownloadLabel = shortcutDownloadFormat === "steady-state-handoff-brief"
+      ? "Steady-state handoff brief"
+      : shortcutDownloadFormat === "handoff-index"
+        ? "Launch operations handoff index"
+        : "Launch operations operator entry";
+    lines.push("");
+    appendStableOperationsTransitionShortcutLines(lines, stableOperationsTransitionShortcut, {
+      title: "Launch Mainline Stable Operations Transition Shortcut Route:"
+    });
+    lines.push(
+      `- stable-operations-transition-shortcut: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
+      + ` | key=${shortcutDownloadKey}`
+      + ` | label=${shortcutDownloadLabel}`
+      + ` | file=${shortcutDownloadFileName}`
+      + ` | format=${shortcutDownloadFormat}`
+      + ` | source=developer-ops-launch-duty-stable-operations-transition`
+      + ` | href=${stableOperationsTransitionShortcut.nextDownloadHref || "-"}`
+      + ` | launchDutyRecordIndex=${stableOperationsTransitionShortcut.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
   }
   if (launchDutyStableOperationsTransitionAction) {
@@ -27550,6 +27811,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
+  const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
+    || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -27729,6 +27992,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (firstWaveCloseoutStableOperationsShortcut) {
     handoffFiles.push([
       "First-wave closeout stable-operations shortcut",
+      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+  }
+  if (stableOperationsTransitionShortcut) {
+    handoffFiles.push([
+      "Stable operations transition shortcut",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
   }
@@ -28462,6 +28731,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push("");
     appendFirstWaveCloseoutStableOperationsShortcutLines(lines, firstWaveCloseoutStableOperationsShortcut, {
       title: "Launch Mainline First-Wave Closeout Stable Operations Shortcut:"
+    });
+  }
+  if (stableOperationsTransitionShortcut) {
+    lines.push("");
+    appendStableOperationsTransitionShortcutLines(lines, stableOperationsTransitionShortcut, {
+      title: "Launch Mainline Stable Operations Transition Shortcut:"
     });
   }
 

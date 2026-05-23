@@ -21370,6 +21370,21 @@ function buildDeveloperLaunchMainlineFirstWaveRecommendationsZipDownloadText(pay
   });
 }
 
+function getDeveloperLaunchMainlineFirstWaveRuntimeEvidenceDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsFirstWaveRuntimeEvidenceDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope
+    ? buildFirstWaveSupportInspectionConfirmationDownload({
+        ...opsDownloadScope,
+        fileName: "first-wave-support-inspection-confirmation.txt"
+      })
+    : null;
+}
+
 function getDeveloperLaunchMainlineOpsDownloadScope(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -21606,6 +21621,44 @@ function buildDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownloadText(
     notes: [
       "Use this route to re-fetch the launch operations overview status for first operating result handoff and receipt readback.",
       "Keep it beside launch-operations-overview-status.txt so the first stable operating result review can jump back to the exact backend/API view."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceDownloadText(payload = {}) {
+  const firstWaveRuntimeEvidence = payload.mainlineSummary?.firstWaveRuntimeEvidence
+    && typeof payload.mainlineSummary.firstWaveRuntimeEvidence === "object"
+      ? payload.mainlineSummary.firstWaveRuntimeEvidence
+      : null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid First-Wave Runtime Evidence Download",
+    download: getDeveloperLaunchMainlineFirstWaveRuntimeEvidenceDownload(payload),
+    status: firstWaveRuntimeEvidence?.status || (firstWaveRuntimeEvidence ? "RECORDED" : "NOT_RECORDED"),
+    action: "inspect_first_wave_runtime_evidence",
+    operatorOrder: ["Open the first-wave runtime evidence route before confirming the first real-user lane."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops first-wave runtime evidence from the offline Mainline package.",
+      "Keep it beside first-wave-runtime-evidence.txt so operators can verify first-user evidence without reconstructing the export format."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownloadText(payload = {}) {
+  const supportInspectionConfirmation = payload.mainlineSummary?.firstWaveSupportInspectionConfirmation
+    && typeof payload.mainlineSummary.firstWaveSupportInspectionConfirmation === "object"
+      ? payload.mainlineSummary.firstWaveSupportInspectionConfirmation
+      : null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid First-Wave Support Inspection Confirmation Download",
+    download: getDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownload(payload),
+    status: supportInspectionConfirmation?.status || (supportInspectionConfirmation ? "RECORDED" : "NOT_RECORDED"),
+    action: "inspect_first_wave_support_confirmation",
+    operatorOrder: ["Open the first-wave support inspection confirmation route before closing the support-owned first-wave check."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops support inspection confirmation from the offline Mainline package.",
+      "Keep it beside first-wave-support-inspection-confirmation.txt so support readiness can be verified without manual format lookup."
     ]
   });
 }
@@ -21984,11 +22037,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
     ...opsDownloadScope
   });
+  const opsFirstWaveRuntimeEvidenceDownload = getDeveloperLaunchMainlineFirstWaveRuntimeEvidenceDownload(payload);
   const opsFirstWaveSupportInspectionConfirmationDownload = firstWaveSupportInspectionConfirmation
-    ? buildFirstWaveSupportInspectionConfirmationDownload({
-        ...opsDownloadScope,
-        fileName: "first-wave-support-inspection-confirmation.txt"
-      })
+    ? getDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownload(payload)
     : null;
   const mainlineRouteParams = compactRouteParams({
     productCode: payload.filters?.productCode || project.code || "",
@@ -22116,6 +22167,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       "Developer Ops first-wave recommendations zip",
       opsFiles.firstWaveRecommendationsZip || "ops/first-wave-recommendations.zip",
       firstWaveRecommendationsZipDownload
+    );
+  }
+  if (opsFirstWaveRuntimeEvidenceDownload) {
+    pushRoute(
+      "ops-first-wave-runtime-evidence",
+      "Developer Ops first-wave runtime evidence",
+      opsFiles.firstWaveRuntimeEvidence || "ops/first-wave-runtime-evidence.txt",
+      opsFirstWaveRuntimeEvidenceDownload
     );
   }
   if (opsFirstWaveSupportInspectionConfirmationDownload) {
@@ -22768,8 +22827,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/first-wave-runtime-evidence-download.txt",
+    getDeveloperLaunchMainlineFirstWaveRuntimeEvidenceDownload(payload)
+      ? buildDeveloperLaunchMainlineFirstWaveRuntimeEvidenceDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/first-wave-support-inspection-confirmation.txt",
     payload.opsSnapshot ? buildDeveloperOpsFirstWaveSupportInspectionConfirmationText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/first-wave-support-inspection-confirmation-download.txt",
+    getDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownload(payload)
+      ? buildDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -24264,8 +24337,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchReceiptBackfillStatus: "ops/launch-receipt-backfill-status.txt",
       launchReceiptBackfillStatusDownloadRoute: "ops/launch-receipt-backfill-status-download.txt",
       firstWaveAuditBackfillStatus: "ops/first-wave-audit-backfill-status.txt",
+      firstWaveRuntimeEvidence: "ops/first-wave-runtime-evidence.txt",
+      firstWaveRuntimeEvidenceDownloadRoute: "ops/first-wave-runtime-evidence-download.txt",
       firstWaveRecommendationsZip: "ops/first-wave-recommendations.zip",
       firstWaveSupportInspectionConfirmation: "ops/first-wave-support-inspection-confirmation.txt",
+      firstWaveSupportInspectionConfirmationDownloadRoute: "ops/first-wave-support-inspection-confirmation-download.txt",
       steadyStateHandoffDownloadRoute: "ops/steady-state-handoff-download.txt",
       steadyStateDutyBoardDownloadRoute: "ops/steady-state-duty-board-download.txt",
       steadyStateDutyActionLinksDownloadRoute: "ops/steady-state-duty-action-links-download.txt",
@@ -24347,11 +24423,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
     ...opsDownloadScope
   });
+  const firstWaveRuntimeEvidenceDownload = getDeveloperLaunchMainlineFirstWaveRuntimeEvidenceDownload(payload);
   const opsFirstWaveSupportInspectionConfirmationDownload = firstWaveSupportInspectionConfirmation
-    ? buildFirstWaveSupportInspectionConfirmationDownload({
-        ...opsDownloadScope,
-        fileName: "first-wave-support-inspection-confirmation.txt"
-      })
+    ? getDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownload(payload)
     : null;
   const stabilizationConfirmation = traceability.stabilizationHandoffConfirmation || null;
   const steadyStateHandoffLanding = mainlineSummary.steadyStateHandoffLanding
@@ -24409,6 +24483,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
     ["Launch receipt backfill status", opsFiles.launchReceiptBackfillStatus || "ops/launch-receipt-backfill-status.txt"],
     ["First-Wave audit backfill status", opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"],
+    ["Developer Ops first-wave runtime evidence", opsFiles.firstWaveRuntimeEvidence || "ops/first-wave-runtime-evidence.txt"],
     ...(firstWaveRecommendationsZipDownload
       ? [["Developer Ops first-wave recommendations zip", opsFiles.firstWaveRecommendationsZip || "ops/first-wave-recommendations.zip"]]
       : []),
@@ -24490,6 +24565,18 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Launch receipt backfill status download route",
       opsFiles.launchReceiptBackfillStatusDownloadRoute || "ops/launch-receipt-backfill-status-download.txt"
+    ]);
+  }
+  if (firstWaveRuntimeEvidenceDownload) {
+    handoffFiles.push([
+      "First-wave runtime evidence download route",
+      opsFiles.firstWaveRuntimeEvidenceDownloadRoute || "ops/first-wave-runtime-evidence-download.txt"
+    ]);
+  }
+  if (opsFirstWaveSupportInspectionConfirmationDownload) {
+    handoffFiles.push([
+      "First-wave support inspection confirmation download route",
+      opsFiles.firstWaveSupportInspectionConfirmationDownloadRoute || "ops/first-wave-support-inspection-confirmation-download.txt"
     ]);
   }
   const lines = [
@@ -24575,6 +24662,15 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | format=${opsFirstWaveAuditBackfillStatusDownload.format || "-"}`
     + ` | href=${opsFirstWaveAuditBackfillStatusDownload.href || "-"}`
   );
+  if (firstWaveRuntimeEvidenceDownload) {
+    lines.push(
+      `- First-Wave Runtime Evidence: ${opsFiles.firstWaveRuntimeEvidence || "ops/first-wave-runtime-evidence.txt"}`
+      + ` | route=${opsFiles.firstWaveRuntimeEvidenceDownloadRoute || "ops/first-wave-runtime-evidence-download.txt"}`
+      + ` | file=${firstWaveRuntimeEvidenceDownload.fileName || "-"}`
+      + ` | format=${firstWaveRuntimeEvidenceDownload.format || "-"}`
+      + ` | href=${firstWaveRuntimeEvidenceDownload.href || "-"}`
+    );
+  }
   if (firstWaveRecommendationsZipDownload) {
     lines.push(
       `- First-Wave Recommendations Zip: ${opsFiles.firstWaveRecommendationsZip || "ops/first-wave-recommendations.zip"}`
@@ -24589,6 +24685,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | file=${opsFirstWaveSupportInspectionConfirmationDownload.fileName || "-"}`
       + ` | format=${opsFirstWaveSupportInspectionConfirmationDownload.format || "-"}`
       + ` | href=${opsFirstWaveSupportInspectionConfirmationDownload.href || "-"}`
+      + ` | route=${opsFiles.firstWaveSupportInspectionConfirmationDownloadRoute || "ops/first-wave-support-inspection-confirmation-download.txt"}`
     );
   }
   lines.push(

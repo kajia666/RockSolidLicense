@@ -23987,6 +23987,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-receipt-backfill-status\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-receipt-backfill-status-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-runtime-evidence\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-runtime-evidence-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-support-inspection-confirmation-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/staging-launch-duty-archive\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-operational-review\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-exception-digest\.txt/);
@@ -24031,6 +24033,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-receipt-backfill-status/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-receipt-backfill-status\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-runtime-evidence\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-runtime-evidence-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-support-inspection-confirmation-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/staging-launch-duty-archive\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-operational-review\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-exception-digest\.txt/);
@@ -24042,6 +24046,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-action-links-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Receipt Backfill Status/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops First-Wave Runtime Evidence/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid First-Wave Runtime Evidence Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=first-wave-runtime-evidence/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid First-Wave Support Inspection Confirmation Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=first-wave-support-inspection-confirmation/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Staging Launch-Duty Archive/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Operational Review/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Exception Digest/);
@@ -24113,6 +24121,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Launch receipt backfill status download route: ops\/launch-receipt-backfill-status-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*First-wave runtime evidence download route: ops\/first-wave-runtime-evidence-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*First-wave support inspection confirmation download route: ops\/first-wave-support-inspection-confirmation-download\.txt/
     );
 
     const launchMainlineSummarySelectionDownload = await getText(

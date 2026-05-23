@@ -17261,6 +17261,11 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchMainlineRoutes.body, /launch-mainline-first-wave-runtime-evidence/);
     assert.match(overflowLaunchMainlineRoutes.body, /format=first-wave-runtime-evidence/);
     assert.match(overflowLaunchMainlineRoutes.body, /\| file=.*first-wave-runtime-evidence\.txt/);
+    assert.match(overflowLaunchMainlineRoutes.body, /ops-first-wave-recommendations-zip/);
+    assert.match(
+      overflowLaunchMainlineRoutes.body,
+      /ops\/first-wave-recommendations\.zip.*\/api\/developer\/ops\/first-wave\/recommendations\/download\?.*format=zip/
+    );
     assert.match(overflowLaunchMainlineRoutes.body, /ops-first-wave-support-inspection-confirmation/);
     assert.match(overflowLaunchMainlineRoutes.body, /ops\/first-wave-support-inspection-confirmation\.txt.*format=first-wave-support-inspection-confirmation/);
 
@@ -17270,6 +17275,14 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       ownerSession.token
     );
     assert.match(overflowLaunchMainlinePostLaunchIndex.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(
+      overflowLaunchMainlinePostLaunchIndex.body,
+      /Included Handoff Files:[\s\S]*Developer Ops first-wave recommendations zip: ops\/first-wave-recommendations\.zip/
+    );
+    assert.match(
+      overflowLaunchMainlinePostLaunchIndex.body,
+      /First-Wave Recommendations Zip: ops\/first-wave-recommendations\.zip \| file=first-wave-recommendations\.zip \| format=zip \| href=.*\/api\/developer\/ops\/first-wave\/recommendations\/download\?.*format=zip/
+    );
     assert.match(
       overflowLaunchMainlinePostLaunchIndex.body,
       /Included Handoff Files:[\s\S]*Developer Ops first-wave support inspection confirmation: ops\/first-wave-support-inspection-confirmation\.txt/

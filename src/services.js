@@ -21449,6 +21449,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     ? nextFollowUp.recommendedDownload
     : {};
   const mainlineSummary = payload.mainlineSummary || {};
+  const firstWaveReadinessBridge = mainlineSummary.firstWaveReadinessBridge
+    && typeof mainlineSummary.firstWaveReadinessBridge === "object"
+      ? mainlineSummary.firstWaveReadinessBridge
+      : null;
+  const firstWaveRecommendationsZipDownload = firstWaveReadinessBridge?.downloads?.zip
+    && typeof firstWaveReadinessBridge.downloads.zip === "object"
+      ? firstWaveReadinessBridge.downloads.zip
+      : null;
   const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
   const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const firstWaveSupportInspectionConfirmation = mainlineSummary.firstWaveSupportInspectionConfirmation || null;
@@ -21675,6 +21683,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt",
     opsFirstWaveAuditBackfillStatusDownload || {}
   );
+  if (firstWaveRecommendationsZipDownload) {
+    pushRoute(
+      "ops-first-wave-recommendations-zip",
+      "Developer Ops first-wave recommendations zip",
+      opsFiles.firstWaveRecommendationsZip || "ops/first-wave-recommendations.zip",
+      firstWaveRecommendationsZipDownload
+    );
+  }
   if (opsFirstWaveSupportInspectionConfirmationDownload) {
     pushRoute(
       "ops-first-wave-support-inspection-confirmation",
@@ -23768,6 +23784,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOverviewStatus: "ops/launch-operations-overview-status.txt",
       launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
       firstWaveAuditBackfillStatus: "ops/first-wave-audit-backfill-status.txt",
+      firstWaveRecommendationsZip: "ops/first-wave-recommendations.zip",
       firstWaveSupportInspectionConfirmation: "ops/first-wave-support-inspection-confirmation.txt",
       stabilizationHandoff: "ops/stabilization-handoff.txt"
     },
@@ -23835,6 +23852,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     productCode: opsScope.productCode || filters.productCode || project.code || "",
     channel: opsScope.channel || filters.channel || manifest.channel || "stable"
   };
+  const firstWaveReadinessBridge = mainlineSummary.firstWaveReadinessBridge
+    && typeof mainlineSummary.firstWaveReadinessBridge === "object"
+      ? mainlineSummary.firstWaveReadinessBridge
+      : null;
+  const firstWaveRecommendationsZipDownload = firstWaveReadinessBridge?.downloads?.zip
+    && typeof firstWaveReadinessBridge.downloads.zip === "object"
+      ? firstWaveReadinessBridge.downloads.zip
+      : null;
   const firstWaveSupportInspectionConfirmation = mainlineSummary.firstWaveSupportInspectionConfirmation || null;
   const opsFirstWaveAuditBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload({
     ...opsDownloadScope
@@ -23900,6 +23925,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Launch operations overview status", opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"],
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
     ["First-Wave audit backfill status", opsFiles.firstWaveAuditBackfillStatus || "ops/first-wave-audit-backfill-status.txt"],
+    ...(firstWaveRecommendationsZipDownload
+      ? [["Developer Ops first-wave recommendations zip", opsFiles.firstWaveRecommendationsZip || "ops/first-wave-recommendations.zip"]]
+      : []),
     ...(mainlineSummary.firstWaveRuntimeEvidence || mainlineSummary.firstWaveSupportInspectionConfirmation
       ? [["First-wave runtime evidence", payload.firstWaveRuntimeEvidenceFileName || "developer-launch-mainline-first-wave-runtime-evidence.txt"]]
       : []),
@@ -24008,6 +24036,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + ` | format=${opsFirstWaveAuditBackfillStatusDownload.format || "-"}`
     + ` | href=${opsFirstWaveAuditBackfillStatusDownload.href || "-"}`
   );
+  if (firstWaveRecommendationsZipDownload) {
+    lines.push(
+      `- First-Wave Recommendations Zip: ${opsFiles.firstWaveRecommendationsZip || "ops/first-wave-recommendations.zip"}`
+      + ` | file=${firstWaveRecommendationsZipDownload.fileName || "-"}`
+      + ` | format=${firstWaveRecommendationsZipDownload.format || "-"}`
+      + ` | href=${firstWaveRecommendationsZipDownload.href || "-"}`
+    );
+  }
   if (opsFirstWaveSupportInspectionConfirmationDownload) {
     lines.push(
       `- First-Wave Support Inspection Confirmation: ${opsFiles.firstWaveSupportInspectionConfirmation || "ops/first-wave-support-inspection-confirmation.txt"}`

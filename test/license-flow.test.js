@@ -26148,6 +26148,66 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       receiptVisibilitySnapshotOperatorEntryDownload.body,
       /Launch Duty Stabilization Execution Action:[\s\S]*status=ready_for_first_wave_incident_log_write \| ready=yes \| current=record_first_wave_incident_log \| record=first_wave_incident_log/
     );
+    const launchMainlineReceiptVisibilityReadback = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      launchMainlineReceiptVisibilityReadback.mainlineSummary.receiptVisibilitySnapshotRecordReadback.status,
+      "ready_for_first_wave_incident_log_write"
+    );
+    assert.equal(
+      launchMainlineReceiptVisibilityReadback.mainlineSummary.receiptVisibilitySnapshotRecordReadback.currentActionKey,
+      "record_first_wave_incident_log"
+    );
+    assert.equal(
+      launchMainlineReceiptVisibilityReadback.mainlineSummary.receiptVisibilitySnapshotRecordReadback.nextRecordKey,
+      "first_wave_incident_log"
+    );
+    assert.equal(
+      launchMainlineReceiptVisibilityReadback.mainlineSummary.receiptVisibilitySnapshotRecordReadback.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.ok(launchMainlineReceiptVisibilityReadback.mainlineSummary.overviewCards.some((item) => (
+      item.key === "receipt_visibility_snapshot_record_readback"
+      && item.tags.some((tag) => tag.label === "next" && tag.value === "record_first_wave_incident_log")
+    )));
+    const launchMainlineReceiptVisibilitySummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineReceiptVisibilitySummaryDownload.body,
+      /Launch Mainline Receipt Visibility Snapshot Record Readback:[\s\S]*status=ready_for_first_wave_incident_log_write \| recorded=yes \| record=receipt_visibility_snapshot \| currentAction=record_first_wave_incident_log/
+    );
+    const launchMainlineReceiptVisibilityRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityRoutesDownload.body,
+      /Launch Mainline Receipt Visibility Snapshot Record Readback Route:[\s\S]*status=ready_for_first_wave_incident_log_write \| nextAction=record_first_wave_incident_log \| nextRecord=first_wave_incident_log/
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityRoutesDownload.body,
+      /receipt-visibility-snapshot-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchMainlineReceiptVisibilityIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityIndexDownload.body,
+      /Launch Mainline Receipt Visibility Snapshot Record Readback:[\s\S]*status=ready_for_first_wave_incident_log_write \| nextAction=record_first_wave_incident_log \| nextRecord=first_wave_incident_log/
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Receipt visibility snapshot record readback: ops\/launch-operations-operator-entry\.txt/
+    );
 
     const firstWaveIncidentLogReadbackReceipt = await postJson(
       baseUrl,

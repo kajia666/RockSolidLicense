@@ -140,6 +140,7 @@
             <button class="secondary" id="preview-export-btn">Preview Snapshot</button>
             <button class="secondary" id="load-first-wave-recommendations-btn">Preview First-Wave Recommendations</button>
             <button class="secondary" id="download-first-wave-recommendations-btn">Download First-Wave Handoff</button>
+            <button class="secondary" id="download-first-wave-recommendations-zip-btn">Download First-Wave Zip</button>
             <button class="secondary" id="confirm-first-wave-handoff-btn">Confirm First-Wave Handoff</button>
             <button class="secondary" id="download-export-json-btn">Download JSON</button>
             <button class="secondary" id="download-export-summary-btn">Download Summary</button>
@@ -7266,6 +7267,7 @@
       el("preview-export-btn").addEventListener("click", async () => { try { await refreshOps(); setStatus("Scoped ops snapshot refreshed."); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("load-first-wave-recommendations-btn").addEventListener("click", async () => { try { const data = await loadFirstWaveRecommendations(); setStatus(`First-wave recommendations loaded for ${data.productCode}.`); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-first-wave-recommendations-btn").addEventListener("click", async () => { try { const result = await downloadFirstWaveRecommendations("summary"); setOutput(result); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
+      el("download-first-wave-recommendations-zip-btn").addEventListener("click", async () => { try { const result = await downloadFirstWaveRecommendations("zip"); setOutput(result); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("confirm-first-wave-handoff-btn").addEventListener("click", async () => { try { const confirmation = await confirmFirstWaveHandoff(); setOutput(confirmation); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-json-btn").addEventListener("click", async () => { try { await handleExportDownload("json", "developer-ops.json", "Ops snapshot JSON"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });
       el("download-export-summary-btn").addEventListener("click", async () => { try { await handleExportDownload("summary", "developer-ops-summary.txt", "Ops snapshot summary"); } catch (error) { setStatus(`${error.code}: ${error.message}`, true); setOutput({ code:error.code, message:error.message }); } });

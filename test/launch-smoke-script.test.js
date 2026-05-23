@@ -107,6 +107,7 @@ test("launch smoke script runs the first-wave operations preflight", () => {
   assert.equal(output.handoff.reviewWorkspaces.launchMainline.route, "/developer/launch-mainline?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave");
   assert.equal(output.handoff.downloads.firstWaveSummary.route, "/api/developer/ops/first-wave/recommendations/download?productCode=SMOKE_ALPHA&channel=stable&limit=20&format=summary");
   assert.equal(output.handoff.downloads.firstWaveChecksums.route, "/api/developer/ops/first-wave/recommendations/download?productCode=SMOKE_ALPHA&channel=stable&limit=20&format=checksums");
+  assert.equal(output.handoff.downloads.firstWaveZip.route, "/api/developer/ops/first-wave/recommendations/download?productCode=SMOKE_ALPHA&channel=stable&limit=20&format=zip");
   assert.equal(output.handoff.downloads.opsHandoffIndex.route, "/api/developer/ops/export/download?productCode=SMOKE_ALPHA&format=handoff-index&limit=20");
   assert.equal(output.handoff.downloads.launchOpsOverviewStatus.route, "/api/developer/ops/export/download?productCode=SMOKE_ALPHA&format=launch-operations-overview-status&limit=20");
   assert.equal(output.handoff.downloads.launchMainlineRouteMap.route, "/api/developer/launch-mainline/download?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=handoff-download-routes");
@@ -183,7 +184,7 @@ test("launch smoke script runs the first-wave operations preflight", () => {
   assert.deepEqual(output.handoff.closeoutBackfill.commands[0].valueJson, {
     result: "pass",
     mode: "ephemeral-in-memory",
-    checksPassed: 14,
+    checksPassed: 15,
     productCode: "SMOKE_ALPHA",
     channel: "stable",
     handoffStatus: "ready_for_launch_review"
@@ -212,6 +213,7 @@ test("launch smoke script runs the first-wave operations preflight", () => {
     "first-wave.after",
     "first-wave.download.summary",
     "first-wave.download.checksums",
+    "first-wave.download.zip",
     "first-wave.confirm",
     "ops.export",
     "ops.handoff-index",

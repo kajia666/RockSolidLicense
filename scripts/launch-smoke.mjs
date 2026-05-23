@@ -486,6 +486,7 @@ function buildLaunchDutyHandoff({
   handoffConfirmation,
   summaryDownload,
   checksumDownload,
+  zipDownload,
   handoffIndex,
   launchOperationsOverviewStatusDownload,
   opsSnapshot
@@ -528,6 +529,15 @@ function buildLaunchDutyHandoff({
       channel: options.channel,
       limit: options.limit,
       format: "checksums"
+    })
+  );
+  const firstWaveZip = buildHandoffLink(
+    handoffBaseUrl,
+    buildRoute("/api/developer/ops/first-wave/recommendations/download", {
+      productCode: options.productCode,
+      channel: options.channel,
+      limit: options.limit,
+      format: "zip"
     })
   );
   const opsHandoffIndex = buildHandoffLink(
@@ -620,6 +630,12 @@ function buildLaunchDutyHandoff({
         label: "First-wave recommendation checksums",
         fileName: checksumDownload.fileName || "first-wave-recommendations-sha256.txt",
         ...firstWaveChecksums
+      },
+      firstWaveZip: {
+        key: "first-wave-zip",
+        label: "First-wave recommendation offline zip",
+        fileName: zipDownload.fileName || "first-wave-recommendations.zip",
+        ...firstWaveZip
       },
       opsHandoffIndex: {
         key: "ops-handoff-index",
@@ -781,6 +797,25 @@ async function requestText(baseUrl, route, token = null) {
     contentType: response.headers.get("content-type") || "",
     contentDisposition: response.headers.get("content-disposition") || "",
     body
+  };
+}
+
+async function requestBinary(baseUrl, route, token = null) {
+  const response = await fetch(`${baseUrl}${route}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {}
+  });
+  const body = Buffer.from(await response.arrayBuffer());
+  if (!response.ok) {
+    const error = new Error(`HTTP ${response.status} from GET ${route}: ${body.toString("utf8", 0, 200)}`);
+    error.status = response.status;
+    throw error;
+  }
+
+  return {
+    contentType: response.headers.get("content-type") || "",
+    contentDisposition: response.headers.get("content-disposition") || "",
+    body,
+    byteLength: body.length
   };
 }
 
@@ -1012,6 +1047,21 @@ async function runLaunchSmoke(options) {
       };
     });
 
+    const zipDownload = await step("first-wave.download.zip", async () => {
+      const download = await requestBinary(
+        baseUrl,
+        `/api/developer/ops/first-wave/recommendations/download?${buildQuery({ ...commonQuery, format: "zip" })}`,
+        developerToken
+      );
+      ensure(/^application\/zip/i.test(download.contentType), "First-wave zip download should be application/zip.", download);
+      ensure(/first-wave-recommendations.*\.zip/i.test(download.contentDisposition), "First-wave zip download should expose a recommendation zip file name.", download);
+      ensure(download.byteLength > 0, "First-wave zip download should not be empty.", download);
+      return {
+        fileName: parseAttachmentFileName(download.contentDisposition),
+        byteLength: download.byteLength
+      };
+    });
+
     const fallbackHandoffFileName = `developer-ops-first-wave-recommendations-${options.productCode.toLowerCase()}-${options.channel}.txt`;
     const handoffFileName = summaryDownload.fileName || fallbackHandoffFileName;
     await step("first-wave.confirm", async () => {
@@ -1101,6 +1151,7 @@ async function runLaunchSmoke(options) {
       handoffConfirmation,
       summaryDownload,
       checksumDownload,
+      zipDownload,
       handoffIndex,
       launchOperationsOverviewStatusDownload,
       opsSnapshot

@@ -15969,6 +15969,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(latestReadinessBridge.currentGate, "first_round_ops");
     assert.equal(latestReadinessBridge.nextAction.key, "first_launch_handoff");
     assert.equal(latestReadinessBridge.downloads.summary.href, "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=summary");
+    assert.equal(latestReadinessBridge.downloads.zip.href, "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=zip");
     assert.equal(latestReadinessBridge.operatingChain.status, "ready_for_handoff_confirmation");
     assert.equal(latestReadinessBridge.operatingChain.currentPhaseKey, "handoff_review");
     assert.equal(latestReadinessBridge.operatingChain.nextAction.key, "confirm_first_wave_handoff");
@@ -16045,6 +16046,22 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.equal(firstWaveChecksums.contentType, "text/plain; charset=utf-8");
     assert.match(firstWaveChecksums.body, /first-wave-recommendations\.json/);
     assert.match(firstWaveChecksums.body, /first-wave-recommendations\.txt/);
+    assert.match(firstWaveChecksums.body, /support\/first-wave-support-inspection-downloads\.txt/);
+
+    const firstWaveZip = await getBinary(
+      baseUrl,
+      "/api/developer/ops/first-wave/recommendations/download?productCode=FIRSTWAVE&channel=stable&format=zip&limit=20",
+      operatorSession.token
+    );
+    assert.match(firstWaveZip.contentType || "", /^application\/zip/);
+    assert.match(firstWaveZip.contentDisposition || "", /first-wave-recommendations.*\.zip/);
+    const firstWaveZipText = firstWaveZip.body.toString("latin1");
+    assert.match(firstWaveZipText, /first-wave-recommendations\.json/);
+    assert.match(firstWaveZipText, /first-wave-recommendations\.txt/);
+    assert.match(firstWaveZipText, /support\/first-wave-support-inspection-downloads\.txt/);
+    assert.match(firstWaveZipText, /first_wave_support_inspection_confirmation/);
+    assert.match(firstWaveZipText, /format=first-wave-support-inspection-confirmation/);
+    assert.match(firstWaveZipText, /SHA256SUMS\.txt/);
 
     const mainlineAfterRecommendation = await getJson(
       baseUrl,
@@ -32069,6 +32086,8 @@ test("developer operations page is served from the dedicated route", async () =>
     assert.match(html, /api\/developer\/ops\/steady-state-duty-plan\/receipt/);
     assert.match(html, /Preview First-Wave Recommendations/);
     assert.match(html, /Download First-Wave Handoff/);
+    assert.match(html, /Download First-Wave Zip/);
+    assert.match(html, /download-first-wave-recommendations-zip-btn/);
     assert.match(html, /Confirm First-Wave Handoff/);
     assert.match(html, /Download Summary/);
     assert.match(html, /Download Next Follow-up/);

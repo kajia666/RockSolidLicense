@@ -26056,7 +26056,8 @@ function buildFirstWaveReadinessBridgeAuditPayload(item = null) {
     downloads: {
       summary: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "summary"),
       json: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "json"),
-      checksums: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "checksums")
+      checksums: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "checksums"),
+      zip: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "zip")
     },
     sourceRecommendation: {
       inventoryStatus,
@@ -40201,7 +40202,9 @@ function buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode =
     ? "sha256.txt"
     : normalizedFormat === "json"
       ? "json"
-      : "txt";
+      : normalizedFormat === "zip"
+        ? "zip"
+        : "txt";
   return {
     key: `first_wave_recommendations_${normalizedFormat}`,
     label: `First-wave recommendations ${normalizedFormat}`,
@@ -40266,7 +40269,8 @@ function buildDeveloperOpsFirstWaveReadinessBridgePayload({
   const downloads = {
     summary: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "summary"),
     json: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "json"),
-    checksums: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "checksums")
+    checksums: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "checksums"),
+    zip: buildDeveloperOpsFirstWaveRecommendationsDownloadShortcut(productCode, channel, "zip")
   };
   const normalizedPostLaunchLifecycleHandoff = normalizeDeveloperOpsFirstWavePostLaunchLifecycleHandoffPayload(postLaunchLifecycleHandoff);
   const confirmationPayloadTemplate = {
@@ -40327,6 +40331,40 @@ function buildDeveloperOpsFirstWaveRecommendationsBaseName(payload = {}) {
   const productCode = String(payload.productCode || "project").trim().toLowerCase() || "project";
   const channel = String(payload.channel || "stable").trim().toLowerCase() || "stable";
   return `developer-ops-first-wave-recommendations-${productCode}-${channel}`;
+}
+
+function buildDeveloperOpsFirstWaveSupportInspectionDownloadsText(payload = {}) {
+  const supportInspectionPlan = payload.supportInspectionPlan && typeof payload.supportInspectionPlan === "object"
+    ? payload.supportInspectionPlan
+    : null;
+  const downloads = Array.isArray(supportInspectionPlan?.downloads)
+    ? supportInspectionPlan.downloads
+    : [];
+  const lines = [
+    "RockSolid Developer Ops First-Wave Support Inspection Downloads",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${payload.productCode || "-"}`,
+    `Channel: ${payload.channel || "stable"}`,
+    "",
+    "Support Inspection Plan:",
+    `- status=${supportInspectionPlan?.status || "not_ready"} | current=${supportInspectionPlan?.currentTargetKey || "-"} | targets=${supportInspectionPlan?.targetCount ?? 0}`,
+    `- confirm=${supportInspectionPlan?.confirmation?.method || "POST"} ${supportInspectionPlan?.confirmation?.endpoint || "/api/developer/ops/first-wave/support-inspection/confirm"}`,
+    "",
+    "Downloads:"
+  ];
+  if (!downloads.length) {
+    lines.push("- none");
+  }
+  for (const download of downloads) {
+    lines.push(
+      `- ${download.key || "-"}`
+      + ` | file=${download.fileName || "-"}`
+      + ` | format=${download.format || "-"}`
+      + ` | source=${download.source || "-"}`
+      + ` | href=${download.href || "-"}`
+    );
+  }
+  return lines.join("\n");
 }
 
 function buildDeveloperOpsFirstWaveRecommendationsText(payload = {}) {
@@ -40548,19 +40586,36 @@ function buildDeveloperOpsFirstWaveRecommendationFiles(payload = {}) {
     {
       path: "first-wave-recommendations.txt",
       body: buildDeveloperOpsFirstWaveRecommendationsText(payload)
+    },
+    {
+      path: "support/first-wave-support-inspection-downloads.txt",
+      body: buildDeveloperOpsFirstWaveSupportInspectionDownloadsText(payload)
     }
   ];
+}
+
+function buildDeveloperOpsFirstWaveRecommendationZipEntries(payload = {}) {
+  const root = buildArchiveRootName(`${buildDeveloperOpsFirstWaveRecommendationsBaseName(payload)}.zip`, "first-wave-recommendations");
+  return buildZipEntriesFromFiles(root, buildDeveloperOpsFirstWaveRecommendationFiles(payload));
 }
 
 function buildDeveloperOpsFirstWaveRecommendationsDownloadAsset(payload, format = "summary") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "checksums"],
+    ["json", "summary", "checksums", "zip"],
     "summary",
     "INVALID_DEVELOPER_FIRST_WAVE_RECOMMENDATIONS_FORMAT",
     "Developer first-wave recommendations format"
   );
   const baseName = buildDeveloperOpsFirstWaveRecommendationsBaseName(payload);
+
+  if (normalizedFormat === "zip") {
+    return {
+      fileName: `${baseName}.zip`,
+      contentType: "application/zip",
+      body: buildZipArchive(buildDeveloperOpsFirstWaveRecommendationZipEntries(payload))
+    };
+  }
 
   if (normalizedFormat === "checksums") {
     return {

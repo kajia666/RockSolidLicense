@@ -20747,6 +20747,9 @@ function appendLaunchCandidateFullVerificationGateLines(lines = [], gate = null,
     ? gate.recommendedDownload
     : null;
   const operatorOrder = Array.isArray(gate.operatorOrder) ? gate.operatorOrder : [];
+  const resultHandoff = gate.resultHandoff && typeof gate.resultHandoff === "object"
+    ? gate.resultHandoff
+    : null;
   lines.push(title);
   lines.push(
     `- status=${gate.status || "-"}`
@@ -20775,6 +20778,63 @@ function appendLaunchCandidateFullVerificationGateLines(lines = [], gate = null,
   );
   if (readbackFiles.length) {
     lines.push(`- readbackFiles=${readbackFiles.join(",")}`);
+  }
+  if (resultHandoff) {
+    const resultReadbackFiles = Array.isArray(resultHandoff.readbackFiles)
+      ? resultHandoff.readbackFiles
+      : [];
+    const resultSuccessCriteria = Array.isArray(resultHandoff.successCriteria)
+      ? resultHandoff.successCriteria
+      : [];
+    const productionSignoffEntryHandoff = resultHandoff.productionSignoffEntryHandoff
+      && typeof resultHandoff.productionSignoffEntryHandoff === "object"
+        ? resultHandoff.productionSignoffEntryHandoff
+        : null;
+    const productionSignoffChecks = Array.isArray(productionSignoffEntryHandoff?.requiredChecks)
+      ? productionSignoffEntryHandoff.requiredChecks
+      : [];
+    lines.push("Launch Candidate Full Verification Result Handoff:");
+    lines.push(
+      `- status=${resultHandoff.status || "-"}`
+      + ` | target=${resultHandoff.targetKey || "-"}`
+      + ` | decision=${resultHandoff.decision || "-"}`
+      + ` | expectedFilled=${resultHandoff.expectedFilledKey || "-"}`
+      + ` | expectedGate=${resultHandoff.expectedNextGate || "-"}`
+    );
+    lines.push(
+      `- artifact=${resultHandoff.artifactPath || "-"}`
+      + ` | expectedArtifact=${resultHandoff.expectedArtifactPath || "-"}`
+      + ` | productionSignoffPacket=${resultHandoff.productionSignoffPacket || "-"}`
+    );
+    lines.push(`- signoffBackfill=${resultHandoff.signoffBackfillCommand || "-"}`);
+    lines.push(`- readback=${resultHandoff.readbackCommand || "-"}`);
+    lines.push(`- readbackFiles=${resultReadbackFiles.length ? resultReadbackFiles.join(",") : "-"}`);
+    lines.push(
+      `- successCriteria=${resultSuccessCriteria.length}`
+      + ` | productionSignoffEntry=${productionSignoffEntryHandoff?.status || "-"}`
+    );
+    if (productionSignoffEntryHandoff) {
+      lines.push("Launch Candidate Full Verification Production Signoff Entry:");
+      lines.push(
+        `- status=${productionSignoffEntryHandoff.status || "-"}`
+        + ` | currentAction=${productionSignoffEntryHandoff.currentActionKey || "-"}`
+        + ` | archiveAction=${productionSignoffEntryHandoff.archiveActionKey || "-"}`
+        + ` | nextGate=${productionSignoffEntryHandoff.nextGate || "-"}`
+        + ` | nextAfterSignoff=${productionSignoffEntryHandoff.nextAfterSignoffActionKey || "-"}`
+      );
+      lines.push(
+        `- packet=${productionSignoffEntryHandoff.productionSignoffPacket || "-"}`
+        + ` | launchDutyRecordIndex=${productionSignoffEntryHandoff.launchDutyRecordIndexPath || "-"}`
+        + ` | launchDutyArchiveIndex=${productionSignoffEntryHandoff.launchDutyArchiveIndexPath || "-"}`
+      );
+      lines.push(`- readinessReadback=${productionSignoffEntryHandoff.readinessReadbackCommand || "-"}`);
+      lines.push(
+        `- rehearsalReload=${productionSignoffEntryHandoff.rehearsalReloadCommand || "-"}`
+        + ` | checks=${productionSignoffChecks.length}`
+      );
+      lines.push(`- productionSignoffEntryNextAction=${productionSignoffEntryHandoff.nextAction || "-"}`);
+    }
+    lines.push(`- resultHandoffNextAction=${resultHandoff.nextAction || "-"}`);
   }
   if (prerequisites.length) {
     lines.push("Launch Candidate Full Verification Prerequisites:");
@@ -36738,6 +36798,68 @@ function buildDeveloperOpsLaunchCandidateFullVerificationGate(stagingReadinessBr
         bridge.filledCloseoutInputFile,
         bridge.readinessActionQueueFile
       ].filter(Boolean);
+  const postBackfillReadback = signoffBackfillGuard?.postBackfillReadback
+    && typeof signoffBackfillGuard.postBackfillReadback === "object"
+      ? signoffBackfillGuard.postBackfillReadback
+      : null;
+  const productionSignoffEntryHandoff = postBackfillReadback?.productionSignoffEntryHandoff
+    && typeof postBackfillReadback.productionSignoffEntryHandoff === "object"
+      ? postBackfillReadback.productionSignoffEntryHandoff
+      : null;
+  const resultHandoff = postBackfillReadback
+    ? {
+        version: "developer-ops-launch-candidate-full-verification-result-handoff/v1",
+        status: postBackfillReadback.status || null,
+        targetKey: signoffBackfillGuard?.targetKey || postBackfillReadback.expectedFilledKey || "full_test_window_passed",
+        artifactPath: signoffBackfillGuard?.artifactPath || postBackfillReadback.expectedArtifactPath || null,
+        expectedArtifactPath: postBackfillReadback.expectedArtifactPath || signoffBackfillGuard?.artifactPath || null,
+        decision: signoffBackfillGuard?.requiredDecision || postBackfillReadback.expectedDecision || null,
+        expectedFilledKey: postBackfillReadback.expectedFilledKey || signoffBackfillGuard?.targetKey || null,
+        expectedNextGate: postBackfillReadback.expectedNextGate || null,
+        productionSignoffPacket: postBackfillReadback.productionSignoffPacket
+          || productionSignoffEntryHandoff?.productionSignoffPacket
+          || fullTestEntryGate?.productionSignoffPacket
+          || bridge.productionSignoffPacket
+          || null,
+        signoffBackfillCommand: signoffBackfillGuard?.command || null,
+        readbackCommand: postBackfillReadback.command
+          || signoffBackfillGuard?.readbackAfterCommand
+          || fullTestEntryGate?.finalReadinessRefreshCommand
+          || bridge.readinessStatusCommand
+          || null,
+        readbackFiles: Array.isArray(postBackfillReadback.readbackFiles)
+          ? postBackfillReadback.readbackFiles.slice()
+          : readbackFiles.slice(),
+        successCriteria: Array.isArray(postBackfillReadback.successCriteria)
+          ? postBackfillReadback.successCriteria.map((item) => ({
+              key: item?.key || null,
+              expected: item?.expected || null
+            }))
+          : [],
+        productionSignoffEntryHandoff: productionSignoffEntryHandoff
+          ? {
+              status: productionSignoffEntryHandoff.status || null,
+              currentActionKey: productionSignoffEntryHandoff.currentActionKey || null,
+              archiveActionKey: productionSignoffEntryHandoff.archiveActionKey || null,
+              productionSignoffPacket: productionSignoffEntryHandoff.productionSignoffPacket || null,
+              launchDutyRecordIndexPath: productionSignoffEntryHandoff.launchDutyRecordIndexPath || null,
+              launchDutyArchiveIndexPath: productionSignoffEntryHandoff.launchDutyArchiveIndexPath || null,
+              readinessReadbackCommand: productionSignoffEntryHandoff.readinessReadbackCommand || null,
+              rehearsalReloadCommand: productionSignoffEntryHandoff.rehearsalReloadCommand || null,
+              nextGate: productionSignoffEntryHandoff.nextGate || null,
+              nextAfterSignoffActionKey: productionSignoffEntryHandoff.nextAfterSignoffActionKey || null,
+              requiredChecks: Array.isArray(productionSignoffEntryHandoff.requiredChecks)
+                ? productionSignoffEntryHandoff.requiredChecks.map((item) => ({
+                    key: item?.key || null,
+                    expected: item?.expected || null
+                  }))
+                : [],
+              nextAction: productionSignoffEntryHandoff.nextAction || null
+            }
+          : null,
+        nextAction: postBackfillReadback.nextAction || null
+      }
+    : null;
   const prerequisites = exitCriteria.map((item, index) => ({
     order: index + 1,
     key: item?.key || null,
@@ -36774,6 +36896,7 @@ function buildDeveloperOpsLaunchCandidateFullVerificationGate(stagingReadinessBr
     blockerCount: Number(fullTestEntryGate?.blockerCount ?? clearanceReviewPacket?.blockerCount ?? 0),
     prerequisiteCount: prerequisites.length,
     readbackFiles,
+    resultHandoff,
     prerequisites,
     recommendedDownload: download,
     operatorOrder: [

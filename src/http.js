@@ -46,12 +46,17 @@ export function sendHtml(res, statusCode, html) {
 }
 
 export function sendText(res, statusCode, body, contentType = "text/plain; charset=utf-8", headers = {}) {
+  const resolvedBody = body ?? "";
+  const contentLength = resolvedBody instanceof Uint8Array
+    ? resolvedBody.byteLength
+    : Buffer.byteLength(String(resolvedBody));
   res.writeHead(statusCode, {
     "content-type": contentType,
     "cache-control": "no-store",
+    "content-length": contentLength,
     ...headers
   });
-  res.end(body);
+  res.end(resolvedBody);
 }
 
 export function getBearerToken(req) {

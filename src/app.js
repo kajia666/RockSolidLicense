@@ -57,11 +57,12 @@ function matchPath(pathname, pattern) {
 
 function sendAttachment(res, asset) {
   const fileName = String(asset?.fileName || "download.txt").replace(/["\r\n]/g, "_");
+  const contentType = asset?.contentType || "text/plain; charset=utf-8";
   sendText(
     res,
     200,
     asset?.body ?? "",
-    asset?.contentType || "text/plain; charset=utf-8",
+    contentType,
     {
       "content-disposition": `attachment; filename="${fileName}"`
     }
@@ -1432,7 +1433,8 @@ export function createApp(overrides = {}) {
           publicHost: url.hostname,
           publicPort: Number(url.port || (url.protocol === "https:" ? 443 : 80))
         });
-        sendAttachment(res, services.launchMainlineDownloadAsset(data, url.searchParams.get("format")));
+        const asset = services.launchMainlineDownloadAsset(data, url.searchParams.get("format"));
+        sendAttachment(res, asset);
         return;
       }
       if (req.method === "POST" && url.pathname === "/api/developer/launch-mainline/action") {
@@ -2431,6 +2433,12 @@ export function createApp(overrides = {}) {
       });
     }
   });
+  server.keepAliveTimeout = Number.isFinite(config.httpKeepAliveTimeoutMs)
+    ? Math.max(0, config.httpKeepAliveTimeoutMs)
+    : 30000;
+  server.headersTimeout = Number.isFinite(config.httpHeadersTimeoutMs)
+    ? Math.max(config.httpHeadersTimeoutMs, server.keepAliveTimeout + 1000)
+    : server.keepAliveTimeout + 1000;
 
   return {
     config,

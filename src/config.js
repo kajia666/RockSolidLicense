@@ -73,6 +73,12 @@ export function loadConfig(overrides = {}) {
     adminPassword: process.env.RSL_ADMIN_PASSWORD ?? "ChangeMe!123",
     adminSessionHours: Number(process.env.RSL_ADMIN_SESSION_HOURS ?? 12),
     developerSessionHours: Number(process.env.RSL_DEVELOPER_SESSION_HOURS ?? 24),
+    httpKeepAliveTimeoutMs: Number(
+      overrides.httpKeepAliveTimeoutMs ?? process.env.RSL_HTTP_KEEP_ALIVE_TIMEOUT_MS ?? 30000
+    ),
+    httpHeadersTimeoutMs: Number(
+      overrides.httpHeadersTimeoutMs ?? process.env.RSL_HTTP_HEADERS_TIMEOUT_MS ?? 31000
+    ),
     requestSkewSeconds: Number(process.env.RSL_REQUEST_SKEW_SECONDS ?? 300),
     serverTokenSecret:
       process.env.RSL_SERVER_TOKEN_SECRET ??

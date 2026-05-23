@@ -21395,6 +21395,31 @@ function getDeveloperLaunchMainlineStagingLaunchDutyArchiveDownload(payload = {}
   return opsDownloadScope ? buildDeveloperOpsStagingLaunchDutyArchiveDownload(opsDownloadScope) : null;
 }
 
+function getDeveloperLaunchMainlineLaunchOperationsOperatorChecklistDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchOperationsOperatorChecklistDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchOperationsOperatorEntryDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchOperationsHandoffSummaryDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineLaunchOperationsDailyBriefDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchOperationsDailyBriefDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownload(payload = {}) {
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchOperationsShiftActionPlanDownload(opsDownloadScope) : null;
+}
+
 function getDeveloperLaunchMainlineOpsDownloadScope(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -21706,6 +21731,86 @@ function buildDeveloperLaunchMainlineStagingLaunchDutyArchiveDownloadText(payloa
     notes: [
       "Use this route to re-fetch the Developer Ops staging launch-duty archive from the offline Mainline package.",
       "Keep it beside staging-launch-duty-archive.txt so launch duty can re-open the staging archive without manual format lookup."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchOperationsOperatorChecklistDownloadText(payload = {}) {
+  const checklist = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorChecklist || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Operations Operator Checklist Download",
+    download: getDeveloperLaunchMainlineLaunchOperationsOperatorChecklistDownload(payload),
+    status: checklist?.status || "",
+    action: checklist?.currentActionKey || "review_launch_operations_operator_checklist",
+    operatorOrder: ["Open the operator checklist route before walking through launch operations handoff files."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops launch operations operator checklist from the offline Mainline package.",
+      "Keep it beside launch-operations-operator-checklist.txt so launch duty can verify checklist steps without manual format lookup."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownloadText(payload = {}) {
+  const entry = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Operations Operator Entry Download",
+    download: getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload),
+    status: entry?.status || entry?.launchDutyStableOperationsTransitionAction?.status || "",
+    action: entry?.currentAction?.key || entry?.launchDutyStableOperationsTransitionAction?.operatorAction || "open_launch_operations_operator_entry",
+    operatorOrder: ["Open the operator entry route first when taking over launch-day watch or stable-operations handoff."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops launch operations operator entry from the offline Mainline package.",
+      "Keep it beside launch-operations-operator-entry.txt so the next operator can resume from the exact backend/API entrypoint."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownloadText(payload = {}) {
+  const handoffSummary = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsHandoffSummary || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Operations Handoff Summary Download",
+    download: getDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownload(payload),
+    status: handoffSummary?.status || "",
+    action: handoffSummary?.currentActionKey || "review_launch_operations_handoff_summary",
+    operatorOrder: ["Open the handoff summary route before transferring launch operations context between operators."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops launch operations handoff summary from the offline Mainline package.",
+      "Keep it beside launch-operations-handoff-summary.txt so shift handoff context stays verifiable."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchOperationsDailyBriefDownloadText(payload = {}) {
+  const dailyBrief = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsDailyBrief || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Operations Daily Brief Download",
+    download: getDeveloperLaunchMainlineLaunchOperationsDailyBriefDownload(payload),
+    status: dailyBrief?.status || "",
+    action: dailyBrief?.currentActionKey || "review_launch_operations_daily_brief",
+    operatorOrder: ["Open the daily brief route at shift start before acting on launch-day watch signals."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops launch operations daily brief from the offline Mainline package.",
+      "Keep it beside launch-operations-daily-brief.txt so launch-day watch context remains recoverable."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownloadText(payload = {}) {
+  const shiftActionPlan = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsShiftActionPlan || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Operations Shift Action Plan Download",
+    download: getDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownload(payload),
+    status: shiftActionPlan?.status || "",
+    action: shiftActionPlan?.primaryAction?.key || shiftActionPlan?.currentActionKey || "review_launch_operations_shift_action_plan",
+    operatorOrder: ["Open the shift action plan route before recording rollout, first operating result, or watch-shift receipts."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops launch operations shift action plan from the offline Mainline package.",
+      "Keep it beside launch-operations-shift-action-plan.txt so active shift actions can be verified and repeated safely."
     ]
   });
 }
@@ -22820,8 +22925,22 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-operations-operator-checklist-download.txt",
+    getDeveloperLaunchMainlineLaunchOperationsOperatorChecklistDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchOperationsOperatorChecklistDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-operations-operator-entry.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsOperatorEntryText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-operations-operator-entry-download.txt",
+    getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -22830,13 +22949,34 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-operations-handoff-summary-download.txt",
+    getDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-operations-daily-brief.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsDailyBriefText(payload.opsSnapshot) : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-operations-daily-brief-download.txt",
+    getDeveloperLaunchMainlineLaunchOperationsDailyBriefDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchOperationsDailyBriefDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-operations-shift-action-plan.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsShiftActionPlanText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-operations-shift-action-plan-download.txt",
+    getDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -24394,6 +24534,16 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       initialLaunchOpsReadinessDownloadRoute: "ops/initial-launch-ops-readiness-download.txt",
       stagingLaunchDutyArchive: "ops/staging-launch-duty-archive.txt",
       stagingLaunchDutyArchiveDownloadRoute: "ops/staging-launch-duty-archive-download.txt",
+      launchOperationsOperatorChecklist: "ops/launch-operations-operator-checklist.txt",
+      launchOperationsOperatorChecklistDownloadRoute: "ops/launch-operations-operator-checklist-download.txt",
+      launchOperationsOperatorEntry: "ops/launch-operations-operator-entry.txt",
+      launchOperationsOperatorEntryDownloadRoute: "ops/launch-operations-operator-entry-download.txt",
+      launchOperationsHandoffSummary: "ops/launch-operations-handoff-summary.txt",
+      launchOperationsHandoffSummaryDownloadRoute: "ops/launch-operations-handoff-summary-download.txt",
+      launchOperationsDailyBrief: "ops/launch-operations-daily-brief.txt",
+      launchOperationsDailyBriefDownloadRoute: "ops/launch-operations-daily-brief-download.txt",
+      launchOperationsShiftActionPlan: "ops/launch-operations-shift-action-plan.txt",
+      launchOperationsShiftActionPlanDownloadRoute: "ops/launch-operations-shift-action-plan-download.txt",
       launchOperationsOverviewStatus: "ops/launch-operations-overview-status.txt",
       launchOperationsOverviewStatusDownloadRoute: "ops/launch-operations-overview-status-download.txt",
       launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
@@ -24522,6 +24672,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchReceiptBackfillStatusDownload = getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload);
   const initialLaunchOpsReadinessDownload = getDeveloperLaunchMainlineInitialLaunchOpsReadinessDownload(payload);
   const stagingLaunchDutyArchiveDownload = getDeveloperLaunchMainlineStagingLaunchDutyArchiveDownload(payload);
+  const launchOperationsOperatorChecklistDownload = getDeveloperLaunchMainlineLaunchOperationsOperatorChecklistDownload(payload);
+  const launchOperationsOperatorEntryDownload = getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload);
+  const launchOperationsHandoffSummaryDownload = getDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownload(payload);
+  const launchOperationsDailyBriefDownload = getDeveloperLaunchMainlineLaunchOperationsDailyBriefDownload(payload);
+  const launchOperationsShiftActionPlanDownload = getDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownload(payload);
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -24564,6 +24719,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       : []),
     ["Initial launch ops readiness", opsFiles.initialLaunchOpsReadiness || "ops/initial-launch-ops-readiness.txt"],
     ["Staging launch-duty archive", opsFiles.stagingLaunchDutyArchive || "ops/staging-launch-duty-archive.txt"],
+    ["Launch operations operator checklist", opsFiles.launchOperationsOperatorChecklist || "ops/launch-operations-operator-checklist.txt"],
+    ["Launch operations operator entry", opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"],
+    ["Launch operations handoff summary", opsFiles.launchOperationsHandoffSummary || "ops/launch-operations-handoff-summary.txt"],
+    ["Launch operations daily brief", opsFiles.launchOperationsDailyBrief || "ops/launch-operations-daily-brief.txt"],
+    ["Launch operations shift action plan", opsFiles.launchOperationsShiftActionPlan || "ops/launch-operations-shift-action-plan.txt"],
     ["Ops stabilization handoff", opsFiles.stabilizationHandoff || "ops/stabilization-handoff.txt"]
   ];
   if (steadyStateHandoffLanding) {
@@ -24656,6 +24816,36 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Staging launch-duty archive download route",
       opsFiles.stagingLaunchDutyArchiveDownloadRoute || "ops/staging-launch-duty-archive-download.txt"
+    ]);
+  }
+  if (launchOperationsOperatorChecklistDownload) {
+    handoffFiles.push([
+      "Launch operations operator checklist download route",
+      opsFiles.launchOperationsOperatorChecklistDownloadRoute || "ops/launch-operations-operator-checklist-download.txt"
+    ]);
+  }
+  if (launchOperationsOperatorEntryDownload) {
+    handoffFiles.push([
+      "Launch operations operator entry download route",
+      opsFiles.launchOperationsOperatorEntryDownloadRoute || "ops/launch-operations-operator-entry-download.txt"
+    ]);
+  }
+  if (launchOperationsHandoffSummaryDownload) {
+    handoffFiles.push([
+      "Launch operations handoff summary download route",
+      opsFiles.launchOperationsHandoffSummaryDownloadRoute || "ops/launch-operations-handoff-summary-download.txt"
+    ]);
+  }
+  if (launchOperationsDailyBriefDownload) {
+    handoffFiles.push([
+      "Launch operations daily brief download route",
+      opsFiles.launchOperationsDailyBriefDownloadRoute || "ops/launch-operations-daily-brief-download.txt"
+    ]);
+  }
+  if (launchOperationsShiftActionPlanDownload) {
+    handoffFiles.push([
+      "Launch operations shift action plan download route",
+      opsFiles.launchOperationsShiftActionPlanDownloadRoute || "ops/launch-operations-shift-action-plan-download.txt"
     ]);
   }
   const lines = [

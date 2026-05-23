@@ -13104,11 +13104,13 @@ function buildDeveloperLaunchReviewPayload({
   const fileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
+  const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
     firstWaveRuntimeEvidenceFileName,
+    firstWaveSupportInspectionConfirmationFileName,
     manifest: {
       generatedAt,
       channel,
@@ -13196,6 +13198,36 @@ function buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload = {}) {
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchReviewFirstWaveSupportInspectionConfirmationText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const confirmation = payload.reviewSummary?.firstWaveSupportInspectionConfirmation
+    && typeof payload.reviewSummary.firstWaveSupportInspectionConfirmation === "object"
+    ? payload.reviewSummary.firstWaveSupportInspectionConfirmation
+    : null;
+  const lines = [
+    "RockSolid Developer Launch Review First-Wave Support Inspection Confirmation",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (confirmation) {
+    appendFirstWaveSupportInspectionConfirmationLines(lines, confirmation);
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Use this file while reviewing Launch Review without reopening Developer Ops.");
+    lines.push("- Keep the runtime evidence download attached for the same first-wave lane.");
+  } else {
+    lines.push("First-Wave Support Inspection Confirmation:");
+    lines.push("- status=not_recorded | support=unknown | targets=0/0");
+    lines.push("- summary=Confirm first-wave support inspection before using this handoff.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchReviewFiles(payload = {}) {
   const files = [
     {
@@ -13234,6 +13266,13 @@ function buildDeveloperLaunchReviewFiles(payload = {}) {
       ? buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload)
       : ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-review-first-wave-support-inspection-confirmation.txt",
+    payload.reviewSummary?.firstWaveSupportInspectionConfirmation
+      ? buildDeveloperLaunchReviewFirstWaveSupportInspectionConfirmationText(payload)
+      : ""
+  );
   return files;
 }
 
@@ -13245,7 +13284,7 @@ function buildDeveloperLaunchReviewZipEntries(payload = {}) {
 function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "first-wave-runtime-evidence", "checksums", "zip"],
+    ["json", "summary", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_REVIEW_FORMAT",
     "Developer launch review format"
@@ -13277,6 +13316,13 @@ function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
       fileName: payload.firstWaveRuntimeEvidenceFileName || "developer-launch-review-first-wave-runtime-evidence.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload)
+    };
+  }
+  if (normalizedFormat === "first-wave-support-inspection-confirmation") {
+    return {
+      fileName: payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-review-first-wave-support-inspection-confirmation.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchReviewFirstWaveSupportInspectionConfirmationText(payload)
     };
   }
 
@@ -14404,11 +14450,13 @@ function buildDeveloperLaunchSmokeKitPayload({
   const fileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
+  const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
     firstWaveRuntimeEvidenceFileName,
+    firstWaveSupportInspectionConfirmationFileName,
     manifest: {
       generatedAt,
       channel,
@@ -14491,6 +14539,36 @@ function buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload = {}) 
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchSmokeKitFirstWaveSupportInspectionConfirmationText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const confirmation = payload.smokeSummary?.firstWaveSupportInspectionConfirmation
+    && typeof payload.smokeSummary.firstWaveSupportInspectionConfirmation === "object"
+    ? payload.smokeSummary.firstWaveSupportInspectionConfirmation
+    : null;
+  const lines = [
+    "RockSolid Developer Launch Smoke Kit First-Wave Support Inspection Confirmation",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (confirmation) {
+    appendFirstWaveSupportInspectionConfirmationLines(lines, confirmation);
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Use this file while reviewing Launch Smoke without reopening Developer Ops.");
+    lines.push("- Keep the runtime evidence download attached for the same first-wave lane.");
+  } else {
+    lines.push("First-Wave Support Inspection Confirmation:");
+    lines.push("- status=not_recorded | support=unknown | targets=0/0");
+    lines.push("- summary=Confirm first-wave support inspection before using this handoff.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
   const files = [
     {
@@ -14524,6 +14602,13 @@ function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
       ? buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload)
       : ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-smoke-kit-first-wave-support-inspection-confirmation.txt",
+    payload.smokeSummary?.firstWaveSupportInspectionConfirmation
+      ? buildDeveloperLaunchSmokeKitFirstWaveSupportInspectionConfirmationText(payload)
+      : ""
+  );
   return files;
 }
 
@@ -14535,7 +14620,7 @@ function buildDeveloperLaunchSmokeKitZipEntries(payload = {}) {
 function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "first-wave-runtime-evidence", "checksums", "zip"],
+    ["json", "summary", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_SMOKE_KIT_FORMAT",
     "Developer launch smoke kit format"
@@ -14567,6 +14652,13 @@ function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
       fileName: payload.firstWaveRuntimeEvidenceFileName || "developer-launch-smoke-kit-first-wave-runtime-evidence.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload)
+    };
+  }
+  if (normalizedFormat === "first-wave-support-inspection-confirmation") {
+    return {
+      fileName: payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-smoke-kit-first-wave-support-inspection-confirmation.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchSmokeKitFirstWaveSupportInspectionConfirmationText(payload)
     };
   }
 

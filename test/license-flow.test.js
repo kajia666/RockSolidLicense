@@ -17092,6 +17092,15 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchReviewRuntimeEvidence.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
     assert.match(overflowLaunchReviewRuntimeEvidence.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 
+    const overflowLaunchReviewSupportConfirmation = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=first-wave-support-inspection-confirmation",
+      ownerSession.token
+    );
+    assert.match(overflowLaunchReviewSupportConfirmation.body, /RockSolid Developer Launch Review First-Wave Support Inspection Confirmation/);
+    assert.match(overflowLaunchReviewSupportConfirmation.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(overflowLaunchReviewSupportConfirmation.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
+
     const overflowLaunchSmokeRuntimeEvidence = await getText(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=FIRSTWAVE&channel=stable&format=first-wave-runtime-evidence",
@@ -17100,6 +17109,15 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(overflowLaunchSmokeRuntimeEvidence.body, /First-Wave Support Inspection Confirmation:/);
     assert.match(overflowLaunchSmokeRuntimeEvidence.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
     assert.match(overflowLaunchSmokeRuntimeEvidence.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
+
+    const overflowLaunchSmokeSupportConfirmation = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTWAVE&channel=stable&format=first-wave-support-inspection-confirmation",
+      ownerSession.token
+    );
+    assert.match(overflowLaunchSmokeSupportConfirmation.body, /RockSolid Developer Launch Smoke Kit First-Wave Support Inspection Confirmation/);
+    assert.match(overflowLaunchSmokeSupportConfirmation.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(overflowLaunchSmokeSupportConfirmation.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 
     const overflowLaunchMainlineRuntimeEvidence = await getText(
       baseUrl,
@@ -17179,12 +17197,15 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       ownerSession.token
     );
     assert.match(overflowLaunchReviewChecksums.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(overflowLaunchReviewChecksums.body, /first-wave-support-inspection-confirmation\.txt/);
     const overflowLaunchReviewZip = await getBinary(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=zip",
       ownerSession.token
     );
     const overflowLaunchReviewZipText = overflowLaunchReviewZip.body.toString("latin1");
+    assert.match(overflowLaunchReviewZipText, /first-wave-support-inspection-confirmation\.txt/);
+    assert.match(overflowLaunchReviewZipText, /RockSolid Developer Launch Review First-Wave Support Inspection Confirmation/);
     assert.match(overflowLaunchReviewZipText, /First-Wave Support Inspection Confirmation:/);
     assert.match(overflowLaunchReviewZipText, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 
@@ -17194,12 +17215,15 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       ownerSession.token
     );
     assert.match(overflowLaunchSmokeChecksums.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(overflowLaunchSmokeChecksums.body, /first-wave-support-inspection-confirmation\.txt/);
     const overflowLaunchSmokeZip = await getBinary(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=FIRSTWAVE&channel=stable&format=zip",
       ownerSession.token
     );
     const overflowLaunchSmokeZipText = overflowLaunchSmokeZip.body.toString("latin1");
+    assert.match(overflowLaunchSmokeZipText, /first-wave-support-inspection-confirmation\.txt/);
+    assert.match(overflowLaunchSmokeZipText, /RockSolid Developer Launch Smoke Kit First-Wave Support Inspection Confirmation/);
     assert.match(overflowLaunchSmokeZipText, /First-Wave Support Inspection Confirmation:/);
     assert.match(overflowLaunchSmokeZipText, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
 

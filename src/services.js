@@ -21438,6 +21438,18 @@ function getDeveloperLaunchMainlineSteadyStateDutyActionLinksDownload(payload = 
   return opsDownloadScope ? buildDeveloperOpsSteadyStateDutyActionLinksDownload(opsDownloadScope) : null;
 }
 
+function getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload = {}) {
+  const firstOperatingResultHandoffDownload = payload.mainlineSummary?.firstOperatingResultHandoffAction?.recommendedDownload
+    && typeof payload.mainlineSummary.firstOperatingResultHandoffAction.recommendedDownload === "object"
+      ? payload.mainlineSummary.firstOperatingResultHandoffAction.recommendedDownload
+      : null;
+  if (firstOperatingResultHandoffDownload) {
+    return firstOperatingResultHandoffDownload;
+  }
+  const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
+  return opsDownloadScope ? buildDeveloperOpsLaunchOperationsOverviewStatusDownload(opsDownloadScope) : null;
+}
+
 function buildDeveloperLaunchMainlineStableOperationsDownloadText({
   payload = {},
   title = "",
@@ -21545,6 +21557,23 @@ function buildDeveloperLaunchMainlineSteadyStateDutyActionLinksDownloadText(payl
     notes: [
       "Use this route to re-fetch action links for rollout widening, first operating result handoff, and receipt readback.",
       "Keep it beside steady-state-duty-action-links.txt so operators can jump from offline review back into the exact backend/API actions."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownloadText(payload = {}) {
+  const launchOperationsOverviewStatus = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
+  const firstOperatingResultHandoffAction = payload.mainlineSummary?.firstOperatingResultHandoffAction || null;
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Operations Overview Status Download",
+    download: getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload),
+    status: firstOperatingResultHandoffAction?.status || launchOperationsOverviewStatus?.status || "",
+    action: firstOperatingResultHandoffAction?.currentActionKey || launchOperationsOverviewStatus?.nextAction?.key || "",
+    operatorOrder: ["Open the launch operations overview status before first operating result handoff review or receipt readback."],
+    notes: [
+      "Use this route to re-fetch the launch operations overview status for first operating result handoff and receipt readback.",
+      "Keep it beside launch-operations-overview-status.txt so the first stable operating result review can jump back to the exact backend/API view."
     ]
   });
 }
@@ -22676,6 +22705,13 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     "ops/launch-operations-overview-status.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsOverviewStatusText(payload.opsSnapshot) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-operations-overview-status-download.txt",
+    getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload)
+      ? buildDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -24142,6 +24178,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       handoffIndex: "ops/handoff-index.txt",
       initialLaunchOpsReadiness: "ops/initial-launch-ops-readiness.txt",
       launchOperationsOverviewStatus: "ops/launch-operations-overview-status.txt",
+      launchOperationsOverviewStatusDownloadRoute: "ops/launch-operations-overview-status-download.txt",
       launchReceiptNextFollowUp: "ops/launch-receipt-next-follow-up.txt",
       firstWaveAuditBackfillStatus: "ops/first-wave-audit-backfill-status.txt",
       firstWaveRecommendationsZip: "ops/first-wave-recommendations.zip",
@@ -24259,6 +24296,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     && typeof mainlineSummary.firstOperatingResultHandoffAction === "object"
       ? mainlineSummary.firstOperatingResultHandoffAction
       : null;
+  const launchOperationsOverviewStatusDownload = getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload);
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -24348,6 +24386,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "First operating result handoff",
       "ops/launch-operations-overview-status.txt"
+    ]);
+  }
+  if (launchOperationsOverviewStatusDownload) {
+    handoffFiles.push([
+      "Launch operations overview status download route",
+      opsFiles.launchOperationsOverviewStatusDownloadRoute || "ops/launch-operations-overview-status-download.txt"
     ]);
   }
   const lines = [

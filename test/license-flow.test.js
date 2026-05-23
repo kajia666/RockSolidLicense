@@ -23982,6 +23982,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-handoff-summary\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-daily-brief\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-shift-action-plan\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-overview-status-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-receipt-backfill-status\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-wave-runtime-evidence\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/staging-launch-duty-archive\.txt/);
@@ -24014,9 +24015,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-handoff-summary\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-daily-brief\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-shift-action-plan\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-overview-status-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Handoff Summary/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Daily Brief/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Shift Action Plan/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Operations Overview Status Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-overview-status/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-receipt-backfill-status\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-wave-runtime-evidence\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/staging-launch-duty-archive\.txt/);
@@ -24089,6 +24093,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*First operating result handoff: ops\/launch-operations-overview-status\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Launch operations overview status download route: ops\/launch-operations-overview-status-download\.txt/
     );
 
     const launchMainlineSummarySelectionDownload = await getText(

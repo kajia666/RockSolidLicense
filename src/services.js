@@ -12257,6 +12257,24 @@ function buildDeveloperLaunchReviewSummaryPayload({
     "summary",
     scopedOpsParams
   );
+  const reviewHandoffRoutesDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch review handoff routes",
+    "launch-review-handoff-routes.txt",
+    "handoff-routes",
+    scopedOpsParams
+  );
+  const reviewChecksumsDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch review checksums",
+    "launch-review-sha256.txt",
+    "checksums",
+    scopedOpsParams
+  );
+  const reviewZipDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch review zip",
+    "launch-review.zip",
+    "zip",
+    scopedOpsParams
+  );
   const workflowSummaryDownload = createLaunchWorkflowDownloadShortcut(
     "launch_summary",
     launchWorkflow?.summaryFileName || "launch-workflow.txt",
@@ -12285,6 +12303,26 @@ function buildDeveloperLaunchReviewSummaryPayload({
       source: "developer-ops",
       format: "summary",
       params: { ...scopedOpsParams }
+    }
+  );
+  const opsHandoffIndexDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_handoff_index",
+    "developer-ops-handoff-index.txt",
+    "Developer Ops Handoff Index",
+    {
+      source: "developer-ops",
+      format: "handoff-index",
+      params: { ...scopedOpsParams, limit: 80 }
+    }
+  );
+  const opsLaunchMainlineRoutesDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_launch_mainline_handoff_routes",
+    "developer-ops-launch-mainline-handoff-routes.txt",
+    "Developer Ops Launch Mainline Routes",
+    {
+      source: "developer-ops",
+      format: "launch-mainline-handoff-routes",
+      params: { ...scopedOpsParams, limit: 80 }
     }
   );
   const firstWaveRuntimeEvidence = opsOverview.firstWaveRuntimeEvidence?.ready === true
@@ -12382,6 +12420,26 @@ function buildDeveloperLaunchReviewSummaryPayload({
     "Launch mainline zip",
     "launch-mainline.zip",
     "zip",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineHandoffRoutesDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline Handoff Routes",
+    "launch-mainline-handoff-routes.txt",
+    "handoff-download-routes",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlinePostLaunchHandoffIndexDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline Post-Launch Index",
+    "launch-mainline-post-launch-handoff-index.txt",
+    "post-launch-handoff-index",
     {
       productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
       channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
@@ -12787,6 +12845,15 @@ function buildDeveloperLaunchReviewSummaryPayload({
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
     recommendedDownload: mainlineRehearsalGuideDownload
   }));
+  pushActionPlan(createLaunchWorkflowActionPlanStep({
+    key: "launch_review_handoff_routes",
+    title: "Attach Review to Ops/Mainline handoff routes",
+    summary: "Keep the Review package connected to Developer Ops handoff index, Launch Mainline route map, and post-launch index before passing the lane forward.",
+    status: workflowBlocked ? "block" : workflowNeedsReview || queueHasUrgent ? "review" : "pass",
+    priority: "secondary",
+    workspaceAction: stayAction,
+    recommendedDownload: reviewHandoffRoutesDownload
+  }));
   if (launchOperationsOverviewStatus) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_review_launch_ops_overview",
@@ -12966,6 +13033,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
     });
   };
   pushRecommendedDownload(reviewDownload);
+  pushRecommendedDownload(reviewHandoffRoutesDownload);
+  pushRecommendedDownload(reviewChecksumsDownload);
+  pushRecommendedDownload(reviewZipDownload);
   if (firstWaveRecommendationsZipDownload) {
     pushRecommendedDownload(firstWaveRecommendationsZipDownload);
   }
@@ -12987,12 +13057,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(workflowSummaryDownload);
   pushRecommendedDownload(workflowChecklistDownload);
   pushRecommendedDownload(opsSummaryDownload);
+  pushRecommendedDownload(opsHandoffIndexDownload);
+  pushRecommendedDownload(opsLaunchMainlineRoutesDownload);
   pushRecommendedDownload(launchOperationsOverviewDownload);
   if (handoffDownload) {
     pushRecommendedDownload(handoffDownload);
   }
   pushRecommendedDownload(mainlineSummaryDownload);
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
+  pushRecommendedDownload(mainlineHandoffRoutesDownload);
+  pushRecommendedDownload(mainlinePostLaunchHandoffIndexDownload);
   pushRecommendedDownload(mainlineChecksumsDownload);
   pushRecommendedDownload(mainlineZipDownload);
   for (const item of Array.isArray(workflowSummary.recommendedDownloads) ? workflowSummary.recommendedDownloads.slice(0, 3) : []) {
@@ -13145,6 +13219,25 @@ function buildDeveloperLaunchReviewSummaryPayload({
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
     firstWaveRecommendationsZipDownload,
+    handoffRouteDownloads: {
+      launchReviewSummary: reviewDownload,
+      launchReviewHandoffRoutes: reviewHandoffRoutesDownload,
+      launchReviewChecksums: reviewChecksumsDownload,
+      launchReviewZip: reviewZipDownload,
+      firstWaveRecommendationsZip: firstWaveRecommendationsZipDownload,
+      firstWaveSupportInspectionConfirmation: firstWaveSupportInspectionConfirmationDownload,
+      firstWaveRuntimeEvidence: firstWaveRuntimeEvidenceDownload,
+      developerOpsSummary: opsSummaryDownload,
+      developerOpsHandoffIndex: opsHandoffIndexDownload,
+      developerOpsLaunchMainlineRoutes: opsLaunchMainlineRoutesDownload,
+      launchOpsOverviewStatus: launchOperationsOverviewDownload,
+      launchMainlineSummary: mainlineSummaryDownload,
+      launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
+      launchMainlineHandoffRoutes: mainlineHandoffRoutesDownload,
+      launchMainlinePostLaunchIndex: mainlinePostLaunchHandoffIndexDownload,
+      launchMainlineChecksums: mainlineChecksumsDownload,
+      launchMainlineZip: mainlineZipDownload
+    },
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads,
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
@@ -13164,12 +13257,14 @@ function buildDeveloperLaunchReviewPayload({
   const scopeTag = sanitizeExportNameSegment(project.code || filters.productCode || "launch-review", "launch-review");
   const fileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
+  const handoffRoutesFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-handoff-routes.txt`;
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
+    handoffRoutesFileName,
     firstWaveRuntimeEvidenceFileName,
     firstWaveSupportInspectionConfirmationFileName,
     manifest: {
@@ -13245,6 +13340,103 @@ function buildLaunchFirstWaveRecommendationsZipDownloadText({
   return lines.join("\n").trimEnd();
 }
 
+function withLaunchDutyRecordIndex(download = null, launchDutyRecordIndexPath = "") {
+  if (!download || typeof download !== "object") {
+    return null;
+  }
+  return {
+    ...download,
+    ...(download.launchDutyRecordIndexPath || !launchDutyRecordIndexPath
+      ? {}
+      : { launchDutyRecordIndexPath })
+  };
+}
+
+function appendLaunchSurfaceHandoffDownloadLines(lines = [], downloads = [], launchDutyRecordIndexPath = "") {
+  if (!Array.isArray(lines)) {
+    return;
+  }
+  for (const item of Array.isArray(downloads) ? downloads : []) {
+    const download = withLaunchDutyRecordIndex(item, launchDutyRecordIndexPath);
+    if (!download?.key && !download?.href && !download?.fileName) {
+      continue;
+    }
+    lines.push(`- ${formatLaunchHandoffDownloadText(download, {
+      fileSeparator: ": ",
+      includeSource: true
+    })}`);
+  }
+}
+
+function buildLaunchSurfaceHandoffRoutesText({
+  title = "RockSolid Launch Handoff Routes",
+  generatedAt = "",
+  projectCode = "",
+  projectName = "",
+  channel = "",
+  packageSectionTitle = "Launch Package",
+  packageDownloads = [],
+  continuationDownloads = [],
+  routeFocus = null,
+  launchReadinessNextGate = null,
+  launchDutyActionOrder = null,
+  operatorNotes = []
+} = {}) {
+  const launchDutyRecordIndexPath = launchReadinessNextGate?.launchDutyRecordIndexPath || "";
+  const lines = [
+    title,
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${projectCode || "-"}`,
+    `Project Name: ${projectName || "-"}`,
+    `Channel: ${channel || "-"}`,
+    ""
+  ];
+
+  if (routeFocus && typeof routeFocus === "object") {
+    lines.push("Route Focus:");
+    lines.push(`- title=${routeFocus.title || "-"}`);
+    lines.push(`- summary=${routeFocus.summary || "-"}`);
+    appendRouteFocusHandoffTextLines(lines, routeFocus);
+    lines.push("");
+  }
+
+  if (launchReadinessNextGate && typeof launchReadinessNextGate === "object") {
+    appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGate);
+    if (launchDutyRecordIndexPath) {
+      lines.push(`- launchDutyRecordIndex=${launchDutyRecordIndexPath}`);
+    }
+    lines.push("");
+  }
+
+  lines.push(packageSectionTitle);
+  appendLaunchSurfaceHandoffDownloadLines(lines, packageDownloads, launchDutyRecordIndexPath);
+
+  lines.push("");
+  lines.push("Ops / Mainline Continuation Routes:");
+  appendLaunchSurfaceHandoffDownloadLines(lines, continuationDownloads, launchDutyRecordIndexPath);
+
+  if (launchDutyActionOrder) {
+    lines.push("");
+    appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
+      title: "Launch Duty Action Order:"
+    });
+  }
+
+  const notes = Array.isArray(operatorNotes) && operatorNotes.length
+    ? operatorNotes
+    : [
+        "Use this file when the next reviewer only has the current package and needs the exact Ops/Mainline continuation downloads.",
+        "Keep the checksum and zip routes beside this handoff so the offline package can be revalidated without reopening the UI."
+      ];
+  lines.push("");
+  lines.push("Operator Notes:");
+  for (const note of notes) {
+    lines.push(`- ${note}`);
+  }
+
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchReviewFirstWaveRecommendationsZipDownloadText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -13256,6 +13448,49 @@ function buildDeveloperLaunchReviewFirstWaveRecommendationsZipDownloadText(paylo
     channel: manifest.channel || filters.channel || "",
     sourceSurface: "launch-review",
     download: payload.reviewSummary?.firstWaveRecommendationsZipDownload || null
+  });
+}
+
+function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const downloads = payload.reviewSummary?.handoffRouteDownloads || {};
+  return buildLaunchSurfaceHandoffRoutesText({
+    title: "RockSolid Developer Launch Review Handoff Routes",
+    generatedAt: payload.generatedAt || "",
+    projectCode: project.code || filters.productCode || "",
+    projectName: project.name || "",
+    channel: manifest.channel || filters.channel || "",
+    packageSectionTitle: "Launch Review Package:",
+    packageDownloads: [
+      downloads.launchReviewSummary,
+      downloads.launchReviewHandoffRoutes,
+      downloads.launchReviewChecksums,
+      downloads.launchReviewZip,
+      downloads.firstWaveRecommendationsZip,
+      downloads.firstWaveSupportInspectionConfirmation,
+      downloads.firstWaveRuntimeEvidence
+    ],
+    continuationDownloads: [
+      downloads.developerOpsSummary,
+      downloads.developerOpsHandoffIndex,
+      downloads.developerOpsLaunchMainlineRoutes,
+      downloads.launchOpsOverviewStatus,
+      downloads.launchMainlineSummary,
+      downloads.launchMainlineRehearsalGuide,
+      downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlinePostLaunchIndex,
+      downloads.launchMainlineChecksums,
+      downloads.launchMainlineZip
+    ],
+    routeFocus: payload.reviewSummary?.routeFocus || null,
+    launchReadinessNextGate: payload.reviewSummary?.launchReadinessNextGate || null,
+    launchDutyActionOrder: payload.reviewSummary?.launchDutyActionOrder || null,
+    operatorNotes: [
+      "Use this file when Launch Review is the current handoff surface and the next operator needs Ops/Mainline routes without rebuilding filters.",
+      "Open Developer Ops Handoff Index first when follow-up ownership is unclear, then use Launch Mainline Handoff Routes for the cross-surface package."
+    ]
   });
 }
 
@@ -13343,6 +13578,10 @@ function buildDeveloperLaunchReviewFiles(payload = {}) {
     {
       path: payload.summaryFileName || "developer-launch-review-summary.txt",
       body: payload.summaryText || ""
+    },
+    {
+      path: payload.handoffRoutesFileName || "developer-launch-review-handoff-routes.txt",
+      body: buildDeveloperLaunchReviewHandoffRoutesText(payload)
     }
   ];
   appendLaunchWorkflowFileIfPresent(
@@ -13397,7 +13636,7 @@ function buildDeveloperLaunchReviewZipEntries(payload = {}) {
 function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "checksums", "zip"],
+    ["json", "summary", "handoff-routes", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_REVIEW_FORMAT",
     "Developer launch review format"
@@ -13422,6 +13661,13 @@ function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-launch-review-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+  if (normalizedFormat === "handoff-routes") {
+    return {
+      fileName: payload.handoffRoutesFileName || "developer-launch-review-handoff-routes.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchReviewHandoffRoutesText(payload)
     };
   }
   if (normalizedFormat === "first-wave-runtime-evidence") {
@@ -13804,19 +14050,111 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineHandoffRoutesDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline Handoff Routes",
+    "launch-mainline-handoff-routes.txt",
+    "handoff-download-routes",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlinePostLaunchHandoffIndexDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline Post-Launch Index",
+    "launch-mainline-post-launch-handoff-index.txt",
+    "post-launch-handoff-index",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchSmokeKitSummaryDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
     "Launch smoke kit summary",
     "launch-smoke-kit.txt",
     "summary",
     smokeRouteParams
   );
+  const launchSmokeKitHandoffRoutesDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
+    "Launch smoke handoff routes",
+    "launch-smoke-handoff-routes.txt",
+    "handoff-routes",
+    smokeRouteParams
+  );
+  const launchSmokeKitChecksumsDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
+    "Launch smoke checksums",
+    "launch-smoke-sha256.txt",
+    "checksums",
+    smokeRouteParams
+  );
+  const launchSmokeKitZipDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
+    "Launch smoke zip",
+    "launch-smoke.zip",
+    "zip",
+    smokeRouteParams
+  );
+  const launchReviewSummaryDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch Review Summary",
+    "launch-review.txt",
+    "summary",
+    smokeRouteParams
+  );
+  const launchReviewHandoffRoutesDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch review handoff routes",
+    "launch-review-handoff-routes.txt",
+    "handoff-routes",
+    smokeRouteParams
+  );
+  const developerOpsSummaryDownload = createLaunchWorkflowDownloadShortcut(
+    "launch_smoke_ops_summary",
+    opsSnapshot?.summaryFileName || "developer-ops-summary.txt",
+    "Developer Ops Summary",
+    {
+      source: "developer-ops",
+      format: "summary",
+      params: { ...smokeRouteParams, limit: 80 }
+    }
+  );
+  const developerOpsHandoffIndexDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_handoff_index",
+    "developer-ops-handoff-index.txt",
+    "Developer Ops Handoff Index",
+    {
+      source: "developer-ops",
+      format: "handoff-index",
+      params: { ...smokeRouteParams, limit: 80 }
+    }
+  );
+  const developerOpsLaunchMainlineRoutesDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_launch_mainline_handoff_routes",
+    "developer-ops-launch-mainline-handoff-routes.txt",
+    "Developer Ops Launch Mainline Routes",
+    {
+      source: "developer-ops",
+      format: "launch-mainline-handoff-routes",
+      params: { ...smokeRouteParams, limit: 80 }
+    }
+  );
   const recommendedDownloads = [
     launchSmokeKitSummaryDownload,
+    launchSmokeKitHandoffRoutesDownload,
+    launchSmokeKitChecksumsDownload,
+    launchSmokeKitZipDownload,
+    launchReviewSummaryDownload,
+    launchReviewHandoffRoutesDownload,
+    developerOpsSummaryDownload,
+    developerOpsHandoffIndexDownload,
+    developerOpsLaunchMainlineRoutesDownload,
     firstWaveRecommendationsZipDownload,
     firstWaveSupportInspectionConfirmationDownload,
     firstWaveRuntimeEvidenceDownload,
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
+    launchMainlineHandoffRoutesDownload,
+    launchMainlinePostLaunchHandoffIndexDownload,
     launchMainlineChecksumsDownload,
     launchMainlineZipDownload
   ].filter(Boolean);
@@ -14242,6 +14580,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
       recommendedDownload: launchMainlineRehearsalGuideDownload
     },
+    {
+      key: "launch_smoke_handoff_routes",
+      title: "Attach Smoke to Review/Ops/Mainline handoff routes",
+      priority: "secondary",
+      status: startupBlocked || !readyPaths.length ? "block" : blockingPaths.length || reviewPaths.length ? "review" : "pass",
+      summary: "Keep the smoke kit connected to Launch Review, Developer Ops handoff index, Launch Mainline route map, and post-launch index.",
+      workspaceAction: smokeWorkspaceAction,
+      recommendedDownload: launchSmokeKitHandoffRoutesDownload
+    },
     primaryReviewTarget?.workspaceAction ? {
       key: "launch_smoke_primary_review",
       title: buildPrimaryReviewStepTitle(
@@ -14428,6 +14775,26 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     firstWaveSupportInspectionConfirmation,
     firstWaveRecommendationsZipDownload,
     launchReadinessNextGate,
+    handoffRouteDownloads: {
+      launchSmokeSummary: launchSmokeKitSummaryDownload,
+      launchSmokeHandoffRoutes: launchSmokeKitHandoffRoutesDownload,
+      launchSmokeChecksums: launchSmokeKitChecksumsDownload,
+      launchSmokeZip: launchSmokeKitZipDownload,
+      launchReviewSummary: launchReviewSummaryDownload,
+      launchReviewHandoffRoutes: launchReviewHandoffRoutesDownload,
+      firstWaveRecommendationsZip: firstWaveRecommendationsZipDownload,
+      firstWaveSupportInspectionConfirmation: firstWaveSupportInspectionConfirmationDownload,
+      firstWaveRuntimeEvidence: firstWaveRuntimeEvidenceDownload,
+      developerOpsSummary: developerOpsSummaryDownload,
+      developerOpsHandoffIndex: developerOpsHandoffIndexDownload,
+      developerOpsLaunchMainlineRoutes: developerOpsLaunchMainlineRoutesDownload,
+      launchMainlineSummary: launchMainlineSummaryDownload,
+      launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
+      launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
+      launchMainlinePostLaunchIndex: launchMainlinePostLaunchHandoffIndexDownload,
+      launchMainlineChecksums: launchMainlineChecksumsDownload,
+      launchMainlineZip: launchMainlineZipDownload
+    },
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
     actionPlan,
@@ -14614,12 +14981,14 @@ function buildDeveloperLaunchSmokeKitPayload({
   const scopeTag = sanitizeExportNameSegment(project.code || filters.productCode || "launch-smoke-kit", "launch-smoke-kit");
   const fileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
+  const handoffRoutesFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-handoff-routes.txt`;
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
+    handoffRoutesFileName,
     firstWaveRuntimeEvidenceFileName,
     firstWaveSupportInspectionConfirmationFileName,
     manifest: {
@@ -14657,6 +15026,50 @@ function buildDeveloperLaunchSmokeKitPayload({
   };
   payload.summaryText = buildDeveloperLaunchSmokeKitSummaryText(payload);
   return payload;
+}
+
+function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const downloads = payload.smokeSummary?.handoffRouteDownloads || {};
+  return buildLaunchSurfaceHandoffRoutesText({
+    title: "RockSolid Developer Launch Smoke Kit Handoff Routes",
+    generatedAt: payload.generatedAt || "",
+    projectCode: project.code || filters.productCode || "",
+    projectName: project.name || "",
+    channel: manifest.channel || filters.channel || "",
+    packageSectionTitle: "Launch Smoke Package:",
+    packageDownloads: [
+      downloads.launchSmokeSummary,
+      downloads.launchSmokeHandoffRoutes,
+      downloads.launchSmokeChecksums,
+      downloads.launchSmokeZip,
+      downloads.launchReviewSummary,
+      downloads.launchReviewHandoffRoutes,
+      downloads.firstWaveRecommendationsZip,
+      downloads.firstWaveSupportInspectionConfirmation,
+      downloads.firstWaveRuntimeEvidence
+    ],
+    continuationDownloads: [
+      downloads.developerOpsSummary,
+      downloads.developerOpsHandoffIndex,
+      downloads.developerOpsLaunchMainlineRoutes,
+      downloads.launchMainlineSummary,
+      downloads.launchMainlineRehearsalGuide,
+      downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlinePostLaunchIndex,
+      downloads.launchMainlineChecksums,
+      downloads.launchMainlineZip
+    ],
+    routeFocus: payload.smokeSummary?.routeFocus || null,
+    launchReadinessNextGate: payload.smokeSummary?.launchReadinessNextGate || null,
+    launchDutyActionOrder: payload.smokeSummary?.launchDutyActionOrder || null,
+    operatorNotes: [
+      "Use this file when Launch Smoke is the current handoff surface and the next operator must continue into Review, Ops, or Mainline without rebuilding filters.",
+      "Run Launch Review Summary after smoke login/recharge evidence, then use Developer Ops Handoff Index if ownership or next follow-up is unclear."
+    ]
+  });
 }
 
 function buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload = {}) {
@@ -14757,6 +15170,10 @@ function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
     {
       path: payload.summaryFileName || "developer-launch-smoke-kit-summary.txt",
       body: payload.summaryText || ""
+    },
+    {
+      path: payload.handoffRoutesFileName || "developer-launch-smoke-kit-handoff-routes.txt",
+      body: buildDeveloperLaunchSmokeKitHandoffRoutesText(payload)
     }
   ];
   appendLaunchWorkflowFileIfPresent(
@@ -14806,7 +15223,7 @@ function buildDeveloperLaunchSmokeKitZipEntries(payload = {}) {
 function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "checksums", "zip"],
+    ["json", "summary", "handoff-routes", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_SMOKE_KIT_FORMAT",
     "Developer launch smoke kit format"
@@ -14831,6 +15248,13 @@ function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
       fileName: payload.summaryFileName || "developer-launch-smoke-kit-summary.txt",
       contentType: "text/plain; charset=utf-8",
       body: payload.summaryText || ""
+    };
+  }
+  if (normalizedFormat === "handoff-routes") {
+    return {
+      fileName: payload.handoffRoutesFileName || "developer-launch-smoke-kit-handoff-routes.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchSmokeKitHandoffRoutesText(payload)
     };
   }
   if (normalizedFormat === "first-wave-runtime-evidence") {

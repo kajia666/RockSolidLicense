@@ -11842,6 +11842,26 @@ test("developer license quickstart first-batch setup can create recommended laun
       ownerSession.token
     );
     assert.match(runtimeEvidenceReviewChecksums.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceReviewChecksums.body, /handoff-routes\.txt/);
+
+    const runtimeEvidenceReviewHandoffRoutes = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=handoff-routes",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceReviewHandoffRoutes.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.contentDisposition || "", /handoff-routes\.txt"/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /RockSolid Developer Launch Review Handoff Routes/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Review Package:/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Handoff Index:.*format=handoff-index/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Launch Mainline Routes:.*format=launch-mainline-handoff-routes/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Mainline Handoff Routes:.*format=handoff-download-routes/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Mainline Post-Launch Index:.*format=post-launch-handoff-index/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch mainline zip:.*format=zip/i);
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /launchDutyRecordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json/
+    );
 
     const runtimeEvidenceReviewZip = await getBinary(
       baseUrl,
@@ -11851,6 +11871,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     const runtimeEvidenceReviewZipText = runtimeEvidenceReviewZip.body.toString("latin1");
     assert.match(runtimeEvidenceReviewZipText, /first-wave-runtime-evidence\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceReviewZipText, /handoff-routes\.txt/);
+    assert.match(runtimeEvidenceReviewZipText, /RockSolid Developer Launch Review Handoff Routes/);
+    assert.match(runtimeEvidenceReviewZipText, /format=handoff-index/);
+    assert.match(runtimeEvidenceReviewZipText, /format=handoff-download-routes/);
 
     const runtimeEvidenceLaunchSmoke = await getJson(
       baseUrl,
@@ -11917,6 +11941,27 @@ test("developer license quickstart first-batch setup can create recommended laun
       ownerSession.token
     );
     assert.match(runtimeEvidenceSmokeChecksums.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceSmokeChecksums.body, /handoff-routes\.txt/);
+
+    const runtimeEvidenceSmokeHandoffRoutes = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=handoff-routes",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.contentDisposition || "", /handoff-routes\.txt"/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /RockSolid Developer Launch Smoke Kit Handoff Routes/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Smoke Package:/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Review Summary:.*format=summary/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Developer Ops Handoff Index:.*format=handoff-index/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Developer Ops Launch Mainline Routes:.*format=launch-mainline-handoff-routes/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Mainline Handoff Routes:.*format=handoff-download-routes/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Mainline Post-Launch Index:.*format=post-launch-handoff-index/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch mainline zip:.*format=zip/i);
+    assert.match(
+      runtimeEvidenceSmokeHandoffRoutes.body,
+      /launchDutyRecordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json/
+    );
 
     const runtimeEvidenceSmokeZip = await getBinary(
       baseUrl,
@@ -11926,6 +11971,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     const runtimeEvidenceSmokeZipText = runtimeEvidenceSmokeZip.body.toString("latin1");
     assert.match(runtimeEvidenceSmokeZipText, /first-wave-runtime-evidence\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /First-Wave Runtime Evidence:/);
+    assert.match(runtimeEvidenceSmokeZipText, /handoff-routes\.txt/);
+    assert.match(runtimeEvidenceSmokeZipText, /RockSolid Developer Launch Smoke Kit Handoff Routes/);
+    assert.match(runtimeEvidenceSmokeZipText, /format=handoff-index/);
+    assert.match(runtimeEvidenceSmokeZipText, /format=handoff-download-routes/);
 
     const repeatSetup = await postJsonExpectError(
       baseUrl,

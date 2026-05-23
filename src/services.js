@@ -20709,6 +20709,64 @@ function appendDeveloperOpsCloseoutEvidenceFullTestEntryGateLines(lines, gate, h
   lines.push(`- nextAction=${gate.nextAction || "-"}`);
 }
 
+function appendLaunchSwitchReadinessSummaryLines(lines = [], launchSwitchReadinessSummary = null, {
+  title = "Launch Switch Readiness:"
+} = {}) {
+  if (!Array.isArray(lines) || !launchSwitchReadinessSummary || typeof launchSwitchReadinessSummary !== "object") {
+    return false;
+  }
+  const requiredBeforeSwitch = Array.isArray(launchSwitchReadinessSummary.requiredBeforeSwitch)
+    ? launchSwitchReadinessSummary.requiredBeforeSwitch
+    : [];
+  lines.push(title);
+  lines.push(
+    `- status=${launchSwitchReadinessSummary.status || "-"}`
+    + ` | decision=${launchSwitchReadinessSummary.operatorDecision || "-"}`
+    + ` | currentAction=${launchSwitchReadinessSummary.currentActionKey || "-"}`
+    + ` | nextAction=${launchSwitchReadinessSummary.nextActionKey || "-"}`
+    + ` | switchPhase=${launchSwitchReadinessSummary.switchPhaseKey || "-"}`
+    + ` | postSwitchPhases=${launchSwitchReadinessSummary.postSwitchPhaseCount ?? 0}`
+    + ` | pendingReceipts=${launchSwitchReadinessSummary.pendingReceiptCount ?? 0}`
+    + ` | productionSignoffPacket=${launchSwitchReadinessSummary.productionSignoffPacket || "-"}`
+    + ` | launchDutyRecordIndex=${launchSwitchReadinessSummary.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`Required Before Switch: ${requiredBeforeSwitch.map((item) => `${item.key || "-"}:${item.status || "-"}`).join("; ") || "-"}`);
+  lines.push(`Launch Switch Next: ${launchSwitchReadinessSummary.nextAction || "-"}`);
+  return true;
+}
+
+function appendLaunchSwitchOperatorRunbookLines(lines = [], launchSwitchOperatorRunbook = null, {
+  title = "Launch Switch Operator Runbook:"
+} = {}) {
+  if (!Array.isArray(lines) || !launchSwitchOperatorRunbook || typeof launchSwitchOperatorRunbook !== "object") {
+    return false;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${launchSwitchOperatorRunbook.status || "-"}`
+    + ` | currentStep=${launchSwitchOperatorRunbook.currentStepKey || "-"}`
+    + ` | currentCommand=${launchSwitchOperatorRunbook.currentCommand || "-"}`
+    + ` | nextStep=${launchSwitchOperatorRunbook.nextStepKey || "-"}`
+    + ` | nextCommand=${launchSwitchOperatorRunbook.nextCommand || "-"}`
+    + ` | fullTest=${launchSwitchOperatorRunbook.guardedFullTestCommand || "-"}`
+    + ` | signoffArtifact=${launchSwitchOperatorRunbook.signoffReviewArtifact || "-"}`
+    + ` | launchDutyRecordIndex=${launchSwitchOperatorRunbook.launchDutyRecordIndexPath || "-"}`
+  );
+  const runbookSteps = Array.isArray(launchSwitchOperatorRunbook.runbookSteps)
+    ? launchSwitchOperatorRunbook.runbookSteps
+    : [];
+  for (const item of runbookSteps) {
+    lines.push(
+      `${item.stepNumber || "-"}. ${item.key || "-"}`
+      + ` | status=${item.status || "-"}`
+      + (item.command ? ` | command=${item.command}` : ` | artifact=${item.artifact || "-"}`)
+      + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+  lines.push(`Launch Switch Runbook Next: ${launchSwitchOperatorRunbook.nextAction || "-"}`);
+  return true;
+}
+
 function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -20719,6 +20777,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     mainlineSummary.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
     || initialLaunchOpsReadiness?.launchOperationsOperatorEntry
     || null;
+  const launchSwitchReadinessSummary = launchOperationsOperatorEntry?.launchSwitchReadinessSummary || null;
+  const launchSwitchOperatorRunbook = launchOperationsOperatorEntry?.launchSwitchOperatorRunbook || null;
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -20842,6 +20902,18 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Mainline Launch Duty Action Order:"
+    });
+  }
+  if (launchSwitchReadinessSummary) {
+    lines.push("");
+    appendLaunchSwitchReadinessSummaryLines(lines, launchSwitchReadinessSummary, {
+      title: "Launch Mainline Launch Switch Readiness:"
+    });
+  }
+  if (launchSwitchOperatorRunbook) {
+    lines.push("");
+    appendLaunchSwitchOperatorRunbookLines(lines, launchSwitchOperatorRunbook, {
+      title: "Launch Mainline Launch Switch Operator Runbook:"
     });
   }
   if (launchSurfaceReviewCloseoutAction) {
@@ -23026,6 +23098,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
     : "";
   const launchOperationsOperatorEntry = initialLaunchOpsReadiness?.launchOperationsOperatorEntry || null;
+  const launchSwitchReadinessSummary = launchOperationsOperatorEntry?.launchSwitchReadinessSummary || null;
+  const launchSwitchOperatorRunbook = launchOperationsOperatorEntry?.launchSwitchOperatorRunbook || null;
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -23067,6 +23141,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const opsFirstWaveSupportInspectionConfirmationDownload = firstWaveSupportInspectionConfirmation
     ? getDeveloperLaunchMainlineFirstWaveSupportInspectionConfirmationDownload(payload)
     : null;
+  const launchOperationsOperatorEntryDownload = getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload);
   const mainlineRouteParams = compactRouteParams({
     productCode: payload.filters?.productCode || project.code || "",
     channel: payload.filters?.channel || manifest.channel || "stable",
@@ -23693,6 +23768,28 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       );
     }
     lines.push(`- nextAction=${preStagingReadinessSelfCheck.nextAction || "-"}`);
+  }
+  if (launchSwitchReadinessSummary) {
+    lines.push("");
+    appendLaunchSwitchReadinessSummaryLines(lines, launchSwitchReadinessSummary, {
+      title: "Launch Switch Readiness Route:"
+    });
+    lines.push(
+      `- launch-switch-readiness: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
+      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
+      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
+      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
+      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
+      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
+      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
+      + ` | launchDutyRecordIndex=${launchSwitchReadinessSummary.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+  if (launchSwitchOperatorRunbook) {
+    lines.push("");
+    appendLaunchSwitchOperatorRunbookLines(lines, launchSwitchOperatorRunbook, {
+      title: "Launch Switch Operator Runbook Route:"
+    });
   }
   if (launchDutyStableOperationsTransitionAction) {
     const requiredChecks = Array.isArray(launchDutyStableOperationsTransitionAction.requiredChecks)
@@ -25800,6 +25897,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ? launchDutyStableOperationsTransitionAction.blockedBy.join(",")
     : "";
   const launchOperationsOperatorEntry = initialLaunchOpsReadiness?.launchOperationsOperatorEntry || null;
+  const launchSwitchReadinessSummary = launchOperationsOperatorEntry?.launchSwitchReadinessSummary || null;
+  const launchSwitchOperatorRunbook = launchOperationsOperatorEntry?.launchSwitchOperatorRunbook || null;
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -25920,6 +26019,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "First operating result handoff",
       "ops/launch-operations-overview-status.txt"
+    ]);
+  }
+  if (launchSwitchReadinessSummary || launchSwitchOperatorRunbook) {
+    handoffFiles.push([
+      "Launch switch operator entry",
+      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
   }
   if (launchOperationsOverviewStatusDownload) {
@@ -26555,6 +26660,18 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     title: "First Operating Result Handoff",
     readyStyle: "yes-no"
   });
+  if (launchSwitchReadinessSummary) {
+    lines.push("");
+    appendLaunchSwitchReadinessSummaryLines(lines, launchSwitchReadinessSummary, {
+      title: "Launch Switch Readiness:"
+    });
+  }
+  if (launchSwitchOperatorRunbook) {
+    lines.push("");
+    appendLaunchSwitchOperatorRunbookLines(lines, launchSwitchOperatorRunbook, {
+      title: "Launch Switch Operator Runbook:"
+    });
+  }
 
   lines.push("");
   lines.push("Receipt Visibility Summary Downloads:");

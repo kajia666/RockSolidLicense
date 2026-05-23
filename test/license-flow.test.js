@@ -24047,6 +24047,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Launch Switch Readiness Route:[\s\S]*status=blocked_until_full_test_and_signoff \| decision=hold_until_full_test_and_signoff \| currentAction=refresh_staging_readiness_status \| nextAction=reload_staging_rehearsal/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-switch-readiness: [^\n]*key=ops_launch_operations_operator_entry[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Launch Switch Operator Runbook Route:[\s\S]*currentStep=refresh_staging_readiness_status[^\n]*currentCommand=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /launch-mainline-production-handoff: [^\n]*format=production-handoff/
     );
     assert.match(
@@ -24409,6 +24421,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Launch operations shift action plan download route: ops\/launch-operations-shift-action-plan-download\.txt/
     );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch Switch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| decision=hold_until_full_test_and_signoff \| currentAction=refresh_staging_readiness_status \| nextAction=reload_staging_rehearsal/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch Switch Operator Runbook:[\s\S]*currentStep=refresh_staging_readiness_status[^\n]*currentCommand=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Launch switch operator entry: ops\/launch-operations-operator-entry\.txt/
+    );
 
     const launchMainlineSummarySelectionDownload = await getText(
       baseUrl,
@@ -24422,6 +24446,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSummarySelectionDownload.body,
       /Launch Mainline First Operating Result Handoff:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision[^\n]*receiptAudit=-[^\n]*nextDownload=launch-operations-overview-status[^\n]*blockedBy=rollout_widening_receipt/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Launch Mainline Launch Switch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| decision=hold_until_full_test_and_signoff \| currentAction=refresh_staging_readiness_status \| nextAction=reload_staging_rehearsal/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Launch Mainline Launch Switch Operator Runbook:[\s\S]*currentStep=refresh_staging_readiness_status[^\n]*currentCommand=npm\.cmd run staging:readiness:status/
     );
 
     const launchOperationsOperatorEntryDownload = await getText(

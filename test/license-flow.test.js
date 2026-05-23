@@ -17337,12 +17337,16 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     );
     assert.match(overflowLaunchReviewChecksums.body, /first-wave-runtime-evidence\.txt/);
     assert.match(overflowLaunchReviewChecksums.body, /first-wave-support-inspection-confirmation\.txt/);
+    assert.match(overflowLaunchReviewChecksums.body, /ops\/first-wave-recommendations-download\.txt/);
     const overflowLaunchReviewZip = await getBinary(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTWAVE&channel=stable&reviewMode=matched&format=zip",
       ownerSession.token
     );
     const overflowLaunchReviewZipText = overflowLaunchReviewZip.body.toString("latin1");
+    assert.match(overflowLaunchReviewZipText, /ops\/first-wave-recommendations-download\.txt/);
+    assert.match(overflowLaunchReviewZipText, /RockSolid Launch First-Wave Recommendations Zip Download/);
+    assert.match(overflowLaunchReviewZipText, /href=.*\/api\/developer\/ops\/first-wave\/recommendations\/download\?.*format=zip/);
     assert.match(overflowLaunchReviewZipText, /first-wave-support-inspection-confirmation\.txt/);
     assert.match(overflowLaunchReviewZipText, /RockSolid Developer Launch Review First-Wave Support Inspection Confirmation/);
     assert.match(overflowLaunchReviewZipText, /First-Wave Support Inspection Confirmation:/);
@@ -17355,12 +17359,16 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     );
     assert.match(overflowLaunchSmokeChecksums.body, /first-wave-runtime-evidence\.txt/);
     assert.match(overflowLaunchSmokeChecksums.body, /first-wave-support-inspection-confirmation\.txt/);
+    assert.match(overflowLaunchSmokeChecksums.body, /ops\/first-wave-recommendations-download\.txt/);
     const overflowLaunchSmokeZip = await getBinary(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=FIRSTWAVE&channel=stable&format=zip",
       ownerSession.token
     );
     const overflowLaunchSmokeZipText = overflowLaunchSmokeZip.body.toString("latin1");
+    assert.match(overflowLaunchSmokeZipText, /ops\/first-wave-recommendations-download\.txt/);
+    assert.match(overflowLaunchSmokeZipText, /RockSolid Launch First-Wave Recommendations Zip Download/);
+    assert.match(overflowLaunchSmokeZipText, /href=.*\/api\/developer\/ops\/first-wave\/recommendations\/download\?.*format=zip/);
     assert.match(overflowLaunchSmokeZipText, /first-wave-support-inspection-confirmation\.txt/);
     assert.match(overflowLaunchSmokeZipText, /RockSolid Developer Launch Smoke Kit First-Wave Support Inspection Confirmation/);
     assert.match(overflowLaunchSmokeZipText, /First-Wave Support Inspection Confirmation:/);

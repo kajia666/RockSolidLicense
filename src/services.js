@@ -13144,6 +13144,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     launchReadinessNextGate,
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
+    firstWaveRecommendationsZipDownload,
     actionPlan,
     recommendedDownloads: orderedRecommendedDownloads,
     nextActions: actionPlan.map((item) => item.title || item.key || "step").slice(0, 4)
@@ -13212,6 +13213,51 @@ function buildDeveloperLaunchReviewPayload({
     payload.summaryText = buildDeveloperLaunchReviewSummaryText(payload);
     return payload;
   }
+
+function buildLaunchFirstWaveRecommendationsZipDownloadText({
+  generatedAt = "",
+  projectCode = "",
+  projectName = "",
+  channel = "",
+  sourceSurface = "",
+  download = null
+} = {}) {
+  const lines = [
+    "RockSolid Launch First-Wave Recommendations Zip Download",
+    `Generated At: ${generatedAt || ""}`,
+    `Project Code: ${projectCode || "-"}`,
+    `Project Name: ${projectName || "-"}`,
+    `Channel: ${channel || "-"}`,
+    `Source Surface: ${sourceSurface || "-"}`,
+    "",
+    "Download:",
+    `- key=${download?.key || "-"}`,
+    `- label=${download?.label || "-"}`,
+    `- file=${download?.fileName || "-"}`,
+    `- format=${download?.format || "-"}`,
+    `- source=${download?.source || "-"}`,
+    `- href=${download?.href || "-"}`,
+    "",
+    "Operator Notes:",
+    "- Keep this route beside the Review/Smoke package during first-wave validation.",
+    "- Use the href to fetch the reviewed Developer Ops first-wave package if the nested package is not already attached."
+  ];
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchReviewFirstWaveRecommendationsZipDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  return buildLaunchFirstWaveRecommendationsZipDownloadText({
+    generatedAt: payload.generatedAt || "",
+    projectCode: project.code || filters.productCode || "",
+    projectName: project.name || "",
+    channel: manifest.channel || filters.channel || "",
+    sourceSurface: "launch-review",
+    download: payload.reviewSummary?.firstWaveRecommendationsZipDownload || null
+  });
+}
 
 function buildDeveloperLaunchReviewFirstWaveRuntimeEvidenceText(payload = {}) {
   const manifest = payload.manifest || {};
@@ -13318,6 +13364,13 @@ function buildDeveloperLaunchReviewFiles(payload = {}) {
     files,
     `ops/${payload.opsSnapshot?.fileName || "developer-ops.json"}`,
     payload.opsSnapshot ? JSON.stringify(payload.opsSnapshot, null, 2) : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/first-wave-recommendations-download.txt",
+    payload.reviewSummary?.firstWaveRecommendationsZipDownload
+      ? buildDeveloperLaunchReviewFirstWaveRecommendationsZipDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -14373,6 +14426,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchDutyActionOrder,
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
+    firstWaveRecommendationsZipDownload,
     launchReadinessNextGate,
     primaryReviewTarget,
     reviewTargets: visibleReviewTargets,
@@ -14650,6 +14704,20 @@ function buildDeveloperLaunchSmokeKitFirstWaveRuntimeEvidenceText(payload = {}) 
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchSmokeKitFirstWaveRecommendationsZipDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  return buildLaunchFirstWaveRecommendationsZipDownloadText({
+    generatedAt: payload.generatedAt || "",
+    projectCode: project.code || filters.productCode || "",
+    projectName: project.name || "",
+    channel: manifest.channel || filters.channel || "",
+    sourceSurface: "launch-smoke",
+    download: payload.smokeSummary?.firstWaveRecommendationsZipDownload || null
+  });
+}
+
 function buildDeveloperLaunchSmokeKitFirstWaveSupportInspectionConfirmationText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -14705,6 +14773,13 @@ function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
     files,
     `integration/${payload.launchWorkflow?.integrationPackage?.snippets?.hostConfigFileName || "rocksolid_host_config.env"}`,
     payload.launchWorkflow?.integrationPackage?.snippets?.hostConfigEnv || ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/first-wave-recommendations-download.txt",
+    payload.smokeSummary?.firstWaveRecommendationsZipDownload
+      ? buildDeveloperLaunchSmokeKitFirstWaveRecommendationsZipDownloadText(payload)
+      : ""
   );
   appendLaunchWorkflowFileIfPresent(
     files,

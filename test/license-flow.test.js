@@ -25878,6 +25878,66 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDayWatchSummaryOperatorEntryDownload.body,
       /Launch-Day Watch Summary Readback Success Criteria:[\s\S]*3\. receipt_visibility_snapshot_ready \| expected=nextReceiptWritePacket is ready_for_receipt_write for receipt_visibility_snapshot/
     );
+    const launchMainlineWatchSummaryReadback = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      launchMainlineWatchSummaryReadback.mainlineSummary.launchDayWatchSummaryRecordReadback.status,
+      "ready_for_receipt_visibility_snapshot_write"
+    );
+    assert.equal(
+      launchMainlineWatchSummaryReadback.mainlineSummary.launchDayWatchSummaryRecordReadback.currentActionKey,
+      "record_receipt_visibility_snapshot"
+    );
+    assert.equal(
+      launchMainlineWatchSummaryReadback.mainlineSummary.launchDayWatchSummaryRecordReadback.nextRecordKey,
+      "receipt_visibility_snapshot"
+    );
+    assert.equal(
+      launchMainlineWatchSummaryReadback.mainlineSummary.launchDayWatchSummaryRecordReadback.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.ok(launchMainlineWatchSummaryReadback.mainlineSummary.overviewCards.some((item) => (
+      item.key === "launch_day_watch_summary_record_readback"
+      && item.tags.some((tag) => tag.label === "next" && tag.value === "record_receipt_visibility_snapshot")
+    )));
+    const launchMainlineWatchSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineWatchSummaryDownload.body,
+      /Launch Mainline Launch-Day Watch Summary Record Readback:[\s\S]*status=ready_for_receipt_visibility_snapshot_write \| recorded=yes \| record=launch_day_watch_summary \| currentAction=record_receipt_visibility_snapshot/
+    );
+    const launchMainlineWatchSummaryRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineWatchSummaryRoutesDownload.body,
+      /Launch Mainline Launch-Day Watch Summary Record Readback Route:[\s\S]*status=ready_for_receipt_visibility_snapshot_write \| nextAction=record_receipt_visibility_snapshot \| nextRecord=receipt_visibility_snapshot/
+    );
+    assert.match(
+      launchMainlineWatchSummaryRoutesDownload.body,
+      /launch-day-watch-summary-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchMainlineWatchSummaryIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineWatchSummaryIndexDownload.body,
+      /Launch Mainline Launch-Day Watch Summary Record Readback:[\s\S]*status=ready_for_receipt_visibility_snapshot_write \| nextAction=record_receipt_visibility_snapshot \| nextRecord=receipt_visibility_snapshot/
+    );
+    assert.match(
+      launchMainlineWatchSummaryIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Launch-day watch summary record readback: ops\/launch-operations-operator-entry\.txt/
+    );
 
     const receiptVisibilitySnapshotReadbackReceipt = await postJson(
       baseUrl,

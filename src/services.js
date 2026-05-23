@@ -15591,6 +15591,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const postArchiveLaunchDayWatchReadback = getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(
     launchOperationsOperatorEntry
   );
+  const launchDayWatchSummaryRecordReadback = getLaunchDayWatchSummaryRecordReadbackFromOperatorEntry(
+    launchOperationsOperatorEntry
+  );
   const preStagingReadinessSelfCheckSource = launchOperationsOperatorEntry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket
     && typeof launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket === "object"
       ? launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket
@@ -18599,6 +18602,44 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.recommendedDownload?.key)
       }
     : null;
+  const launchDayWatchSummaryRecordReadbackCard = launchDayWatchSummaryRecordReadback
+    ? {
+        key: "launch_day_watch_summary_record_readback",
+        title: "Launch-Day Watch Summary Record Readback",
+        summary: launchDayWatchSummaryRecordReadback.nextAction
+          || "Launch-day watch summary is recorded; receipt visibility snapshot is next.",
+        tags: [
+          {
+            label: "status",
+            value: launchDayWatchSummaryRecordReadback.status || "unknown",
+            strong: true
+          },
+          {
+            label: "record",
+            value: launchDayWatchSummaryRecordReadback.recordKey || "-",
+            strong: false
+          },
+          {
+            label: "next",
+            value: launchDayWatchSummaryRecordReadback.nextActionKey || "-",
+            strong: false
+          }
+        ],
+        details: [
+          `Recorded at: ${launchDayWatchSummaryRecordReadback.recordedAt || "-"}`,
+          `Next record: ${launchDayWatchSummaryRecordReadback.nextRecordKey || "-"}`,
+          `Next artifact: ${launchDayWatchSummaryRecordReadback.nextArtifact || "-"}`,
+          `Launch duty record index: ${launchDayWatchSummaryRecordReadback.launchDutyRecordIndexPath || "-"}`
+        ],
+        controls: [
+          launchOperationsOperatorEntry?.primaryDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open Launch Operations Operator Entry",
+            recommendedDownload: launchOperationsOperatorEntry.primaryDownload
+          }, params) : null
+        ].filter((item) => item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -18692,6 +18733,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     rolloutWideningDecisionCard,
     firstOperatingResultHandoffCard,
     postArchiveLaunchDayWatchReadbackCard,
+    launchDayWatchSummaryRecordReadbackCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -19253,6 +19295,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: overviewCards.filter((item) => item?.key === "post_archive_launch_day_watch_readback")
     },
     {
+      key: "launch_day_watch_summary_record_readback",
+      title: "Launch-Day Watch Summary Record Readback",
+      emptyState: "Record launch_day_watch_summary to expose the receipt visibility snapshot readback here.",
+      cards: overviewCards.filter((item) => item?.key === "launch_day_watch_summary_record_readback")
+    },
+    {
       key: "workspace_path",
       title: "Workspace Path",
       emptyState: "Generate a launch mainline package to inspect the routed workspace path here.",
@@ -19646,6 +19694,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstOperatingResultHandoffAction,
     firstOperatingResultHandoffReceiptReadbackAction,
     postArchiveLaunchDayWatchReadback,
+    launchDayWatchSummaryRecordReadback,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -21003,6 +21052,105 @@ function appendPostArchiveLaunchDayWatchReadbackLines(lines = [], readback = nul
   return true;
 }
 
+function normalizeLaunchDayWatchSummaryRecordReadback(source = null) {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+  return {
+    version: source.version || "developer-ops-launch-operations-operator-launch-day-watch-summary-record-readback/v1",
+    status: source.status || null,
+    recorded: source.recorded === true,
+    recordKey: source.recordKey || null,
+    recordedAt: source.recordedAt || null,
+    recordIndexStatus: source.recordIndexStatus || null,
+    recordIndexArtifactPath: source.recordIndexArtifactPath || null,
+    recordedReceiptIds: Array.isArray(source.recordedReceiptIds) ? source.recordedReceiptIds.slice() : [],
+    currentActionKey: source.currentActionKey || null,
+    expectedCurrentActionKey: source.expectedCurrentActionKey || null,
+    nextRecordKey: source.nextRecordKey || null,
+    nextActionKey: source.nextActionKey || null,
+    nextArtifact: source.nextArtifact || null,
+    nextCommand: source.nextCommand || null,
+    nextReceiptWritePacketStatus: source.nextReceiptWritePacketStatus || null,
+    expectedNextReceiptWritePacketStatus: source.expectedNextReceiptWritePacketStatus || null,
+    launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    refreshAfterPreviousWrite: source.refreshAfterPreviousWrite && typeof source.refreshAfterPreviousWrite === "object"
+      ? {
+          method: source.refreshAfterPreviousWrite.method || null,
+          href: source.refreshAfterPreviousWrite.href || null,
+          status: source.refreshAfterPreviousWrite.status || null,
+          confirmationAuditLogId: source.refreshAfterPreviousWrite.confirmationAuditLogId || null
+        }
+      : null,
+    successCriteria: Array.isArray(source.successCriteria)
+      ? source.successCriteria.map((item) => ({
+          key: item?.key || null,
+          expected: item?.expected || null
+        }))
+      : [],
+    nextAction: source.nextAction || null
+  };
+}
+
+function getLaunchDayWatchSummaryRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry = null) {
+  const entry = launchOperationsOperatorEntry && typeof launchOperationsOperatorEntry === "object"
+    ? launchOperationsOperatorEntry
+    : null;
+  return normalizeLaunchDayWatchSummaryRecordReadback(
+    entry?.launchDutyHandoffAction?.launchDayWatchSummaryRecordReadback
+  );
+}
+
+function appendLaunchDayWatchSummaryRecordReadbackLines(lines = [], readback = null, {
+  title = "Launch-Day Watch Summary Record Readback:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const item = normalizeLaunchDayWatchSummaryRecordReadback(readback);
+  if (!item) {
+    return false;
+  }
+  const recordedReceiptIds = Array.isArray(item.recordedReceiptIds) ? item.recordedReceiptIds.join(",") : "";
+  const successCriteria = Array.isArray(item.successCriteria) ? item.successCriteria : [];
+  lines.push(title);
+  lines.push(
+    `- status=${item.status || "-"}`
+    + ` | recorded=${item.recorded === true ? "yes" : "no"}`
+    + ` | record=${item.recordKey || "-"}`
+    + ` | currentAction=${item.currentActionKey || "-"}`
+  );
+  lines.push(
+    `- nextRecord=${item.nextRecordKey || "-"}`
+    + ` | nextAction=${item.nextActionKey || "-"}`
+    + ` | packet=${item.nextReceiptWritePacketStatus || "-"}`
+    + ` | expectedPacket=${item.expectedNextReceiptWritePacketStatus || "-"}`
+  );
+  lines.push(
+    `- recordedAt=${item.recordedAt || "-"}`
+    + ` | recordIndexStatus=${item.recordIndexStatus || "-"}`
+    + ` | artifact=${item.recordIndexArtifactPath || "-"}`
+    + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`- recordedReceiptIds=${recordedReceiptIds || "-"}`);
+  if (item.nextCommand) {
+    lines.push(`- nextCommand=${item.nextCommand}`);
+  }
+  lines.push(
+    `- refreshAfterPreviousWrite=${item.refreshAfterPreviousWrite?.method || "-"} ${item.refreshAfterPreviousWrite?.href || "-"}`
+    + ` | status=${item.refreshAfterPreviousWrite?.status || "-"}`
+  );
+  if (successCriteria.length) {
+    lines.push("Launch-Day Watch Summary Readback Success Criteria:");
+    for (let index = 0; index < successCriteria.length; index += 1) {
+      const criterion = successCriteria[index];
+      lines.push(`${index + 1}. ${criterion?.key || "-"} | expected=${criterion?.expected || "-"}`);
+    }
+  }
+  lines.push(`Launch-Day Watch Summary Readback Next: ${item.nextAction || "-"}`);
+  return true;
+}
+
 function appendLaunchSwitchOperatorRunbookLines(lines = [], launchSwitchOperatorRunbook = null, {
   title = "Launch Switch Operator Runbook:"
 } = {}) {
@@ -21050,6 +21198,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
+    || getLaunchDayWatchSummaryRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -21202,6 +21352,17 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       `- status=${postArchiveLaunchDayWatchReadback.status || "-"}`
       + ` | action=${postArchiveLaunchDayWatchReadback.actionKey || "-"}`
       + ` | record=${postArchiveLaunchDayWatchReadback.recordKey || "-"}`
+    );
+  }
+  if (launchDayWatchSummaryRecordReadback) {
+    lines.push("");
+    appendLaunchDayWatchSummaryRecordReadbackLines(lines, launchDayWatchSummaryRecordReadback, {
+      title: "Launch Mainline Launch-Day Watch Summary Record Readback:"
+    });
+    lines.push(
+      `- status=${launchDayWatchSummaryRecordReadback.status || "-"}`
+      + ` | nextAction=${launchDayWatchSummaryRecordReadback.nextActionKey || "-"}`
+      + ` | nextRecord=${launchDayWatchSummaryRecordReadback.nextRecordKey || "-"}`
     );
   }
   if (launchSurfaceReviewCloseoutAction) {
@@ -23391,6 +23552,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
+    || getLaunchDayWatchSummaryRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -24107,6 +24270,27 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${postArchiveLaunchDayWatchReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+  if (launchDayWatchSummaryRecordReadback) {
+    lines.push("");
+    appendLaunchDayWatchSummaryRecordReadbackLines(lines, launchDayWatchSummaryRecordReadback, {
+      title: "Launch Mainline Launch-Day Watch Summary Record Readback Route:"
+    });
+    lines.push(
+      `- status=${launchDayWatchSummaryRecordReadback.status || "-"}`
+      + ` | nextAction=${launchDayWatchSummaryRecordReadback.nextActionKey || "-"}`
+      + ` | nextRecord=${launchDayWatchSummaryRecordReadback.nextRecordKey || "-"}`
+    );
+    lines.push(
+      `- launch-day-watch-summary-readback: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
+      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
+      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
+      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
+      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
+      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
+      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
+      + ` | launchDutyRecordIndex=${launchDayWatchSummaryRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
   }
   if (launchDutyStableOperationsTransitionAction) {
@@ -26220,6 +26404,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
+    || getLaunchDayWatchSummaryRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -26357,6 +26543,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (postArchiveLaunchDayWatchReadback) {
     handoffFiles.push([
       "Post-archive launch-day watch readback",
+      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+  }
+  if (launchDayWatchSummaryRecordReadback) {
+    handoffFiles.push([
+      "Launch-day watch summary record readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
   }
@@ -27018,6 +27210,17 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       `- status=${postArchiveLaunchDayWatchReadback.status || "-"}`
       + ` | action=${postArchiveLaunchDayWatchReadback.actionKey || "-"}`
       + ` | record=${postArchiveLaunchDayWatchReadback.recordKey || "-"}`
+    );
+  }
+  if (launchDayWatchSummaryRecordReadback) {
+    lines.push("");
+    appendLaunchDayWatchSummaryRecordReadbackLines(lines, launchDayWatchSummaryRecordReadback, {
+      title: "Launch Mainline Launch-Day Watch Summary Record Readback:"
+    });
+    lines.push(
+      `- status=${launchDayWatchSummaryRecordReadback.status || "-"}`
+      + ` | nextAction=${launchDayWatchSummaryRecordReadback.nextActionKey || "-"}`
+      + ` | nextRecord=${launchDayWatchSummaryRecordReadback.nextRecordKey || "-"}`
     );
   }
 

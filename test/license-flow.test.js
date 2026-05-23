@@ -11642,6 +11642,24 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(stabilizationGateMainlinePostLaunchIndex.contentType || "", /^text\/plain/);
     assertGoLiveNextGateHandoffText(stabilizationGateMainlinePostLaunchIndex.body);
+    assert.match(stabilizationGateMainlinePostLaunchIndex.body, /Launch Review handoff routes \|[^\n]*format=handoff-routes/);
+    assert.match(stabilizationGateMainlinePostLaunchIndex.body, /Launch Smoke Kit handoff routes \|[^\n]*format=handoff-routes/);
+    assert.match(
+      stabilizationGateMainlinePostLaunchIndex.body,
+      /Launch Review handoff routes \|[^\n]*launchDutyRecordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      stabilizationGateMainlinePostLaunchIndex.body,
+      /Launch Smoke Kit handoff routes \|[^\n]*launchDutyRecordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      stabilizationGateMainlinePostLaunchIndex.body,
+      /Included Handoff Files:[\s\S]*Launch Review handoff routes: launch-review-handoff-routes\.txt/
+    );
+    assert.match(
+      stabilizationGateMainlinePostLaunchIndex.body,
+      /Included Handoff Files:[\s\S]*Launch Smoke Kit handoff routes: launch-smoke-handoff-routes\.txt/
+    );
     const stabilizationGateMainlineRouteMap = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=handoff-download-routes",
@@ -11649,6 +11667,16 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(stabilizationGateMainlineRouteMap.contentType || "", /^text\/plain/);
     assertGoLiveNextGateHandoffText(stabilizationGateMainlineRouteMap.body);
+    assert.match(stabilizationGateMainlineRouteMap.body, /launch-review-handoff-routes:[^\n]*format=handoff-routes/);
+    assert.match(stabilizationGateMainlineRouteMap.body, /launch-smoke-handoff-routes:[^\n]*format=handoff-routes/);
+    assert.match(
+      stabilizationGateMainlineRouteMap.body,
+      /launch-review-handoff-routes:[^\n]*launchDutyRecordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      stabilizationGateMainlineRouteMap.body,
+      /launch-smoke-handoff-routes:[^\n]*launchDutyRecordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json/
+    );
     const stabilizationGateLaunchReviewSummary = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=summary",

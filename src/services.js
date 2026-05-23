@@ -23228,6 +23228,22 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       launchOpsOverviewDownload
     );
   }
+  if (receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes) {
+    pushRoute(
+      "launch-review-handoff-routes",
+      "Launch Review handoff routes",
+      "launch-review-handoff-routes.txt",
+      receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes
+    );
+  }
+  if (receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes) {
+    pushRoute(
+      "launch-smoke-handoff-routes",
+      "Launch Smoke Kit handoff routes",
+      "launch-smoke-handoff-routes.txt",
+      receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes
+    );
+  }
   pushRoute(
     "launch-mainline-post-launch-handoff-index",
     "Launch Mainline post-launch handoff index",
@@ -25795,6 +25811,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     ["Recovery drill handoff", payload.recoveryDrillHandoffFileName || "developer-launch-mainline-recovery-drill-handoff.txt"],
     ["Ops handoff index", opsFiles.handoffIndex || "ops/handoff-index.txt"],
     ["Launch Mainline handoff routes", opsFiles.launchMainlineHandoffRoutes || "ops/launch-mainline-handoff-routes.txt"],
+    ...(receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes
+      ? [["Launch Review handoff routes", "launch-review-handoff-routes.txt"]]
+      : []),
+    ...(receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes
+      ? [["Launch Smoke Kit handoff routes", "launch-smoke-handoff-routes.txt"]]
+      : []),
     ["Launch operations overview status", opsFiles.launchOperationsOverviewStatus || "ops/launch-operations-overview-status.txt"],
     ["Launch receipt next follow-up", opsFiles.launchReceiptNextFollowUp || "ops/launch-receipt-next-follow-up.txt"],
     ["Launch receipt backfill status", opsFiles.launchReceiptBackfillStatus || "ops/launch-receipt-backfill-status.txt"],
@@ -26543,10 +26565,22 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     + `${receiptVisibilitySummaryDownloads.launchReviewSummary?.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${receiptVisibilitySummaryDownloads.launchReviewSummary.launchDutyRecordIndexPath}` : ""}`
   );
   lines.push(
+    `- Launch Review handoff routes | file=${receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes?.fileName || "-"}`
+    + ` | format=${receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes?.format || "-"}`
+    + ` | href=${receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes?.href || "-"}`
+    + `${receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes?.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes.launchDutyRecordIndexPath}` : ""}`
+  );
+  lines.push(
     `- Launch Smoke Kit summary | file=${receiptVisibilitySummaryDownloads.launchSmokeSummary?.fileName || "-"}`
     + ` | format=${receiptVisibilitySummaryDownloads.launchSmokeSummary?.format || "-"}`
     + ` | href=${receiptVisibilitySummaryDownloads.launchSmokeSummary?.href || "-"}`
     + `${receiptVisibilitySummaryDownloads.launchSmokeSummary?.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${receiptVisibilitySummaryDownloads.launchSmokeSummary.launchDutyRecordIndexPath}` : ""}`
+  );
+  lines.push(
+    `- Launch Smoke Kit handoff routes | file=${receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes?.fileName || "-"}`
+    + ` | format=${receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes?.format || "-"}`
+    + ` | href=${receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes?.href || "-"}`
+    + `${receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes?.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes.launchDutyRecordIndexPath}` : ""}`
   );
 
   lines.push("");
@@ -45180,6 +45214,18 @@ function buildLaunchDutyReceiptVisibilitySummaryDownloads({
         baseParams
       )
     ),
+    launchReviewHandoffRoutes: attachLaunchDutyRecordIndex(
+      createLaunchWorkflowDownloadShortcut(
+        "launch_review_handoff_routes",
+        "launch-review-handoff-routes.txt",
+        "Launch Review handoff routes",
+        {
+          source: "developer-launch-review",
+          format: "handoff-routes",
+          params: baseParams
+        }
+      )
+    ),
     launchSmokeSummary: attachLaunchDutyRecordIndex(
       createLaunchWorkflowSmokeKitDownloadShortcut(
         "Launch Smoke receipt visibility summary",
@@ -45193,19 +45239,45 @@ function buildLaunchDutyReceiptVisibilitySummaryDownloads({
           readinessGateRecordIndex: resolvedLaunchDutyRecordIndexPath
         })
       )
+    ),
+    launchSmokeHandoffRoutes: attachLaunchDutyRecordIndex(
+      createLaunchWorkflowDownloadShortcut(
+        "launch_smoke_handoff_routes",
+        "launch-smoke-handoff-routes.txt",
+        "Launch Smoke Kit handoff routes",
+        {
+          source: "developer-launch-smoke-kit",
+          format: "handoff-routes",
+          params: compactRouteParams({
+            productCode,
+            channel,
+            operation: "record_post_launch_ops_sweep",
+            downloadKey: "launch_smoke_handoff_routes",
+            readinessGateRecordIndex: resolvedLaunchDutyRecordIndexPath
+          })
+        }
+      )
     )
   };
 }
 
 function formatLaunchDutyReceiptVisibilitySummaryDownloadBridgeSuffix(receiptVisibilitySummaryDownloads = {}) {
   const launchReviewSummary = receiptVisibilitySummaryDownloads?.launchReviewSummary || null;
+  const launchReviewHandoffRoutes = receiptVisibilitySummaryDownloads?.launchReviewHandoffRoutes || null;
   const launchSmokeSummary = receiptVisibilitySummaryDownloads?.launchSmokeSummary || null;
+  const launchSmokeHandoffRoutes = receiptVisibilitySummaryDownloads?.launchSmokeHandoffRoutes || null;
   return (launchReviewSummary?.fileName ? ` | launchReviewSummaryFile=${launchReviewSummary.fileName}` : "")
     + (launchReviewSummary?.href ? ` | launchReviewSummaryHref=${launchReviewSummary.href}` : "")
     + (launchReviewSummary?.launchDutyRecordIndexPath ? ` | launchReviewSummaryRecordIndex=${launchReviewSummary.launchDutyRecordIndexPath}` : "")
+    + (launchReviewHandoffRoutes?.fileName ? ` | launchReviewHandoffRoutesFile=${launchReviewHandoffRoutes.fileName}` : "")
+    + (launchReviewHandoffRoutes?.href ? ` | launchReviewHandoffRoutesHref=${launchReviewHandoffRoutes.href}` : "")
+    + (launchReviewHandoffRoutes?.launchDutyRecordIndexPath ? ` | launchReviewHandoffRoutesRecordIndex=${launchReviewHandoffRoutes.launchDutyRecordIndexPath}` : "")
     + (launchSmokeSummary?.fileName ? ` | launchSmokeSummaryFile=${launchSmokeSummary.fileName}` : "")
     + (launchSmokeSummary?.href ? ` | launchSmokeSummaryHref=${launchSmokeSummary.href}` : "")
-    + (launchSmokeSummary?.launchDutyRecordIndexPath ? ` | launchSmokeSummaryRecordIndex=${launchSmokeSummary.launchDutyRecordIndexPath}` : "");
+    + (launchSmokeSummary?.launchDutyRecordIndexPath ? ` | launchSmokeSummaryRecordIndex=${launchSmokeSummary.launchDutyRecordIndexPath}` : "")
+    + (launchSmokeHandoffRoutes?.fileName ? ` | launchSmokeHandoffRoutesFile=${launchSmokeHandoffRoutes.fileName}` : "")
+    + (launchSmokeHandoffRoutes?.href ? ` | launchSmokeHandoffRoutesHref=${launchSmokeHandoffRoutes.href}` : "")
+    + (launchSmokeHandoffRoutes?.launchDutyRecordIndexPath ? ` | launchSmokeHandoffRoutesRecordIndex=${launchSmokeHandoffRoutes.launchDutyRecordIndexPath}` : "");
 }
 
 function getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(launchOperationsFileIndex = []) {
@@ -45216,7 +45288,9 @@ function getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(launch
     || {};
   return {
     launchReviewSummaryDownload: receiptVisibilitySummaryDownloads.launchReviewSummary || null,
-    launchSmokeSummaryDownload: receiptVisibilitySummaryDownloads.launchSmokeSummary || null
+    launchReviewHandoffRoutesDownload: receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes || null,
+    launchSmokeSummaryDownload: receiptVisibilitySummaryDownloads.launchSmokeSummary || null,
+    launchSmokeHandoffRoutesDownload: receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes || null
   };
 }
 
@@ -45240,20 +45314,36 @@ function getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadsFromPay
 
 function appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines = [], {
   launchReviewSummaryDownload = null,
+  launchReviewHandoffRoutesDownload = null,
   launchSmokeSummaryDownload = null,
+  launchSmokeHandoffRoutesDownload = null,
   title = "Receipt Visibility Summary Downloads:"
 } = {}) {
   if (!Array.isArray(lines)) {
     return false;
   }
   lines.push(title);
-  if (launchReviewSummaryDownload || launchSmokeSummaryDownload) {
-    lines.push(
-      `- Launch Review summary | ${formatLaunchHandoffDownloadText(launchReviewSummaryDownload, { fileSeparator: " | " })}`
-    );
-    lines.push(
-      `- Launch Smoke Kit summary | ${formatLaunchHandoffDownloadText(launchSmokeSummaryDownload, { fileSeparator: " | " })}`
-    );
+  if (launchReviewSummaryDownload || launchReviewHandoffRoutesDownload || launchSmokeSummaryDownload || launchSmokeHandoffRoutesDownload) {
+    if (launchReviewSummaryDownload) {
+      lines.push(
+        `- Launch Review summary | ${formatLaunchHandoffDownloadText(launchReviewSummaryDownload, { fileSeparator: " | " })}`
+      );
+    }
+    if (launchReviewHandoffRoutesDownload) {
+      lines.push(
+        `- Launch Review handoff routes | ${formatLaunchHandoffDownloadText(launchReviewHandoffRoutesDownload, { fileSeparator: " | " })}`
+      );
+    }
+    if (launchSmokeSummaryDownload) {
+      lines.push(
+        `- Launch Smoke Kit summary | ${formatLaunchHandoffDownloadText(launchSmokeSummaryDownload, { fileSeparator: " | " })}`
+      );
+    }
+    if (launchSmokeHandoffRoutesDownload) {
+      lines.push(
+        `- Launch Smoke Kit handoff routes | ${formatLaunchHandoffDownloadText(launchSmokeHandoffRoutesDownload, { fileSeparator: " | " })}`
+      );
+    }
   } else {
     lines.push("- none");
   }
@@ -48699,10 +48789,22 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       receiptVisibilitySummaryDownloads.launchReviewSummary
     ]);
   }
+  if (receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes) {
+    downloads.push([
+      "launch-review-handoff-routes",
+      receiptVisibilitySummaryDownloads.launchReviewHandoffRoutes
+    ]);
+  }
   if (receiptVisibilitySummaryDownloads.launchSmokeSummary) {
     downloads.push([
       "launch-smoke-receipt-visibility-summary",
       receiptVisibilitySummaryDownloads.launchSmokeSummary
+    ]);
+  }
+  if (receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes) {
+    downloads.push([
+      "launch-smoke-handoff-routes",
+      receiptVisibilitySummaryDownloads.launchSmokeHandoffRoutes
     ]);
   }
   const lines = [

@@ -22118,7 +22118,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         "review_launch_review_receipt_visibility_summary",
         "review_launch_smoke_receipt_visibility_summary",
         "open_launch_mainline_handoff_routes",
-        "continue_launch_duty_record_index_selection_handoff"
+        "continue_launch_duty_record_index_selection_handoff",
+        "review_launch_candidate_full_verification_gate"
       ]
     );
     assert.ok(launchOperationsOperatorChecklist.steps.every((item, index) => (
@@ -22147,6 +22148,41 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && /\/api\/developer\/ops\/export\/download\?/.test(item.href || "")
       && /format=launch-operations-operator-entry/.test(item.href || "")
     )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "review_launch_candidate_full_verification_gate"
+      && item.sourceKey === "ops_pre_staging_readiness_self_check"
+      && item.fileName === "developer-ops-pre-staging-readiness-self-check.txt"
+      && item.format === "pre-staging-readiness-self-check"
+      && /\/api\/developer\/ops\/export\/download\?/.test(item.href || "")
+      && /format=pre-staging-readiness-self-check/.test(item.href || "")
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
+    assert.deepEqual(
+      {
+        status: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.status,
+        ready: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.ready,
+        currentActionKey: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.currentActionKey,
+        fullTestCommand: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.fullTestCommand,
+        outputArtifact: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.outputArtifact,
+        blockerCount: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.blockerCount,
+        prerequisiteCount: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.prerequisiteCount,
+        productionSignoffPacket: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.productionSignoffPacket,
+        launchDutyRecordIndexPath: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.launchDutyRecordIndexPath,
+        recommendedDownloadFormat: launchOperationsOperatorChecklist.launchCandidateFullVerificationGate.recommendedDownload.format
+      },
+      {
+        status: "blocked_until_closeout_evidence_readbacks_complete",
+        ready: false,
+        currentActionKey: "complete_closeout_readbacks",
+        fullTestCommand: "npm.cmd test",
+        outputArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt",
+        blockerCount: 8,
+        prerequisiteCount: 4,
+        productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        recommendedDownloadFormat: "pre-staging-readiness-self-check"
+      }
+    );
     const launchOperationsOperatorEntry = steadyStateDutyReceiptSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOperatorEntry;
     assert.ok(launchOperationsOperatorEntry);
     assert.equal(launchOperationsOperatorEntry.version, "developer-ops-launch-operations-operator-entry/v1");
@@ -22155,9 +22191,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOperatorEntry.status, launchOperationsOverviewStatus.status);
     assert.equal(launchOperationsOperatorEntry.receiptVisibilityStatus, launchOperationsOverviewStatus.receiptVisibilityStatus);
     assert.equal(launchOperationsOperatorEntry.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
-    assert.equal(launchOperationsOperatorEntry.checklistStepCount, 8);
+    assert.equal(launchOperationsOperatorEntry.checklistStepCount, 9);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
     assert.equal(launchOperationsOperatorEntry.checklistStepKeys[0], "open_launch_operations_handoff_summary");
+    assert.ok(launchOperationsOperatorEntry.checklistStepKeys.includes("review_launch_candidate_full_verification_gate"));
+    assert.equal(launchOperationsOperatorEntry.launchCandidateFullVerificationGate.fullTestCommand, "npm.cmd test");
+    assert.equal(
+      launchOperationsOperatorEntry.launchCandidateFullVerificationGate.outputArtifact,
+      "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt"
+    );
     assert.ok(launchOperationsOperatorEntry.workspaceAction?.href);
     assert.equal(launchOperationsOperatorEntry.primaryDownload?.key, "ops_launch_operations_operator_entry");
     assert.equal(launchOperationsOperatorEntry.primaryDownload?.format, "launch-operations-operator-entry");
@@ -23976,6 +24018,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorChecklistDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /7\. open_launch_mainline_handoff_routes[^\n]*developer-ops-launch-mainline-handoff-routes\.txt/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /8\. continue_launch_duty_record_index_selection_handoff[^\n]*developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /9\. review_launch_candidate_full_verification_gate[^\n]*developer-ops-pre-staging-readiness-self-check\.txt[^\n]*format=pre-staging-readiness-self-check/);
+    assert.match(
+      launchOperationsOperatorChecklistDownload.body,
+      /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test \| output=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt/
+    );
     assert.match(launchOperationsOperatorChecklistDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
 
     const launchOperationsMainlineHandoffRoutesDownload = await getText(
@@ -24056,6 +24103,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Launch Switch Operator Runbook Route:[\s\S]*currentStep=refresh_staging_readiness_status[^\n]*currentCommand=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Launch Candidate Full Verification Gate Route:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
@@ -24431,6 +24482,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Launch switch operator entry: ops\/launch-operations-operator-entry\.txt/
     );
 
@@ -24454,6 +24509,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSummarySelectionDownload.body,
       /Launch Mainline Launch Switch Operator Runbook:[\s\S]*currentStep=refresh_staging_readiness_status[^\n]*currentCommand=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Launch Mainline Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test/
     );
 
     const launchOperationsOperatorEntryDownload = await getText(
@@ -24523,6 +24582,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*status=blocked_until_full_test_and_signoff \| currentStep=refresh_staging_readiness_status \| currentCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*nextCommand=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json \| fullTest=npm\.cmd test/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Switch Operator Runbook:[\s\S]*4\. review_production_signoff_packet \| status=blocked_until_full_test \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test \| output=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt/
+    );
     assert.match(launchOperationsOperatorEntryDownload.body, /First-Launch Confirmation Doorway:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /First-Launch Confirmation Doorway:[\s\S]*confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
     assert.match(launchOperationsOperatorEntryDownload.body, /First-Launch Confirmation Doorway:[\s\S]*supportInspection=confirmed \| supportReady=true \| support=ready_for_support_inspection/);
@@ -27146,13 +27209,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     )));
     const staleLaunchDutyReadbackChecklist = staleLaunchDutyReadbackSnapshot.summary.initialLaunchOpsReadiness
       .launchOperationsOperatorChecklist;
-    assert.equal(staleLaunchDutyReadbackChecklist.stepCount, 8);
+    assert.equal(staleLaunchDutyReadbackChecklist.stepCount, 9);
     assert.ok(staleLaunchDutyReadbackChecklist.steps.some((item) => (
       item.key === "continue_launch_duty_record_index_selection_handoff"
       && item.sourceKey === "ops_steady_state_handoff_brief"
       && item.fileName === "developer-ops-steady-state-handoff-brief.txt"
       && item.format === "steady-state-handoff-brief"
       && /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/.test(item.href || "")
+    )));
+    assert.ok(staleLaunchDutyReadbackChecklist.steps.some((item) => (
+      item.key === "review_launch_candidate_full_verification_gate"
+      && item.sourceKey === "ops_pre_staging_readiness_self_check"
+      && item.format === "pre-staging-readiness-self-check"
     )));
     assert.equal(staleLaunchDutyReadbackQueue.status, "complete");
     assert.equal(staleLaunchDutyReadbackQueue.currentRecordKey, null);

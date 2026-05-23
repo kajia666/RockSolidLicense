@@ -16845,6 +16845,7 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(firstWaveHandoffIndex.body, /First-Wave Confirmation Chain:[\s\S]*postLaunchLifecycle=hold/);
     assert.match(firstWaveHandoffIndex.body, /developer-ops-first-wave-recommendations-firstwave-stable\.txt/);
     assert.match(firstWaveHandoffIndex.body, /first-wave-audit-backfill-status\.txt.*format=first-wave-audit-backfill-status/);
+    assert.match(firstWaveHandoffIndex.body, /Included Files:[\s\S]*- first-wave-support-inspection-confirmation\.txt/);
 
     const firstWaveSteadyStateOperationalReviewDownload = await getText(
       baseUrl,

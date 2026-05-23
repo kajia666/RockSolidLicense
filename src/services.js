@@ -47388,6 +47388,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     "launch-receipt-backfill-status.txt",
     "first-wave-audit-backfill-status.txt",
     "first-wave-runtime-evidence.txt",
+    "first-wave-support-inspection-confirmation.txt",
     "initial-launch-ops-readiness.txt",
     "staging-launch-duty-archive.txt",
     "stabilization-handoff.txt",

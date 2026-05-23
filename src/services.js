@@ -23391,6 +23391,39 @@ function buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload = {}) {
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperOpsFirstWaveSupportInspectionConfirmationText(payload = {}) {
+  const scope = payload.scope || {};
+  const project = Array.isArray(payload.projects) && payload.projects.length ? payload.projects[0] : {};
+  const confirmation = payload.summary?.initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
+    || selectFirstWaveSupportInspectionConfirmation(
+      payload.overview?.latestFirstWaveSupportInspectionConfirmations,
+      {
+        productCode: scope.productCode || project.code || "",
+        channel: scope.channel || ""
+      }
+    );
+  const lines = [
+    "RockSolid Developer Ops First-Wave Support Inspection Confirmation",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Filter: ${scope.productCode || confirmation?.productCode || project.code || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${scope.channel || confirmation?.channel || "-"}`,
+    ""
+  ];
+  if (confirmation) {
+    appendFirstWaveSupportInspectionConfirmationLines(lines, confirmation);
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Use this file as the Developer Ops source-of-truth support inspection confirmation.");
+    lines.push("- Keep the runtime evidence download attached to the same first-wave lane.");
+  } else {
+    lines.push("First-Wave Support Inspection Confirmation:");
+    lines.push("- status=not_recorded | support=unknown | targets=0/0");
+    lines.push("- summary=Confirm first-wave support inspection before using this handoff.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {}) {
   const opsSnapshot = payload.opsSnapshot && typeof payload.opsSnapshot === "object" ? payload.opsSnapshot : {};
   const initialLaunchOpsReadiness = opsSnapshot.summary?.initialLaunchOpsReadiness || null;
@@ -25463,14 +25496,14 @@ function buildFirstWaveSupportInspectionRuntimeEvidenceDownload({
 function buildFirstWaveSupportInspectionConfirmationDownload({
   productCode = "",
   channel = "stable",
-  fileName = "developer-launch-mainline-first-wave-support-inspection-confirmation.txt"
+  fileName = "developer-ops-first-wave-support-inspection-confirmation.txt"
 } = {}) {
   return createLaunchWorkflowDownloadShortcut(
     "first_wave_support_inspection_confirmation",
-    fileName || "developer-launch-mainline-first-wave-support-inspection-confirmation.txt",
+    fileName || "developer-ops-first-wave-support-inspection-confirmation.txt",
     "First-wave support inspection confirmation",
     {
-      source: "developer-launch-mainline",
+      source: "developer-ops",
       format: "first-wave-support-inspection-confirmation",
       params: {
         productCode,
@@ -50308,6 +50341,10 @@ function buildDeveloperOpsExportFiles(payload) {
       body: buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload)
     },
     {
+      path: "first-wave-support-inspection-confirmation.txt",
+      body: buildDeveloperOpsFirstWaveSupportInspectionConfirmationText(payload)
+    },
+    {
       path: "initial-launch-ops-readiness.txt",
       body: buildDeveloperOpsInitialLaunchOpsReadinessText(payload)
     },
@@ -51343,7 +51380,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "pre-staging-readiness-self-check", "launch-operations-file-index", "launch-operations-operator-entry", "launch-operations-operator-checklist", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "pre-staging-readiness-self-check", "launch-operations-file-index", "launch-operations-operator-entry", "launch-operations-operator-checklist", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -51450,6 +51487,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "first-wave-runtime-evidence.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsFirstWaveRuntimeEvidenceText(payload)
+    };
+  }
+
+  if (normalizedFormat === "first-wave-support-inspection-confirmation") {
+    return {
+      fileName: "first-wave-support-inspection-confirmation.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsFirstWaveSupportInspectionConfirmationText(payload)
     };
   }
 

@@ -16265,6 +16265,17 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.match(supportConfirmedOpsSnapshot.summaryText, /runtimeEvidence=developer-ops-first-wave-runtime-evidence\.txt \| format=first-wave-runtime-evidence/);
     assert.ok(supportConfirmedOpsSnapshot.overview.highlights.some((item) => item.includes("Latest first-wave support inspection confirmation")));
 
+    const supportInspectionConfirmationDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=FIRSTWAVE&channel=stable&format=first-wave-support-inspection-confirmation",
+      operatorSession.token
+    );
+    assert.equal(supportInspectionConfirmationDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(supportInspectionConfirmationDownload.body, /RockSolid Developer Ops First-Wave Support Inspection Confirmation/);
+    assert.match(supportInspectionConfirmationDownload.body, /status=confirmed \| support=ready_for_support_inspection \| targets=6\/6/);
+    assert.match(supportInspectionConfirmationDownload.body, new RegExp(`audit=${supportInspectionConfirmation.auditLogId}`));
+    assert.match(supportInspectionConfirmationDownload.body, /runtimeEvidence=developer-ops-first-wave-runtime-evidence\.txt \| format=first-wave-runtime-evidence/);
+
     const mainlineAfterSupportInspection = await getJson(
       baseUrl,
       "/api/developer/launch-mainline?productCode=FIRSTWAVE&channel=stable&reviewMode=matched",

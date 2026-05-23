@@ -15609,6 +15609,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const firstWaveCloseoutRecordReadback = getFirstWaveCloseoutRecordReadbackFromOperatorEntry(
     launchOperationsOperatorEntry
   );
+  const firstWaveCloseoutStableOperationsShortcut = getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(
+    launchOperationsOperatorEntry
+  );
   const preStagingReadinessSelfCheckSource = launchOperationsOperatorEntry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket
     && typeof launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket === "object"
       ? launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket
@@ -18845,6 +18848,45 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.recommendedDownload?.key)
       }
     : null;
+  const firstWaveCloseoutStableOperationsShortcutCard = firstWaveCloseoutStableOperationsShortcut
+    ? {
+        key: "first_wave_closeout_stable_operations_shortcut",
+        title: "First-Wave Closeout Stable Operations Shortcut",
+        summary: firstWaveCloseoutStableOperationsShortcut.nextAction
+          || "Run readiness refresh, reload rehearsal, then continue stable-operations handoff.",
+        tags: [
+          {
+            label: "status",
+            value: firstWaveCloseoutStableOperationsShortcut.status || "unknown",
+            strong: true
+          },
+          {
+            label: "current",
+            value: firstWaveCloseoutStableOperationsShortcut.currentActionKey || "-",
+            strong: false
+          },
+          {
+            label: "next",
+            value: firstWaveCloseoutStableOperationsShortcut.nextActionKey || "-",
+            strong: false
+          }
+        ],
+        details: [
+          `Readback packet: ${firstWaveCloseoutStableOperationsShortcut.readbackPacketStatus || "-"}`,
+          `Readiness gate: ${firstWaveCloseoutStableOperationsShortcut.expectedReadinessGate || "-"}`,
+          `Rehearsal status: ${firstWaveCloseoutStableOperationsShortcut.expectedRehearsalPacketStatus || "-"}`,
+          `Confirmation points: ${firstWaveCloseoutStableOperationsShortcut.requiredConfirmationPoints.join(",") || "-"}`,
+          `Launch duty record index: ${firstWaveCloseoutStableOperationsShortcut.launchDutyRecordIndexPath || "-"}`
+        ],
+        controls: [
+          launchOperationsOperatorEntry?.primaryDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open Launch Operations Operator Entry",
+            recommendedDownload: launchOperationsOperatorEntry.primaryDownload
+          }, params) : null
+        ].filter((item) => item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -18944,6 +18986,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     rollbackSignalReviewRecordReadbackCard,
     stabilizationOwnerHandoffRecordReadbackCard,
     firstWaveCloseoutRecordReadbackCard,
+    firstWaveCloseoutStableOperationsShortcutCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -19934,6 +19977,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     rollbackSignalReviewRecordReadback,
     stabilizationOwnerHandoffRecordReadback,
     firstWaveCloseoutRecordReadback,
+    firstWaveCloseoutStableOperationsShortcut,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -21900,6 +21944,139 @@ function appendFirstWaveCloseoutRecordReadbackLines(lines = [], readback = null,
   return true;
 }
 
+function normalizeFirstWaveCloseoutStableOperationsShortcut(shortcut = null) {
+  const source = shortcut && typeof shortcut === "object" ? shortcut : null;
+  if (!source) {
+    return null;
+  }
+  return {
+    version: source.version || "developer-launch-mainline-first-wave-closeout-stable-operations-shortcut/v1",
+    status: source.status || null,
+    ready: source.ready === true,
+    currentActionKey: source.currentActionKey || null,
+    currentCommand: source.currentCommand || null,
+    nextActionKey: source.nextActionKey || null,
+    nextCommand: source.nextCommand || null,
+    readbackPacketStatus: source.readbackPacketStatus || null,
+    expectedReadinessGate: source.expectedReadinessGate || null,
+    expectedReadinessLaunchStatus: source.expectedReadinessLaunchStatus || null,
+    expectedReadinessNextStep: source.expectedReadinessNextStep || null,
+    expectedRehearsalPacketStatus: source.expectedRehearsalPacketStatus || null,
+    expectedRehearsalCurrentActionKey: source.expectedRehearsalCurrentActionKey || null,
+    requiredConfirmationPoints: Array.isArray(source.requiredConfirmationPoints)
+      ? source.requiredConfirmationPoints.slice()
+      : [],
+    handoffArtifacts: Array.isArray(source.handoffArtifacts) ? source.handoffArtifacts.slice() : [],
+    launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    firstWaveCloseoutArtifactPath: source.firstWaveCloseoutArtifactPath || null,
+    nextAction: source.nextAction || null
+  };
+}
+
+function getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry = null) {
+  const entry = launchOperationsOperatorEntry && typeof launchOperationsOperatorEntry === "object"
+    ? launchOperationsOperatorEntry
+    : null;
+  const launchDutyHandoffAction = entry?.launchDutyHandoffAction || null;
+  const firstWaveCloseoutReadback = normalizeFirstWaveCloseoutRecordReadback(
+    launchDutyHandoffAction?.firstWaveCloseoutRecordReadback
+  );
+  const stableOperationsHandoffTail =
+    launchDutyHandoffAction?.stabilizationReceiptWriteQueue?.stableOperationsHandoffTail || null;
+  const currentHandoffPacket = stableOperationsHandoffTail?.currentHandoffPacket || null;
+  const readinessReloadReadbackPacket = stableOperationsHandoffTail?.readinessReloadReadbackPacket || null;
+  if (!firstWaveCloseoutReadback?.recorded || !stableOperationsHandoffTail || !currentHandoffPacket || !readinessReloadReadbackPacket) {
+    return null;
+  }
+  const readinessCommands = readinessReloadReadbackPacket.commands || {};
+  const expectedReadiness = readinessReloadReadbackPacket.expectedReadinessResult || {};
+  const expectedRehearsal = readinessReloadReadbackPacket.expectedRehearsalResult || {};
+  const requiredConfirmationPoints = Array.isArray(expectedRehearsal.requiredConfirmationPoints)
+    ? expectedRehearsal.requiredConfirmationPoints.slice()
+    : [];
+  const handoffArtifacts = Array.isArray(readinessReloadReadbackPacket.handoffArtifacts)
+    ? readinessReloadReadbackPacket.handoffArtifacts.slice()
+    : (Array.isArray(currentHandoffPacket.handoffArtifacts)
+      ? currentHandoffPacket.handoffArtifacts.slice()
+      : (Array.isArray(stableOperationsHandoffTail.handoffArtifacts)
+        ? stableOperationsHandoffTail.handoffArtifacts.slice()
+        : []));
+  return normalizeFirstWaveCloseoutStableOperationsShortcut({
+    status: stableOperationsHandoffTail.status || firstWaveCloseoutReadback.status || null,
+    ready: stableOperationsHandoffTail.readyForHandoff === true || currentHandoffPacket.readyForHandoff === true,
+    currentActionKey: currentHandoffPacket.actionKey || firstWaveCloseoutReadback.currentActionKey || null,
+    currentCommand: currentHandoffPacket.command || readinessCommands.readinessStatus || stableOperationsHandoffTail.readinessStatusCommand || null,
+    nextActionKey: currentHandoffPacket.nextActionKey || firstWaveCloseoutReadback.nextActionKey || null,
+    nextCommand: currentHandoffPacket.nextCommand || readinessCommands.rehearsalReload || stableOperationsHandoffTail.rehearsalReloadCommand || firstWaveCloseoutReadback.nextCommand || null,
+    readbackPacketStatus: readinessReloadReadbackPacket.status || firstWaveCloseoutReadback.readinessReloadReadbackPacketStatus || null,
+    expectedReadinessGate: expectedReadiness.currentGate || null,
+    expectedReadinessLaunchStatus: expectedReadiness.launchStatus || null,
+    expectedReadinessNextStep: expectedReadiness.nextStepKey || null,
+    expectedRehearsalPacketStatus: expectedRehearsal.finalRehearsalPacketStatus || null,
+    expectedRehearsalCurrentActionKey: expectedRehearsal.launchDutyCurrentActionKey || null,
+    requiredConfirmationPoints,
+    handoffArtifacts,
+    launchDutyRecordIndexPath: currentHandoffPacket.recordIndexFile
+      || readinessReloadReadbackPacket.recordIndexFile
+      || stableOperationsHandoffTail.recordIndexFile
+      || firstWaveCloseoutReadback.launchDutyRecordIndexPath
+      || null,
+    firstWaveCloseoutArtifactPath: currentHandoffPacket.firstWaveCloseoutArtifactPath
+      || readinessReloadReadbackPacket.firstWaveCloseoutArtifactPath
+      || stableOperationsHandoffTail.firstWaveCloseoutArtifactPath
+      || firstWaveCloseoutReadback.recordIndexArtifactPath
+      || null,
+    nextAction: readinessReloadReadbackPacket.nextAction || stableOperationsHandoffTail.nextAction || firstWaveCloseoutReadback.nextAction || null
+  });
+}
+
+function appendFirstWaveCloseoutStableOperationsShortcutLines(lines = [], shortcut = null, {
+  title = "First-Wave Closeout Stable Operations Shortcut:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const item = normalizeFirstWaveCloseoutStableOperationsShortcut(shortcut);
+  if (!item) {
+    return false;
+  }
+  const confirmationPoints = Array.isArray(item.requiredConfirmationPoints)
+    ? item.requiredConfirmationPoints.join(",")
+    : "";
+  const handoffArtifacts = Array.isArray(item.handoffArtifacts) ? item.handoffArtifacts.join(",") : "";
+  lines.push(title);
+  lines.push(
+    `- status=${item.status || "-"}`
+    + ` | ready=${item.ready === true ? "yes" : "no"}`
+    + ` | current=${item.currentActionKey || "-"}`
+    + ` | next=${item.nextActionKey || "-"}`
+    + ` | readback=${item.readbackPacketStatus || "-"}`
+  );
+  if (item.currentCommand) {
+    lines.push(`- currentCommand=${item.currentCommand}`);
+  }
+  if (item.nextCommand) {
+    lines.push(`- rehearsalCommand=${item.nextCommand}`);
+  }
+  lines.push(
+    `- readinessGate=${item.expectedReadinessGate || "-"}`
+    + ` | readinessStatus=${item.expectedReadinessLaunchStatus || "-"}`
+    + ` | readinessNext=${item.expectedReadinessNextStep || "-"}`
+  );
+  lines.push(
+    `- rehearsalStatus=${item.expectedRehearsalPacketStatus || "-"}`
+    + ` | rehearsalCurrent=${item.expectedRehearsalCurrentActionKey || "-"}`
+    + ` | confirmationPoints=${confirmationPoints || "-"}`
+  );
+  lines.push(
+    `- launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+    + ` | firstWaveCloseout=${item.firstWaveCloseoutArtifactPath || "-"}`
+    + ` | artifacts=${handoffArtifacts || "-"}`
+  );
+  lines.push(`First-Wave Closeout Stable Operations Next: ${item.nextAction || "-"}`);
+  return true;
+}
+
 function appendLaunchSwitchOperatorRunbookLines(lines = [], launchSwitchOperatorRunbook = null, {
   title = "Launch Switch Operator Runbook:"
 } = {}) {
@@ -21959,6 +22136,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getStabilizationOwnerHandoffRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutRecordReadback = mainlineSummary.firstWaveCloseoutRecordReadback
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
+    || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -22178,6 +22357,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       + ` | nextAction=${firstWaveCloseoutRecordReadback.nextActionKey || "-"}`
       + ` | stableTail=${firstWaveCloseoutRecordReadback.stableOperationsHandoffTailStatus || "-"}`
     );
+  }
+  if (firstWaveCloseoutStableOperationsShortcut) {
+    lines.push("");
+    appendFirstWaveCloseoutStableOperationsShortcutLines(lines, firstWaveCloseoutStableOperationsShortcut, {
+      title: "Launch Mainline First-Wave Closeout Stable Operations Shortcut:"
+    });
   }
   if (launchSurfaceReviewCloseoutAction) {
     const confirmationSubmission = launchSurfaceReviewCloseoutAction.confirmationSubmission
@@ -24378,6 +24563,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || getStabilizationOwnerHandoffRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutRecordReadback = mainlineSummary.firstWaveCloseoutRecordReadback
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
+    || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -25220,6 +25407,22 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${firstWaveCloseoutRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+  if (firstWaveCloseoutStableOperationsShortcut) {
+    lines.push("");
+    appendFirstWaveCloseoutStableOperationsShortcutLines(lines, firstWaveCloseoutStableOperationsShortcut, {
+      title: "Launch Mainline First-Wave Closeout Stable Operations Shortcut Route:"
+    });
+    lines.push(
+      `- first-wave-closeout-stable-operations-shortcut: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
+      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
+      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
+      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
+      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
+      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
+      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
+      + ` | launchDutyRecordIndex=${firstWaveCloseoutStableOperationsShortcut.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
   }
   if (launchDutyStableOperationsTransitionAction) {
@@ -27345,6 +27548,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || getStabilizationOwnerHandoffRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutRecordReadback = mainlineSummary.firstWaveCloseoutRecordReadback
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
+    || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -27518,6 +27723,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (firstWaveCloseoutRecordReadback) {
     handoffFiles.push([
       "First-wave closeout record readback",
+      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+  }
+  if (firstWaveCloseoutStableOperationsShortcut) {
+    handoffFiles.push([
+      "First-wave closeout stable-operations shortcut",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
   }
@@ -28246,6 +28457,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | nextAction=${firstWaveCloseoutRecordReadback.nextActionKey || "-"}`
       + ` | stableTail=${firstWaveCloseoutRecordReadback.stableOperationsHandoffTailStatus || "-"}`
     );
+  }
+  if (firstWaveCloseoutStableOperationsShortcut) {
+    lines.push("");
+    appendFirstWaveCloseoutStableOperationsShortcutLines(lines, firstWaveCloseoutStableOperationsShortcut, {
+      title: "Launch Mainline First-Wave Closeout Stable Operations Shortcut:"
+    });
   }
 
   lines.push("");

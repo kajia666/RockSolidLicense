@@ -17065,6 +17065,26 @@ test("developer first-wave recommendations summarize launch inventory, card issu
       item.key === "launch_review_first_wave_runtime_evidence"
       && item.format === "first-wave-runtime-evidence"
     ));
+    const overflowLaunchReviewSupportConfirmationAction = overflowLaunchReview.reviewSummary.actionPlan.find((item) =>
+      item.key === "launch_review_first_wave_support_inspection_confirmation"
+    );
+    assert.ok(overflowLaunchReviewSupportConfirmationAction);
+    assert.equal(
+      overflowLaunchReviewSupportConfirmationAction.recommendedDownload?.key,
+      "launch_review_first_wave_support_inspection_confirmation"
+    );
+    assert.equal(
+      overflowLaunchReviewSupportConfirmationAction.recommendedDownload?.format,
+      "first-wave-support-inspection-confirmation"
+    );
+    assert.match(
+      overflowLaunchReviewSupportConfirmationAction.recommendedDownload?.href || "",
+      /format=first-wave-support-inspection-confirmation/
+    );
+    assert.ok(overflowLaunchReview.reviewSummary.recommendedDownloads.some((item) =>
+      item.key === "launch_review_first_wave_support_inspection_confirmation"
+      && item.format === "first-wave-support-inspection-confirmation"
+    ));
 
     const overflowLaunchSmoke = await getJson(
       baseUrl,
@@ -17081,6 +17101,26 @@ test("developer first-wave recommendations summarize launch inventory, card issu
     assert.ok(overflowLaunchSmoke.smokeSummary.recommendedDownloads.some((item) =>
       item.key === "launch_smoke_first_wave_runtime_evidence"
       && item.format === "first-wave-runtime-evidence"
+    ));
+    const overflowLaunchSmokeSupportConfirmationAction = overflowLaunchSmoke.smokeSummary.actionPlan.find((item) =>
+      item.key === "launch_smoke_first_wave_support_inspection_confirmation"
+    );
+    assert.ok(overflowLaunchSmokeSupportConfirmationAction);
+    assert.equal(
+      overflowLaunchSmokeSupportConfirmationAction.recommendedDownload?.key,
+      "launch_smoke_first_wave_support_inspection_confirmation"
+    );
+    assert.equal(
+      overflowLaunchSmokeSupportConfirmationAction.recommendedDownload?.format,
+      "first-wave-support-inspection-confirmation"
+    );
+    assert.match(
+      overflowLaunchSmokeSupportConfirmationAction.recommendedDownload?.href || "",
+      /format=first-wave-support-inspection-confirmation/
+    );
+    assert.ok(overflowLaunchSmoke.smokeSummary.recommendedDownloads.some((item) =>
+      item.key === "launch_smoke_first_wave_support_inspection_confirmation"
+      && item.format === "first-wave-support-inspection-confirmation"
     ));
 
     const overflowLaunchReviewRuntimeEvidence = await getText(

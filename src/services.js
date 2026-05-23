@@ -12327,6 +12327,18 @@ function buildDeveloperLaunchReviewSummaryPayload({
         }
       )
     : null;
+  const firstWaveSupportInspectionConfirmationDownload = firstWaveSupportInspectionConfirmation
+    ? createLaunchWorkflowDownloadShortcut(
+        "launch_review_first_wave_support_inspection_confirmation",
+        "first-wave-support-inspection-confirmation.txt",
+        "First-wave support inspection confirmation",
+        {
+          source: "developer-launch-review",
+          format: "first-wave-support-inspection-confirmation",
+          params: { ...scopedOpsParams }
+        }
+      )
+    : null;
   const mainlineSummaryDownload = createLaunchMainlineDownloadShortcut(
     "Launch mainline summary",
     "launch-mainline-summary.txt",
@@ -12804,6 +12816,21 @@ function buildDeveloperLaunchReviewSummaryPayload({
       recommendedDownload: firstWaveRuntimeEvidenceDownload || opsSummaryDownload
     }));
   }
+  if (firstWaveSupportInspectionConfirmation) {
+    const firstWaveSupportInspectionConfirmationReady = firstWaveSupportInspectionConfirmation.allTargetsConfirmed === true
+      || normalizeDeveloperOpsConfirmationToken(firstWaveSupportInspectionConfirmation.supportInspectionStatus, "") === "ready_for_support_inspection";
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_first_wave_support_inspection_confirmation",
+      title: "Review first-wave support inspection confirmation",
+      summary: firstWaveSupportInspectionConfirmationReady
+        ? "First-wave support inspection confirmation is ready as a standalone Launch Review handoff."
+        : `First-wave support inspection confirmation status: ${firstWaveSupportInspectionConfirmation.status || "unknown"}.`,
+      status: firstWaveSupportInspectionConfirmationReady ? "pass" : "review",
+      priority: "secondary",
+      workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction || opsWorkspaceAction,
+      recommendedDownload: firstWaveSupportInspectionConfirmationDownload || firstWaveRuntimeEvidenceDownload || opsSummaryDownload
+    }));
+  }
 
   for (const item of (Array.isArray(workflowSummary.actionPlan) ? workflowSummary.actionPlan : []).slice(0, 3)) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
@@ -12919,6 +12946,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
     });
   };
   pushRecommendedDownload(reviewDownload);
+  if (firstWaveSupportInspectionConfirmationDownload) {
+    pushRecommendedDownload(firstWaveSupportInspectionConfirmationDownload);
+  }
   if (firstWaveRuntimeEvidenceDownload) {
     pushRecommendedDownload(firstWaveRuntimeEvidenceDownload);
   }
@@ -13545,6 +13575,18 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         }
       )
     : null;
+  const firstWaveSupportInspectionConfirmationDownload = firstWaveSupportInspectionConfirmation
+    ? createLaunchWorkflowDownloadShortcut(
+        "launch_smoke_first_wave_support_inspection_confirmation",
+        "first-wave-support-inspection-confirmation.txt",
+        "First-wave support inspection confirmation",
+        {
+          source: "developer-launch-smoke-kit",
+          format: "first-wave-support-inspection-confirmation",
+          params: smokeRouteParams
+        }
+      )
+    : null;
 
   const accountLoginReady = accountLoginEnabled && (registerEnabled || accountCandidates.length > 0);
   const directCardReady = cardLoginEnabled && directCardCandidates.length > 0;
@@ -13678,6 +13720,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   );
   const recommendedDownloads = [
     launchSmokeKitSummaryDownload,
+    firstWaveSupportInspectionConfirmationDownload,
     firstWaveRuntimeEvidenceDownload,
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
@@ -14075,6 +14118,18 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
           : "First-wave runtime evidence is ready for this smoke lane."),
       workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction,
       recommendedDownload: firstWaveRuntimeEvidenceDownload
+    } : null,
+    firstWaveSupportInspectionConfirmation ? {
+      key: "launch_smoke_first_wave_support_inspection_confirmation",
+      title: "Review first-wave support inspection confirmation",
+      priority: "secondary",
+      status: firstWaveSupportInspectionConfirmation.allTargetsConfirmed === true
+        || normalizeDeveloperOpsConfirmationToken(firstWaveSupportInspectionConfirmation.supportInspectionStatus, "") === "ready_for_support_inspection"
+        ? "pass"
+        : "review",
+      summary: "Use the standalone support inspection confirmation before the first-wave smoke handoff.",
+      workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction,
+      recommendedDownload: firstWaveSupportInspectionConfirmationDownload
     } : null,
     {
       key: "launch_mainline_overview",

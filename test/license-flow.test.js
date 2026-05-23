@@ -26354,6 +26354,66 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       firstWaveIncidentLogOperatorEntryDownload.body,
       /First-Wave Incident Log Readback Success Criteria:[\s\S]*3\. rollback_signal_review_ready \| expected=current stabilization receipt write packet is ready for rollback_signal_review/
     );
+    const launchMainlineFirstWaveIncidentReadback = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      launchMainlineFirstWaveIncidentReadback.mainlineSummary.firstWaveIncidentLogRecordReadback.status,
+      "ready_for_rollback_signal_review_write"
+    );
+    assert.equal(
+      launchMainlineFirstWaveIncidentReadback.mainlineSummary.firstWaveIncidentLogRecordReadback.currentActionKey,
+      "record_rollback_signal_review"
+    );
+    assert.equal(
+      launchMainlineFirstWaveIncidentReadback.mainlineSummary.firstWaveIncidentLogRecordReadback.nextRecordKey,
+      "rollback_signal_review"
+    );
+    assert.equal(
+      launchMainlineFirstWaveIncidentReadback.mainlineSummary.firstWaveIncidentLogRecordReadback.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.ok(launchMainlineFirstWaveIncidentReadback.mainlineSummary.overviewCards.some((item) => (
+      item.key === "first_wave_incident_log_record_readback"
+      && item.tags.some((tag) => tag.label === "next" && tag.value === "record_rollback_signal_review")
+    )));
+    const launchMainlineFirstWaveIncidentSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineFirstWaveIncidentSummaryDownload.body,
+      /Launch Mainline First-Wave Incident Log Record Readback:[\s\S]*status=ready_for_rollback_signal_review_write \| recorded=yes \| record=first_wave_incident_log \| currentAction=record_rollback_signal_review/
+    );
+    const launchMainlineFirstWaveIncidentRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineFirstWaveIncidentRoutesDownload.body,
+      /Launch Mainline First-Wave Incident Log Record Readback Route:[\s\S]*status=ready_for_rollback_signal_review_write \| nextAction=record_rollback_signal_review \| nextRecord=rollback_signal_review/
+    );
+    assert.match(
+      launchMainlineFirstWaveIncidentRoutesDownload.body,
+      /first-wave-incident-log-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchMainlineFirstWaveIncidentIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineFirstWaveIncidentIndexDownload.body,
+      /Launch Mainline First-Wave Incident Log Record Readback:[\s\S]*status=ready_for_rollback_signal_review_write \| nextAction=record_rollback_signal_review \| nextRecord=rollback_signal_review/
+    );
+    assert.match(
+      launchMainlineFirstWaveIncidentIndexDownload.body,
+      /Included Handoff Files:[\s\S]*First-wave incident log record readback: ops\/launch-operations-operator-entry\.txt/
+    );
 
     const launchDutyRecordIndexReadbackReceipt = await postJson(
       baseUrl,

@@ -26600,6 +26600,66 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       rollbackSignalReviewOperatorEntryDownload.body,
       /Rollback Signal Review Readback Success Criteria:[\s\S]*3\. stabilization_owner_handoff_ready \| expected=current stabilization receipt write packet is ready for stabilization_owner_handoff/
     );
+    const launchMainlineRollbackSignalReadback = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      launchMainlineRollbackSignalReadback.mainlineSummary.rollbackSignalReviewRecordReadback.status,
+      "ready_for_stabilization_owner_handoff_write"
+    );
+    assert.equal(
+      launchMainlineRollbackSignalReadback.mainlineSummary.rollbackSignalReviewRecordReadback.currentActionKey,
+      "handoff_stabilization_owner"
+    );
+    assert.equal(
+      launchMainlineRollbackSignalReadback.mainlineSummary.rollbackSignalReviewRecordReadback.nextRecordKey,
+      "stabilization_owner_handoff"
+    );
+    assert.equal(
+      launchMainlineRollbackSignalReadback.mainlineSummary.rollbackSignalReviewRecordReadback.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.ok(launchMainlineRollbackSignalReadback.mainlineSummary.overviewCards.some((item) => (
+      item.key === "rollback_signal_review_record_readback"
+      && item.tags.some((tag) => tag.label === "next" && tag.value === "handoff_stabilization_owner")
+    )));
+    const launchMainlineRollbackSignalSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineRollbackSignalSummaryDownload.body,
+      /Launch Mainline Rollback Signal Review Record Readback:[\s\S]*status=ready_for_stabilization_owner_handoff_write \| recorded=yes \| record=rollback_signal_review \| currentAction=handoff_stabilization_owner/
+    );
+    const launchMainlineRollbackSignalRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineRollbackSignalRoutesDownload.body,
+      /Launch Mainline Rollback Signal Review Record Readback Route:[\s\S]*status=ready_for_stabilization_owner_handoff_write \| nextAction=handoff_stabilization_owner \| nextRecord=stabilization_owner_handoff/
+    );
+    assert.match(
+      launchMainlineRollbackSignalRoutesDownload.body,
+      /rollback-signal-review-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchMainlineRollbackSignalIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineRollbackSignalIndexDownload.body,
+      /Launch Mainline Rollback Signal Review Record Readback:[\s\S]*status=ready_for_stabilization_owner_handoff_write \| nextAction=handoff_stabilization_owner \| nextRecord=stabilization_owner_handoff/
+    );
+    assert.match(
+      launchMainlineRollbackSignalIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Rollback signal review record readback: ops\/launch-operations-operator-entry\.txt/
+    );
     const launchDutyRecordIndexReadbackActionOrder = launchDutyRecordIndexReadbackSnapshot.summary.initialLaunchOpsReadiness
       .launchDutyActionOrder;
     assert.equal(

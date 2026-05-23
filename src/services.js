@@ -15600,6 +15600,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const firstWaveIncidentLogRecordReadback = getFirstWaveIncidentLogRecordReadbackFromOperatorEntry(
     launchOperationsOperatorEntry
   );
+  const rollbackSignalReviewRecordReadback = getRollbackSignalReviewRecordReadbackFromOperatorEntry(
+    launchOperationsOperatorEntry
+  );
   const preStagingReadinessSelfCheckSource = launchOperationsOperatorEntry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket
     && typeof launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket === "object"
       ? launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket
@@ -18722,6 +18725,44 @@ function buildDeveloperLaunchMainlineSummaryPayload({
         ].filter((item) => item?.recommendedDownload?.key)
       }
     : null;
+  const rollbackSignalReviewRecordReadbackCard = rollbackSignalReviewRecordReadback
+    ? {
+        key: "rollback_signal_review_record_readback",
+        title: "Rollback Signal Review Record Readback",
+        summary: rollbackSignalReviewRecordReadback.nextAction
+          || "Rollback signal review is recorded; stabilization owner handoff is next.",
+        tags: [
+          {
+            label: "status",
+            value: rollbackSignalReviewRecordReadback.status || "unknown",
+            strong: true
+          },
+          {
+            label: "record",
+            value: rollbackSignalReviewRecordReadback.recordKey || "-",
+            strong: false
+          },
+          {
+            label: "next",
+            value: rollbackSignalReviewRecordReadback.nextActionKey || "-",
+            strong: false
+          }
+        ],
+        details: [
+          `Recorded at: ${rollbackSignalReviewRecordReadback.recordedAt || "-"}`,
+          `Next record: ${rollbackSignalReviewRecordReadback.nextRecordKey || "-"}`,
+          `Next artifact: ${rollbackSignalReviewRecordReadback.nextArtifact || "-"}`,
+          `Launch duty record index: ${rollbackSignalReviewRecordReadback.launchDutyRecordIndexPath || "-"}`
+        ],
+        controls: [
+          launchOperationsOperatorEntry?.primaryDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open Launch Operations Operator Entry",
+            recommendedDownload: launchOperationsOperatorEntry.primaryDownload
+          }, params) : null
+        ].filter((item) => item?.recommendedDownload?.key)
+      }
+    : null;
   const overviewCards = [
     {
       key: "overall_gate",
@@ -18818,6 +18859,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     launchDayWatchSummaryRecordReadbackCard,
     receiptVisibilitySnapshotRecordReadbackCard,
     firstWaveIncidentLogRecordReadbackCard,
+    rollbackSignalReviewRecordReadbackCard,
     {
       key: "recommended_downloads",
       title: "Recommended downloads",
@@ -19397,6 +19439,12 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       cards: overviewCards.filter((item) => item?.key === "first_wave_incident_log_record_readback")
     },
     {
+      key: "rollback_signal_review_record_readback",
+      title: "Rollback Signal Review Record Readback",
+      emptyState: "Record rollback_signal_review to expose the stabilization owner handoff readback here.",
+      cards: overviewCards.filter((item) => item?.key === "rollback_signal_review_record_readback")
+    },
+    {
       key: "workspace_path",
       title: "Workspace Path",
       emptyState: "Generate a launch mainline package to inspect the routed workspace path here.",
@@ -19793,6 +19841,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     launchDayWatchSummaryRecordReadback,
     receiptVisibilitySnapshotRecordReadback,
     firstWaveIncidentLogRecordReadback,
+    rollbackSignalReviewRecordReadback,
     initialLaunchOpsGate,
     initialLaunchOpsMainlineGate,
     initialLaunchOpsReadinessDownload,
@@ -21447,6 +21496,105 @@ function appendFirstWaveIncidentLogRecordReadbackLines(lines = [], readback = nu
   return true;
 }
 
+function normalizeRollbackSignalReviewRecordReadback(source = null) {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+  return {
+    version: source.version || "developer-ops-launch-operations-operator-rollback-signal-review-record-readback/v1",
+    status: source.status || null,
+    recorded: source.recorded === true,
+    recordKey: source.recordKey || null,
+    recordedAt: source.recordedAt || null,
+    recordIndexStatus: source.recordIndexStatus || null,
+    recordIndexArtifactPath: source.recordIndexArtifactPath || null,
+    recordedReceiptIds: Array.isArray(source.recordedReceiptIds) ? source.recordedReceiptIds.slice() : [],
+    currentActionKey: source.currentActionKey || null,
+    expectedCurrentActionKey: source.expectedCurrentActionKey || null,
+    nextRecordKey: source.nextRecordKey || null,
+    nextActionKey: source.nextActionKey || null,
+    nextArtifact: source.nextArtifact || null,
+    nextCommand: source.nextCommand || null,
+    currentReceiptWritePacketStatus: source.currentReceiptWritePacketStatus || null,
+    expectedCurrentReceiptWritePacketStatus: source.expectedCurrentReceiptWritePacketStatus || null,
+    launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    refreshAfterWrite: source.refreshAfterWrite && typeof source.refreshAfterWrite === "object"
+      ? {
+          method: source.refreshAfterWrite.method || null,
+          href: source.refreshAfterWrite.href || null,
+          status: source.refreshAfterWrite.status || null,
+          confirmationAuditLogId: source.refreshAfterWrite.confirmationAuditLogId || null
+        }
+      : null,
+    successCriteria: Array.isArray(source.successCriteria)
+      ? source.successCriteria.map((item) => ({
+          key: item?.key || null,
+          expected: item?.expected || null
+        }))
+      : [],
+    nextAction: source.nextAction || null
+  };
+}
+
+function getRollbackSignalReviewRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry = null) {
+  const entry = launchOperationsOperatorEntry && typeof launchOperationsOperatorEntry === "object"
+    ? launchOperationsOperatorEntry
+    : null;
+  return normalizeRollbackSignalReviewRecordReadback(
+    entry?.launchDutyHandoffAction?.rollbackSignalReviewRecordReadback
+  );
+}
+
+function appendRollbackSignalReviewRecordReadbackLines(lines = [], readback = null, {
+  title = "Rollback Signal Review Record Readback:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const item = normalizeRollbackSignalReviewRecordReadback(readback);
+  if (!item) {
+    return false;
+  }
+  const recordedReceiptIds = Array.isArray(item.recordedReceiptIds) ? item.recordedReceiptIds.join(",") : "";
+  const successCriteria = Array.isArray(item.successCriteria) ? item.successCriteria : [];
+  lines.push(title);
+  lines.push(
+    `- status=${item.status || "-"}`
+    + ` | recorded=${item.recorded === true ? "yes" : "no"}`
+    + ` | record=${item.recordKey || "-"}`
+    + ` | currentAction=${item.currentActionKey || "-"}`
+  );
+  lines.push(
+    `- nextRecord=${item.nextRecordKey || "-"}`
+    + ` | nextAction=${item.nextActionKey || "-"}`
+    + ` | packet=${item.currentReceiptWritePacketStatus || "-"}`
+    + ` | expectedPacket=${item.expectedCurrentReceiptWritePacketStatus || "-"}`
+  );
+  lines.push(
+    `- recordedAt=${item.recordedAt || "-"}`
+    + ` | recordIndexStatus=${item.recordIndexStatus || "-"}`
+    + ` | artifact=${item.recordIndexArtifactPath || "-"}`
+    + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`- recordedReceiptIds=${recordedReceiptIds || "-"}`);
+  if (item.nextCommand) {
+    lines.push(`- nextCommand=${item.nextCommand}`);
+  }
+  lines.push(
+    `- refreshAfterWrite=${item.refreshAfterWrite?.method || "-"} ${item.refreshAfterWrite?.href || "-"}`
+    + ` | status=${item.refreshAfterWrite?.status || "-"}`
+  );
+  if (successCriteria.length) {
+    lines.push("Rollback Signal Review Readback Success Criteria:");
+    for (let index = 0; index < successCriteria.length; index += 1) {
+      const criterion = successCriteria[index];
+      lines.push(`${index + 1}. ${criterion?.key || "-"} | expected=${criterion?.expected || "-"}`);
+    }
+  }
+  lines.push(`Rollback Signal Review Readback Next: ${item.nextAction || "-"}`);
+  return true;
+}
+
 function appendLaunchSwitchOperatorRunbookLines(lines = [], launchSwitchOperatorRunbook = null, {
   title = "Launch Switch Operator Runbook:"
 } = {}) {
@@ -21500,6 +21648,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getReceiptVisibilitySnapshotRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveIncidentLogRecordReadback = mainlineSummary.firstWaveIncidentLogRecordReadback
     || getFirstWaveIncidentLogRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const rollbackSignalReviewRecordReadback = mainlineSummary.rollbackSignalReviewRecordReadback
+    || getRollbackSignalReviewRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -21685,6 +21835,17 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
       `- status=${firstWaveIncidentLogRecordReadback.status || "-"}`
       + ` | nextAction=${firstWaveIncidentLogRecordReadback.nextActionKey || "-"}`
       + ` | nextRecord=${firstWaveIncidentLogRecordReadback.nextRecordKey || "-"}`
+    );
+  }
+  if (rollbackSignalReviewRecordReadback) {
+    lines.push("");
+    appendRollbackSignalReviewRecordReadbackLines(lines, rollbackSignalReviewRecordReadback, {
+      title: "Launch Mainline Rollback Signal Review Record Readback:"
+    });
+    lines.push(
+      `- status=${rollbackSignalReviewRecordReadback.status || "-"}`
+      + ` | nextAction=${rollbackSignalReviewRecordReadback.nextActionKey || "-"}`
+      + ` | nextRecord=${rollbackSignalReviewRecordReadback.nextRecordKey || "-"}`
     );
   }
   if (launchSurfaceReviewCloseoutAction) {
@@ -23880,6 +24041,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || getReceiptVisibilitySnapshotRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveIncidentLogRecordReadback = mainlineSummary.firstWaveIncidentLogRecordReadback
     || getFirstWaveIncidentLogRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const rollbackSignalReviewRecordReadback = mainlineSummary.rollbackSignalReviewRecordReadback
+    || getRollbackSignalReviewRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -24659,6 +24822,27 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${firstWaveIncidentLogRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+  if (rollbackSignalReviewRecordReadback) {
+    lines.push("");
+    appendRollbackSignalReviewRecordReadbackLines(lines, rollbackSignalReviewRecordReadback, {
+      title: "Launch Mainline Rollback Signal Review Record Readback Route:"
+    });
+    lines.push(
+      `- status=${rollbackSignalReviewRecordReadback.status || "-"}`
+      + ` | nextAction=${rollbackSignalReviewRecordReadback.nextActionKey || "-"}`
+      + ` | nextRecord=${rollbackSignalReviewRecordReadback.nextRecordKey || "-"}`
+    );
+    lines.push(
+      `- rollback-signal-review-readback: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
+      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
+      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
+      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
+      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
+      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
+      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
+      + ` | launchDutyRecordIndex=${rollbackSignalReviewRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
   }
   if (launchDutyStableOperationsTransitionAction) {
@@ -26778,6 +26962,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || getReceiptVisibilitySnapshotRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveIncidentLogRecordReadback = mainlineSummary.firstWaveIncidentLogRecordReadback
     || getFirstWaveIncidentLogRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
+  const rollbackSignalReviewRecordReadback = mainlineSummary.rollbackSignalReviewRecordReadback
+    || getRollbackSignalReviewRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
   const launchSurfaceReviewCloseoutAction = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
   const launchDutyHandoffAction = launchOperationsOperatorEntry?.launchDutyHandoffAction || null;
@@ -26933,6 +27119,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (firstWaveIncidentLogRecordReadback) {
     handoffFiles.push([
       "First-wave incident log record readback",
+      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+  }
+  if (rollbackSignalReviewRecordReadback) {
+    handoffFiles.push([
+      "Rollback signal review record readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
   }
@@ -27627,6 +27819,17 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       `- status=${firstWaveIncidentLogRecordReadback.status || "-"}`
       + ` | nextAction=${firstWaveIncidentLogRecordReadback.nextActionKey || "-"}`
       + ` | nextRecord=${firstWaveIncidentLogRecordReadback.nextRecordKey || "-"}`
+    );
+  }
+  if (rollbackSignalReviewRecordReadback) {
+    lines.push("");
+    appendRollbackSignalReviewRecordReadbackLines(lines, rollbackSignalReviewRecordReadback, {
+      title: "Launch Mainline Rollback Signal Review Record Readback:"
+    });
+    lines.push(
+      `- status=${rollbackSignalReviewRecordReadback.status || "-"}`
+      + ` | nextAction=${rollbackSignalReviewRecordReadback.nextActionKey || "-"}`
+      + ` | nextRecord=${rollbackSignalReviewRecordReadback.nextRecordKey || "-"}`
     );
   }
 

@@ -4092,6 +4092,16 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
           ? "launch_mainline_launch_day_watch_summary_record_readback"
+        : normalizedFormat === "receipt-visibility-snapshot-record-readback"
+          ? "launch_mainline_receipt_visibility_snapshot_record_readback"
+        : normalizedFormat === "first-wave-incident-log-record-readback"
+          ? "launch_mainline_first_wave_incident_log_record_readback"
+        : normalizedFormat === "rollback-signal-review-record-readback"
+          ? "launch_mainline_rollback_signal_review_record_readback"
+        : normalizedFormat === "stabilization-owner-handoff-record-readback"
+          ? "launch_mainline_stabilization_owner_handoff_record_readback"
+        : normalizedFormat === "first-wave-closeout-record-readback"
+          ? "launch_mainline_first_wave_closeout_record_readback"
         : normalizedFormat === "first-launch-handoff"
           ? "launch_mainline_first_launch_handoff"
         : normalizedFormat === "first-wave-runtime-evidence"
@@ -24813,6 +24823,118 @@ function buildDeveloperLaunchMainlineLaunchDayWatchSummaryRecordReadbackDownload
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchMainlineReadbackDownloadText(payload = {}, {
+  title = "RockSolid Launch Mainline Readback Download",
+  readback = null,
+  appendReadbackLines = null,
+  sectionTitle = "Readback:",
+  notes = []
+} = {}) {
+  if (!readback || typeof appendReadbackLines !== "function") {
+    return "";
+  }
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const lines = [
+    title,
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendReadbackLines(lines, readback, { title: sectionTitle });
+  lines.push("");
+  lines.push("Operator Notes:");
+  for (const note of notes) {
+    lines.push(`- ${note}`);
+  }
+  lines.push("- Keep this direct file with the post-launch handoff index so launch duty can verify the current record without reopening the full Operator Entry.");
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchMainlineReceiptVisibilitySnapshotRecordReadbackDownloadText(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const readback = payload.mainlineSummary?.receiptVisibilitySnapshotRecordReadback
+    || getReceiptVisibilitySnapshotRecordReadbackFromOperatorEntry(entry);
+  return buildDeveloperLaunchMainlineReadbackDownloadText(payload, {
+    title: "RockSolid Launch Mainline Receipt Visibility Snapshot Record Readback Download",
+    readback,
+    appendReadbackLines: appendReceiptVisibilitySnapshotRecordReadbackLines,
+    sectionTitle: "Receipt Visibility Snapshot Record Readback:",
+    notes: [
+      "Use this direct file after receipt_visibility_snapshot is recorded.",
+      "It shows the next first-wave incident-log write, receipt ids, and launch-duty record index without the longer Operator Entry."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineFirstWaveIncidentLogRecordReadbackDownloadText(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const readback = payload.mainlineSummary?.firstWaveIncidentLogRecordReadback
+    || getFirstWaveIncidentLogRecordReadbackFromOperatorEntry(entry);
+  return buildDeveloperLaunchMainlineReadbackDownloadText(payload, {
+    title: "RockSolid Launch Mainline First-Wave Incident Log Record Readback Download",
+    readback,
+    appendReadbackLines: appendFirstWaveIncidentLogRecordReadbackLines,
+    sectionTitle: "First-Wave Incident Log Record Readback:",
+    notes: [
+      "Use this direct file after first_wave_incident_log is recorded.",
+      "It shows the next rollback-signal review write, receipt ids, and launch-duty record index without the longer Operator Entry."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineRollbackSignalReviewRecordReadbackDownloadText(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const readback = payload.mainlineSummary?.rollbackSignalReviewRecordReadback
+    || getRollbackSignalReviewRecordReadbackFromOperatorEntry(entry);
+  return buildDeveloperLaunchMainlineReadbackDownloadText(payload, {
+    title: "RockSolid Launch Mainline Rollback Signal Review Record Readback Download",
+    readback,
+    appendReadbackLines: appendRollbackSignalReviewRecordReadbackLines,
+    sectionTitle: "Rollback Signal Review Record Readback:",
+    notes: [
+      "Use this direct file after rollback_signal_review is recorded.",
+      "It shows the stabilization-owner handoff write, receipt ids, and launch-duty record index without the longer Operator Entry."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineStabilizationOwnerHandoffRecordReadbackDownloadText(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const readback = payload.mainlineSummary?.stabilizationOwnerHandoffRecordReadback
+    || getStabilizationOwnerHandoffRecordReadbackFromOperatorEntry(entry);
+  return buildDeveloperLaunchMainlineReadbackDownloadText(payload, {
+    title: "RockSolid Launch Mainline Stabilization Owner Handoff Record Readback Download",
+    readback,
+    appendReadbackLines: appendStabilizationOwnerHandoffRecordReadbackLines,
+    sectionTitle: "Stabilization Owner Handoff Record Readback:",
+    notes: [
+      "Use this direct file after stabilization_owner_handoff is recorded.",
+      "It shows the first-wave closeout write readiness, closeout execution state, and launch-duty record index without the longer Operator Entry."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineFirstWaveCloseoutRecordReadbackDownloadText(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const readback = payload.mainlineSummary?.firstWaveCloseoutRecordReadback
+    || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(entry);
+  return buildDeveloperLaunchMainlineReadbackDownloadText(payload, {
+    title: "RockSolid Launch Mainline First-Wave Closeout Record Readback Download",
+    readback,
+    appendReadbackLines: appendFirstWaveCloseoutRecordReadbackLines,
+    sectionTitle: "First-Wave Closeout Record Readback:",
+    notes: [
+      "Use this direct file after first_wave_closeout is blocked or recorded.",
+      "It shows the stable-operations tail, readiness/rehearsal readback packet, and launch-duty record index without the longer Operator Entry."
+    ]
+  });
+}
+
 function buildDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownloadText(payload = {}) {
   const handoffSummary = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsHandoffSummary || null;
   return buildDeveloperLaunchMainlineStableOperationsDownloadText({
@@ -25476,6 +25598,46 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
         "Launch Mainline launch-day watch summary record readback",
         "launch-day-watch-summary-record-readback.txt",
         "launch-day-watch-summary-record-readback",
+        mainlineRouteParams
+      )
+    : null;
+  const receiptVisibilitySnapshotRecordReadbackDownload = receiptVisibilitySnapshotRecordReadback
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch Mainline receipt visibility snapshot record readback",
+        "receipt-visibility-snapshot-record-readback.txt",
+        "receipt-visibility-snapshot-record-readback",
+        mainlineRouteParams
+      )
+    : null;
+  const firstWaveIncidentLogRecordReadbackDownload = firstWaveIncidentLogRecordReadback
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch Mainline first-wave incident log record readback",
+        "first-wave-incident-log-record-readback.txt",
+        "first-wave-incident-log-record-readback",
+        mainlineRouteParams
+      )
+    : null;
+  const rollbackSignalReviewRecordReadbackDownload = rollbackSignalReviewRecordReadback
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch Mainline rollback signal review record readback",
+        "rollback-signal-review-record-readback.txt",
+        "rollback-signal-review-record-readback",
+        mainlineRouteParams
+      )
+    : null;
+  const stabilizationOwnerHandoffRecordReadbackDownload = stabilizationOwnerHandoffRecordReadback
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch Mainline stabilization owner handoff record readback",
+        "stabilization-owner-handoff-record-readback.txt",
+        "stabilization-owner-handoff-record-readback",
+        mainlineRouteParams
+      )
+    : null;
+  const firstWaveCloseoutRecordReadbackDownload = firstWaveCloseoutRecordReadback
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch Mainline first-wave closeout record readback",
+        "first-wave-closeout-record-readback.txt",
+        "first-wave-closeout-record-readback",
         mainlineRouteParams
       )
     : null;
@@ -26163,6 +26325,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${receiptVisibilitySnapshotRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
+    pushRoute(
+      "receipt-visibility-snapshot-readback-direct",
+      "Launch Mainline receipt visibility snapshot record readback",
+      opsFiles.receiptVisibilitySnapshotRecordReadback || "ops/receipt-visibility-snapshot-record-readback.txt",
+      receiptVisibilitySnapshotRecordReadbackDownload || {}
+    );
   }
   if (firstWaveIncidentLogRecordReadback) {
     lines.push("");
@@ -26183,6 +26351,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${firstWaveIncidentLogRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    );
+    pushRoute(
+      "first-wave-incident-log-readback-direct",
+      "Launch Mainline first-wave incident log record readback",
+      opsFiles.firstWaveIncidentLogRecordReadback || "ops/first-wave-incident-log-record-readback.txt",
+      firstWaveIncidentLogRecordReadbackDownload || {}
     );
   }
   if (rollbackSignalReviewRecordReadback) {
@@ -26205,6 +26379,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${rollbackSignalReviewRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
+    pushRoute(
+      "rollback-signal-review-readback-direct",
+      "Launch Mainline rollback signal review record readback",
+      opsFiles.rollbackSignalReviewRecordReadback || "ops/rollback-signal-review-record-readback.txt",
+      rollbackSignalReviewRecordReadbackDownload || {}
+    );
   }
   if (stabilizationOwnerHandoffRecordReadback) {
     lines.push("");
@@ -26226,6 +26406,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${stabilizationOwnerHandoffRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
+    pushRoute(
+      "stabilization-owner-handoff-readback-direct",
+      "Launch Mainline stabilization owner handoff record readback",
+      opsFiles.stabilizationOwnerHandoffRecordReadback || "ops/stabilization-owner-handoff-record-readback.txt",
+      stabilizationOwnerHandoffRecordReadbackDownload || {}
+    );
   }
   if (firstWaveCloseoutRecordReadback) {
     lines.push("");
@@ -26246,6 +26432,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${firstWaveCloseoutRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    );
+    pushRoute(
+      "first-wave-closeout-readback-direct",
+      "Launch Mainline first-wave closeout record readback",
+      opsFiles.firstWaveCloseoutRecordReadback || "ops/first-wave-closeout-record-readback.txt",
+      firstWaveCloseoutRecordReadbackDownload || {}
     );
   }
   if (firstWaveCloseoutStableOperationsShortcut) {
@@ -26564,6 +26756,31 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     "ops/launch-day-watch-summary-record-readback.txt",
     buildDeveloperLaunchMainlineLaunchDayWatchSummaryRecordReadbackDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/receipt-visibility-snapshot-record-readback.txt",
+    buildDeveloperLaunchMainlineReceiptVisibilitySnapshotRecordReadbackDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/first-wave-incident-log-record-readback.txt",
+    buildDeveloperLaunchMainlineFirstWaveIncidentLogRecordReadbackDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/rollback-signal-review-record-readback.txt",
+    buildDeveloperLaunchMainlineRollbackSignalReviewRecordReadbackDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/stabilization-owner-handoff-record-readback.txt",
+    buildDeveloperLaunchMainlineStabilizationOwnerHandoffRecordReadbackDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/first-wave-closeout-record-readback.txt",
+    buildDeveloperLaunchMainlineFirstWaveCloseoutRecordReadbackDownloadText(payload)
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -26978,7 +27195,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -27101,6 +27318,41 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "launch-day-watch-summary-record-readback.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineLaunchDayWatchSummaryRecordReadbackDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "receipt-visibility-snapshot-record-readback") {
+    return {
+      fileName: "receipt-visibility-snapshot-record-readback.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineReceiptVisibilitySnapshotRecordReadbackDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "first-wave-incident-log-record-readback") {
+    return {
+      fileName: "first-wave-incident-log-record-readback.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineFirstWaveIncidentLogRecordReadbackDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "rollback-signal-review-record-readback") {
+    return {
+      fileName: "rollback-signal-review-record-readback.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineRollbackSignalReviewRecordReadbackDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "stabilization-owner-handoff-record-readback") {
+    return {
+      fileName: "stabilization-owner-handoff-record-readback.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineStabilizationOwnerHandoffRecordReadbackDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "first-wave-closeout-record-readback") {
+    return {
+      fileName: "first-wave-closeout-record-readback.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineFirstWaveCloseoutRecordReadbackDownloadText(payload)
     };
   }
   if (normalizedFormat === "surface-review-closeout-shortcut-download") {
@@ -28336,6 +28588,11 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchCandidateFullVerificationGate: "ops/launch-candidate-full-verification-gate.txt",
       postArchiveLaunchDayWatchReadback: "ops/post-archive-launch-day-watch-readback.txt",
       launchDayWatchSummaryRecordReadback: "ops/launch-day-watch-summary-record-readback.txt",
+      receiptVisibilitySnapshotRecordReadback: "ops/receipt-visibility-snapshot-record-readback.txt",
+      firstWaveIncidentLogRecordReadback: "ops/first-wave-incident-log-record-readback.txt",
+      rollbackSignalReviewRecordReadback: "ops/rollback-signal-review-record-readback.txt",
+      stabilizationOwnerHandoffRecordReadback: "ops/stabilization-owner-handoff-record-readback.txt",
+      firstWaveCloseoutRecordReadback: "ops/first-wave-closeout-record-readback.txt",
       surfaceReviewCloseoutShortcutDownloadRoute: "ops/surface-review-closeout-shortcut-download.txt",
       firstWaveCloseoutStableOperationsShortcutDownloadRoute: "ops/first-wave-closeout-stable-operations-shortcut-download.txt",
       stableOperationsTransitionShortcutDownloadRoute: "ops/stable-operations-transition-shortcut-download.txt",
@@ -28705,11 +28962,19 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       "Receipt visibility snapshot record readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
+    handoffFiles.push([
+      "Receipt visibility snapshot record readback direct file",
+      opsFiles.receiptVisibilitySnapshotRecordReadback || "ops/receipt-visibility-snapshot-record-readback.txt"
+    ]);
   }
   if (firstWaveIncidentLogRecordReadback) {
     handoffFiles.push([
       "First-wave incident log record readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+    handoffFiles.push([
+      "First-wave incident log record readback direct file",
+      opsFiles.firstWaveIncidentLogRecordReadback || "ops/first-wave-incident-log-record-readback.txt"
     ]);
   }
   if (rollbackSignalReviewRecordReadback) {
@@ -28717,17 +28982,29 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       "Rollback signal review record readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
+    handoffFiles.push([
+      "Rollback signal review record readback direct file",
+      opsFiles.rollbackSignalReviewRecordReadback || "ops/rollback-signal-review-record-readback.txt"
+    ]);
   }
   if (stabilizationOwnerHandoffRecordReadback) {
     handoffFiles.push([
       "Stabilization owner handoff record readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
+    handoffFiles.push([
+      "Stabilization owner handoff record readback direct file",
+      opsFiles.stabilizationOwnerHandoffRecordReadback || "ops/stabilization-owner-handoff-record-readback.txt"
+    ]);
   }
   if (firstWaveCloseoutRecordReadback) {
     handoffFiles.push([
       "First-wave closeout record readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+    handoffFiles.push([
+      "First-wave closeout record readback direct file",
+      opsFiles.firstWaveCloseoutRecordReadback || "ops/first-wave-closeout-record-readback.txt"
     ]);
   }
   if (firstWaveCloseoutStableOperationsShortcut) {

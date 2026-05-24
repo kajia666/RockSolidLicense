@@ -26478,6 +26478,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineReceiptVisibilityRoutesDownload.body,
       /receipt-visibility-snapshot-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineReceiptVisibilityRoutesDownload.body,
+      /receipt-visibility-snapshot-readback-direct: [^\n]*file=receipt-visibility-snapshot-record-readback\.txt[^\n]*format=receipt-visibility-snapshot-record-readback[^\n]*source=developer-launch-mainline/
+    );
     const launchMainlineReceiptVisibilityIndexDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -26490,6 +26494,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineReceiptVisibilityIndexDownload.body,
       /Included Handoff Files:[\s\S]*Receipt visibility snapshot record readback: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Receipt visibility snapshot record readback direct file: ops\/receipt-visibility-snapshot-record-readback\.txt/
+    );
+    const receiptVisibilitySnapshotReadbackDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=receipt-visibility-snapshot-record-readback",
+      ownerSession.token
+    );
+    assert.match(
+      receiptVisibilitySnapshotReadbackDirectDownload.body,
+      /Receipt Visibility Snapshot Record Readback:[\s\S]*status=ready_for_first_wave_incident_log_write \| recorded=yes \| record=receipt_visibility_snapshot \| currentAction=record_first_wave_incident_log/
     );
 
     const firstWaveIncidentLogReadbackReceipt = await postJson(
@@ -26684,6 +26701,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineFirstWaveIncidentRoutesDownload.body,
       /first-wave-incident-log-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineFirstWaveIncidentRoutesDownload.body,
+      /first-wave-incident-log-readback-direct: [^\n]*file=first-wave-incident-log-record-readback\.txt[^\n]*format=first-wave-incident-log-record-readback[^\n]*source=developer-launch-mainline/
+    );
     const launchMainlineFirstWaveIncidentIndexDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -26696,6 +26717,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineFirstWaveIncidentIndexDownload.body,
       /Included Handoff Files:[\s\S]*First-wave incident log record readback: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlineFirstWaveIncidentIndexDownload.body,
+      /Included Handoff Files:[\s\S]*First-wave incident log record readback direct file: ops\/first-wave-incident-log-record-readback\.txt/
+    );
+    const firstWaveIncidentLogReadbackDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=first-wave-incident-log-record-readback",
+      ownerSession.token
+    );
+    assert.match(
+      firstWaveIncidentLogReadbackDirectDownload.body,
+      /First-Wave Incident Log Record Readback:[\s\S]*status=ready_for_rollback_signal_review_write \| recorded=yes \| record=first_wave_incident_log \| currentAction=record_rollback_signal_review/
     );
 
     const launchDutyRecordIndexReadbackReceipt = await postJson(
@@ -26930,6 +26964,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineRollbackSignalRoutesDownload.body,
       /rollback-signal-review-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineRollbackSignalRoutesDownload.body,
+      /rollback-signal-review-readback-direct: [^\n]*file=rollback-signal-review-record-readback\.txt[^\n]*format=rollback-signal-review-record-readback[^\n]*source=developer-launch-mainline/
+    );
     const launchMainlineRollbackSignalIndexDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -26942,6 +26980,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineRollbackSignalIndexDownload.body,
       /Included Handoff Files:[\s\S]*Rollback signal review record readback: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlineRollbackSignalIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Rollback signal review record readback direct file: ops\/rollback-signal-review-record-readback\.txt/
+    );
+    const rollbackSignalReviewReadbackDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=rollback-signal-review-record-readback",
+      ownerSession.token
+    );
+    assert.match(
+      rollbackSignalReviewReadbackDirectDownload.body,
+      /Rollback Signal Review Record Readback:[\s\S]*status=ready_for_stabilization_owner_handoff_write \| recorded=yes \| record=rollback_signal_review \| currentAction=handoff_stabilization_owner/
     );
     const launchDutyRecordIndexReadbackActionOrder = launchDutyRecordIndexReadbackSnapshot.summary.initialLaunchOpsReadiness
       .launchDutyActionOrder;
@@ -27314,11 +27365,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineStabilizationOwnerRoutesDownload.body,
+      /stabilization-owner-handoff-readback-direct: [^\n]*file=stabilization-owner-handoff-record-readback\.txt[^\n]*format=stabilization-owner-handoff-record-readback[^\n]*source=developer-launch-mainline/
+    );
+    assert.match(
+      launchMainlineStabilizationOwnerRoutesDownload.body,
       /Launch Mainline First-Wave Closeout Record Readback Route:[\s\S]*status=blocked_until_first_wave_closeout_recorded \| nextAction=refresh_staging_readiness_after_first_wave_closeout \| stableTail=[^\n]*/
     );
     assert.match(
       launchMainlineStabilizationOwnerRoutesDownload.body,
       /first-wave-closeout-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineStabilizationOwnerRoutesDownload.body,
+      /first-wave-closeout-readback-direct: [^\n]*file=first-wave-closeout-record-readback\.txt[^\n]*format=first-wave-closeout-record-readback[^\n]*source=developer-launch-mainline/
     );
     const launchMainlineStabilizationOwnerIndexDownload = await getText(
       baseUrl,
@@ -27339,7 +27398,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineStabilizationOwnerIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Stabilization owner handoff record readback direct file: ops\/stabilization-owner-handoff-record-readback\.txt/
+    );
+    assert.match(
+      launchMainlineStabilizationOwnerIndexDownload.body,
       /Included Handoff Files:[\s\S]*First-wave closeout record readback: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlineStabilizationOwnerIndexDownload.body,
+      /Included Handoff Files:[\s\S]*First-wave closeout record readback direct file: ops\/first-wave-closeout-record-readback\.txt/
+    );
+    const stabilizationOwnerHandoffReadbackDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stabilization-owner-handoff-record-readback",
+      ownerSession.token
+    );
+    assert.match(
+      stabilizationOwnerHandoffReadbackDirectDownload.body,
+      /Stabilization Owner Handoff Record Readback:[\s\S]*status=ready_for_first_wave_closeout_write \| recorded=yes \| record=stabilization_owner_handoff \| currentAction=close_first_wave/
     );
     const launchDutyCloseoutRecordedReceipt = await postJson(
       baseUrl,
@@ -27975,6 +28051,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
+      /first-wave-closeout-readback-direct: [^\n]*file=first-wave-closeout-record-readback\.txt[^\n]*format=first-wave-closeout-record-readback[^\n]*source=developer-launch-mainline/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
       /Launch Mainline First-Wave Closeout Stable Operations Shortcut Route:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| readback=awaiting_readiness_and_rehearsal_readback/
     );
     assert.match(
@@ -28009,6 +28089,49 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
       /Included Handoff Files:[\s\S]*First-wave closeout record readback: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
+      /Included Handoff Files:[\s\S]*First-wave closeout record readback direct file: ops\/first-wave-closeout-record-readback\.txt/
+    );
+    const launchDutyReadbackDirectFilesChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/receipt-visibility-snapshot-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/first-wave-incident-log-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/rollback-signal-review-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/stabilization-owner-handoff-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/first-wave-closeout-record-readback\.txt/);
+    const launchDutyReadbackDirectFilesZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const launchDutyReadbackDirectFilesZipText = launchDutyReadbackDirectFilesZipDownload.body.toString("latin1");
+    assert.match(launchDutyReadbackDirectFilesZipText, /ops\/receipt-visibility-snapshot-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /ops\/first-wave-incident-log-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /ops\/rollback-signal-review-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /ops\/stabilization-owner-handoff-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /ops\/first-wave-closeout-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline Receipt Visibility Snapshot Record Readback Download/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline First-Wave Incident Log Record Readback Download/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline Rollback Signal Review Record Readback Download/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline Stabilization Owner Handoff Record Readback Download/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline First-Wave Closeout Record Readback Download/);
+    assert.match(
+      launchDutyReadbackDirectFilesZipText,
+      /First-Wave Closeout Record Readback:[\s\S]*status=ready_for_stable_operations_handoff \| recorded=yes \| record=first_wave_closeout \| currentAction=refresh_staging_readiness_after_first_wave_closeout/
+    );
+    const firstWaveCloseoutReadbackDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=first-wave-closeout-record-readback",
+      ownerSession.token
+    );
+    assert.match(
+      firstWaveCloseoutReadbackDirectDownload.body,
+      /First-Wave Closeout Record Readback:[\s\S]*status=ready_for_stable_operations_handoff \| recorded=yes \| record=first_wave_closeout \| currentAction=refresh_staging_readiness_after_first_wave_closeout/
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,

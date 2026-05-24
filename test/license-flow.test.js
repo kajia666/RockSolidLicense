@@ -23517,6 +23517,81 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsOperatorEntry.launchSurfaceReviewCloseoutAction,
       receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction
     );
+    const expectedSurfaceReviewCloseoutOperatorOrder = [
+      "Review Launch Review and Launch Smoke summaries against the same launch-duty record index.",
+      "Submit first-wave handoff confirmation, then refresh Developer Ops overview before handing launch duty forward."
+    ];
+    const expectedSurfaceReviewCloseoutRequiredChecksBlocked = [
+      { key: "receipt_visibility_parity", ready: true },
+      { key: "first_wave_handoff_confirmation", ready: false },
+      { key: "support_inspection_confirmation", ready: true },
+      { key: "manual_checkpoint_closeout", ready: false },
+      { key: "developer_ops_overview_refresh", ready: false }
+    ];
+    const expectedSurfaceReviewCloseoutShortcutBlocked = {
+      version: "developer-launch-mainline-surface-review-closeout-shortcut/v1",
+      status: "ready_for_first_wave_confirmation",
+      ready: false,
+      currentActionKey: "confirm_first_wave_handoff",
+      decision: "hold_launch_duty_handoff",
+      manualCheckpointStatus: "open_pending_handoff_confirmation",
+      manualCheckpointClosed: false,
+      manualCheckpointProgress: "1/2",
+      remainingManualCheckpoints: 1,
+      reviewSurfaceCount: 3,
+      readyReviewSurfaceCount: 2,
+      confirmationStatus: "ready_to_submit",
+      confirmationReady: true,
+      confirmationMethod: "POST",
+      confirmationRoute: "/api/developer/ops/first-wave/recommendations/confirm",
+      overviewRefreshStatus: "pending_confirmation_receipt",
+      overviewRefreshReady: false,
+      overviewRefreshHref: receiptVisibilityConfirmationQueue.overviewRefreshAction?.href || null,
+      postConfirmationSwitchStatus: "blocked_until_first_wave_confirmation",
+      postConfirmationSwitchReady: false,
+      postConfirmationSwitchDecision: "hold_launch_duty_handoff",
+      blockedBy: [
+        "first_wave_handoff_confirmation",
+        "manual_checkpoint_closeout",
+        "developer_ops_overview_refresh"
+      ],
+      requiredChecks: expectedSurfaceReviewCloseoutRequiredChecksBlocked,
+      nextActionKey: "confirm_first_wave_handoff",
+      nextActionMethod: "POST",
+      nextActionRoute: "/api/developer/ops/first-wave/recommendations/confirm",
+      nextActionHref: null,
+      handoffPacketStatus: "awaiting_first_wave_confirmation",
+      handoffPacketReady: false,
+      supportInspectionReady: true,
+      supportInspectionStatus: "ready_for_support_inspection",
+      supportInspectionAuditLogId: launchOperationsSupportInspectionConfirmation.auditLogId,
+      reviewDownloads: receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.reviewDownloads.map((item) => ({
+        key: item.key,
+        status: item.status,
+        ready: item.ready,
+        fileName: item.fileName,
+        format: item.format,
+        href: item.href,
+        launchDutyRecordIndexPath: item.launchDutyRecordIndexPath
+      })),
+      operatorOrder: expectedSurfaceReviewCloseoutOperatorOrder,
+      launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+      nextAction: "Submit first-wave handoff confirmation with the aligned Launch Review and Launch Smoke summaries attached."
+    };
+    const launchMainlineSurfaceReviewCloseoutBlocked = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.deepEqual(
+      launchMainlineSurfaceReviewCloseoutBlocked.mainlineSummary.surfaceReviewCloseoutShortcut,
+      expectedSurfaceReviewCloseoutShortcutBlocked
+    );
+    assert.ok(launchMainlineSurfaceReviewCloseoutBlocked.mainlineSummary.overviewCards.some((item) => (
+      item.key === "surface_review_closeout_shortcut"
+      && item.tags.some((tag) => tag.label === "current" && tag.value === "confirm_first_wave_handoff")
+      && item.tags.some((tag) => tag.label === "next" && tag.value === "confirm_first_wave_handoff")
+    )));
     assert.equal(
       launchDutyHandoffAction.version,
       "developer-ops-launch-operations-operator-launch-duty-handoff-action/v1"
@@ -24142,6 +24217,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut Route:[\s\S]*status=ready_for_first_wave_confirmation \| ready=false \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff \| manualProgress=1\/2 \| manualRemaining=1 \| surfaces=2\/3/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut Route:[\s\S]*confirmStatus=ready_to_submit \| confirmReady=true \| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /surface-review-closeout-shortcut: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /launch-mainline-production-handoff: [^\n]*format=production-handoff/
     );
     assert.match(
@@ -24522,6 +24609,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*status=ready_for_first_wave_confirmation \| ready=no \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff \| manualProgress=1\/2 \| manualRemaining=1 \| surfaces=2\/3/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Surface review closeout shortcut: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Launch switch operator entry: ops\/launch-operations-operator-entry\.txt/
     );
 
@@ -24553,6 +24648,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSummarySelectionDownload.body,
       /Launch Candidate Full Verification Result Handoff:[\s\S]*status=required_after_full_test_window_passed_backfill \| target=full_test_window_passed \| decision=ready-for-production-signoff \| expectedFilled=full_test_window_passed \| expectedGate=production_signoff/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*status=ready_for_first_wave_confirmation \| ready=no \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff \| manualProgress=1\/2 \| manualRemaining=1 \| surfaces=2\/3/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*nextAction=confirm_first_wave_handoff \| nextMethod=POST \| nextRoute=\/api\/developer\/ops\/first-wave\/recommendations\/confirm \| handoffPacket=awaiting_first_wave_confirmation \| handoffReady=no/
     );
 
     const launchOperationsOperatorEntryDownload = await getText(

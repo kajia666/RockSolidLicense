@@ -28272,6 +28272,43 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         nextAction: "Complete packet result review before opening the steady-state handoff brief."
       }
     );
+    assert.deepEqual(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview,
+      {
+        version: "developer-launch-mainline-stable-operations-transition-review/v1",
+        status: "blocked_until_packet_result_review",
+        ready: false,
+        currentActionKey: "review_staging_packet_results",
+        blockedBy: ["packet_result_review"],
+        operatorActionKey: "continue_packet_result_review",
+        reviewRequired: false,
+        nextDownloadKey: "ops_launch_operations_operator_entry",
+        nextDownloadFormat: "launch-operations-operator-entry",
+        nextDownloadHref: "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry",
+        recordReady: true,
+        packetReady: false,
+        tailReady: true,
+        handoffReady: false,
+        recordIndexStatus: "selected_latest_readback",
+        recordIndexProgress: "6/6",
+        packetReviewStatus: null,
+        packetReviewProgress: null,
+        stableOperationsTailStatus: "ready_for_stable_operations_handoff",
+        stableOperationsReadbackStatus: "awaiting_readiness_and_rehearsal_readback",
+        landingStatus: null,
+        landingHref: null,
+        landingBridgeStatus: null,
+        requiredChecks: [
+          "readiness_gate_stable_operations_handoff",
+          "rehearsal_ready_for_stable_operations_handoff",
+          "packet_result_review_complete",
+          "record_index_complete"
+        ],
+        operatorOrder: ["Review the launch-duty packet results, then refresh Developer Ops."],
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        nextAction: "Complete packet result review before opening the steady-state handoff brief."
+      }
+    );
     assert.ok(launchMainlineCloseoutRecordedReadback.mainlineSummary.overviewCards.some((item) => (
       item.key === "first_wave_closeout_record_readback"
       && item.tags.some((tag) => tag.label === "next" && tag.value === "reload_staging_rehearsal_for_stable_operations")
@@ -28331,6 +28368,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*recordReady=yes \| packetReady=no \| tailReady=yes \| handoffReady=no \| blockedBy=packet_result_review/
     );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Transition Review:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Transition Review:[\s\S]*checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete/
+    );
     const launchMainlineCloseoutRecordedRoutesDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
@@ -28366,6 +28411,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
+      /Stable Operations Transition Review Route:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
+      /stable-operations-transition-review: [^\n]*file=stable-operations-transition-review\.txt[^\n]*format=stable-operations-transition-review[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
       /Launch Mainline Stable Operations Transition Shortcut Route:[\s\S]*status=blocked_until_packet_result_review \| current=review_staging_packet_results \| nextDownload=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry/
     );
     assert.match(
@@ -28388,6 +28441,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
       /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| nextDownload=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
+      /Launch Mainline Stable Operations Transition Review:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| nextDownload=launch-operations-operator-entry/
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
@@ -28454,6 +28511,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Stable operations transition review direct file: ops\/stable-operations-transition-review\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
       /Included Handoff Files:[\s\S]*Stable operations transition shortcut: ops\/launch-operations-operator-entry\.txt/
     );
     assert.match(
@@ -28472,6 +28533,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedChecksumsDownload.body,
       /ops\/stable-operations-handoff-execution\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedChecksumsDownload.body,
+      /ops\/stable-operations-transition-review\.txt/
     );
     assert.match(
       launchMainlineCloseoutRecordedChecksumsDownload.body,
@@ -28506,6 +28571,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedZipText,
       /Stable Operations Handoff Commands:[\s\S]*readinessCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /ops\/stable-operations-transition-review\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /RockSolid Launch Mainline Stable Operations Transition Review Download/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /Stable Operations Transition Review Checks:[\s\S]*checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete/
     );
     assert.match(
       launchMainlineCloseoutRecordedZipText,
@@ -28548,6 +28625,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
       /Stable Operations Handoff Rehearsal Expectations:[\s\S]*rehearsalStatus=ready_for_stable_operations_handoff \| rehearsalCurrent=stable_operations_handoff \| confirmationPoints=launch_duty_record_index,first_wave_closeout/
+    );
+    const launchMainlineStableOperationsTransitionReviewDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stable-operations-transition-review",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionReviewDirectDownload.body,
+      /RockSolid Launch Mainline Stable Operations Transition Review Download/
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionReviewDirectDownload.body,
+      /Stable Operations Transition Review:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionReviewDirectDownload.body,
+      /Stable Operations Transition Review Next Download:[\s\S]*key=ops_launch_operations_operator_entry \| format=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionReviewDirectDownload.body,
+      /Stable Operations Transition Review Checks:[\s\S]*checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete/
     );
     const launchMainlineCloseoutStableOperationsTransitionShortcutDirectDownload = await getText(
       baseUrl,

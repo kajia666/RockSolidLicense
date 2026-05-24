@@ -4100,6 +4100,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_stabilization_receipt_execution_handoff"
         : normalizedFormat === "stable-operations-handoff-execution"
           ? "launch_mainline_stable_operations_handoff_execution"
+        : normalizedFormat === "stable-operations-transition-review"
+          ? "launch_mainline_stable_operations_transition_review"
         : normalizedFormat === "post-archive-launch-day-watch-readback"
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
@@ -22376,6 +22378,88 @@ function appendStableOperationsTransitionShortcutLines(lines = [], shortcut = nu
   return true;
 }
 
+function normalizeStableOperationsTransitionReview(review = null) {
+  const item = normalizeStableOperationsTransitionShortcut(review);
+  return item
+    ? {
+        ...item,
+        version: "developer-launch-mainline-stable-operations-transition-review/v1"
+      }
+    : null;
+}
+
+function getDeveloperLaunchMainlineStableOperationsTransitionReview(payload = {}) {
+  const shortcut = payload.mainlineSummary?.stableOperationsTransitionShortcut
+    && typeof payload.mainlineSummary.stableOperationsTransitionShortcut === "object"
+      ? payload.mainlineSummary.stableOperationsTransitionShortcut
+      : getStableOperationsTransitionShortcutFromOperatorEntry(
+          payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+        );
+  return normalizeStableOperationsTransitionReview(shortcut);
+}
+
+function appendStableOperationsTransitionReviewLines(lines = [], review = null, {
+  title = "Stable Operations Transition Review:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const item = normalizeStableOperationsTransitionReview(review);
+  if (!item) {
+    return false;
+  }
+  const blockedBy = Array.isArray(item.blockedBy) ? item.blockedBy.join(",") : "";
+  const requiredChecks = Array.isArray(item.requiredChecks) ? item.requiredChecks.join(",") : "";
+  lines.push(title);
+  lines.push(
+    `- status=${item.status || "-"}`
+    + ` | ready=${item.ready === true ? "yes" : "no"}`
+    + ` | current=${item.currentActionKey || "-"}`
+    + ` | operatorAction=${item.operatorActionKey || "-"}`
+    + ` | reviewRequired=${item.operatorActionKey ? item.reviewRequired === true ? "yes" : "no" : "-"}`
+    + ` | nextDownload=${item.nextDownloadFormat || "-"}`
+  );
+  lines.push(
+    "Stable Operations Transition Review Readiness:"
+    + ` recordReady=${item.recordReady === true ? "yes" : "no"}`
+    + ` | packetReady=${item.packetReady === true ? "yes" : "no"}`
+    + ` | tailReady=${item.tailReady === true ? "yes" : "no"}`
+    + ` | handoffReady=${item.handoffReady === true ? "yes" : "no"}`
+    + ` | blockedBy=${blockedBy || "-"}`
+  );
+  lines.push(
+    "Stable Operations Transition Review Next Download:"
+    + ` key=${item.nextDownloadKey || "-"}`
+    + ` | format=${item.nextDownloadFormat || "-"}`
+    + ` | href=${item.nextDownloadHref || "-"}`
+    + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(
+    "Stable Operations Transition Review Record State:"
+    + ` recordIndex=${item.recordIndexStatus || "-"}`
+    + ` | recordProgress=${item.recordIndexProgress || "-"}`
+    + ` | packetReview=${item.packetReviewStatus || "-"}`
+    + ` | packetProgress=${item.packetReviewProgress || "-"}`
+  );
+  lines.push(
+    "Stable Operations Transition Review Landing:"
+    + ` stableTail=${item.stableOperationsTailStatus || "-"}`
+    + ` | stableReadback=${item.stableOperationsReadbackStatus || "-"}`
+    + ` | landing=${item.landingStatus || "-"}`
+    + ` | landingHref=${item.landingHref || "-"}`
+    + ` | landingBridge=${item.landingBridgeStatus || "-"}`
+  );
+  lines.push(`Stable Operations Transition Review Checks: checks=${requiredChecks || "-"}`);
+  lines.push(`Stable Operations Transition Review Next: ${item.nextAction || "-"}`);
+  if (Array.isArray(item.operatorOrder) && item.operatorOrder.length) {
+    lines.push("Stable Operations Transition Review Operator Order:");
+    for (const step of item.operatorOrder) {
+      lines.push(`- ${step}`);
+    }
+  }
+  return true;
+}
+
 function normalizeSurfaceReviewCloseoutShortcut(shortcut = null) {
   const source = shortcut && typeof shortcut === "object" ? shortcut : null;
   if (!source) {
@@ -22715,6 +22799,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const stableOperationsHandoffExecution = mainlineSummary.stableOperationsHandoffExecution
     || getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
+  const stableOperationsTransitionReview = mainlineSummary.stableOperationsTransitionReview
+    || getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
   const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
     || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const surfaceReviewCloseoutShortcut = mainlineSummary.surfaceReviewCloseoutShortcut
@@ -22979,6 +23065,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendStableOperationsHandoffExecutionLines(lines, stableOperationsHandoffExecution, {
       title: "Launch Mainline Stable Operations Handoff Execution:"
+    });
+  }
+  if (stableOperationsTransitionReview) {
+    lines.push("");
+    appendStableOperationsTransitionReviewLines(lines, stableOperationsTransitionReview, {
+      title: "Launch Mainline Stable Operations Transition Review:"
     });
   }
   if (stableOperationsTransitionShortcut) {
@@ -24761,6 +24853,50 @@ function buildDeveloperLaunchMainlineStableOperationsTransitionShortcutDownloadT
       "Keep it beside steady-state-handoff-download.txt and launch-operations-operator-entry.txt so the final transition can be verified without manual format lookup."
     ]
   });
+}
+
+function getDeveloperLaunchMainlineStableOperationsTransitionReviewDownload(payload = {}) {
+  const review = payload.mainlineSummary?.stableOperationsTransitionReview
+    || getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
+  if (!review) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline stable operations transition review",
+      "stable-operations-transition-review.txt",
+      "stable-operations-transition-review",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: review.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineStableOperationsTransitionReviewDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const review = payload.mainlineSummary?.stableOperationsTransitionReview
+    || getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
+  if (!review) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Stable Operations Transition Review Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendStableOperationsTransitionReviewLines(lines, review);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file to review the stable-operations transition gate without reopening the longer Operator Entry.");
+  lines.push("- If packet review is still blocking, open the listed next download and complete the packet result review before steady-state handoff.");
+  lines.push("- Keep the launch-duty record index beside this file so the handoff can be resumed from the same record lane.");
+  return lines.join("\n").trimEnd();
 }
 
 function getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload = {}) {
@@ -26714,6 +26850,7 @@ function buildDeveloperLaunchMainlinePayload({
     payload.mainlineSummary.launchDutyReceiptExecutionHandoff = getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
     payload.mainlineSummary.stabilizationReceiptExecutionHandoff = getDeveloperLaunchMainlineStabilizationReceiptExecutionHandoff(payload);
     payload.mainlineSummary.stableOperationsHandoffExecution = getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
+    payload.mainlineSummary.stableOperationsTransitionReview = getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -26865,6 +27002,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const stableOperationsHandoffExecution = mainlineSummary.stableOperationsHandoffExecution
     || getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
+  const stableOperationsTransitionReview = mainlineSummary.stableOperationsTransitionReview
+    || getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
   const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
     || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const surfaceReviewCloseoutShortcut = mainlineSummary.surfaceReviewCloseoutShortcut
@@ -27018,6 +27157,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const launchDutyReceiptExecutionHandoffDownload = getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoffDownload(payload);
   const stabilizationReceiptExecutionHandoffDownload = getDeveloperLaunchMainlineStabilizationReceiptExecutionHandoffDownload(payload);
   const stableOperationsHandoffExecutionDownload = getDeveloperLaunchMainlineStableOperationsHandoffExecutionDownload(payload);
+  const stableOperationsTransitionReviewDownload = getDeveloperLaunchMainlineStableOperationsTransitionReviewDownload(payload);
   const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
   const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
   const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
@@ -27905,6 +28045,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       stableOperationsHandoffExecutionDownload || {}
     );
   }
+  if (stableOperationsTransitionReview) {
+    lines.push("");
+    appendStableOperationsTransitionReviewLines(lines, stableOperationsTransitionReview, {
+      title: "Stable Operations Transition Review Route:"
+    });
+    pushRoute(
+      "stable-operations-transition-review",
+      "Launch Mainline stable operations transition review",
+      opsFiles.stableOperationsTransitionReview || "ops/stable-operations-transition-review.txt",
+      stableOperationsTransitionReviewDownload || {}
+    );
+  }
   if (stableOperationsTransitionShortcut) {
     const shortcutDownloadFormat = stableOperationsTransitionShortcut.nextDownloadFormat || "launch-operations-operator-entry";
     const shortcutDownloadKey = stableOperationsTransitionShortcut.nextDownloadKey
@@ -28274,6 +28426,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     files,
     "ops/stable-operations-handoff-execution.txt",
     buildDeveloperLaunchMainlineStableOperationsHandoffExecutionDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/stable-operations-transition-review.txt",
+    buildDeveloperLaunchMainlineStableOperationsTransitionReviewDownloadText(payload)
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -28674,7 +28831,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -28888,6 +29045,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "stable-operations-handoff-execution.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineStableOperationsHandoffExecutionDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "stable-operations-transition-review") {
+    return {
+      fileName: "stable-operations-transition-review.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineStableOperationsTransitionReviewDownloadText(payload)
     };
   }
   if (normalizedFormat === "stable-operations-transition-shortcut-download") {
@@ -30122,6 +30286,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       surfaceReviewCloseoutShortcutDownloadRoute: "ops/surface-review-closeout-shortcut-download.txt",
       firstWaveCloseoutStableOperationsShortcutDownloadRoute: "ops/first-wave-closeout-stable-operations-shortcut-download.txt",
       stableOperationsHandoffExecution: "ops/stable-operations-handoff-execution.txt",
+      stableOperationsTransitionReview: "ops/stable-operations-transition-review.txt",
       stableOperationsTransitionShortcutDownloadRoute: "ops/stable-operations-transition-shortcut-download.txt",
       launchOperationsHandoffSummary: "ops/launch-operations-handoff-summary.txt",
       launchOperationsHandoffSummaryDownloadRoute: "ops/launch-operations-handoff-summary-download.txt",
@@ -30330,6 +30495,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const stableOperationsHandoffExecution = mainlineSummary.stableOperationsHandoffExecution
     || getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
+  const stableOperationsTransitionReview = mainlineSummary.stableOperationsTransitionReview
+    || getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
   const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
     || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const surfaceReviewCloseoutShortcut = mainlineSummary.surfaceReviewCloseoutShortcut
@@ -30590,6 +30757,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Stable operations handoff execution direct file",
       opsFiles.stableOperationsHandoffExecution || "ops/stable-operations-handoff-execution.txt"
+    ]);
+  }
+  if (stableOperationsTransitionReview) {
+    handoffFiles.push([
+      "Stable operations transition review direct file",
+      opsFiles.stableOperationsTransitionReview || "ops/stable-operations-transition-review.txt"
     ]);
   }
   if (stableOperationsTransitionShortcut) {
@@ -31374,6 +31547,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push("");
     appendStableOperationsHandoffExecutionLines(lines, stableOperationsHandoffExecution, {
       title: "Launch Mainline Stable Operations Handoff Execution:"
+    });
+  }
+  if (stableOperationsTransitionReview) {
+    lines.push("");
+    appendStableOperationsTransitionReviewLines(lines, stableOperationsTransitionReview, {
+      title: "Launch Mainline Stable Operations Transition Review:"
     });
   }
   if (stableOperationsTransitionShortcut) {

@@ -4092,6 +4092,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_launch_readiness_distance"
         : normalizedFormat === "production-signoff-entry-handoff"
           ? "launch_mainline_production_signoff_entry_handoff"
+        : normalizedFormat === "signoff-archive-watch-handoff"
+          ? "launch_mainline_signoff_archive_watch_handoff"
         : normalizedFormat === "post-archive-launch-day-watch-readback"
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
@@ -22683,6 +22685,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
   const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
+  const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
+    || getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -22838,6 +22842,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendProductionSignoffEntryHandoffLines(lines, productionSignoffEntryHandoff, {
       title: "Launch Mainline Production Signoff Entry Handoff:"
+    });
+  }
+  if (signoffArchiveWatchHandoff) {
+    lines.push("");
+    appendSignoffArchiveWatchHandoffLines(lines, signoffArchiveWatchHandoff, {
+      title: "Launch Mainline Signoff Archive Watch Handoff:"
     });
   }
   if (launchSwitchReadinessSummary) {
@@ -25124,6 +25134,222 @@ function buildDeveloperLaunchMainlineProductionSignoffEntryHandoffDownloadText(p
   return lines.join("\n").trimEnd();
 }
 
+function getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const action = entry?.launchDutyHandoffAction && typeof entry.launchDutyHandoffAction === "object"
+    ? entry.launchDutyHandoffAction
+    : null;
+  if (!action) {
+    return null;
+  }
+  const archivePacket = action.postSignoffArchiveHandoffPacket
+    && typeof action.postSignoffArchiveHandoffPacket === "object"
+      ? action.postSignoffArchiveHandoffPacket
+      : null;
+  const cutoverAction = action.launchDutyCutoverExecutionAction
+    && typeof action.launchDutyCutoverExecutionAction === "object"
+      ? action.launchDutyCutoverExecutionAction
+      : null;
+  const firstReceiptPacket = action.firstReceiptWritePacket
+    && typeof action.firstReceiptWritePacket === "object"
+      ? action.firstReceiptWritePacket
+      : null;
+  if (!archivePacket && !cutoverAction && !firstReceiptPacket) {
+    return null;
+  }
+  const preflightGate = action.preflightGate && typeof action.preflightGate === "object"
+    ? action.preflightGate
+    : null;
+  const archiveNextActionTemplate = archivePacket?.nextActionTemplate
+    && typeof archivePacket.nextActionTemplate === "object"
+      ? archivePacket.nextActionTemplate
+      : null;
+  const cutoverNextActionTemplate = cutoverAction?.nextActionTemplate
+    && typeof cutoverAction.nextActionTemplate === "object"
+      ? cutoverAction.nextActionTemplate
+      : null;
+  const postArchiveReadback = archivePacket?.postArchiveLaunchDayWatchReadback
+    ? normalizePostArchiveLaunchDayWatchReadback(archivePacket.postArchiveLaunchDayWatchReadback)
+    : payload.mainlineSummary?.postArchiveLaunchDayWatchReadback
+      ? normalizePostArchiveLaunchDayWatchReadback(payload.mainlineSummary.postArchiveLaunchDayWatchReadback)
+      : getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(entry);
+  const productionSignoffEntryHandoff = payload.mainlineSummary?.productionSignoffEntryHandoff
+    || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
+  const receiptOperations = Array.isArray(firstReceiptPacket?.receiptOperations) && firstReceiptPacket.receiptOperations.length
+    ? firstReceiptPacket.receiptOperations
+    : Array.isArray(archivePacket?.afterArchiveReceiptOperations) && archivePacket.afterArchiveReceiptOperations.length
+      ? archivePacket.afterArchiveReceiptOperations
+      : Array.isArray(postArchiveReadback?.receiptOperations) && postArchiveReadback.receiptOperations.length
+        ? postArchiveReadback.receiptOperations
+        : Array.isArray(cutoverAction?.currentReceiptOperations) ? cutoverAction.currentReceiptOperations : [];
+  const receiptPlaceholders = Array.isArray(firstReceiptPacket?.receiptPlaceholders) && firstReceiptPacket.receiptPlaceholders.length
+    ? firstReceiptPacket.receiptPlaceholders
+    : Array.isArray(archivePacket?.afterArchiveReceiptPlaceholders) && archivePacket.afterArchiveReceiptPlaceholders.length
+      ? archivePacket.afterArchiveReceiptPlaceholders
+      : Array.isArray(postArchiveReadback?.receiptPlaceholders) ? postArchiveReadback.receiptPlaceholders : [];
+  const archiveActionKey = archivePacket?.archiveActionKey
+    || archiveNextActionTemplate?.actionKey
+    || cutoverNextActionTemplate?.actionKey
+    || action.nextLaunchDutyActionKey
+    || null;
+  const firstReceiptActionKey = firstReceiptPacket?.actionKey
+    || archivePacket?.afterArchiveActionKey
+    || postArchiveReadback?.actionKey
+    || cutoverNextActionTemplate?.afterActionKey
+    || cutoverNextActionTemplate?.actionKey
+    || null;
+  const firstReceiptRecordKey = firstReceiptPacket?.recordKey
+    || archivePacket?.afterArchiveRecordKey
+    || postArchiveReadback?.recordKey
+    || cutoverNextActionTemplate?.afterRecordKey
+    || cutoverAction?.currentRecordKey
+    || null;
+  const firstReceiptStatus = firstReceiptPacket?.status
+    || archivePacket?.afterArchiveStatus
+    || cutoverAction?.firstReceiptWritePacketStatus
+    || postArchiveReadback?.firstReceiptWritePacketStatus
+    || null;
+  const launchDutyRecordIndexPath = archivePacket?.launchDutyRecordIndexPath
+    || cutoverAction?.launchDutyRecordIndexPath
+    || firstReceiptPacket?.launchDutyRecordIndexPath
+    || postArchiveReadback?.launchDutyRecordIndexPath
+    || productionSignoffEntryHandoff?.launchDutyRecordIndexPath
+    || null;
+  return {
+    mode: "developer-launch-mainline-signoff-archive-watch-handoff",
+    status: cutoverAction?.status || archivePacket?.status || action.status || null,
+    ready: archivePacket?.readyForArchive === true || cutoverAction?.ready === true || preflightGate?.readyForPostSignoffArchive === true,
+    preflightStatus: preflightGate?.status || null,
+    preflightDecision: preflightGate?.decision || null,
+    archivePhaseKey: archivePacket?.archivePhaseKey || archiveNextActionTemplate?.phaseKey || cutoverNextActionTemplate?.phaseKey || action.nextLaunchDutyPhaseKey || null,
+    archiveActionKey,
+    archiveRecorded: archivePacket?.archiveRecorded === true || cutoverAction?.archiveRecorded === true,
+    archiveReceiptAuditLogId: archivePacket?.archiveReceiptAuditLogId || cutoverAction?.archiveReceiptAuditLogId || postArchiveReadback?.archiveReceiptAuditLogId || null,
+    productionSignoffPacket: archivePacket?.productionSignoffPacket
+      || (cutoverAction?.currentActionKey === archiveActionKey ? cutoverAction.currentArtifact : null)
+      || productionSignoffEntryHandoff?.productionSignoffPacket
+      || null,
+    launchDutyArchiveIndex: archivePacket?.launchDutyArchiveIndex || productionSignoffEntryHandoff?.launchDutyArchiveIndexPath || null,
+    launchDutyRecordIndexPath,
+    firstReceiptActionKey,
+    firstReceiptRecordKey,
+    firstReceiptArtifact: firstReceiptPacket?.artifact || archivePacket?.afterArchiveArtifact || postArchiveReadback?.artifact || cutoverNextActionTemplate?.afterArtifact || null,
+    firstReceiptCommand: firstReceiptPacket?.command || archivePacket?.afterArchiveCommand || postArchiveReadback?.command || cutoverNextActionTemplate?.afterCommand || null,
+    firstReceiptStatus,
+    firstReceiptWriteReady: firstReceiptPacket?.readyForReceiptWrite === true,
+    receiptOperations,
+    receiptPlaceholders,
+    archiveCommand: archiveNextActionTemplate?.command || cutoverNextActionTemplate?.command || null,
+    refreshAfterWrite: firstReceiptPacket?.refreshAfterWrite || archivePacket?.refreshAfterFirstReceiptWrite || postArchiveReadback?.refreshAfterWrite || cutoverAction?.refreshAfterWrite || null,
+    postArchiveReadbackStatus: postArchiveReadback?.status || null,
+    postArchiveReadbackActionKey: postArchiveReadback?.actionKey || null,
+    postArchiveReadbackRecordKey: postArchiveReadback?.recordKey || null,
+    postArchiveExpectedPacketStatus: postArchiveReadback?.expectedFirstReceiptWritePacketStatus || null,
+    nextAction: archivePacket?.nextAction || firstReceiptPacket?.nextAction || cutoverAction?.nextAction || action.nextAction || null
+  };
+}
+
+function appendSignoffArchiveWatchHandoffLines(lines = [], handoff = null, {
+  title = "Signoff Archive Watch Handoff:"
+} = {}) {
+  if (!Array.isArray(lines) || !handoff || typeof handoff !== "object") {
+    return false;
+  }
+  const receiptOperations = Array.isArray(handoff.receiptOperations) ? handoff.receiptOperations.join(",") : "";
+  const receiptPlaceholders = Array.isArray(handoff.receiptPlaceholders) ? handoff.receiptPlaceholders.join(",") : "";
+  lines.push(title);
+  lines.push(
+    `- status=${handoff.status || "-"}`
+    + ` | ready=${handoff.ready === true ? "yes" : "no"}`
+    + ` | archiveAction=${handoff.archiveActionKey || "-"}`
+    + ` | firstReceipt=${handoff.firstReceiptActionKey || "-"}`
+    + ` | firstReceiptStatus=${handoff.firstReceiptStatus || "-"}`
+  );
+  lines.push(
+    "Signoff Archive Watch Packet:"
+    + ` productionSignoffPacket=${handoff.productionSignoffPacket || "-"}`
+    + ` | archivePhase=${handoff.archivePhaseKey || "-"}`
+    + ` | archiveRecorded=${handoff.archiveRecorded === true ? "yes" : "no"}`
+    + ` | archiveAudit=${handoff.archiveReceiptAuditLogId || "-"}`
+    + ` | launchDutyArchiveIndex=${handoff.launchDutyArchiveIndex || "-"}`
+    + ` | launchDutyRecordIndex=${handoff.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(
+    "Signoff Archive Watch First Receipt:"
+    + ` record=${handoff.firstReceiptRecordKey || "-"}`
+    + ` | action=${handoff.firstReceiptActionKey || "-"}`
+    + ` | artifact=${handoff.firstReceiptArtifact || "-"}`
+    + ` | packet=${handoff.firstReceiptStatus || "-"}`
+    + ` | writeReady=${handoff.firstReceiptWriteReady === true ? "yes" : "no"}`
+  );
+  lines.push(`- receiptOperations=${receiptOperations || "-"}`);
+  lines.push(`- receiptPlaceholders=${receiptPlaceholders || "-"}`);
+  lines.push(
+    "Signoff Archive Watch Commands:"
+    + ` archive=${handoff.archiveCommand || "-"}`
+    + ` | firstReceipt=${handoff.firstReceiptCommand || "-"}`
+    + ` | refreshAfterWrite=${handoff.refreshAfterWrite?.method || "-"} ${handoff.refreshAfterWrite?.href || "-"}`
+  );
+  lines.push(
+    "Signoff Archive Watch Readback:"
+    + ` status=${handoff.postArchiveReadbackStatus || "-"}`
+    + ` | action=${handoff.postArchiveReadbackActionKey || "-"}`
+    + ` | record=${handoff.postArchiveReadbackRecordKey || "-"}`
+    + ` | expectedPacket=${handoff.postArchiveExpectedPacketStatus || "-"}`
+  );
+  lines.push(
+    "Signoff Archive Watch Preflight:"
+    + ` status=${handoff.preflightStatus || "-"}`
+    + ` | decision=${handoff.preflightDecision || "-"}`
+  );
+  lines.push(`Signoff Archive Watch Next: ${handoff.nextAction || "-"}`);
+  return true;
+}
+
+function getDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownload(payload = {}) {
+  const handoff = payload.mainlineSummary?.signoffArchiveWatchHandoff
+    || getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
+  if (!handoff) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline signoff archive watch handoff",
+      "signoff-archive-watch-handoff.txt",
+      "signoff-archive-watch-handoff",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: handoff.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const handoff = payload.mainlineSummary?.signoffArchiveWatchHandoff
+    || getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
+  if (!handoff) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Signoff Archive Watch Handoff Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendSignoffArchiveWatchHandoffLines(lines, handoff);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file after production sign-off is approved and before writing the first launch-day watch record.");
+  lines.push("- It compresses sign-off archive status, the launch-day watch summary record command, receipt placeholders, and record-index path into one handoff.");
+  lines.push("- After the archive receipt is recorded, refresh this file or open post-archive-launch-day-watch-readback.txt to confirm write readiness.");
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -25773,6 +25999,7 @@ function buildDeveloperLaunchMainlinePayload({
   if (payload.mainlineSummary && typeof payload.mainlineSummary === "object") {
     payload.mainlineSummary.launchReadinessDistance = buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
     payload.mainlineSummary.productionSignoffEntryHandoff = getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
+    payload.mainlineSummary.signoffArchiveWatchHandoff = getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -25900,6 +26127,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
   const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
+  const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
+    || getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -26065,6 +26294,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     : null;
   const launchReadinessDistanceDownload = getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload);
   const productionSignoffEntryHandoffDownload = getDeveloperLaunchMainlineProductionSignoffEntryHandoffDownload(payload);
+  const signoffArchiveWatchHandoffDownload = getDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownload(payload);
   const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
   const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
   const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
@@ -26671,6 +26901,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       productionSignoffEntryHandoffDownload || {}
     );
   }
+  if (signoffArchiveWatchHandoff) {
+    lines.push("");
+    appendSignoffArchiveWatchHandoffLines(lines, signoffArchiveWatchHandoff, {
+      title: "Signoff Archive Watch Handoff Route:"
+    });
+    pushRoute(
+      "signoff-archive-watch-handoff",
+      "Launch Mainline signoff archive watch handoff",
+      opsFiles.signoffArchiveWatchHandoff || "ops/signoff-archive-watch-handoff.txt",
+      signoffArchiveWatchHandoffDownload || {}
+    );
+  }
   if (launchSwitchReadinessSummary) {
     lines.push("");
     appendLaunchSwitchReadinessSummaryLines(lines, launchSwitchReadinessSummary, {
@@ -27197,6 +27439,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/signoff-archive-watch-handoff.txt",
+    buildDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-switch-readiness.txt",
     buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload)
   );
@@ -27653,7 +27900,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -27762,6 +28009,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "production-signoff-entry-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineProductionSignoffEntryHandoffDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "signoff-archive-watch-handoff") {
+    return {
+      fileName: "signoff-archive-watch-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownloadText(payload)
     };
   }
   if (normalizedFormat === "launch-switch-readiness") {
@@ -29058,6 +29312,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOperatorEntryDownloadRoute: "ops/launch-operations-operator-entry-download.txt",
       launchReadinessDistance: "ops/launch-readiness-distance.txt",
       productionSignoffEntryHandoff: "ops/production-signoff-entry-handoff.txt",
+      signoffArchiveWatchHandoff: "ops/signoff-archive-watch-handoff.txt",
       launchSwitchReadiness: "ops/launch-switch-readiness.txt",
       launchCandidateFullVerificationGate: "ops/launch-candidate-full-verification-gate.txt",
       postArchiveLaunchDayWatchReadback: "ops/post-archive-launch-day-watch-readback.txt",
@@ -29253,6 +29508,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
   const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
+  const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
+    || getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -29405,6 +29662,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Production signoff entry handoff direct file",
       opsFiles.productionSignoffEntryHandoff || "ops/production-signoff-entry-handoff.txt"
+    ]);
+  }
+  if (signoffArchiveWatchHandoff) {
+    handoffFiles.push([
+      "Signoff archive watch handoff direct file",
+      opsFiles.signoffArchiveWatchHandoff || "ops/signoff-archive-watch-handoff.txt"
     ]);
   }
   if (launchSwitchReadinessSummary || launchSwitchOperatorRunbook) {
@@ -30167,6 +30430,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (productionSignoffEntryHandoff) {
     lines.push("");
     appendProductionSignoffEntryHandoffLines(lines, productionSignoffEntryHandoff);
+  }
+  if (signoffArchiveWatchHandoff) {
+    lines.push("");
+    appendSignoffArchiveWatchHandoffLines(lines, signoffArchiveWatchHandoff, {
+      title: "Launch Mainline Signoff Archive Watch Handoff:"
+    });
   }
   if (launchSwitchReadinessSummary) {
     lines.push("");

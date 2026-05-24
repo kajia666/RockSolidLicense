@@ -25762,6 +25762,80 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       /Launch Operations Operator Entry:[\s\S]*launchDutyStabilizationProgress=0\/4/
     );
 
+    const confirmedSignoffArchiveWatchSummaryDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=summary",
+      ownerSession.token
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchSummaryDownload.body,
+      /Launch Mainline Signoff Archive Watch Handoff:[\s\S]*status=ready_to_archive_signoff_packet \| ready=yes \| archiveAction=archive_production_signoff_packet \| firstReceipt=record_launch_day_watch_summary \| firstReceiptStatus=queued_after_signoff_archive/
+    );
+    const confirmedSignoffArchiveWatchRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchRoutesDownload.body,
+      /Signoff Archive Watch Handoff Route:[\s\S]*status=ready_to_archive_signoff_packet \| ready=yes \| archiveAction=archive_production_signoff_packet \| firstReceipt=record_launch_day_watch_summary \| firstReceiptStatus=queued_after_signoff_archive/
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchRoutesDownload.body,
+      /signoff-archive-watch-handoff: [^\n]*file=signoff-archive-watch-handoff\.txt[^\n]*format=signoff-archive-watch-handoff[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const confirmedSignoffArchiveWatchIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchIndexDownload.body,
+      /Launch Mainline Signoff Archive Watch Handoff:[\s\S]*status=ready_to_archive_signoff_packet \| ready=yes \| archiveAction=archive_production_signoff_packet \| firstReceipt=record_launch_day_watch_summary/
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Signoff archive watch handoff direct file: ops\/signoff-archive-watch-handoff\.txt/
+    );
+    const confirmedSignoffArchiveWatchChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(confirmedSignoffArchiveWatchChecksumsDownload.body, /ops\/signoff-archive-watch-handoff\.txt/);
+    const confirmedSignoffArchiveWatchZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const confirmedSignoffArchiveWatchZipText = confirmedSignoffArchiveWatchZipDownload.body.toString("latin1");
+    assert.match(confirmedSignoffArchiveWatchZipText, /ops\/signoff-archive-watch-handoff\.txt/);
+    assert.match(
+      confirmedSignoffArchiveWatchZipText,
+      /RockSolid Launch Mainline Signoff Archive Watch Handoff Download/
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchZipText,
+      /Signoff Archive Watch First Receipt:[\s\S]*record=launch_day_watch_summary \| action=record_launch_day_watch_summary \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md \| packet=queued_after_signoff_archive \| writeReady=no/
+    );
+    const confirmedSignoffArchiveWatchDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=signoff-archive-watch-handoff",
+      ownerSession.token
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchDirectDownload.body,
+      /RockSolid Launch Mainline Signoff Archive Watch Handoff Download/
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchDirectDownload.body,
+      /Signoff Archive Watch Handoff:[\s\S]*status=ready_to_archive_signoff_packet \| ready=yes \| archiveAction=archive_production_signoff_packet \| firstReceipt=record_launch_day_watch_summary \| firstReceiptStatus=queued_after_signoff_archive/
+    );
+    assert.match(
+      confirmedSignoffArchiveWatchDirectDownload.body,
+      /Signoff Archive Watch First Receipt:[\s\S]*record=launch_day_watch_summary \| action=record_launch_day_watch_summary \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md \| packet=queued_after_signoff_archive \| writeReady=no/
+    );
+
     const postSignoffArchiveReceipt = await postJson(
       baseUrl,
       "/api/developer/ops/steady-state-duty-plan/receipt",

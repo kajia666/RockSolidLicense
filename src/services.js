@@ -4088,6 +4088,10 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_post_launch_handoff_index"
         : normalizedFormat === "handoff-download-routes"
           ? "launch_mainline_handoff_download_routes"
+        : normalizedFormat === "post-archive-launch-day-watch-readback"
+          ? "launch_mainline_post_archive_launch_day_watch_readback"
+        : normalizedFormat === "launch-day-watch-summary-record-readback"
+          ? "launch_mainline_launch_day_watch_summary_record_readback"
         : normalizedFormat === "first-launch-handoff"
           ? "launch_mainline_first_launch_handoff"
         : normalizedFormat === "first-wave-runtime-evidence"
@@ -24751,6 +24755,64 @@ function buildDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownload
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchMainlinePostArchiveLaunchDayWatchReadbackDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const readback = payload.mainlineSummary?.postArchiveLaunchDayWatchReadback
+    || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(entry);
+  if (!readback) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Post-Archive Launch-Day Watch Readback Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendPostArchiveLaunchDayWatchReadbackLines(lines, readback, {
+    title: "Post-Archive Launch-Day Watch Readback:"
+  });
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file immediately after archiving the production sign-off packet.");
+  lines.push("- It shows the exact launch-day watch summary record command, archive receipt audit, and launch-duty record index without reopening the full Operator Entry.");
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchMainlineLaunchDayWatchSummaryRecordReadbackDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const readback = payload.mainlineSummary?.launchDayWatchSummaryRecordReadback
+    || getLaunchDayWatchSummaryRecordReadbackFromOperatorEntry(entry);
+  if (!readback) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Launch-Day Watch Summary Record Readback Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendLaunchDayWatchSummaryRecordReadbackLines(lines, readback, {
+    title: "Launch-Day Watch Summary Record Readback:"
+  });
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file after the launch-day watch summary record is written.");
+  lines.push("- It shows the next receipt-visibility snapshot action, receipt ids, and launch-duty record index without reopening the full Operator Entry.");
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownloadText(payload = {}) {
   const handoffSummary = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsHandoffSummary || null;
   return buildDeveloperLaunchMainlineStableOperationsDownloadText({
@@ -25401,6 +25463,22 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     "zip",
     mainlineRouteParams
   );
+  const postArchiveLaunchDayWatchReadbackDownload = postArchiveLaunchDayWatchReadback
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch Mainline post-archive launch-day watch readback",
+        "post-archive-launch-day-watch-readback.txt",
+        "post-archive-launch-day-watch-readback",
+        mainlineRouteParams
+      )
+    : null;
+  const launchDayWatchSummaryRecordReadbackDownload = launchDayWatchSummaryRecordReadback
+    ? createLaunchMainlineDownloadShortcut(
+        "Launch Mainline launch-day watch summary record readback",
+        "launch-day-watch-summary-record-readback.txt",
+        "launch-day-watch-summary-record-readback",
+        mainlineRouteParams
+      )
+    : null;
   const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
   const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
   const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
@@ -26031,6 +26109,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${postArchiveLaunchDayWatchReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
+    pushRoute(
+      "post-archive-launch-day-watch-direct",
+      "Launch Mainline post-archive launch-day watch readback",
+      opsFiles.postArchiveLaunchDayWatchReadback || "ops/post-archive-launch-day-watch-readback.txt",
+      postArchiveLaunchDayWatchReadbackDownload || {}
+    );
   }
   if (launchDayWatchSummaryRecordReadback) {
     lines.push("");
@@ -26051,6 +26135,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
       + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${launchDayWatchSummaryRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    );
+    pushRoute(
+      "launch-day-watch-summary-readback-direct",
+      "Launch Mainline launch-day watch summary record readback",
+      opsFiles.launchDayWatchSummaryRecordReadback || "ops/launch-day-watch-summary-record-readback.txt",
+      launchDayWatchSummaryRecordReadbackDownload || {}
     );
   }
   if (receiptVisibilitySnapshotRecordReadback) {
@@ -26467,6 +26557,16 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/post-archive-launch-day-watch-readback.txt",
+    buildDeveloperLaunchMainlinePostArchiveLaunchDayWatchReadbackDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-day-watch-summary-record-readback.txt",
+    buildDeveloperLaunchMainlineLaunchDayWatchSummaryRecordReadbackDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/surface-review-closeout-shortcut-download.txt",
     getDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownload(payload)
       ? buildDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownloadText(payload)
@@ -26878,7 +26978,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-switch-readiness", "launch-candidate-full-verification-gate", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -26987,6 +27087,20 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "launch-candidate-full-verification-gate.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "post-archive-launch-day-watch-readback") {
+    return {
+      fileName: "post-archive-launch-day-watch-readback.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlinePostArchiveLaunchDayWatchReadbackDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "launch-day-watch-summary-record-readback") {
+    return {
+      fileName: "launch-day-watch-summary-record-readback.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineLaunchDayWatchSummaryRecordReadbackDownloadText(payload)
     };
   }
   if (normalizedFormat === "surface-review-closeout-shortcut-download") {
@@ -28220,6 +28334,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOperatorEntryDownloadRoute: "ops/launch-operations-operator-entry-download.txt",
       launchSwitchReadiness: "ops/launch-switch-readiness.txt",
       launchCandidateFullVerificationGate: "ops/launch-candidate-full-verification-gate.txt",
+      postArchiveLaunchDayWatchReadback: "ops/post-archive-launch-day-watch-readback.txt",
+      launchDayWatchSummaryRecordReadback: "ops/launch-day-watch-summary-record-readback.txt",
       surfaceReviewCloseoutShortcutDownloadRoute: "ops/surface-review-closeout-shortcut-download.txt",
       firstWaveCloseoutStableOperationsShortcutDownloadRoute: "ops/first-wave-closeout-stable-operations-shortcut-download.txt",
       stableOperationsTransitionShortcutDownloadRoute: "ops/stable-operations-transition-shortcut-download.txt",
@@ -28569,11 +28685,19 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       "Post-archive launch-day watch readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
+    handoffFiles.push([
+      "Post-archive launch-day watch readback direct file",
+      opsFiles.postArchiveLaunchDayWatchReadback || "ops/post-archive-launch-day-watch-readback.txt"
+    ]);
   }
   if (launchDayWatchSummaryRecordReadback) {
     handoffFiles.push([
       "Launch-day watch summary record readback",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+    handoffFiles.push([
+      "Launch-day watch summary record readback direct file",
+      opsFiles.launchDayWatchSummaryRecordReadback || "ops/launch-day-watch-summary-record-readback.txt"
     ]);
   }
   if (receiptVisibilitySnapshotRecordReadback) {

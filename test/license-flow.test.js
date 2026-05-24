@@ -25613,6 +25613,35 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.fileName === "developer-ops-launch-operations-overview-status.txt"
       && /format=launch-operations-overview-status/.test(item.href || "")
     )));
+    assert.ok(firstOperatingResultHandoffReceiptOverview.firstOperatingResultReviewAction);
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultReviewAction.status,
+      "ready_for_first_operating_result_review"
+    );
+    assert.equal(firstOperatingResultHandoffReceiptOverview.firstOperatingResultReviewAction.ready, true);
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultReviewAction.actionKey,
+      "review_first_operating_result_handoff"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultReviewAction.auditLogId,
+      firstOperatingResultHandoffReceipt.auditLogId
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultReviewAction.reviewSourceStatus,
+      "recorded_ready_for_first_operating_result_review"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultReviewAction.nextDownloadFormat,
+      "launch-operations-overview-status"
+    );
+    assert.ok(firstOperatingResultHandoffReceiptOverview.panels.some((item) => (
+      item.key === "first_operating_result_review"
+      && item.status === "ready_for_first_operating_result_review"
+      && item.ready === true
+      && item.fileName === "developer-ops-launch-operations-overview-status.txt"
+      && /format=launch-operations-overview-status/.test(item.href || "")
+    )));
 
     const firstOperatingResultHandoffReceiptActionLinksDownload = await getText(
       baseUrl,
@@ -25639,7 +25668,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
+      new RegExp(`firstOperatingResultReview=ready_for_first_operating_result_review \\| action=review_first_operating_result_handoff \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| source=recorded_ready_for_first_operating_result_review`)
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
+      /firstOperatingResultReviewNext=review_first_operating_result_handoff \| nextDownload=launch-operations-overview-status \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
       /Panels:[\s\S]*- first_operating_result_handoff_receipt[^\n]*status=recorded_ready_for_first_operating_result_review[^\n]*ready=yes[^\n]*file=developer-ops-launch-operations-overview-status\.txt/
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
+      /Panels:[\s\S]*- first_operating_result_review[^\n]*status=ready_for_first_operating_result_review[^\n]*ready=yes[^\n]*file=developer-ops-launch-operations-overview-status\.txt/
     );
 
     const launchOperationsChecksumsDownload = await getText(

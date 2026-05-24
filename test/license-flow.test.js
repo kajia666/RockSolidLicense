@@ -26690,6 +26690,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineReceiptVisibilitySummaryDownload.body,
       /Launch Mainline Receipt Visibility Snapshot Record Readback:[\s\S]*status=ready_for_first_wave_incident_log_write \| recorded=yes \| record=receipt_visibility_snapshot \| currentAction=record_first_wave_incident_log/
     );
+    assert.match(
+      launchMainlineReceiptVisibilitySummaryDownload.body,
+      /Launch Mainline Stabilization Receipt Execution Handoff:[\s\S]*status=ready_for_first_wave_incident_log_write \| ready=yes \| currentRecord=first_wave_incident_log \| currentAction=record_first_wave_incident_log \| packet=ready_for_receipt_write/
+    );
     const launchMainlineReceiptVisibilityRoutesDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
@@ -26706,6 +26710,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineReceiptVisibilityRoutesDownload.body,
       /receipt-visibility-snapshot-readback-direct: [^\n]*file=receipt-visibility-snapshot-record-readback\.txt[^\n]*format=receipt-visibility-snapshot-record-readback[^\n]*source=developer-launch-mainline/
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityRoutesDownload.body,
+      /Stabilization Receipt Execution Handoff Route:[\s\S]*status=ready_for_first_wave_incident_log_write \| ready=yes \| currentRecord=first_wave_incident_log \| currentAction=record_first_wave_incident_log \| packet=ready_for_receipt_write/
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityRoutesDownload.body,
+      /stabilization-receipt-execution-handoff: [^\n]*file=stabilization-receipt-execution-handoff\.txt[^\n]*format=stabilization-receipt-execution-handoff[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const launchMainlineReceiptVisibilityIndexDownload = await getText(
       baseUrl,
@@ -26724,6 +26736,35 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineReceiptVisibilityIndexDownload.body,
       /Included Handoff Files:[\s\S]*Receipt visibility snapshot record readback direct file: ops\/receipt-visibility-snapshot-record-readback\.txt/
     );
+    assert.match(
+      launchMainlineReceiptVisibilityIndexDownload.body,
+      /Launch Mainline Stabilization Receipt Execution Handoff:[\s\S]*status=ready_for_first_wave_incident_log_write \| ready=yes \| currentRecord=first_wave_incident_log \| currentAction=record_first_wave_incident_log/
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Stabilization receipt execution handoff direct file: ops\/stabilization-receipt-execution-handoff\.txt/
+    );
+    const launchMainlineReceiptVisibilityChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(launchMainlineReceiptVisibilityChecksumsDownload.body, /ops\/stabilization-receipt-execution-handoff\.txt/);
+    const launchMainlineReceiptVisibilityZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const launchMainlineReceiptVisibilityZipText = launchMainlineReceiptVisibilityZipDownload.body.toString("latin1");
+    assert.match(launchMainlineReceiptVisibilityZipText, /ops\/stabilization-receipt-execution-handoff\.txt/);
+    assert.match(
+      launchMainlineReceiptVisibilityZipText,
+      /RockSolid Launch Mainline Stabilization Receipt Execution Handoff Download/
+    );
+    assert.match(
+      launchMainlineReceiptVisibilityZipText,
+      /Stabilization Receipt Execution Queue:[\s\S]*receiptOperations=record_post_launch_ops_sweep \| receiptPlaceholders=<record_post_launch_ops_sweep-receipt-id>/
+    );
     const receiptVisibilitySnapshotReadbackDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=receipt-visibility-snapshot-record-readback",
@@ -26732,6 +26773,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       receiptVisibilitySnapshotReadbackDirectDownload.body,
       /Receipt Visibility Snapshot Record Readback:[\s\S]*status=ready_for_first_wave_incident_log_write \| recorded=yes \| record=receipt_visibility_snapshot \| currentAction=record_first_wave_incident_log/
+    );
+    const stabilizationReceiptExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stabilization-receipt-execution-handoff",
+      ownerSession.token
+    );
+    assert.match(
+      stabilizationReceiptExecutionDirectDownload.body,
+      /RockSolid Launch Mainline Stabilization Receipt Execution Handoff Download/
+    );
+    assert.match(
+      stabilizationReceiptExecutionDirectDownload.body,
+      /Stabilization Receipt Execution Handoff:[\s\S]*status=ready_for_first_wave_incident_log_write \| ready=yes \| currentRecord=first_wave_incident_log \| currentAction=record_first_wave_incident_log \| packet=ready_for_receipt_write/
+    );
+    assert.match(
+      stabilizationReceiptExecutionDirectDownload.body,
+      /Stabilization Receipt Execution Command:[\s\S]*command=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key first_wave_incident_log/
+    );
+    assert.match(
+      stabilizationReceiptExecutionDirectDownload.body,
+      /Stabilization Receipt Completion:[\s\S]*progress=0\/4 \| next=first_wave_incident_log \| closeoutReady=no \| blockedBy=first_wave_incident_log,rollback_signal_review,stabilization_owner_handoff/
     );
 
     const firstWaveIncidentLogReadbackReceipt = await postJson(

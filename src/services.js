@@ -22183,6 +22183,14 @@ function normalizeStableOperationsTransitionShortcut(shortcut = null) {
   if (!source) {
     return null;
   }
+  const operatorAction = source.operatorAction && typeof source.operatorAction === "object"
+    ? source.operatorAction
+    : null;
+  const operatorActionKey = source.operatorActionKey || operatorAction?.key || (
+    source.currentActionKey === "review_staging_packet_results"
+      ? "continue_packet_result_review"
+      : null
+  );
   const blockedBy = Array.isArray(source.blockedBy)
     ? source.blockedBy.filter((item) => String(item || "").trim() !== "")
     : [];
@@ -22198,11 +22206,11 @@ function normalizeStableOperationsTransitionShortcut(shortcut = null) {
     ready: source.ready === true,
     currentActionKey: source.currentActionKey || null,
     blockedBy,
-    operatorActionKey: source.operatorActionKey || null,
-    reviewRequired: source.reviewRequired === true,
-    nextDownloadKey: source.nextDownloadKey || null,
-    nextDownloadFormat: source.nextDownloadFormat || null,
-    nextDownloadHref: source.nextDownloadHref || null,
+    operatorActionKey,
+    reviewRequired: operatorAction ? operatorAction.reviewRequired === true : source.reviewRequired === true,
+    nextDownloadKey: source.nextDownloadKey || operatorAction?.nextDownloadKey || null,
+    nextDownloadFormat: source.nextDownloadFormat || operatorAction?.nextDownloadFormat || null,
+    nextDownloadHref: source.nextDownloadHref || operatorAction?.nextDownloadHref || null,
     recordReady: source.recordReady === true,
     packetReady: source.packetReady === true,
     tailReady: source.tailReady === true,
@@ -22219,7 +22227,7 @@ function normalizeStableOperationsTransitionShortcut(shortcut = null) {
     requiredChecks,
     operatorOrder,
     launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
-    nextAction: source.nextAction || null
+    nextAction: source.nextAction || operatorAction?.nextAction || null
   };
 }
 
@@ -23950,6 +23958,51 @@ function getDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownload(payload
   return shortcut ? getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload) : null;
 }
 
+function getDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownload(payload = {}) {
+  const shortcut = payload.mainlineSummary?.firstWaveCloseoutStableOperationsShortcut
+    && typeof payload.mainlineSummary.firstWaveCloseoutStableOperationsShortcut === "object"
+      ? payload.mainlineSummary.firstWaveCloseoutStableOperationsShortcut
+      : getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(
+          payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+        );
+  return shortcut ? getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload) : null;
+}
+
+function getDeveloperLaunchMainlineStableOperationsTransitionShortcutDownload(payload = {}) {
+  const shortcut = payload.mainlineSummary?.stableOperationsTransitionShortcut
+    && typeof payload.mainlineSummary.stableOperationsTransitionShortcut === "object"
+      ? payload.mainlineSummary.stableOperationsTransitionShortcut
+      : getStableOperationsTransitionShortcutFromOperatorEntry(
+          payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+        );
+  if (!shortcut) {
+    return null;
+  }
+  if (shortcut.nextDownloadKey || shortcut.nextDownloadHref || shortcut.nextDownloadFormat) {
+    const format = shortcut.nextDownloadFormat || "launch-operations-operator-entry";
+    const isSteadyStateHandoff = format === "steady-state-handoff-brief";
+    const isHandoffIndex = format === "handoff-index";
+    return {
+      key: shortcut.nextDownloadKey || "ops_launch_operations_operator_entry",
+      label: isSteadyStateHandoff
+        ? "Steady-state handoff brief"
+        : isHandoffIndex
+          ? "Launch operations handoff index"
+          : "Launch operations operator entry",
+      fileName: isSteadyStateHandoff
+        ? "developer-ops-steady-state-handoff-brief.txt"
+        : isHandoffIndex
+          ? "developer-ops-handoff-index.txt"
+          : "developer-ops-launch-operations-operator-entry.txt",
+      format,
+      source: "developer-ops-launch-duty-stable-operations-transition",
+      href: shortcut.nextDownloadHref || null,
+      launchDutyRecordIndexPath: shortcut.launchDutyRecordIndexPath || null
+    };
+  }
+  return getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload);
+}
+
 function getDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownload(payload = {}) {
   const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
   return opsDownloadScope ? buildDeveloperOpsLaunchOperationsHandoffSummaryDownload(opsDownloadScope) : null;
@@ -24583,6 +24636,55 @@ function buildDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownloadText(p
     notes: [
       "Use this route to re-fetch the Developer Ops operator entry that carries surfaceReviewCloseoutShortcut.",
       "Keep it beside launch-operations-operator-entry.txt so first-wave confirmation and Developer Ops refresh can be checked from the offline Mainline package."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownloadText(payload = {}) {
+  const shortcut = payload.mainlineSummary?.firstWaveCloseoutStableOperationsShortcut
+    && typeof payload.mainlineSummary.firstWaveCloseoutStableOperationsShortcut === "object"
+      ? payload.mainlineSummary.firstWaveCloseoutStableOperationsShortcut
+      : getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(
+          payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+        );
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Mainline First-Wave Closeout Stable Operations Shortcut Download",
+    download: getDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownload(payload),
+    status: shortcut?.status || "",
+    action: shortcut?.nextActionKey || shortcut?.currentActionKey || "review_first_wave_closeout_stable_operations",
+    launchDutyRecordIndexPath: shortcut?.launchDutyRecordIndexPath || "",
+    operatorOrder: [
+      "Run the readiness refresh and rehearsal reload from the first-wave closeout stable-operations shortcut before stable handoff."
+    ],
+    notes: [
+      "Use this route to re-fetch the Developer Ops operator entry that carries firstWaveCloseoutStableOperationsShortcut.",
+      "Keep it beside launch-operations-operator-entry.txt so stable-operations refresh and rehearsal reload can be checked from the offline Mainline package."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineStableOperationsTransitionShortcutDownloadText(payload = {}) {
+  const shortcut = payload.mainlineSummary?.stableOperationsTransitionShortcut
+    && typeof payload.mainlineSummary.stableOperationsTransitionShortcut === "object"
+      ? payload.mainlineSummary.stableOperationsTransitionShortcut
+      : getStableOperationsTransitionShortcutFromOperatorEntry(
+          payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+        );
+  const normalizedShortcut = normalizeStableOperationsTransitionShortcut(shortcut);
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Mainline Stable Operations Transition Shortcut Download",
+    download: getDeveloperLaunchMainlineStableOperationsTransitionShortcutDownload(payload),
+    status: normalizedShortcut?.status || "",
+    action: normalizedShortcut?.operatorActionKey || normalizedShortcut?.currentActionKey || "review_stable_operations_transition",
+    launchDutyRecordIndexPath: normalizedShortcut?.launchDutyRecordIndexPath || "",
+    operatorOrder: Array.isArray(normalizedShortcut?.operatorOrder) && normalizedShortcut.operatorOrder.length
+      ? normalizedShortcut.operatorOrder
+      : ["Open the stable operations transition shortcut before handing launch duty into steady-state operations."],
+    notes: [
+      "Use this route to re-fetch the next stable-operations transition download from the offline Mainline package.",
+      "Keep it beside steady-state-handoff-download.txt and launch-operations-operator-entry.txt so the final transition can be verified without manual format lookup."
     ]
   });
 }
@@ -26300,6 +26402,20 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/first-wave-closeout-stable-operations-shortcut-download.txt",
+    getDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownload(payload)
+      ? buildDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/stable-operations-transition-shortcut-download.txt",
+    getDeveloperLaunchMainlineStableOperationsTransitionShortcutDownload(payload)
+      ? buildDeveloperLaunchMainlineStableOperationsTransitionShortcutDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-operations-handoff-summary.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload.opsSnapshot) : ""
   );
@@ -27996,6 +28112,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOperatorEntry: "ops/launch-operations-operator-entry.txt",
       launchOperationsOperatorEntryDownloadRoute: "ops/launch-operations-operator-entry-download.txt",
       surfaceReviewCloseoutShortcutDownloadRoute: "ops/surface-review-closeout-shortcut-download.txt",
+      firstWaveCloseoutStableOperationsShortcutDownloadRoute: "ops/first-wave-closeout-stable-operations-shortcut-download.txt",
+      stableOperationsTransitionShortcutDownloadRoute: "ops/stable-operations-transition-shortcut-download.txt",
       launchOperationsHandoffSummary: "ops/launch-operations-handoff-summary.txt",
       launchOperationsHandoffSummaryDownloadRoute: "ops/launch-operations-handoff-summary-download.txt",
       launchOperationsDailyBrief: "ops/launch-operations-daily-brief.txt",
@@ -28376,11 +28494,19 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       "First-wave closeout stable-operations shortcut",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
+    handoffFiles.push([
+      "First-wave closeout stable-operations shortcut download route",
+      opsFiles.firstWaveCloseoutStableOperationsShortcutDownloadRoute || "ops/first-wave-closeout-stable-operations-shortcut-download.txt"
+    ]);
   }
   if (stableOperationsTransitionShortcut) {
     handoffFiles.push([
       "Stable operations transition shortcut",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+    handoffFiles.push([
+      "Stable operations transition shortcut download route",
+      opsFiles.stableOperationsTransitionShortcutDownloadRoute || "ops/stable-operations-transition-shortcut-download.txt"
     ]);
   }
   if (surfaceReviewCloseoutShortcut) {

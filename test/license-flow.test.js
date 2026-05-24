@@ -24280,6 +24280,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/surface-review-closeout-shortcut-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/stable-operations-transition-shortcut-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-handoff-summary\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-handoff-summary-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-daily-brief\.txt/);
@@ -24344,6 +24345,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/surface-review-closeout-shortcut-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/stable-operations-transition-shortcut-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Checklist/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Entry/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Operations Operator Checklist Download/);
@@ -24354,6 +24356,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /Action: confirm_first_wave_handoff/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Duty Record Index: artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-operator-entry/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Stable Operations Transition Shortcut Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /continue_launch_duty_record_index_selection_handoff/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-handoff-summary\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-handoff-summary-download\.txt/);
@@ -24624,6 +24627,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Surface review closeout shortcut download route: ops\/surface-review-closeout-shortcut-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Stable operations transition shortcut download route: ops\/stable-operations-transition-shortcut-download\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
@@ -27846,7 +27853,58 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
+      /Included Handoff Files:[\s\S]*First-wave closeout stable-operations shortcut download route: ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
       /Included Handoff Files:[\s\S]*Stable operations transition shortcut: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Stable operations transition shortcut download route: ops\/stable-operations-transition-shortcut-download\.txt/
+    );
+    const launchMainlineCloseoutRecordedChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedChecksumsDownload.body,
+      /ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedChecksumsDownload.body,
+      /ops\/stable-operations-transition-shortcut-download\.txt/
+    );
+    const launchMainlineCloseoutRecordedZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const launchMainlineCloseoutRecordedZipText = launchMainlineCloseoutRecordedZipDownload.body.toString("latin1");
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /RockSolid Launch Mainline First-Wave Closeout Stable Operations Shortcut Download/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /Action: reload_staging_rehearsal_for_stable_operations/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /ops\/stable-operations-transition-shortcut-download\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /RockSolid Launch Mainline Stable Operations Transition Shortcut Download/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /Action: continue_packet_result_review/
     );
     const staleLaunchDutyReadbackReceipt = await postJson(
       baseUrl,

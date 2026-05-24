@@ -24443,6 +24443,34 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /rehearsal-guide-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, steadyStateDutyReceiptOperatorOrderPattern);
 
+    const launchMainlineSurfaceReviewCloseoutShortcutDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=surface-review-closeout-shortcut-download",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body,
+      /RockSolid Launch Mainline Surface Review Closeout Shortcut Download/
+    );
+    assert.match(launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body, /Action: confirm_first_wave_handoff/);
+    const launchMainlineStableOperationsTransitionShortcutDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stable-operations-transition-shortcut-download",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionShortcutDirectDownload.body,
+      /RockSolid Launch Mainline Stable Operations Transition Shortcut Download/
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionShortcutDirectDownload.body,
+      /Status: blocked_until_stable_operations_handoff_tail/
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionShortcutDirectDownload.body,
+      /Action: confirm_first_wave_handoff/
+    );
+
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -27904,6 +27932,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedZipText,
+      /Action: continue_packet_result_review/
+    );
+    const launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=first-wave-closeout-stable-operations-shortcut-download",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload.body,
+      /RockSolid Launch Mainline First-Wave Closeout Stable Operations Shortcut Download/
+    );
+    assert.match(
+      launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload.body,
+      /Action: reload_staging_rehearsal_for_stable_operations/
+    );
+    const launchMainlineCloseoutStableOperationsTransitionShortcutDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stable-operations-transition-shortcut-download",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineCloseoutStableOperationsTransitionShortcutDirectDownload.body,
+      /RockSolid Launch Mainline Stable Operations Transition Shortcut Download/
+    );
+    assert.match(
+      launchMainlineCloseoutStableOperationsTransitionShortcutDirectDownload.body,
       /Action: continue_packet_result_review/
     );
     const staleLaunchDutyReadbackReceipt = await postJson(

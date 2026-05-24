@@ -26806,7 +26806,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -26901,6 +26901,27 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "handoff-download-routes.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload)
+    };
+  }
+  if (normalizedFormat === "surface-review-closeout-shortcut-download") {
+    return {
+      fileName: "surface-review-closeout-shortcut-download.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "first-wave-closeout-stable-operations-shortcut-download") {
+    return {
+      fileName: "first-wave-closeout-stable-operations-shortcut-download.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "stable-operations-transition-shortcut-download") {
+    return {
+      fileName: "stable-operations-transition-shortcut-download.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineStableOperationsTransitionShortcutDownloadText(payload)
     };
   }
   if (normalizedFormat === "first-launch-handoff") {

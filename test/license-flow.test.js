@@ -24470,6 +24470,40 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineStableOperationsTransitionShortcutDirectDownload.body,
       /Action: confirm_first_wave_handoff/
     );
+    const launchMainlineLaunchSwitchReadinessDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=launch-switch-readiness",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineLaunchSwitchReadinessDirectDownload.body,
+      /RockSolid Launch Mainline Launch Switch Readiness Download/
+    );
+    assert.match(
+      launchMainlineLaunchSwitchReadinessDirectDownload.body,
+      /Launch Switch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| decision=hold_until_full_test_and_signoff \| currentAction=refresh_staging_readiness_status \| nextAction=reload_staging_rehearsal/
+    );
+    assert.match(
+      launchMainlineLaunchSwitchReadinessDirectDownload.body,
+      /Launch Switch Operator Runbook:[\s\S]*currentStep=refresh_staging_readiness_status[^\n]*currentCommand=npm\.cmd run staging:readiness:status/
+    );
+    const launchMainlineLaunchCandidateFullVerificationGateDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=launch-candidate-full-verification-gate",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineLaunchCandidateFullVerificationGateDirectDownload.body,
+      /RockSolid Launch Mainline Launch Candidate Full Verification Gate Download/
+    );
+    assert.match(
+      launchMainlineLaunchCandidateFullVerificationGateDirectDownload.body,
+      /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test/
+    );
+    assert.match(
+      launchMainlineLaunchCandidateFullVerificationGateDirectDownload.body,
+      /Launch Candidate Full Verification Production Signoff Entry:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet/
+    );
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,

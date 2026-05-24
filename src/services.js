@@ -24689,6 +24689,68 @@ function buildDeveloperLaunchMainlineStableOperationsTransitionShortcutDownloadT
   });
 }
 
+function getDeveloperLaunchMainlineOperatorEntry(payload = {}) {
+  const mainlineSummary = payload.mainlineSummary || {};
+  return mainlineSummary.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+    || payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+    || null;
+}
+
+function buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const launchSwitchReadinessSummary = entry?.launchSwitchReadinessSummary || null;
+  const launchSwitchOperatorRunbook = entry?.launchSwitchOperatorRunbook || null;
+  const lines = [
+    "RockSolid Launch Mainline Launch Switch Readiness Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendLaunchSwitchReadinessSummaryLines(lines, launchSwitchReadinessSummary, {
+    title: "Launch Switch Readiness:"
+  });
+  lines.push("");
+  appendLaunchSwitchOperatorRunbookLines(lines, launchSwitchOperatorRunbook, {
+    title: "Launch Switch Operator Runbook:"
+  });
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct download during launch switch watch to check whether full-test/signoff still blocks the switch.");
+  lines.push("- Keep this file beside post-launch-handoff-index.txt so the current command and guarded full-test handoff are visible without opening the longer summary.");
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const launchCandidateFullVerificationGate = entry?.launchCandidateFullVerificationGate || null;
+  const lines = [
+    "RockSolid Launch Mainline Launch Candidate Full Verification Gate Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendLaunchCandidateFullVerificationGateLines(lines, launchCandidateFullVerificationGate, {
+    title: "Launch Candidate Full Verification Gate:"
+  });
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct download before reserving the guarded full-test window or backfilling full_test_window_passed.");
+  lines.push("- Keep the production sign-off entry section with the full-test output artifact so signoff handoff can be reviewed without reopening the full Operator Entry.");
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownloadText(payload = {}) {
   const handoffSummary = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsHandoffSummary || null;
   return buildDeveloperLaunchMainlineStableOperationsDownloadText({
@@ -26806,7 +26868,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-switch-readiness", "launch-candidate-full-verification-gate", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -26901,6 +26963,20 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "handoff-download-routes.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload)
+    };
+  }
+  if (normalizedFormat === "launch-switch-readiness") {
+    return {
+      fileName: "launch-switch-readiness.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "launch-candidate-full-verification-gate") {
+    return {
+      fileName: "launch-candidate-full-verification-gate.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownloadText(payload)
     };
   }
   if (normalizedFormat === "surface-review-closeout-shortcut-download") {

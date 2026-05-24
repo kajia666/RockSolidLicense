@@ -4098,6 +4098,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_launch_duty_receipt_execution_handoff"
         : normalizedFormat === "stabilization-receipt-execution-handoff"
           ? "launch_mainline_stabilization_receipt_execution_handoff"
+        : normalizedFormat === "stable-operations-handoff-execution"
+          ? "launch_mainline_stable_operations_handoff_execution"
         : normalizedFormat === "post-archive-launch-day-watch-readback"
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
@@ -22711,6 +22713,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
+  const stableOperationsHandoffExecution = mainlineSummary.stableOperationsHandoffExecution
+    || getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
   const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
     || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const surfaceReviewCloseoutShortcut = mainlineSummary.surfaceReviewCloseoutShortcut
@@ -22969,6 +22973,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendFirstWaveCloseoutStableOperationsShortcutLines(lines, firstWaveCloseoutStableOperationsShortcut, {
       title: "Launch Mainline First-Wave Closeout Stable Operations Shortcut:"
+    });
+  }
+  if (stableOperationsHandoffExecution) {
+    lines.push("");
+    appendStableOperationsHandoffExecutionLines(lines, stableOperationsHandoffExecution, {
+      title: "Launch Mainline Stable Operations Handoff Execution:"
     });
   }
   if (stableOperationsTransitionShortcut) {
@@ -24753,6 +24763,240 @@ function buildDeveloperLaunchMainlineStableOperationsTransitionShortcutDownloadT
   });
 }
 
+function getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const launchDutyHandoffAction = entry?.launchDutyHandoffAction
+    && typeof entry.launchDutyHandoffAction === "object"
+      ? entry.launchDutyHandoffAction
+      : null;
+  const queue = launchDutyHandoffAction?.stabilizationReceiptWriteQueue
+    && typeof launchDutyHandoffAction.stabilizationReceiptWriteQueue === "object"
+      ? launchDutyHandoffAction.stabilizationReceiptWriteQueue
+      : null;
+  const tail = queue?.stableOperationsHandoffTail
+    && typeof queue.stableOperationsHandoffTail === "object"
+      ? queue.stableOperationsHandoffTail
+      : null;
+  if (!tail) {
+    return null;
+  }
+  const currentPacket = tail.currentHandoffPacket && typeof tail.currentHandoffPacket === "object"
+    ? tail.currentHandoffPacket
+    : null;
+  const readbackPacket = tail.readinessReloadReadbackPacket && typeof tail.readinessReloadReadbackPacket === "object"
+    ? tail.readinessReloadReadbackPacket
+    : null;
+  const firstWaveCloseoutReadback = payload.mainlineSummary?.firstWaveCloseoutRecordReadback
+    ? normalizeFirstWaveCloseoutRecordReadback(payload.mainlineSummary.firstWaveCloseoutRecordReadback)
+    : getFirstWaveCloseoutRecordReadbackFromOperatorEntry(entry);
+  const commands = readbackPacket?.commands && typeof readbackPacket.commands === "object"
+    ? readbackPacket.commands
+    : {};
+  const expectedReadiness = readbackPacket?.expectedReadinessResult
+    && typeof readbackPacket.expectedReadinessResult === "object"
+      ? readbackPacket.expectedReadinessResult
+      : {};
+  const expectedRehearsal = readbackPacket?.expectedRehearsalResult
+    && typeof readbackPacket.expectedRehearsalResult === "object"
+      ? readbackPacket.expectedRehearsalResult
+      : {};
+  const actions = Array.isArray(tail.actions)
+    ? tail.actions.map((item) => ({
+        key: item?.key || null,
+        status: item?.status || null,
+        command: item?.command || null
+      }))
+    : [];
+  const currentAction = actions.find((item) => item.status === "current") || actions[0] || null;
+  const nextAction = actions.find((item) => item.key === currentPacket?.nextActionKey)
+    || actions.find((item) => String(item.status || "").startsWith("blocked_after"))
+    || actions[1]
+    || null;
+  const handoffArtifacts = Array.isArray(currentPacket?.handoffArtifacts)
+    ? currentPacket.handoffArtifacts.slice()
+    : Array.isArray(readbackPacket?.handoffArtifacts)
+      ? readbackPacket.handoffArtifacts.slice()
+      : Array.isArray(tail.handoffArtifacts)
+        ? tail.handoffArtifacts.slice()
+        : [];
+  const requiredConfirmationPoints = Array.isArray(expectedRehearsal.requiredConfirmationPoints)
+    ? expectedRehearsal.requiredConfirmationPoints.slice()
+    : [];
+  const actionQueueKeys = Array.isArray(expectedReadiness.actionQueueKeys)
+    ? expectedReadiness.actionQueueKeys.slice()
+    : [];
+  const launchDutyRecordIndexPath = currentPacket?.recordIndexFile
+    || readbackPacket?.recordIndexFile
+    || tail.recordIndexFile
+    || firstWaveCloseoutReadback?.launchDutyRecordIndexPath
+    || null;
+  return {
+    mode: "developer-launch-mainline-stable-operations-handoff-execution",
+    status: tail.status || firstWaveCloseoutReadback?.status || null,
+    ready: tail.readyForHandoff === true || currentPacket?.readyForHandoff === true,
+    currentActionKey: currentPacket?.actionKey
+      || currentAction?.key
+      || firstWaveCloseoutReadback?.currentActionKey
+      || null,
+    currentCommand: currentPacket?.command
+      || commands.readinessStatus
+      || tail.readinessStatusCommand
+      || currentAction?.command
+      || null,
+    nextActionKey: currentPacket?.nextActionKey
+      || nextAction?.key
+      || firstWaveCloseoutReadback?.nextActionKey
+      || null,
+    nextCommand: currentPacket?.nextCommand
+      || commands.rehearsalReload
+      || tail.rehearsalReloadCommand
+      || nextAction?.command
+      || firstWaveCloseoutReadback?.nextCommand
+      || null,
+    packetStatus: currentPacket?.status || firstWaveCloseoutReadback?.currentStableOperationsHandoffPacketStatus || null,
+    readbackPacketStatus: readbackPacket?.status || firstWaveCloseoutReadback?.readinessReloadReadbackPacketStatus || null,
+    sourceRecordKey: currentPacket?.sourceRecordKey || readbackPacket?.sourceRecordKey || firstWaveCloseoutReadback?.recordKey || null,
+    sourceRecordRecorded: currentPacket?.sourceRecordRecorded === true || firstWaveCloseoutReadback?.recorded === true,
+    sourceRecordRecordedAt: currentPacket?.sourceRecordRecordedAt || firstWaveCloseoutReadback?.recordedAt || null,
+    launchDutyRecordIndexPath,
+    firstWaveCloseoutArtifactPath: currentPacket?.firstWaveCloseoutArtifactPath
+      || readbackPacket?.firstWaveCloseoutArtifactPath
+      || tail.firstWaveCloseoutArtifactPath
+      || firstWaveCloseoutReadback?.recordIndexArtifactPath
+      || null,
+    expectedReadinessGate: expectedReadiness.currentGate || null,
+    expectedReadinessLaunchStatus: expectedReadiness.launchStatus || null,
+    expectedReadinessNextStep: expectedReadiness.nextStepKey || null,
+    expectedReadinessActionQueueKeys: actionQueueKeys,
+    expectedRehearsalPacketStatus: expectedRehearsal.finalRehearsalPacketStatus || null,
+    expectedRehearsalExecutionSummaryStatus: expectedRehearsal.executionSummaryStatus || null,
+    expectedRehearsalCurrentActionKey: expectedRehearsal.launchDutyCurrentActionKey || null,
+    expectedRehearsalCurrentActionStage: expectedRehearsal.launchDutyCurrentActionStage || null,
+    expectedRehearsalSourceFocus: expectedRehearsal.sourceFocus || null,
+    requiredConfirmationPoints,
+    handoffArtifacts,
+    actions,
+    refreshAfterHandoff: currentPacket?.refreshAfterHandoff || firstWaveCloseoutReadback?.refreshAfterWrite || null,
+    nextAction: readbackPacket?.nextAction || tail.nextAction || firstWaveCloseoutReadback?.nextAction || null
+  };
+}
+
+function appendStableOperationsHandoffExecutionLines(lines = [], execution = null, {
+  title = "Stable Operations Handoff Execution:"
+} = {}) {
+  if (!Array.isArray(lines) || !execution || typeof execution !== "object") {
+    return false;
+  }
+  const actionQueueKeys = Array.isArray(execution.expectedReadinessActionQueueKeys)
+    ? execution.expectedReadinessActionQueueKeys.join(",")
+    : "";
+  const confirmationPoints = Array.isArray(execution.requiredConfirmationPoints)
+    ? execution.requiredConfirmationPoints.join(",")
+    : "";
+  const handoffArtifacts = Array.isArray(execution.handoffArtifacts)
+    ? execution.handoffArtifacts.join(",")
+    : "";
+  const actions = Array.isArray(execution.actions)
+    ? execution.actions.map((item, index) => (
+        `${index + 1}.${item?.key || "-"}:${item?.status || "-"}`
+      )).join("; ")
+    : "";
+  lines.push(title);
+  lines.push(
+    `- status=${execution.status || "-"}`
+    + ` | ready=${execution.ready === true ? "yes" : "no"}`
+    + ` | current=${execution.currentActionKey || "-"}`
+    + ` | next=${execution.nextActionKey || "-"}`
+    + ` | packet=${execution.packetStatus || "-"}`
+    + ` | readback=${execution.readbackPacketStatus || "-"}`
+  );
+  lines.push(
+    "Stable Operations Handoff Commands:"
+    + ` readinessCommand=${execution.currentCommand || "-"}`
+    + ` | rehearsalCommand=${execution.nextCommand || "-"}`
+  );
+  lines.push(
+    "Stable Operations Handoff Source:"
+    + ` source=${execution.sourceRecordKey || "-"}`
+    + ` | sourceRecorded=${execution.sourceRecordRecorded === true ? "yes" : "no"}`
+    + ` | recordedAt=${execution.sourceRecordRecordedAt || "-"}`
+    + ` | launchDutyRecordIndex=${execution.launchDutyRecordIndexPath || "-"}`
+    + ` | firstWaveCloseout=${execution.firstWaveCloseoutArtifactPath || "-"}`
+  );
+  lines.push(
+    "Stable Operations Handoff Readiness Expectations:"
+    + ` readinessGate=${execution.expectedReadinessGate || "-"}`
+    + ` | readinessStatus=${execution.expectedReadinessLaunchStatus || "-"}`
+    + ` | readinessNext=${execution.expectedReadinessNextStep || "-"}`
+    + ` | actionQueue=${actionQueueKeys || "-"}`
+  );
+  lines.push(
+    "Stable Operations Handoff Rehearsal Expectations:"
+    + ` rehearsalStatus=${execution.expectedRehearsalPacketStatus || "-"}`
+    + ` | rehearsalCurrent=${execution.expectedRehearsalCurrentActionKey || "-"}`
+    + ` | confirmationPoints=${confirmationPoints || "-"}`
+    + ` | sourceFocus=${execution.expectedRehearsalSourceFocus || "-"}`
+  );
+  lines.push(
+    "Stable Operations Handoff Artifacts:"
+    + ` artifacts=${handoffArtifacts || "-"}`
+    + ` | actions=${actions || "-"}`
+  );
+  lines.push(
+    "Stable Operations Handoff Refresh:"
+    + ` method=${execution.refreshAfterHandoff?.method || "-"}`
+    + ` | href=${execution.refreshAfterHandoff?.href || "-"}`
+    + ` | status=${execution.refreshAfterHandoff?.status || "-"}`
+    + ` | audit=${execution.refreshAfterHandoff?.confirmationAuditLogId || "-"}`
+  );
+  lines.push(`Stable Operations Handoff Execution Next: ${execution.nextAction || "-"}`);
+  return true;
+}
+
+function getDeveloperLaunchMainlineStableOperationsHandoffExecutionDownload(payload = {}) {
+  const execution = payload.mainlineSummary?.stableOperationsHandoffExecution
+    || getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
+  if (!execution) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline stable operations handoff execution",
+      "stable-operations-handoff-execution.txt",
+      "stable-operations-handoff-execution",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: execution.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineStableOperationsHandoffExecutionDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const execution = payload.mainlineSummary?.stableOperationsHandoffExecution
+    || getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
+  if (!execution) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Stable Operations Handoff Execution Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendStableOperationsHandoffExecutionLines(lines, execution);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file after first-wave closeout is recorded and before handing launch duty into stable operations.");
+  lines.push("- It carries the readiness refresh command, rehearsal reload command, expected readbacks, handoff artifacts, and shared launch-duty record index.");
+  lines.push("- After the readiness and rehearsal readbacks are confirmed, open the stable operations transition shortcut or steady-state handoff brief.");
+  return lines.join("\n").trimEnd();
+}
+
 function getDeveloperLaunchMainlineOperatorEntry(payload = {}) {
   const mainlineSummary = payload.mainlineSummary || {};
   return mainlineSummary.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
@@ -26469,6 +26713,7 @@ function buildDeveloperLaunchMainlinePayload({
     payload.mainlineSummary.signoffArchiveWatchHandoff = getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
     payload.mainlineSummary.launchDutyReceiptExecutionHandoff = getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
     payload.mainlineSummary.stabilizationReceiptExecutionHandoff = getDeveloperLaunchMainlineStabilizationReceiptExecutionHandoff(payload);
+    payload.mainlineSummary.stableOperationsHandoffExecution = getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -26618,6 +26863,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
+  const stableOperationsHandoffExecution = mainlineSummary.stableOperationsHandoffExecution
+    || getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
   const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
     || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const surfaceReviewCloseoutShortcut = mainlineSummary.surfaceReviewCloseoutShortcut
@@ -26770,6 +27017,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const signoffArchiveWatchHandoffDownload = getDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownload(payload);
   const launchDutyReceiptExecutionHandoffDownload = getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoffDownload(payload);
   const stabilizationReceiptExecutionHandoffDownload = getDeveloperLaunchMainlineStabilizationReceiptExecutionHandoffDownload(payload);
+  const stableOperationsHandoffExecutionDownload = getDeveloperLaunchMainlineStableOperationsHandoffExecutionDownload(payload);
   const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
   const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
   const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
@@ -27645,6 +27893,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | launchDutyRecordIndex=${firstWaveCloseoutStableOperationsShortcut.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
     );
   }
+  if (stableOperationsHandoffExecution) {
+    lines.push("");
+    appendStableOperationsHandoffExecutionLines(lines, stableOperationsHandoffExecution, {
+      title: "Stable Operations Handoff Execution Route:"
+    });
+    pushRoute(
+      "stable-operations-handoff-execution",
+      "Launch Mainline stable operations handoff execution",
+      opsFiles.stableOperationsHandoffExecution || "ops/stable-operations-handoff-execution.txt",
+      stableOperationsHandoffExecutionDownload || {}
+    );
+  }
   if (stableOperationsTransitionShortcut) {
     const shortcutDownloadFormat = stableOperationsTransitionShortcut.nextDownloadFormat || "launch-operations-operator-entry";
     const shortcutDownloadKey = stableOperationsTransitionShortcut.nextDownloadKey
@@ -28009,6 +28269,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
     getDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownload(payload)
       ? buildDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownloadText(payload)
       : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/stable-operations-handoff-execution.txt",
+    buildDeveloperLaunchMainlineStableOperationsHandoffExecutionDownloadText(payload)
   );
   appendLaunchWorkflowFileIfPresent(
     files,
@@ -28409,7 +28674,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -28616,6 +28881,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "first-wave-closeout-stable-operations-shortcut-download.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "stable-operations-handoff-execution") {
+    return {
+      fileName: "stable-operations-handoff-execution.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineStableOperationsHandoffExecutionDownloadText(payload)
     };
   }
   if (normalizedFormat === "stable-operations-transition-shortcut-download") {
@@ -29849,6 +30121,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       firstWaveCloseoutRecordReadback: "ops/first-wave-closeout-record-readback.txt",
       surfaceReviewCloseoutShortcutDownloadRoute: "ops/surface-review-closeout-shortcut-download.txt",
       firstWaveCloseoutStableOperationsShortcutDownloadRoute: "ops/first-wave-closeout-stable-operations-shortcut-download.txt",
+      stableOperationsHandoffExecution: "ops/stable-operations-handoff-execution.txt",
       stableOperationsTransitionShortcutDownloadRoute: "ops/stable-operations-transition-shortcut-download.txt",
       launchOperationsHandoffSummary: "ops/launch-operations-handoff-summary.txt",
       launchOperationsHandoffSummaryDownloadRoute: "ops/launch-operations-handoff-summary-download.txt",
@@ -30055,6 +30328,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || getFirstWaveCloseoutRecordReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const firstWaveCloseoutStableOperationsShortcut = mainlineSummary.firstWaveCloseoutStableOperationsShortcut
     || getFirstWaveCloseoutStableOperationsShortcutFromOperatorEntry(launchOperationsOperatorEntry);
+  const stableOperationsHandoffExecution = mainlineSummary.stableOperationsHandoffExecution
+    || getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
   const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
     || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const surfaceReviewCloseoutShortcut = mainlineSummary.surfaceReviewCloseoutShortcut
@@ -30309,6 +30584,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "First-wave closeout stable-operations shortcut download route",
       opsFiles.firstWaveCloseoutStableOperationsShortcutDownloadRoute || "ops/first-wave-closeout-stable-operations-shortcut-download.txt"
+    ]);
+  }
+  if (stableOperationsHandoffExecution) {
+    handoffFiles.push([
+      "Stable operations handoff execution direct file",
+      opsFiles.stableOperationsHandoffExecution || "ops/stable-operations-handoff-execution.txt"
     ]);
   }
   if (stableOperationsTransitionShortcut) {
@@ -31087,6 +31368,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push("");
     appendFirstWaveCloseoutStableOperationsShortcutLines(lines, firstWaveCloseoutStableOperationsShortcut, {
       title: "Launch Mainline First-Wave Closeout Stable Operations Shortcut:"
+    });
+  }
+  if (stableOperationsHandoffExecution) {
+    lines.push("");
+    appendStableOperationsHandoffExecutionLines(lines, stableOperationsHandoffExecution, {
+      title: "Launch Mainline Stable Operations Handoff Execution:"
     });
   }
   if (stableOperationsTransitionShortcut) {

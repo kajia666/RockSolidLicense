@@ -28317,6 +28317,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Handoff Execution:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| packet=ready_for_readiness_refresh \| readback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Handoff Execution:[\s\S]*readinessCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
     );
     assert.match(
@@ -28347,6 +28355,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
       /first-wave-closeout-stable-operations-shortcut: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
+      /Stable Operations Handoff Execution Route:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| packet=ready_for_readiness_refresh \| readback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
+      /stable-operations-handoff-execution: [^\n]*file=stable-operations-handoff-execution\.txt[^\n]*format=stable-operations-handoff-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
@@ -28430,6 +28446,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
+      /Launch Mainline Stable Operations Handoff Execution:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Stable operations handoff execution direct file: ops\/stable-operations-handoff-execution\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
       /Included Handoff Files:[\s\S]*Stable operations transition shortcut: ops\/launch-operations-operator-entry\.txt/
     );
     assert.match(
@@ -28444,6 +28468,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedChecksumsDownload.body,
       /ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedChecksumsDownload.body,
+      /ops\/stable-operations-handoff-execution\.txt/
     );
     assert.match(
       launchMainlineCloseoutRecordedChecksumsDownload.body,
@@ -28469,6 +28497,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedZipText,
+      /ops\/stable-operations-handoff-execution\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /RockSolid Launch Mainline Stable Operations Handoff Execution Download/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /Stable Operations Handoff Commands:[\s\S]*readinessCommand=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
       /ops\/stable-operations-transition-shortcut-download\.txt/
     );
     assert.match(
@@ -28491,6 +28531,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload.body,
       /Action: reload_staging_rehearsal_for_stable_operations/
+    );
+    const launchMainlineStableOperationsHandoffExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stable-operations-handoff-execution",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
+      /RockSolid Launch Mainline Stable Operations Handoff Execution Download/
+    );
+    assert.match(
+      launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
+      /Stable Operations Handoff Execution:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| packet=ready_for_readiness_refresh \| readback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
+      /Stable Operations Handoff Rehearsal Expectations:[\s\S]*rehearsalStatus=ready_for_stable_operations_handoff \| rehearsalCurrent=stable_operations_handoff \| confirmationPoints=launch_duty_record_index,first_wave_closeout/
     );
     const launchMainlineCloseoutStableOperationsTransitionShortcutDirectDownload = await getText(
       baseUrl,

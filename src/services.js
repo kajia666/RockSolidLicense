@@ -26457,6 +26457,16 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-switch-readiness.txt",
+    buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    "ops/launch-candidate-full-verification-gate.txt",
+    buildDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/surface-review-closeout-shortcut-download.txt",
     getDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownload(payload)
       ? buildDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownloadText(payload)
@@ -28208,6 +28218,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOperatorChecklistDownloadRoute: "ops/launch-operations-operator-checklist-download.txt",
       launchOperationsOperatorEntry: "ops/launch-operations-operator-entry.txt",
       launchOperationsOperatorEntryDownloadRoute: "ops/launch-operations-operator-entry-download.txt",
+      launchSwitchReadiness: "ops/launch-switch-readiness.txt",
+      launchCandidateFullVerificationGate: "ops/launch-candidate-full-verification-gate.txt",
       surfaceReviewCloseoutShortcutDownloadRoute: "ops/surface-review-closeout-shortcut-download.txt",
       firstWaveCloseoutStableOperationsShortcutDownloadRoute: "ops/first-wave-closeout-stable-operations-shortcut-download.txt",
       stableOperationsTransitionShortcutDownloadRoute: "ops/stable-operations-transition-shortcut-download.txt",
@@ -28537,11 +28549,19 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       "Launch switch operator entry",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
     ]);
+    handoffFiles.push([
+      "Launch switch readiness direct file",
+      opsFiles.launchSwitchReadiness || "ops/launch-switch-readiness.txt"
+    ]);
   }
   if (launchCandidateFullVerificationGate) {
     handoffFiles.push([
       "Launch candidate full verification gate",
       opsFiles.preStagingReadinessSelfCheck || "ops/pre-staging-readiness-self-check.txt"
+    ]);
+    handoffFiles.push([
+      "Launch candidate full verification gate direct file",
+      opsFiles.launchCandidateFullVerificationGate || "ops/launch-candidate-full-verification-gate.txt"
     ]);
   }
   if (postArchiveLaunchDayWatchReadback) {

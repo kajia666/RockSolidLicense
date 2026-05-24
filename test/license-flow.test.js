@@ -24279,6 +24279,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-checklist-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-switch-readiness\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-candidate-full-verification-gate\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/surface-review-closeout-shortcut-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/stable-operations-transition-shortcut-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-handoff-summary\.txt/);
@@ -24344,6 +24346,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-checklist-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-switch-readiness\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Launch Switch Readiness Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Switch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| decision=hold_until_full_test_and_signoff/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-candidate-full-verification-gate\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Launch Candidate Full Verification Gate Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/surface-review-closeout-shortcut-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/stable-operations-transition-shortcut-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Checklist/);
@@ -24649,6 +24657,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Launch operations operator entry download route: ops\/launch-operations-operator-entry-download\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Launch switch readiness direct file: ops\/launch-switch-readiness\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Launch candidate full verification gate direct file: ops\/launch-candidate-full-verification-gate\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,

@@ -23942,6 +23942,14 @@ function getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload
   return opsDownloadScope ? buildDeveloperOpsLaunchOperationsOperatorEntryDownload(opsDownloadScope) : null;
 }
 
+function getDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownload(payload = {}) {
+  const shortcut = payload.mainlineSummary?.surfaceReviewCloseoutShortcut
+    && typeof payload.mainlineSummary.surfaceReviewCloseoutShortcut === "object"
+      ? payload.mainlineSummary.surfaceReviewCloseoutShortcut
+      : null;
+  return shortcut ? getDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownload(payload) : null;
+}
+
 function getDeveloperLaunchMainlineLaunchOperationsHandoffSummaryDownload(payload = {}) {
   const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
   return opsDownloadScope ? buildDeveloperOpsLaunchOperationsHandoffSummaryDownload(opsDownloadScope) : null;
@@ -24208,6 +24216,7 @@ function buildDeveloperLaunchMainlineStableOperationsDownloadText({
   download = null,
   status = "",
   action = "",
+  launchDutyRecordIndexPath = "",
   operatorOrder = [],
   notes = []
 } = {}) {
@@ -24218,7 +24227,8 @@ function buildDeveloperLaunchMainlineStableOperationsDownloadText({
     && typeof payload.mainlineSummary.steadyStateHandoffLanding === "object"
     ? payload.mainlineSummary.steadyStateHandoffLanding
     : null;
-  const launchDutyRecordIndexPath = getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload, steadyStateHandoffLanding);
+  const resolvedLaunchDutyRecordIndexPath = launchDutyRecordIndexPath
+    || getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload, steadyStateHandoffLanding);
   const normalizedOperatorOrder = Array.isArray(operatorOrder) ? operatorOrder.filter(Boolean) : [];
   const lines = [
     title || "RockSolid Launch Stable Operations Download",
@@ -24229,7 +24239,7 @@ function buildDeveloperLaunchMainlineStableOperationsDownloadText({
     "Source Surface: launch-mainline",
     `Status: ${status || "-"}`,
     `Action: ${action || "-"}`,
-    `Launch Duty Record Index: ${launchDutyRecordIndexPath}`,
+    `Launch Duty Record Index: ${resolvedLaunchDutyRecordIndexPath}`,
     "",
     "Download:",
     `- key=${download?.key || "-"}`,
@@ -24549,6 +24559,30 @@ function buildDeveloperLaunchMainlineLaunchOperationsOperatorEntryDownloadText(p
     notes: [
       "Use this route to re-fetch the Developer Ops launch operations operator entry from the offline Mainline package.",
       "Keep it beside launch-operations-operator-entry.txt so the next operator can resume from the exact backend/API entrypoint."
+    ]
+  });
+}
+
+function buildDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownloadText(payload = {}) {
+  const shortcut = payload.mainlineSummary?.surfaceReviewCloseoutShortcut
+    && typeof payload.mainlineSummary.surfaceReviewCloseoutShortcut === "object"
+      ? payload.mainlineSummary.surfaceReviewCloseoutShortcut
+      : getSurfaceReviewCloseoutShortcutFromOperatorEntry(
+          payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+        );
+  return buildDeveloperLaunchMainlineStableOperationsDownloadText({
+    payload,
+    title: "RockSolid Launch Mainline Surface Review Closeout Shortcut Download",
+    download: getDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownload(payload),
+    status: shortcut?.status || "",
+    action: shortcut?.nextActionKey || shortcut?.currentActionKey || "review_surface_review_closeout",
+    launchDutyRecordIndexPath: shortcut?.launchDutyRecordIndexPath || "",
+    operatorOrder: Array.isArray(shortcut?.operatorOrder) && shortcut.operatorOrder.length
+      ? shortcut.operatorOrder
+      : ["Open the Launch Operations Operator Entry before closing the Launch Review / Launch Smoke / Developer Ops handoff."],
+    notes: [
+      "Use this route to re-fetch the Developer Ops operator entry that carries surfaceReviewCloseoutShortcut.",
+      "Keep it beside launch-operations-operator-entry.txt so first-wave confirmation and Developer Ops refresh can be checked from the offline Mainline package."
     ]
   });
 }
@@ -26259,6 +26293,13 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/surface-review-closeout-shortcut-download.txt",
+    getDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownload(payload)
+      ? buildDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownloadText(payload)
+      : ""
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-operations-handoff-summary.txt",
     payload.opsSnapshot ? buildDeveloperOpsLaunchOperationsHandoffSummaryText(payload.opsSnapshot) : ""
   );
@@ -27954,6 +27995,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOperatorChecklistDownloadRoute: "ops/launch-operations-operator-checklist-download.txt",
       launchOperationsOperatorEntry: "ops/launch-operations-operator-entry.txt",
       launchOperationsOperatorEntryDownloadRoute: "ops/launch-operations-operator-entry-download.txt",
+      surfaceReviewCloseoutShortcutDownloadRoute: "ops/surface-review-closeout-shortcut-download.txt",
       launchOperationsHandoffSummary: "ops/launch-operations-handoff-summary.txt",
       launchOperationsHandoffSummaryDownloadRoute: "ops/launch-operations-handoff-summary-download.txt",
       launchOperationsDailyBrief: "ops/launch-operations-daily-brief.txt",
@@ -28345,6 +28387,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Surface review closeout shortcut",
       opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
+    ]);
+    handoffFiles.push([
+      "Surface review closeout shortcut download route",
+      opsFiles.surfaceReviewCloseoutShortcutDownloadRoute || "ops/surface-review-closeout-shortcut-download.txt"
     ]);
   }
   if (launchOperationsOverviewStatusDownload) {

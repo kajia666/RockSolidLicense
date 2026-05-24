@@ -24279,6 +24279,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-checklist-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/surface-review-closeout-shortcut-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-handoff-summary\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-handoff-summary-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-daily-brief\.txt/);
@@ -24342,11 +24343,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-checklist-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry-download\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/surface-review-closeout-shortcut-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Checklist/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Operations Operator Entry/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Operations Operator Checklist Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-operator-checklist/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Operations Operator Entry Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-operator-entry/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Surface Review Closeout Shortcut Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Action: confirm_first_wave_handoff/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Duty Record Index: artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-operator-entry/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /continue_launch_duty_record_index_selection_handoff/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-handoff-summary\.txt/);
@@ -24614,6 +24620,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Surface review closeout shortcut: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Surface review closeout shortcut download route: ops\/surface-review-closeout-shortcut-download\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,

@@ -30436,10 +30436,49 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateHandoff.mainlineSummary.firstOperatingResultHandoffAction.receiptReadbackAction.auditLogId,
       firstOperatingResultHandoffReceipt.auditLogId
     );
+    const firstOperatingResultHandoffReceiptReadbackExecution = launchMainlineSteadyStateHandoff.mainlineSummary
+      .firstOperatingResultHandoffReceiptReadbackExecution;
+    assert.ok(firstOperatingResultHandoffReceiptReadbackExecution);
+    assert.equal(
+      firstOperatingResultHandoffReceiptReadbackExecution.version,
+      "developer-launch-mainline-first-operating-result-handoff-receipt-readback-execution/v1"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptReadbackExecution.status,
+      "recorded_ready_for_first_operating_result_review"
+    );
+    assert.equal(firstOperatingResultHandoffReceiptReadbackExecution.ready, true);
+    assert.equal(firstOperatingResultHandoffReceiptReadbackExecution.receiptRecorded, true);
+    assert.equal(firstOperatingResultHandoffReceiptReadbackExecution.auditLogId, firstOperatingResultHandoffReceipt.auditLogId);
+    assert.equal(firstOperatingResultHandoffReceiptReadbackExecution.currentActionKey, "review_first_operating_result_handoff");
+    assert.equal(
+      firstOperatingResultHandoffReceiptReadbackExecution.rolloutWideningDecisionReceiptAuditLogId,
+      rolloutWideningDecisionReceipt.auditLogId
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptReadbackExecution.firstOperatingResultHandoffStatus,
+      "ready_for_first_operating_result_handoff"
+    );
+    assert.equal(firstOperatingResultHandoffReceiptReadbackExecution.nextDownloadKey, "ops_launch_operations_overview_status");
+    assert.equal(firstOperatingResultHandoffReceiptReadbackExecution.nextDownloadFileName, "developer-ops-launch-operations-overview-status.txt");
+    assert.equal(firstOperatingResultHandoffReceiptReadbackExecution.nextDownloadFormat, "launch-operations-overview-status");
+    assert.equal(firstOperatingResultHandoffReceiptReadbackExecution.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    assert.deepEqual(firstOperatingResultHandoffReceiptReadbackExecution.blockedBy, []);
+    assert.deepEqual(firstOperatingResultHandoffReceiptReadbackExecution.requiredChecks, [
+      "first_operating_result_handoff_receipt_recorded",
+      "receipt_visible_in_developer_ops",
+      "launch_operations_overview_attached"
+    ]);
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       new RegExp(
         `Launch Mainline First Operating Result Handoff:[\\s\\S]*receiptReadback=recorded_ready_for_first_operating_result_review \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| nextDownload=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      new RegExp(
+        `Launch Mainline First Operating Result Handoff Receipt Readback Execution:[\\s\\S]*status=recorded_ready_for_first_operating_result_review \\| ready=yes \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
       )
     );
     const launchMainlineSteadyStateRoutesDownload = await getText(
@@ -30557,6 +30596,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         `First Operating Result Handoff Route:[\\s\\S]*receiptReadback=recorded_ready_for_first_operating_result_review \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| nextDownload=launch-operations-overview-status`
       )
     );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      new RegExp(
+        `First Operating Result Handoff Receipt Readback Execution Route:[\\s\\S]*status=recorded_ready_for_first_operating_result_review \\| ready=yes \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /first-operating-result-handoff-receipt-readback-execution: [^\n]*file=first-operating-result-handoff-receipt-readback-execution\.txt[^\n]*format=first-operating-result-handoff-receipt-readback-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
     const launchMainlineSteadyStatePostLaunchIndexDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
@@ -30672,6 +30721,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         `First Operating Result Handoff:[\\s\\S]*receiptReadback=recorded_ready_for_first_operating_result_review \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| nextDownload=launch-operations-overview-status`
       )
     );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      new RegExp(
+        `Launch Mainline First Operating Result Handoff Receipt Readback Execution:[\\s\\S]*status=recorded_ready_for_first_operating_result_review \\| ready=yes \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Included Handoff Files:[\s\S]*First operating result handoff receipt readback execution direct file: ops\/first-operating-result-handoff-receipt-readback-execution\.txt/
+    );
     const launchMainlineSteadyStateChecksumsDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
@@ -30680,6 +30739,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateChecksumsDownload.body,
       /ops\/steady-state-handoff-landing-execution\.txt/
+    );
+    assert.match(
+      launchMainlineSteadyStateChecksumsDownload.body,
+      /ops\/first-operating-result-handoff-receipt-readback-execution\.txt/
     );
     const launchMainlineSteadyStateZipDownload = await getBinary(
       baseUrl,
@@ -30698,6 +30761,41 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateZipText,
       /Steady-State Handoff Landing Receipt Review:[\s\S]*action=packet_review_readback \| format=launch-duty-packet-review/
+    );
+    assert.match(
+      launchMainlineSteadyStateZipText,
+      /ops\/first-operating-result-handoff-receipt-readback-execution\.txt/
+    );
+    assert.match(
+      launchMainlineSteadyStateZipText,
+      /RockSolid Launch Mainline First Operating Result Handoff Receipt Readback Execution Download/
+    );
+    assert.match(
+      launchMainlineSteadyStateZipText,
+      new RegExp(`First Operating Result Handoff Receipt Readback Execution:[\\s\\S]*audit=${firstOperatingResultHandoffReceipt.auditLogId}`)
+    );
+    const launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=first-operating-result-handoff-receipt-readback-execution",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDirectDownload.body,
+      /RockSolid Launch Mainline First Operating Result Handoff Receipt Readback Execution Download/
+    );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDirectDownload.body,
+      new RegExp(
+        `First Operating Result Handoff Receipt Readback Execution:[\\s\\S]*status=recorded_ready_for_first_operating_result_review \\| ready=yes \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDirectDownload.body,
+      new RegExp(`First Operating Result Handoff Receipt Readback Record:[^\\n]*rolloutReceiptAudit=${rolloutWideningDecisionReceipt.auditLogId}[^\\n]*handoffStatus=ready_for_first_operating_result_handoff`)
+    );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDirectDownload.body,
+      /First Operating Result Handoff Receipt Readback Blockers:[^\n]*blockedBy=-[^\n]*checks=first_operating_result_handoff_receipt_recorded,receipt_visible_in_developer_ops,launch_operations_overview_attached[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const launchMainlineSteadyStateHandoffLandingExecutionDirectDownload = await getText(
       baseUrl,

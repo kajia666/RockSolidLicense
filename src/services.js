@@ -4110,6 +4110,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_rollout_widening_decision_execution"
         : normalizedFormat === "first-operating-result-handoff-execution"
           ? "launch_mainline_first_operating_result_handoff_execution"
+        : normalizedFormat === "first-operating-result-handoff-receipt-readback-execution"
+          ? "launch_mainline_first_operating_result_handoff_receipt_readback_execution"
         : normalizedFormat === "post-archive-launch-day-watch-readback"
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
@@ -23591,6 +23593,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getDeveloperLaunchMainlineRolloutWideningDecisionExecution(payload);
   const firstOperatingResultHandoffExecution = mainlineSummary.firstOperatingResultHandoffExecution
     || getDeveloperLaunchMainlineFirstOperatingResultHandoffExecution(payload);
+  const firstOperatingResultHandoffReceiptReadbackExecution = mainlineSummary.firstOperatingResultHandoffReceiptReadbackExecution
+    || getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecution(payload);
   if (rolloutWideningDecisionAction) {
     lines.push("");
     lines.push("Launch Mainline Rollout Widening Decision:");
@@ -23637,6 +23641,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendFirstOperatingResultHandoffExecutionLines(lines, firstOperatingResultHandoffExecution, {
       title: "Launch Mainline First Operating Result Handoff Execution:"
+    });
+  }
+  if (firstOperatingResultHandoffReceiptReadbackExecution) {
+    lines.push("");
+    appendFirstOperatingResultHandoffReceiptReadbackExecutionLines(lines, firstOperatingResultHandoffReceiptReadbackExecution, {
+      title: "Launch Mainline First Operating Result Handoff Receipt Readback Execution:"
     });
   }
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
@@ -25036,6 +25046,195 @@ function buildDeveloperLaunchMainlineFirstOperatingResultHandoffExecutionDownloa
   lines.push("- Use this direct file after rollout widening decision review to see whether the first operating result can be handed off.");
   lines.push("- It carries the blocking receipt state, overview-status download, rollout queue state, and shared launch-duty record index.");
   lines.push("- Keep it beside launch-operations-overview-status.txt so the first operating result handoff can resume without reopening the full route map.");
+  return lines.join("\n").trimEnd();
+}
+
+function resolveFirstOperatingResultHandoffReceiptReadbackNextDownload(payload = {}, action = null) {
+  const normalizedFormat = String(action?.nextDownloadFormat || "").trim().toLowerCase();
+  if (normalizedFormat === "launch-operations-overview-status") {
+    return getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload);
+  }
+  if (normalizedFormat === "launch-operations-shift-action-plan") {
+    return getDeveloperLaunchMainlineLaunchOperationsShiftActionPlanDownload(payload);
+  }
+  if (normalizedFormat === "steady-state-duty-action-links") {
+    return getDeveloperLaunchMainlineSteadyStateDutyActionLinksDownload(payload);
+  }
+  return null;
+}
+
+function buildFirstOperatingResultHandoffReceiptReadbackFallbackFileName(format = "") {
+  const normalizedFormat = String(format || "").trim().toLowerCase();
+  if (normalizedFormat === "launch-operations-overview-status") {
+    return "developer-ops-launch-operations-overview-status.txt";
+  }
+  if (normalizedFormat === "launch-operations-shift-action-plan") {
+    return "developer-ops-launch-operations-shift-action-plan.txt";
+  }
+  if (normalizedFormat === "steady-state-duty-action-links") {
+    return "developer-ops-steady-state-duty-action-links.txt";
+  }
+  return null;
+}
+
+function getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecution(payload = {}) {
+  const action = payload.mainlineSummary?.firstOperatingResultHandoffAction?.receiptReadbackAction
+    && typeof payload.mainlineSummary.firstOperatingResultHandoffAction.receiptReadbackAction === "object"
+      ? payload.mainlineSummary.firstOperatingResultHandoffAction.receiptReadbackAction
+      : null;
+  if (!action) {
+    return null;
+  }
+  const download = resolveFirstOperatingResultHandoffReceiptReadbackNextDownload(payload, action);
+  const nextDownloadFormat = action.nextDownloadFormat || download?.format || null;
+  const launchDutyRecordIndexPath = action.launchDutyRecordIndexPath
+    || payload.mainlineSummary?.firstOperatingResultHandoffExecution?.launchDutyRecordIndexPath
+    || payload.mainlineSummary?.firstOperatingResultHandoffAction?.launchDutyRecordIndexPath
+    || payload.mainlineSummary?.rolloutWideningDecisionExecution?.launchDutyRecordIndexPath
+    || payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.launchOpsOverviewContext?.launchDutyRecordIndexPath
+    || getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload);
+  const requiredChecks = Array.isArray(action.requiredChecks)
+    ? action.requiredChecks.filter((item) => String(item || "").trim() !== "")
+    : [];
+  const blockedBy = Array.isArray(action.blockedBy)
+    ? action.blockedBy.filter((item) => String(item || "").trim() !== "")
+    : [];
+  const operatorOrder = action.receiptRecorded === true
+    ? ["Review the first operating result handoff from the launch operations overview."]
+    : ["Record the first operating result handoff receipt before the first operating result review."];
+  return {
+    version: "developer-launch-mainline-first-operating-result-handoff-receipt-readback-execution/v1",
+    mode: "developer-launch-mainline-first-operating-result-handoff-receipt-readback-execution",
+    status: action.status || null,
+    ready: action.ready === true,
+    currentActionKey: action.currentActionKey || null,
+    receiptRecorded: action.receiptRecorded === true,
+    auditLogId: action.auditLogId || null,
+    recordedAt: action.recordedAt || null,
+    recordedBy: action.recordedBy || null,
+    receiptAction: action.receiptAction || null,
+    receiptIntent: action.receiptIntent || null,
+    receiptPlanKind: action.receiptPlanKind || null,
+    receiptPlanMode: action.receiptPlanMode || null,
+    receiptVisibilityStatus: action.receiptVisibilityStatus || null,
+    rolloutWideningDecisionReceiptAuditLogId: action.rolloutWideningDecisionReceiptAuditLogId || null,
+    firstOperatingResultHandoffStatus: action.firstOperatingResultHandoffStatus || null,
+    queueStatus: action.queueStatus || null,
+    queueTotal: action.queueTotal ?? null,
+    attentionCount: action.attentionCount ?? null,
+    nextDownloadKey: action.nextDownloadKey || download?.key || null,
+    nextDownloadFileName: action.nextDownloadFileName
+      || download?.fileName
+      || buildFirstOperatingResultHandoffReceiptReadbackFallbackFileName(nextDownloadFormat),
+    nextDownloadFormat,
+    nextDownloadHref: action.nextDownloadHref || download?.href || null,
+    nextDownloadSource: download?.source || "developer-ops-first-operating-result-handoff-receipt-readback",
+    launchDutyRecordIndexPath,
+    blockedBy,
+    requiredChecks,
+    receiptPlan: action.receiptPlan || null,
+    operatorOrder,
+    nextAction: action.nextAction || null
+  };
+}
+
+function appendFirstOperatingResultHandoffReceiptReadbackExecutionLines(lines = [], execution = null, {
+  title = "First Operating Result Handoff Receipt Readback Execution:"
+} = {}) {
+  if (!Array.isArray(lines) || !execution || typeof execution !== "object") {
+    return false;
+  }
+  const blockedBy = Array.isArray(execution.blockedBy) ? execution.blockedBy.join(",") : "";
+  const requiredChecks = Array.isArray(execution.requiredChecks) ? execution.requiredChecks.join(",") : "";
+  lines.push(title);
+  lines.push(
+    `- status=${execution.status || "-"}`
+    + ` | ready=${execution.ready === true ? "yes" : "no"}`
+    + ` | current=${execution.currentActionKey || "-"}`
+    + ` | receiptRecorded=${execution.receiptRecorded === true}`
+    + ` | audit=${execution.auditLogId || "-"}`
+    + ` | file=${execution.nextDownloadFileName || "-"}`
+    + ` | format=${execution.nextDownloadFormat || "-"}`
+  );
+  lines.push(
+    "First Operating Result Handoff Receipt Readback Download:"
+    + ` key=${execution.nextDownloadKey || "-"}`
+    + ` | file=${execution.nextDownloadFileName || "-"}`
+    + ` | format=${execution.nextDownloadFormat || "-"}`
+    + ` | href=${execution.nextDownloadHref || "-"}`
+    + ` | source=${execution.nextDownloadSource || "-"}`
+  );
+  lines.push(
+    "First Operating Result Handoff Receipt Readback Record:"
+    + ` rolloutReceiptAudit=${execution.rolloutWideningDecisionReceiptAuditLogId || "-"}`
+    + ` | handoffStatus=${execution.firstOperatingResultHandoffStatus || "-"}`
+    + ` | receiptAction=${execution.receiptAction || "-"}`
+    + ` | intent=${execution.receiptIntent || "-"}`
+    + ` | visibility=${execution.receiptVisibilityStatus || "-"}`
+  );
+  lines.push(
+    "First Operating Result Handoff Receipt Readback Queue:"
+    + ` queueStatus=${execution.queueStatus || "-"}`
+    + ` | queueTotal=${execution.queueTotal ?? "-"}`
+    + ` | attention=${execution.attentionCount ?? "-"}`
+  );
+  lines.push(
+    "First Operating Result Handoff Receipt Readback Blockers:"
+    + ` blockedBy=${blockedBy || "-"}`
+    + ` | checks=${requiredChecks || "-"}`
+    + ` | launchDutyRecordIndex=${execution.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`First Operating Result Handoff Receipt Readback Execution Next: ${execution.nextAction || "-"}`);
+  if (Array.isArray(execution.operatorOrder) && execution.operatorOrder.length) {
+    lines.push("First Operating Result Handoff Receipt Readback Operator Order:");
+    for (const step of execution.operatorOrder) {
+      lines.push(`- ${step}`);
+    }
+  }
+  return true;
+}
+
+function getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload(payload = {}) {
+  const execution = payload.mainlineSummary?.firstOperatingResultHandoffReceiptReadbackExecution
+    || getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecution(payload);
+  if (!execution) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline first operating result handoff receipt readback execution",
+      "first-operating-result-handoff-receipt-readback-execution.txt",
+      "first-operating-result-handoff-receipt-readback-execution",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: execution.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const execution = payload.mainlineSummary?.firstOperatingResultHandoffReceiptReadbackExecution
+    || getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecution(payload);
+  if (!execution) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline First Operating Result Handoff Receipt Readback Execution Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendFirstOperatingResultHandoffReceiptReadbackExecutionLines(lines, execution);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file after the first operating result handoff receipt is recorded.");
+  lines.push("- It carries the receipt audit id, rollout widening receipt bridge, next overview-status download, queue context, and launch-duty record index.");
+  lines.push("- Keep it beside first-operating-result-handoff-execution.txt so the review step can resume without rebuilding state from Developer Ops action links.");
   return lines.join("\n").trimEnd();
 }
 
@@ -27533,6 +27732,8 @@ function buildDeveloperLaunchMainlinePayload({
     payload.mainlineSummary.steadyStateDutyReceiptReviewExecution = getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload);
     payload.mainlineSummary.rolloutWideningDecisionExecution = getDeveloperLaunchMainlineRolloutWideningDecisionExecution(payload);
     payload.mainlineSummary.firstOperatingResultHandoffExecution = getDeveloperLaunchMainlineFirstOperatingResultHandoffExecution(payload);
+    payload.mainlineSummary.firstOperatingResultHandoffReceiptReadbackExecution =
+      getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecution(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -27652,6 +27853,10 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const firstOperatingResultHandoffExecution = mainlineSummary.firstOperatingResultHandoffExecution
     || getDeveloperLaunchMainlineFirstOperatingResultHandoffExecution(payload);
   const firstOperatingResultHandoffExecutionDownload = getDeveloperLaunchMainlineFirstOperatingResultHandoffExecutionDownload(payload);
+  const firstOperatingResultHandoffReceiptReadbackExecution = mainlineSummary.firstOperatingResultHandoffReceiptReadbackExecution
+    || getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecution(payload);
+  const firstOperatingResultHandoffReceiptReadbackExecutionDownload =
+    getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload(payload);
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -27855,6 +28060,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const steadyStateDutyReceiptReviewExecutionDirectDownload = getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecutionDownload(payload);
   const rolloutWideningDecisionExecutionDirectDownload = getDeveloperLaunchMainlineRolloutWideningDecisionExecutionDownload(payload);
   const firstOperatingResultHandoffExecutionDirectDownload = getDeveloperLaunchMainlineFirstOperatingResultHandoffExecutionDownload(payload);
+  const firstOperatingResultHandoffReceiptReadbackExecutionDirectDownload =
+    getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload(payload);
   const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
   const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
   const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
@@ -28953,6 +29160,20 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       firstOperatingResultHandoffExecutionDownload || firstOperatingResultHandoffExecutionDirectDownload || {}
     );
   }
+  if (firstOperatingResultHandoffReceiptReadbackExecution) {
+    lines.push("");
+    appendFirstOperatingResultHandoffReceiptReadbackExecutionLines(lines, firstOperatingResultHandoffReceiptReadbackExecution, {
+      title: "First Operating Result Handoff Receipt Readback Execution Route:"
+    });
+    pushRoute(
+      "first-operating-result-handoff-receipt-readback-execution",
+      "Launch Mainline first operating result handoff receipt readback execution",
+      opsFiles.firstOperatingResultHandoffReceiptReadbackExecution || "ops/first-operating-result-handoff-receipt-readback-execution.txt",
+      firstOperatingResultHandoffReceiptReadbackExecutionDownload
+        || firstOperatingResultHandoffReceiptReadbackExecutionDirectDownload
+        || {}
+    );
+  }
 
   appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(lines, launchDutyRecordIndexSelectionChecklistStep);
   lines.push("");
@@ -29403,6 +29624,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/first-operating-result-handoff-receipt-readback-execution.txt",
+    buildDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/steady-state-duty-board-download.txt",
     getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload)
       ? buildDeveloperLaunchMainlineSteadyStateDutyBoardDownloadText(payload)
@@ -29596,7 +29822,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "rollout-widening-decision-execution", "first-operating-result-handoff-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "rollout-widening-decision-execution", "first-operating-result-handoff-execution", "first-operating-result-handoff-receipt-readback-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -29845,6 +30071,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "first-operating-result-handoff-execution.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineFirstOperatingResultHandoffExecutionDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "first-operating-result-handoff-receipt-readback-execution") {
+    return {
+      fileName: "first-operating-result-handoff-receipt-readback-execution.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownloadText(payload)
     };
   }
   if (normalizedFormat === "stable-operations-transition-shortcut-download") {
@@ -31111,6 +31344,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       steadyStateDutyReceiptReviewExecution: "ops/steady-state-duty-receipt-review-execution.txt",
       rolloutWideningDecisionExecution: "ops/rollout-widening-decision-execution.txt",
       firstOperatingResultHandoffExecution: "ops/first-operating-result-handoff-execution.txt",
+      firstOperatingResultHandoffReceiptReadbackExecution: "ops/first-operating-result-handoff-receipt-readback-execution.txt",
       steadyStateHandoffDownloadRoute: "ops/steady-state-handoff-download.txt",
       steadyStateDutyBoardDownloadRoute: "ops/steady-state-duty-board-download.txt",
       steadyStateDutyActionLinksDownloadRoute: "ops/steady-state-duty-action-links-download.txt",
@@ -31230,6 +31464,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       : null;
   const firstOperatingResultHandoffExecution = mainlineSummary.firstOperatingResultHandoffExecution
     || getDeveloperLaunchMainlineFirstOperatingResultHandoffExecution(payload);
+  const firstOperatingResultHandoffReceiptReadbackExecution = mainlineSummary.firstOperatingResultHandoffReceiptReadbackExecution
+    || getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecution(payload);
   const launchOperationsOverviewStatusDownload = getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload);
   const launchReceiptNextFollowUpDownload = getDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownload(payload);
   const launchReceiptBackfillStatusDownload = getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload);
@@ -31450,6 +31686,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "First operating result handoff execution direct file",
       opsFiles.firstOperatingResultHandoffExecution || "ops/first-operating-result-handoff-execution.txt"
+    ]);
+  }
+  if (firstOperatingResultHandoffReceiptReadbackExecution) {
+    handoffFiles.push([
+      "First operating result handoff receipt readback execution direct file",
+      opsFiles.firstOperatingResultHandoffReceiptReadbackExecution
+        || "ops/first-operating-result-handoff-receipt-readback-execution.txt"
     ]);
   }
   if (launchReadinessDistance) {
@@ -32269,6 +32512,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push("");
     appendFirstOperatingResultHandoffExecutionLines(lines, firstOperatingResultHandoffExecution, {
       title: "Launch Mainline First Operating Result Handoff Execution:"
+    });
+  }
+  if (firstOperatingResultHandoffReceiptReadbackExecution) {
+    lines.push("");
+    appendFirstOperatingResultHandoffReceiptReadbackExecutionLines(lines, firstOperatingResultHandoffReceiptReadbackExecution, {
+      title: "Launch Mainline First Operating Result Handoff Receipt Readback Execution:"
     });
   }
   if (launchReadinessDistance) {
@@ -55030,6 +55279,52 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       firstOperatingResultHandoffExecutionDownload
     ]);
   }
+  const firstOperatingResultHandoffReceiptReadbackAction = firstOperatingResultHandoffAction?.receiptReadbackAction
+    && typeof firstOperatingResultHandoffAction.receiptReadbackAction === "object"
+      ? firstOperatingResultHandoffAction.receiptReadbackAction
+      : null;
+  const firstOperatingResultHandoffReceiptReadbackExecution = firstOperatingResultHandoffReceiptReadbackAction
+    ? getDeveloperLaunchMainlineFirstOperatingResultHandoffReceiptReadbackExecution({
+        manifest: {
+          project: {
+            code: overviewStatusScope.productCode || ""
+          },
+          channel: overviewStatusScope.channel || "stable"
+        },
+        filters: {
+          productCode: overviewStatusScope.productCode || "",
+          channel: overviewStatusScope.channel || "stable",
+          reviewMode: "matched"
+        },
+        mainlineSummary: {
+          firstOperatingResultHandoffAction,
+          firstOperatingResultHandoffExecution
+        },
+        opsSnapshot: {
+          scope: overviewStatusScope,
+          summary: {
+            initialLaunchOpsReadiness: readiness
+          }
+        }
+      })
+    : null;
+  const firstOperatingResultHandoffReceiptReadbackExecutionDownload = firstOperatingResultHandoffReceiptReadbackExecution
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline first operating result handoff receipt readback execution",
+          "first-operating-result-handoff-receipt-readback-execution.txt",
+          "first-operating-result-handoff-receipt-readback-execution",
+          routeParams
+        ),
+        launchDutyRecordIndexPath: firstOperatingResultHandoffReceiptReadbackExecution.launchDutyRecordIndexPath || null
+      }
+    : null;
+  if (firstOperatingResultHandoffReceiptReadbackExecutionDownload) {
+    downloads.push([
+      "first-operating-result-handoff-receipt-readback-execution",
+      firstOperatingResultHandoffReceiptReadbackExecutionDownload
+    ]);
+  }
   if (receiptVisibilitySummaryDownloads.launchReviewSummary) {
     downloads.push([
       "launch-review-receipt-visibility-summary",
@@ -55169,6 +55464,22 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       + ` | source=${firstOperatingResultHandoffExecutionDownload?.source || "developer-launch-mainline"}`
       + ` | href=${firstOperatingResultHandoffExecutionDownload?.href || "-"}`
       + ` | launchDutyRecordIndex=${firstOperatingResultHandoffExecution.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+  if (firstOperatingResultHandoffReceiptReadbackExecution) {
+    lines.push("");
+    appendFirstOperatingResultHandoffReceiptReadbackExecutionLines(lines, firstOperatingResultHandoffReceiptReadbackExecution, {
+      title: "First Operating Result Handoff Receipt Readback Execution Route:"
+    });
+    lines.push(
+      `- first-operating-result-handoff-receipt-readback-execution: ops/first-operating-result-handoff-receipt-readback-execution.txt`
+      + ` | key=${firstOperatingResultHandoffReceiptReadbackExecutionDownload?.key || "launch_mainline_first_operating_result_handoff_receipt_readback_execution"}`
+      + ` | label=${firstOperatingResultHandoffReceiptReadbackExecutionDownload?.label || "Launch Mainline first operating result handoff receipt readback execution"}`
+      + ` | file=${firstOperatingResultHandoffReceiptReadbackExecutionDownload?.fileName || "first-operating-result-handoff-receipt-readback-execution.txt"}`
+      + ` | format=${firstOperatingResultHandoffReceiptReadbackExecutionDownload?.format || "first-operating-result-handoff-receipt-readback-execution"}`
+      + ` | source=${firstOperatingResultHandoffReceiptReadbackExecutionDownload?.source || "developer-launch-mainline"}`
+      + ` | href=${firstOperatingResultHandoffReceiptReadbackExecutionDownload?.href || "-"}`
+      + ` | launchDutyRecordIndex=${firstOperatingResultHandoffReceiptReadbackExecution.launchDutyRecordIndexPath || "-"}`
     );
   }
   appendLaunchDutyRecordIndexSelectionChecklistStepLines(lines, readiness, scope);

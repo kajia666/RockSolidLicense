@@ -21125,6 +21125,37 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       rolloutWideningDecisionExecution.operatorOrder,
       expectedRolloutWideningDecisionOperatorOrder
     );
+    const expectedFirstOperatingResultHandoffOperatorOrder = [
+      "Record the rollout widening receipt before handing off the first operating result."
+    ];
+    const firstOperatingResultHandoffExecution = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary
+      .firstOperatingResultHandoffExecution;
+    assert.ok(firstOperatingResultHandoffExecution);
+    assert.equal(
+      firstOperatingResultHandoffExecution.version,
+      "developer-launch-mainline-first-operating-result-handoff-execution/v1"
+    );
+    assert.equal(firstOperatingResultHandoffExecution.status, "awaiting_rollout_widening_receipt");
+    assert.equal(firstOperatingResultHandoffExecution.ready, false);
+    assert.equal(firstOperatingResultHandoffExecution.currentActionKey, "record_rollout_widening_decision");
+    assert.equal(firstOperatingResultHandoffExecution.rolloutWideningDecisionStatus, rolloutWideningDecisionStatus);
+    assert.equal(firstOperatingResultHandoffExecution.rolloutWideningDecisionReady, rolloutWideningDecisionReady);
+    assert.equal(firstOperatingResultHandoffExecution.queueStatus, steadyStateDutyBoard.queueStatus);
+    assert.equal(firstOperatingResultHandoffExecution.queueTotal, steadyStateDutyBoard.queueTotal);
+    assert.equal(firstOperatingResultHandoffExecution.attentionCount, steadyStateDutyBoard.attentionCount);
+    assert.equal(firstOperatingResultHandoffExecution.nextDownloadKey, "ops_launch_operations_overview_status");
+    assert.equal(firstOperatingResultHandoffExecution.nextDownloadFileName, "developer-ops-launch-operations-overview-status.txt");
+    assert.equal(firstOperatingResultHandoffExecution.nextDownloadFormat, "launch-operations-overview-status");
+    assert.match(
+      firstOperatingResultHandoffExecution.nextDownloadHref,
+      /\/api\/developer\/ops\/export\/download\?[^ ]*productCode=EXPORT_CLOSEOUT_READY[^ ]*format=launch-operations-overview-status/
+    );
+    assert.equal(firstOperatingResultHandoffExecution.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    assert.deepEqual(firstOperatingResultHandoffExecution.blockedBy, ["rollout_widening_receipt"]);
+    assert.deepEqual(
+      firstOperatingResultHandoffExecution.operatorOrder,
+      expectedFirstOperatingResultHandoffOperatorOrder
+    );
     const steadyStateDutyReceiptRecommendedDownload = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.recommendedDownloads.find((item) => (
       item.key === "ops_latest_steady_state_duty_receipt_asset"
     ));
@@ -21349,6 +21380,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       new RegExp(`Launch Mainline Rollout Widening Decision Execution:[\\s\\S]*status=${rolloutWideningDecisionStatus} \\| ready=${rolloutWideningDecisionReady ? "yes" : "no"} \\| action=review_rollout_widening_decision \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline First Operating Result Handoff Execution:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision \| receiptAudit=- \| file=developer-ops-launch-operations-overview-status\.txt \| format=launch-operations-overview-status/
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
@@ -24248,6 +24283,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsMainlineHandoffRoutesDownload.body,
       /first-operating-result-handoff: [^\n]*key=ops_launch_operations_overview_status[^\n]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /First Operating Result Handoff Execution Route:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision \| receiptAudit=- \| file=developer-ops-launch-operations-overview-status\.txt \| format=launch-operations-overview-status/
+    );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /first-operating-result-handoff-execution: [^\n]*file=first-operating-result-handoff-execution\.txt[^\n]*format=first-operating-result-handoff-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchMainlineHandoffDownloadRoutesSelectionDownload = await getText(
       baseUrl,
@@ -24297,6 +24340,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /first-operating-result-handoff: [^\n]*key=ops_launch_operations_overview_status[^\n]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /First Operating Result Handoff Execution Route:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision \| receiptAudit=- \| file=developer-ops-launch-operations-overview-status\.txt \| format=launch-operations-overview-status/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /first-operating-result-handoff-execution: [^\n]*file=first-operating-result-handoff-execution\.txt[^\n]*format=first-operating-result-handoff-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
@@ -24431,6 +24482,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-board\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-receipt-review-execution\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/rollout-widening-decision-execution\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/first-operating-result-handoff-execution\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-board-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-action-links\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-action-links-download\.txt/);
@@ -24541,6 +24593,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-board\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-receipt-review-execution\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/rollout-widening-decision-execution\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/first-operating-result-handoff-execution\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-board-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-action-links\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-action-links-download\.txt/);
@@ -24571,6 +24624,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Steady-State Duty Board Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Steady-State Duty Receipt Review Execution Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Rollout Widening Decision Execution Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline First Operating Result Handoff Execution Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=steady-state-duty-board/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Action Links/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Steady-State Duty Action Links Download/);
@@ -24739,6 +24793,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineRolloutWideningDecisionExecutionDirectDownload.body,
       /Rollout Widening Decision Record:[^\n]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    const launchMainlineFirstOperatingResultHandoffExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=first-operating-result-handoff-execution",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffExecutionDirectDownload.body,
+      /RockSolid Launch Mainline First Operating Result Handoff Execution Download/
+    );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffExecutionDirectDownload.body,
+      /First Operating Result Handoff Execution:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision \| receiptAudit=- \| file=developer-ops-launch-operations-overview-status\.txt \| format=launch-operations-overview-status/
+    );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffExecutionDirectDownload.body,
+      /First Operating Result Handoff Rollout:[^\n]*rolloutReceiptStatus=-[^\n]*rolloutDecision=ready_for_rollout_widening_decision[^\n]*rolloutReady=true[^\n]*queueStatus=clear[^\n]*queueTotal=0[^\n]*attention=0/
+    );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffExecutionDirectDownload.body,
+      /First Operating Result Handoff Blockers:[^\n]*blockedBy=rollout_widening_receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,
@@ -24827,7 +24902,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch Mainline First Operating Result Handoff Execution:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision \| receiptAudit=- \| file=developer-ops-launch-operations-overview-status\.txt \| format=launch-operations-overview-status/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*First operating result handoff: ops\/launch-operations-overview-status\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*First operating result handoff execution direct file: ops\/first-operating-result-handoff-execution\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,

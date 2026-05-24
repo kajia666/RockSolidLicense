@@ -29861,6 +29861,53 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         "record_index_complete"
       ]
     );
+    const steadyStateHandoffLandingExecution = launchMainlineSteadyStateHandoff.mainlineSummary
+      .steadyStateHandoffLandingExecution;
+    assert.ok(steadyStateHandoffLandingExecution);
+    assert.equal(steadyStateHandoffLandingExecution.status, "ready_for_steady_state_handoff");
+    assert.equal(steadyStateHandoffLandingExecution.ready, true);
+    assert.equal(steadyStateHandoffLandingExecution.actionKey, "open_steady_state_handoff_brief");
+    assert.equal(steadyStateHandoffLandingExecution.fileName, "developer-ops-steady-state-handoff-brief.txt");
+    assert.equal(steadyStateHandoffLandingExecution.format, "steady-state-handoff-brief");
+    assert.equal(steadyStateHandoffLandingExecution.handoffBriefKey, "ops_steady_state_handoff_brief");
+    assert.equal(steadyStateHandoffLandingExecution.handoffBriefFileName, "developer-ops-steady-state-handoff-brief.txt");
+    assert.equal(steadyStateHandoffLandingExecution.handoffBriefFormat, "steady-state-handoff-brief");
+    assert.match(
+      steadyStateHandoffLandingExecution.handoffBriefHref,
+      /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.equal(steadyStateHandoffLandingExecution.stableOperationsLandingBridgeStatus, "ready_for_steady_state_handoff_brief");
+    assert.equal(steadyStateHandoffLandingExecution.stableOperationsReadbackStatus, "awaiting_readiness_and_rehearsal_readback");
+    assert.equal(steadyStateHandoffLandingExecution.packetReviewStatus, "complete");
+    assert.equal(steadyStateHandoffLandingExecution.recordIndexStatus, "complete");
+    assert.equal(steadyStateHandoffLandingExecution.readinessGate, "stable_operations_handoff");
+    assert.equal(steadyStateHandoffLandingExecution.rehearsalStatus, "ready_for_stable_operations_handoff");
+    assert.deepEqual(
+      steadyStateHandoffLandingExecution.completionChecks,
+      [
+        "readiness_gate_stable_operations_handoff",
+        "rehearsal_ready_for_stable_operations_handoff",
+        "packet_result_review_complete",
+        "record_index_complete"
+      ]
+    );
+    assert.deepEqual(
+      steadyStateHandoffLandingExecution.handoffArtifacts,
+      [
+        expectedSteadyStateLaunchDutyRecordIndexPath,
+        "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md"
+      ]
+    );
+    assert.equal(steadyStateHandoffLandingExecution.steadyStateDutyReceiptReviewStatus, "ready_for_receipt_review");
+    assert.equal(steadyStateHandoffLandingExecution.steadyStateDutyReceiptReviewAuditLogId, launchDutyPacketReviewReceipt.auditLogId);
+    assert.equal(steadyStateHandoffLandingExecution.steadyStateDutyReceiptReviewAction, "packet_review_readback");
+    assert.equal(steadyStateHandoffLandingExecution.steadyStateDutyReceiptReviewFormat, "launch-duty-packet-review");
+    assert.equal(steadyStateHandoffLandingExecution.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    assert.deepEqual(steadyStateHandoffLandingExecution.operatorOrder, expectedSteadyStateHandoffOperatorOrder);
+    assert.deepEqual(
+      steadyStateHandoffLandingExecution.receiptReviewOperatorOrder,
+      ["Review the steady-state duty receipt review route before stable operations handoff."]
+    );
     assert.match(
       launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.recommendedDownload.href,
       /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
@@ -29991,6 +30038,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Steady-State Handoff Landing:[\s\S]*Stable Operations Landing Bridge: status=ready_for_steady_state_handoff_brief \| readback=awaiting_readiness_and_rehearsal_readback \| packetReview=complete \| recordIndex=complete/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Steady-State Handoff Landing Execution:[\s\S]*status=ready_for_steady_state_handoff \| ready=yes \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Steady-State Handoff Landing Execution:[\s\S]*Steady-State Handoff Landing Bridge: status=ready_for_steady_state_handoff_brief \| readback=awaiting_readiness_and_rehearsal_readback \| packetReview=complete \| recordIndex=complete/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      new RegExp(
+        `Launch Mainline Steady-State Handoff Landing Execution:[\\s\\S]*Steady-State Handoff Landing Receipt Review: status=ready_for_receipt_review \\| audit=${launchDutyPacketReviewReceipt.auditLogId} \\| action=packet_review_readback \\| format=launch-duty-packet-review`
+      )
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Steady-State Handoff Landing Execution:[\s\S]*Steady-State Handoff Landing Checks: checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
@@ -30138,6 +30203,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Steady-State Handoff Landing Execution Route:[\s\S]*status=ready_for_steady_state_handoff \| ready=yes \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
+      /steady-state-handoff-landing-execution: [^\n]*file=steady-state-handoff-landing-execution\.txt[^\n]*format=steady-state-handoff-landing-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /Stable Operations Transition Route:[\s\S]*status=ready_for_steady_state_handoff[^\n]*current=open_steady_state_handoff_brief[^\n]*blockedBy=-[^\n]*operatorAction=continue_steady_state_handoff[^\n]*reviewRequired=false[^\n]*nextDownloadKey=ops_steady_state_handoff_brief[^\n]*nextDownload=steady-state-handoff-brief[^\n]*nextDownloadHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief[^\n]*ready=true/
     );
     assert.match(
@@ -30245,6 +30318,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Launch Mainline Steady-State Handoff Landing Execution:[\s\S]*status=ready_for_steady_state_handoff \| ready=yes \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Stable Operations Transition:[\s\S]*status=ready_for_steady_state_handoff[^\n]*current=open_steady_state_handoff_brief[^\n]*blockedBy=-[^\n]*operatorAction=continue_steady_state_handoff[^\n]*reviewRequired=no[^\n]*nextDownloadKey=ops_steady_state_handoff_brief[^\n]*nextDownload=steady-state-handoff-brief[^\n]*nextDownloadHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief[^\n]*ready=yes/
     );
     assert.match(
@@ -30325,6 +30402,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Steady-state handoff landing execution direct file: ops\/steady-state-handoff-landing-execution\.txt/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Pre-Staging Readiness Self-Check:[\s\S]*status=ready_for_pre_staging_self_check \| current=refresh_staging_readiness_status \| next=reload_staging_rehearsal \| groups=4/
     );
     assert.match(
@@ -30339,6 +30420,56 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       new RegExp(
         `First Operating Result Handoff:[\\s\\S]*receiptReadback=recorded_ready_for_first_operating_result_review \\| current=review_first_operating_result_handoff \\| receiptRecorded=true \\| audit=${firstOperatingResultHandoffReceipt.auditLogId} \\| nextDownload=launch-operations-overview-status`
+      )
+    );
+    const launchMainlineSteadyStateChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineSteadyStateChecksumsDownload.body,
+      /ops\/steady-state-handoff-landing-execution\.txt/
+    );
+    const launchMainlineSteadyStateZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const launchMainlineSteadyStateZipText = launchMainlineSteadyStateZipDownload.body.toString("latin1");
+    assert.match(
+      launchMainlineSteadyStateZipText,
+      /ops\/steady-state-handoff-landing-execution\.txt/
+    );
+    assert.match(
+      launchMainlineSteadyStateZipText,
+      /RockSolid Launch Mainline Steady-State Handoff Landing Execution Download/
+    );
+    assert.match(
+      launchMainlineSteadyStateZipText,
+      /Steady-State Handoff Landing Receipt Review:[\s\S]*action=packet_review_readback \| format=launch-duty-packet-review/
+    );
+    const launchMainlineSteadyStateHandoffLandingExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=steady-state-handoff-landing-execution",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body,
+      /RockSolid Launch Mainline Steady-State Handoff Landing Execution Download/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body,
+      /Steady-State Handoff Landing Execution:[\s\S]*status=ready_for_steady_state_handoff \| ready=yes \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body,
+      /Steady-State Handoff Landing Download:[\s\S]*key=ops_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body,
+      new RegExp(
+        `Steady-State Handoff Landing Receipt Review:[\\s\\S]*status=ready_for_receipt_review \\| audit=${launchDutyPacketReviewReceipt.auditLogId} \\| action=packet_review_readback \\| format=launch-duty-packet-review`
       )
     );
 

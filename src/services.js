@@ -4102,6 +4102,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_stable_operations_handoff_execution"
         : normalizedFormat === "stable-operations-transition-review"
           ? "launch_mainline_stable_operations_transition_review"
+        : normalizedFormat === "steady-state-handoff-landing-execution"
+          ? "launch_mainline_steady_state_handoff_landing_execution"
         : normalizedFormat === "post-archive-launch-day-watch-readback"
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
@@ -22803,6 +22805,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
   const stableOperationsTransitionShortcut = mainlineSummary.stableOperationsTransitionShortcut
     || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
+  const steadyStateHandoffLandingExecution = mainlineSummary.steadyStateHandoffLandingExecution
+    || getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload);
   const surfaceReviewCloseoutShortcut = mainlineSummary.surfaceReviewCloseoutShortcut
     || getSurfaceReviewCloseoutShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
@@ -23077,6 +23081,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendStableOperationsTransitionShortcutLines(lines, stableOperationsTransitionShortcut, {
       title: "Launch Mainline Stable Operations Transition Shortcut:"
+    });
+  }
+  if (steadyStateHandoffLandingExecution) {
+    lines.push("");
+    appendSteadyStateHandoffLandingExecutionLines(lines, steadyStateHandoffLandingExecution, {
+      title: "Launch Mainline Steady-State Handoff Landing Execution:"
     });
   }
   if (surfaceReviewCloseoutShortcut) {
@@ -24359,6 +24369,198 @@ function getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload = {}) {
   }
   const opsDownloadScope = getDeveloperLaunchMainlineOpsDownloadScope(payload);
   return opsDownloadScope ? buildDeveloperOpsSteadyStateHandoffBriefDownload(opsDownloadScope) : null;
+}
+
+function getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload = {}) {
+  const operatorEntryLanding = getDeveloperLaunchMainlineOperatorEntry(payload)?.launchDutySteadyStateHandoffLanding
+    && typeof getDeveloperLaunchMainlineOperatorEntry(payload).launchDutySteadyStateHandoffLanding === "object"
+      ? getDeveloperLaunchMainlineOperatorEntry(payload).launchDutySteadyStateHandoffLanding
+      : null;
+  const landing = payload.mainlineSummary?.steadyStateHandoffLanding
+    && typeof payload.mainlineSummary.steadyStateHandoffLanding === "object"
+      ? payload.mainlineSummary.steadyStateHandoffLanding
+      : operatorEntryLanding;
+  if (!landing || typeof landing !== "object") {
+    return null;
+  }
+  const bridge = landing.stableOperationsLandingBridge && typeof landing.stableOperationsLandingBridge === "object"
+    ? landing.stableOperationsLandingBridge
+    : {};
+  const receiptReview = landing.steadyStateDutyReceiptReviewAction
+    && typeof landing.steadyStateDutyReceiptReviewAction === "object"
+      ? landing.steadyStateDutyReceiptReviewAction
+      : (operatorEntryLanding?.steadyStateDutyReceiptReviewAction
+        && typeof operatorEntryLanding.steadyStateDutyReceiptReviewAction === "object"
+          ? operatorEntryLanding.steadyStateDutyReceiptReviewAction
+          : (payload.mainlineSummary?.steadyStateDutyReceiptReview
+            && typeof payload.mainlineSummary.steadyStateDutyReceiptReview === "object"
+              ? payload.mainlineSummary.steadyStateDutyReceiptReview
+              : {}));
+  const download = landing.recommendedDownload && typeof landing.recommendedDownload === "object"
+    ? landing.recommendedDownload
+    : getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload);
+  const handoffBrief = bridge.handoffBrief && typeof bridge.handoffBrief === "object"
+    ? bridge.handoffBrief
+    : {};
+  const completionChecks = Array.isArray(bridge.completionChecks)
+    ? bridge.completionChecks.filter((item) => String(item || "").trim() !== "")
+    : [];
+  const handoffArtifacts = Array.isArray(bridge.handoffArtifacts)
+    ? bridge.handoffArtifacts.filter((item) => String(item || "").trim() !== "")
+    : [];
+  const operatorOrder = Array.isArray(landing.operatorOrder)
+    ? landing.operatorOrder.filter((item) => String(item || "").trim() !== "")
+    : [];
+  const receiptReviewOperatorOrder = Array.isArray(receiptReview.operatorOrder)
+    ? receiptReview.operatorOrder.filter((item) => String(item || "").trim() !== "")
+    : [];
+  const launchDutyRecordIndexPath = landing.launchDutyRecordIndexPath
+    || bridge.recordIndexFile
+    || receiptReview.launchDutyRecordIndexPath
+    || getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload, landing);
+  return {
+    version: "developer-launch-mainline-steady-state-handoff-landing-execution/v1",
+    status: landing.status || null,
+    ready: bridge.readyForLanding === true || landing.status === "ready_for_steady_state_handoff",
+    actionKey: landing.actionKey || null,
+    fileName: landing.fileName || download?.fileName || handoffBrief.fileName || null,
+    format: landing.format || download?.format || handoffBrief.format || null,
+    href: landing.href || download?.href || handoffBrief.href || null,
+    source: landing.source || download?.source || null,
+    launchDutyRecordIndexPath,
+    handoffBriefKey: download?.key || handoffBrief.key || null,
+    handoffBriefFileName: download?.fileName || handoffBrief.fileName || landing.fileName || null,
+    handoffBriefFormat: download?.format || handoffBrief.format || landing.format || null,
+    handoffBriefHref: download?.href || handoffBrief.href || landing.href || null,
+    stableOperationsLandingBridgeStatus: bridge.status || null,
+    stableOperationsReadbackStatus: bridge.readbackPacketStatus || null,
+    packetReviewStatus: bridge.packetReviewStatus || null,
+    recordIndexStatus: bridge.recordIndexStatus || null,
+    readinessGate: bridge.readinessGate || null,
+    rehearsalStatus: bridge.rehearsalStatus || null,
+    completionChecks,
+    handoffArtifacts,
+    firstWaveCloseoutArtifactPath: bridge.firstWaveCloseoutArtifactPath || null,
+    steadyStateDutyReceiptReviewStatus: receiptReview.status || null,
+    steadyStateDutyReceiptReviewAuditLogId: receiptReview.auditLogId || null,
+    steadyStateDutyReceiptReviewAction: receiptReview.action || receiptReview.actionKey || null,
+    steadyStateDutyReceiptReviewFormat: receiptReview.format || null,
+    steadyStateDutyReceiptReviewFileName: receiptReview.fileName || receiptReview.recommendedDownload?.fileName || null,
+    steadyStateDutyReceiptReviewHref: receiptReview.href || receiptReview.recommendedDownload?.href || null,
+    steadyStateDutyReceiptReviewVisibility: receiptReview.receiptVisibilityStatus || null,
+    steadyStateDutyReceiptReviewRecordIndexPath: receiptReview.launchDutyRecordIndexPath || null,
+    operatorOrder,
+    receiptReviewOperatorOrder,
+    nextAction: landing.nextAction || bridge.nextAction || receiptReview.nextAction || null
+  };
+}
+
+function appendSteadyStateHandoffLandingExecutionLines(lines = [], execution = null, {
+  title = "Steady-State Handoff Landing Execution:"
+} = {}) {
+  if (!Array.isArray(lines) || !execution || typeof execution !== "object") {
+    return false;
+  }
+  const checks = Array.isArray(execution.completionChecks) ? execution.completionChecks.join(",") : "";
+  const artifacts = Array.isArray(execution.handoffArtifacts) ? execution.handoffArtifacts.join(",") : "";
+  lines.push(title);
+  lines.push(
+    `- status=${execution.status || "-"}`
+    + ` | ready=${execution.ready === true ? "yes" : "no"}`
+    + ` | action=${execution.actionKey || "-"}`
+    + ` | file=${execution.fileName || "-"}`
+    + ` | format=${execution.format || "-"}`
+  );
+  lines.push(
+    "Steady-State Handoff Landing Download:"
+    + ` key=${execution.handoffBriefKey || "-"}`
+    + ` | file=${execution.handoffBriefFileName || "-"}`
+    + ` | format=${execution.handoffBriefFormat || "-"}`
+    + ` | href=${execution.handoffBriefHref || "-"}`
+  );
+  lines.push(
+    "Steady-State Handoff Landing Bridge:"
+    + ` status=${execution.stableOperationsLandingBridgeStatus || "-"}`
+    + ` | readback=${execution.stableOperationsReadbackStatus || "-"}`
+    + ` | packetReview=${execution.packetReviewStatus || "-"}`
+    + ` | recordIndex=${execution.recordIndexStatus || "-"}`
+    + ` | readinessGate=${execution.readinessGate || "-"}`
+    + ` | rehearsalStatus=${execution.rehearsalStatus || "-"}`
+  );
+  lines.push(
+    "Steady-State Handoff Landing Receipt Review:"
+    + ` status=${execution.steadyStateDutyReceiptReviewStatus || "-"}`
+    + ` | audit=${execution.steadyStateDutyReceiptReviewAuditLogId || "-"}`
+    + ` | action=${execution.steadyStateDutyReceiptReviewAction || "-"}`
+    + ` | format=${execution.steadyStateDutyReceiptReviewFormat || "-"}`
+    + ` | visibility=${execution.steadyStateDutyReceiptReviewVisibility || "-"}`
+    + ` | launchDutyRecordIndex=${execution.steadyStateDutyReceiptReviewRecordIndexPath || execution.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`Steady-State Handoff Landing Checks: checks=${checks || "-"}`);
+  lines.push(
+    "Steady-State Handoff Landing Artifacts:"
+    + ` launchDutyRecordIndex=${execution.launchDutyRecordIndexPath || "-"}`
+    + ` | firstWaveCloseout=${execution.firstWaveCloseoutArtifactPath || "-"}`
+    + ` | artifacts=${artifacts || "-"}`
+  );
+  lines.push(`Steady-State Handoff Landing Execution Next: ${execution.nextAction || "-"}`);
+  if (Array.isArray(execution.operatorOrder) && execution.operatorOrder.length) {
+    lines.push("Steady-State Handoff Landing Operator Order:");
+    for (const step of execution.operatorOrder) {
+      lines.push(`- ${step}`);
+    }
+  }
+  if (Array.isArray(execution.receiptReviewOperatorOrder) && execution.receiptReviewOperatorOrder.length) {
+    lines.push("Steady-State Handoff Landing Receipt Review Operator Order:");
+    for (const step of execution.receiptReviewOperatorOrder) {
+      lines.push(`- ${step}`);
+    }
+  }
+  return true;
+}
+
+function getDeveloperLaunchMainlineSteadyStateHandoffLandingExecutionDownload(payload = {}) {
+  const execution = payload.mainlineSummary?.steadyStateHandoffLandingExecution
+    || getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload);
+  if (!execution) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline steady-state handoff landing execution",
+      "steady-state-handoff-landing-execution.txt",
+      "steady-state-handoff-landing-execution",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: execution.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineSteadyStateHandoffLandingExecutionDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const execution = payload.mainlineSummary?.steadyStateHandoffLandingExecution
+    || getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload);
+  if (!execution) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Steady-State Handoff Landing Execution Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendSteadyStateHandoffLandingExecutionLines(lines, execution);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file after packet review and launch-duty record-index readbacks are complete.");
+  lines.push("- It carries the steady-state handoff brief route, bridge checks, duty receipt review action, and shared launch-duty record index.");
+  lines.push("- Keep it beside steady-state-handoff-brief.txt so launch duty can transfer into stable operations without reopening the full route map.");
+  return lines.join("\n").trimEnd();
 }
 
 function getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload = {}) {
@@ -26851,6 +27053,7 @@ function buildDeveloperLaunchMainlinePayload({
     payload.mainlineSummary.stabilizationReceiptExecutionHandoff = getDeveloperLaunchMainlineStabilizationReceiptExecutionHandoff(payload);
     payload.mainlineSummary.stableOperationsHandoffExecution = getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
     payload.mainlineSummary.stableOperationsTransitionReview = getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
+    payload.mainlineSummary.steadyStateHandoffLandingExecution = getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -26938,6 +27141,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       ? mainlineSummary.steadyStateHandoffLanding
       : null;
   const steadyStateHandoffLandingDownload = getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload);
+  const steadyStateHandoffLandingExecution = mainlineSummary.steadyStateHandoffLandingExecution
+    || getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload);
+  const steadyStateHandoffLandingExecutionDownload = getDeveloperLaunchMainlineSteadyStateHandoffLandingExecutionDownload(payload);
   const steadyStateDutyReceiptReview = mainlineSummary.steadyStateDutyReceiptReview
     && typeof mainlineSummary.steadyStateDutyReceiptReview === "object"
       ? mainlineSummary.steadyStateDutyReceiptReview
@@ -28162,6 +28368,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     );
     lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
   }
+  if (steadyStateHandoffLandingExecution) {
+    lines.push("");
+    appendSteadyStateHandoffLandingExecutionLines(lines, steadyStateHandoffLandingExecution, {
+      title: "Steady-State Handoff Landing Execution Route:"
+    });
+    pushRoute(
+      "steady-state-handoff-landing-execution",
+      "Launch Mainline steady-state handoff landing execution",
+      opsFiles.steadyStateHandoffLandingExecution || "ops/steady-state-handoff-landing-execution.txt",
+      steadyStateHandoffLandingExecutionDownload || {}
+    );
+  }
   if (steadyStateDutyReceiptReview) {
     lines.push("");
     lines.push("Steady-State Duty Receipt Review Route:");
@@ -28626,6 +28844,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/steady-state-handoff-landing-execution.txt",
+    buildDeveloperLaunchMainlineSteadyStateHandoffLandingExecutionDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/steady-state-handoff-download.txt",
     getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload)
       ? buildDeveloperLaunchMainlineSteadyStateHandoffDownloadText(payload)
@@ -28831,7 +29054,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "steady-state-handoff-landing-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -29052,6 +29275,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "stable-operations-transition-review.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineStableOperationsTransitionReviewDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "steady-state-handoff-landing-execution") {
+    return {
+      fileName: "steady-state-handoff-landing-execution.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineSteadyStateHandoffLandingExecutionDownloadText(payload)
     };
   }
   if (normalizedFormat === "stable-operations-transition-shortcut-download") {
@@ -30314,6 +30544,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       steadyStateOperationalReviewDownloadRoute: "ops/steady-state-operational-review-download.txt",
       steadyStateExceptionDigest: "ops/steady-state-exception-digest.txt",
       steadyStateExceptionDigestDownloadRoute: "ops/steady-state-exception-digest-download.txt",
+      steadyStateHandoffLandingExecution: "ops/steady-state-handoff-landing-execution.txt",
       steadyStateHandoffDownloadRoute: "ops/steady-state-handoff-download.txt",
       steadyStateDutyBoardDownloadRoute: "ops/steady-state-duty-board-download.txt",
       steadyStateDutyActionLinksDownloadRoute: "ops/steady-state-duty-action-links-download.txt",
@@ -30405,6 +30636,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       ? mainlineSummary.steadyStateHandoffLanding
       : null;
   const steadyStateHandoffLandingDownload = getDeveloperLaunchMainlineSteadyStateHandoffDownload(payload);
+  const steadyStateHandoffLandingExecution = mainlineSummary.steadyStateHandoffLandingExecution
+    || getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload);
   const steadyStateDutyReceiptReview = mainlineSummary.steadyStateDutyReceiptReview
     && typeof mainlineSummary.steadyStateDutyReceiptReview === "object"
       ? mainlineSummary.steadyStateDutyReceiptReview
@@ -30577,6 +30810,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Steady-state handoff landing",
       "ops/steady-state-handoff-brief.txt"
+    ]);
+  }
+  if (steadyStateHandoffLandingExecution) {
+    handoffFiles.push([
+      "Steady-state handoff landing execution direct file",
+      opsFiles.steadyStateHandoffLandingExecution || "ops/steady-state-handoff-landing-execution.txt"
     ]);
   }
   if (steadyStateHandoffLandingDownload) {
@@ -31375,6 +31614,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
         + ` | href=${steadyStateHandoffLandingDownload.href || "-"}`
       );
     }
+  }
+  if (steadyStateHandoffLandingExecution) {
+    lines.push("");
+    appendSteadyStateHandoffLandingExecutionLines(lines, steadyStateHandoffLandingExecution, {
+      title: "Launch Mainline Steady-State Handoff Landing Execution:"
+    });
   }
   if (steadyStateDutyReceiptReview) {
     lines.push("");

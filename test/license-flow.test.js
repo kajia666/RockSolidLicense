@@ -20999,6 +20999,35 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.recommendedDownload.href,
       /\/api\/developer\/ops\/export\/download\?[^ ]*productCode=EXPORT_CLOSEOUT_READY[^ ]*format=steady-state-duty-board/
     );
+    const steadyStateDutyReceiptReviewExecution = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary
+      .steadyStateDutyReceiptReviewExecution;
+    assert.ok(steadyStateDutyReceiptReviewExecution);
+    assert.equal(
+      steadyStateDutyReceiptReviewExecution.version,
+      "developer-launch-mainline-steady-state-duty-receipt-review-execution/v1"
+    );
+    assert.equal(steadyStateDutyReceiptReviewExecution.status, "recorded");
+    assert.equal(steadyStateDutyReceiptReviewExecution.ready, true);
+    assert.equal(steadyStateDutyReceiptReviewExecution.auditLogId, steadyStateDutyPlanReceipt.auditLogId);
+    assert.equal(steadyStateDutyReceiptReviewExecution.action, "download");
+    assert.equal(steadyStateDutyReceiptReviewExecution.fileName, "developer-ops-steady-state-duty-board.txt");
+    assert.equal(steadyStateDutyReceiptReviewExecution.format, "steady-state-duty-board");
+    assert.equal(steadyStateDutyReceiptReviewExecution.receiptVisibilityStatus, "visible");
+    assert.equal(
+      steadyStateDutyReceiptReviewExecution.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.equal(steadyStateDutyReceiptReviewExecution.recommendedDownloadKey, "ops_latest_steady_state_duty_receipt_asset");
+    assert.equal(steadyStateDutyReceiptReviewExecution.recommendedDownloadFileName, "developer-ops-steady-state-duty-board.txt");
+    assert.equal(steadyStateDutyReceiptReviewExecution.recommendedDownloadFormat, "steady-state-duty-board");
+    assert.match(
+      steadyStateDutyReceiptReviewExecution.recommendedDownloadHref,
+      /\/api\/developer\/ops\/export\/download\?[^ ]*productCode=EXPORT_CLOSEOUT_READY[^ ]*format=steady-state-duty-board/
+    );
+    assert.deepEqual(
+      steadyStateDutyReceiptReviewExecution.operatorOrder,
+      expectedSteadyStateDutyReceiptOperatorOrder
+    );
     const expectedRolloutWideningDecisionOperatorOrder = [
       "Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached."
     ];
@@ -21274,6 +21303,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       new RegExp(`Launch Mainline Steady-State Duty Receipt Review:[\\s\\S]*status=recorded \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      new RegExp(`Launch Mainline Steady-State Duty Receipt Review Execution:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
@@ -24143,6 +24176,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsMainlineHandoffRoutesDownload.body,
       /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      new RegExp(`Steady-State Duty Receipt Review Execution Route:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /steady-state-duty-receipt-review-execution: [^\n]*file=steady-state-duty-receipt-review-execution\.txt[^\n]*format=steady-state-duty-receipt-review-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
@@ -24176,6 +24217,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      new RegExp(`Steady-State Duty Receipt Review Execution Route:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /steady-state-duty-receipt-review-execution: [^\n]*file=steady-state-duty-receipt-review-execution\.txt[^\n]*format=steady-state-duty-receipt-review-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(
@@ -24326,6 +24375,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-handoff-brief\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-board\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-receipt-review-execution\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-board-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-action-links\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/steady-state-duty-action-links-download\.txt/);
@@ -24434,6 +24484,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-handoff-brief\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-board\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-receipt-review-execution\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-board-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-action-links\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/steady-state-duty-action-links-download\.txt/);
@@ -24462,6 +24513,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=steady-state-handoff-brief/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Board/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Steady-State Duty Board Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Steady-State Duty Receipt Review Execution Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=steady-state-duty-board/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Action Links/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Steady-State Duty Action Links Download/);
@@ -24588,6 +24640,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
       /Production Signoff Entry Required Checks:[\s\S]*4\. launch_day_watch_entry_preserved \| expected=enter_after_production_signoff remains the next launch-day watch entry after sign-off archive/
     );
+    const launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=steady-state-duty-receipt-review-execution",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
+      /RockSolid Launch Mainline Steady-State Duty Receipt Review Execution Download/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
+      new RegExp(`Steady-State Duty Receipt Review Execution:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
+      /Steady-State Duty Receipt Review Download:[^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*format=steady-state-duty-board/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
+      /Steady-State Duty Receipt Review Visibility:[^\n]*visibility=visible[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,
@@ -24602,7 +24675,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      new RegExp(`Launch Mainline Steady-State Duty Receipt Review Execution:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Steady-state duty receipt review: ops\/steady-state-duty-board\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Steady-state duty receipt review execution direct file: ops\/steady-state-duty-receipt-review-execution\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,

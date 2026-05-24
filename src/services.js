@@ -4104,6 +4104,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_stable_operations_transition_review"
         : normalizedFormat === "steady-state-handoff-landing-execution"
           ? "launch_mainline_steady_state_handoff_landing_execution"
+        : normalizedFormat === "steady-state-duty-receipt-review-execution"
+          ? "launch_mainline_steady_state_duty_receipt_review_execution"
         : normalizedFormat === "post-archive-launch-day-watch-readback"
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
@@ -22807,6 +22809,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getStableOperationsTransitionShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const steadyStateHandoffLandingExecution = mainlineSummary.steadyStateHandoffLandingExecution
     || getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload);
+  const steadyStateDutyReceiptReviewExecution = mainlineSummary.steadyStateDutyReceiptReviewExecution
+    || getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload);
   const surfaceReviewCloseoutShortcut = mainlineSummary.surfaceReviewCloseoutShortcut
     || getSurfaceReviewCloseoutShortcutFromOperatorEntry(launchOperationsOperatorEntry);
   const receiptVisibilityConfirmationQueue = launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue || null;
@@ -23571,6 +23575,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
         lines.push(`- ${item}`);
       }
     }
+  }
+  if (steadyStateDutyReceiptReviewExecution) {
+    lines.push("");
+    appendSteadyStateDutyReceiptReviewExecutionLines(lines, steadyStateDutyReceiptReviewExecution, {
+      title: "Launch Mainline Steady-State Duty Receipt Review Execution:"
+    });
   }
   const rolloutWideningDecisionAction = mainlineSummary.rolloutWideningDecisionAction || null;
   if (rolloutWideningDecisionAction) {
@@ -24560,6 +24570,136 @@ function buildDeveloperLaunchMainlineSteadyStateHandoffLandingExecutionDownloadT
   lines.push("- Use this direct file after packet review and launch-duty record-index readbacks are complete.");
   lines.push("- It carries the steady-state handoff brief route, bridge checks, duty receipt review action, and shared launch-duty record index.");
   lines.push("- Keep it beside steady-state-handoff-brief.txt so launch duty can transfer into stable operations without reopening the full route map.");
+  return lines.join("\n").trimEnd();
+}
+
+function getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload = {}) {
+  const review = payload.mainlineSummary?.steadyStateDutyReceiptReview
+    && typeof payload.mainlineSummary.steadyStateDutyReceiptReview === "object"
+      ? payload.mainlineSummary.steadyStateDutyReceiptReview
+      : null;
+  if (!review) {
+    return null;
+  }
+  const download = review.recommendedDownload && typeof review.recommendedDownload === "object"
+    ? review.recommendedDownload
+    : getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload);
+  const operatorOrder = Array.isArray(review.operatorOrder)
+    ? review.operatorOrder.filter((item) => String(item || "").trim() !== "")
+    : (Array.isArray(download?.operatorOrder)
+      ? download.operatorOrder.filter((item) => String(item || "").trim() !== "")
+      : []);
+  const launchDutyRecordIndexPath = review.launchDutyRecordIndexPath
+    || download?.launchDutyRecordIndexPath
+    || getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload);
+  const status = review.status || null;
+  const receiptVisibilityStatus = review.receiptVisibilityStatus || null;
+  return {
+    version: "developer-launch-mainline-steady-state-duty-receipt-review-execution/v1",
+    mode: "developer-launch-mainline-steady-state-duty-receipt-review-execution",
+    status,
+    ready: status === "recorded" || receiptVisibilityStatus === "visible",
+    auditLogId: review.auditLogId || null,
+    productCode: review.productCode || payload.filters?.productCode || payload.manifest?.project?.code || null,
+    channel: review.channel || payload.filters?.channel || payload.manifest?.channel || "stable",
+    action: review.action || "download",
+    fileName: review.fileName || download?.fileName || null,
+    format: review.format || download?.format || null,
+    href: review.href || download?.href || null,
+    source: review.source || download?.source || "developer-ops-steady-state-duty-plan-receipt",
+    receiptVisibilityStatus,
+    launchDutyRecordIndexPath,
+    recommendedDownloadKey: download?.key || null,
+    recommendedDownloadLabel: download?.label || null,
+    recommendedDownloadFileName: download?.fileName || null,
+    recommendedDownloadFormat: download?.format || null,
+    recommendedDownloadHref: download?.href || null,
+    recommendedDownloadSource: download?.source || null,
+    recommendedDownload: download || null,
+    operatorOrder,
+    nextAction: review.nextAction || "Review the recorded steady-state duty receipt from Launch Mainline and keep it attached to the first stable operations handoff."
+  };
+}
+
+function appendSteadyStateDutyReceiptReviewExecutionLines(lines = [], execution = null, {
+  title = "Steady-State Duty Receipt Review Execution:"
+} = {}) {
+  if (!Array.isArray(lines) || !execution || typeof execution !== "object") {
+    return false;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${execution.status || "-"}`
+    + ` | ready=${execution.ready === true ? "yes" : "no"}`
+    + ` | audit=${execution.auditLogId || "-"}`
+    + ` | action=${execution.action || "-"}`
+    + ` | file=${execution.fileName || "-"}`
+    + ` | format=${execution.format || "-"}`
+  );
+  lines.push(
+    "Steady-State Duty Receipt Review Download:"
+    + ` key=${execution.recommendedDownloadKey || "-"}`
+    + ` | file=${execution.recommendedDownloadFileName || execution.fileName || "-"}`
+    + ` | format=${execution.recommendedDownloadFormat || execution.format || "-"}`
+    + ` | href=${execution.recommendedDownloadHref || execution.href || "-"}`
+    + ` | source=${execution.recommendedDownloadSource || execution.source || "-"}`
+  );
+  lines.push(
+    "Steady-State Duty Receipt Review Visibility:"
+    + ` visibility=${execution.receiptVisibilityStatus || "-"}`
+    + ` | launchDutyRecordIndex=${execution.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`Steady-State Duty Receipt Review Execution Next: ${execution.nextAction || "-"}`);
+  if (Array.isArray(execution.operatorOrder) && execution.operatorOrder.length) {
+    lines.push("Steady-State Duty Receipt Review Operator Order:");
+    for (const step of execution.operatorOrder) {
+      lines.push(`- ${step}`);
+    }
+  }
+  return true;
+}
+
+function getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecutionDownload(payload = {}) {
+  const execution = payload.mainlineSummary?.steadyStateDutyReceiptReviewExecution
+    || getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload);
+  if (!execution) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline steady-state duty receipt review execution",
+      "steady-state-duty-receipt-review-execution.txt",
+      "steady-state-duty-receipt-review-execution",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: execution.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecutionDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const execution = payload.mainlineSummary?.steadyStateDutyReceiptReviewExecution
+    || getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload);
+  if (!execution) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Steady-State Duty Receipt Review Execution Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendSteadyStateDutyReceiptReviewExecutionLines(lines, execution);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file after the steady-state duty receipt is recorded and before stable operations handoff.");
+  lines.push("- It carries the duty receipt audit, visibility status, source download, and shared launch-duty record index in one review artifact.");
+  lines.push("- Keep it beside steady-state-duty-board.txt so receipt review can be completed without reopening the longer handoff route map.");
   return lines.join("\n").trimEnd();
 }
 
@@ -27054,6 +27194,7 @@ function buildDeveloperLaunchMainlinePayload({
     payload.mainlineSummary.stableOperationsHandoffExecution = getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload);
     payload.mainlineSummary.stableOperationsTransitionReview = getDeveloperLaunchMainlineStableOperationsTransitionReview(payload);
     payload.mainlineSummary.steadyStateHandoffLandingExecution = getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload);
+    payload.mainlineSummary.steadyStateDutyReceiptReviewExecution = getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -27152,6 +27293,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     && typeof steadyStateDutyReceiptReview.recommendedDownload === "object"
       ? steadyStateDutyReceiptReview.recommendedDownload
       : null;
+  const steadyStateDutyReceiptReviewExecution = mainlineSummary.steadyStateDutyReceiptReviewExecution
+    || getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload);
+  const steadyStateDutyReceiptReviewExecutionDownload = getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecutionDownload(payload);
   const rolloutWideningDecisionAction = mainlineSummary.rolloutWideningDecisionAction
     && typeof mainlineSummary.rolloutWideningDecisionAction === "object"
       ? mainlineSummary.rolloutWideningDecisionAction
@@ -27364,6 +27508,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const stabilizationReceiptExecutionHandoffDownload = getDeveloperLaunchMainlineStabilizationReceiptExecutionHandoffDownload(payload);
   const stableOperationsHandoffExecutionDownload = getDeveloperLaunchMainlineStableOperationsHandoffExecutionDownload(payload);
   const stableOperationsTransitionReviewDownload = getDeveloperLaunchMainlineStableOperationsTransitionReviewDownload(payload);
+  const steadyStateDutyReceiptReviewExecutionDirectDownload = getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecutionDownload(payload);
   const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
   const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
   const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
@@ -28401,6 +28546,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     );
     lines.push(`- nextAction=${steadyStateDutyReceiptReview.nextAction || "-"}`);
   }
+  if (steadyStateDutyReceiptReviewExecution) {
+    lines.push("");
+    appendSteadyStateDutyReceiptReviewExecutionLines(lines, steadyStateDutyReceiptReviewExecution, {
+      title: "Steady-State Duty Receipt Review Execution Route:"
+    });
+    pushRoute(
+      "steady-state-duty-receipt-review-execution",
+      "Launch Mainline steady-state duty receipt review execution",
+      opsFiles.steadyStateDutyReceiptReviewExecution || "ops/steady-state-duty-receipt-review-execution.txt",
+      steadyStateDutyReceiptReviewExecutionDownload || steadyStateDutyReceiptReviewExecutionDirectDownload || {}
+    );
+  }
   if (rolloutWideningDecisionAction) {
     lines.push("");
     lines.push("Rollout Widening Decision Route:");
@@ -28861,6 +29018,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/steady-state-duty-receipt-review-execution.txt",
+    buildDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecutionDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/steady-state-duty-board-download.txt",
     getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload)
       ? buildDeveloperLaunchMainlineSteadyStateDutyBoardDownloadText(payload)
@@ -29054,7 +29216,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "steady-state-handoff-landing-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -29282,6 +29444,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "steady-state-handoff-landing-execution.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineSteadyStateHandoffLandingExecutionDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "steady-state-duty-receipt-review-execution") {
+    return {
+      fileName: "steady-state-duty-receipt-review-execution.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecutionDownloadText(payload)
     };
   }
   if (normalizedFormat === "stable-operations-transition-shortcut-download") {
@@ -30545,6 +30714,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       steadyStateExceptionDigest: "ops/steady-state-exception-digest.txt",
       steadyStateExceptionDigestDownloadRoute: "ops/steady-state-exception-digest-download.txt",
       steadyStateHandoffLandingExecution: "ops/steady-state-handoff-landing-execution.txt",
+      steadyStateDutyReceiptReviewExecution: "ops/steady-state-duty-receipt-review-execution.txt",
       steadyStateHandoffDownloadRoute: "ops/steady-state-handoff-download.txt",
       steadyStateDutyBoardDownloadRoute: "ops/steady-state-duty-board-download.txt",
       steadyStateDutyActionLinksDownloadRoute: "ops/steady-state-duty-action-links-download.txt",
@@ -30646,6 +30816,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     && typeof steadyStateDutyReceiptReview.recommendedDownload === "object"
       ? steadyStateDutyReceiptReview.recommendedDownload
       : null;
+  const steadyStateDutyReceiptReviewExecution = mainlineSummary.steadyStateDutyReceiptReviewExecution
+    || getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload);
   const rolloutWideningDecisionAction = mainlineSummary.rolloutWideningDecisionAction
     && typeof mainlineSummary.rolloutWideningDecisionAction === "object"
       ? mainlineSummary.rolloutWideningDecisionAction
@@ -30834,6 +31006,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Steady-state duty receipt review",
       "ops/steady-state-duty-board.txt"
+    ]);
+  }
+  if (steadyStateDutyReceiptReviewExecution) {
+    handoffFiles.push([
+      "Steady-state duty receipt review execution direct file",
+      opsFiles.steadyStateDutyReceiptReviewExecution || "ops/steady-state-duty-receipt-review-execution.txt"
     ]);
   }
   const steadyStateDutyBoardDownload = getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload);
@@ -31639,6 +31817,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       + ` | launchDutyRecordIndex=${steadyStateDutyReceiptReview.launchDutyRecordIndexPath || "-"}`
     );
     lines.push(`- nextAction=${steadyStateDutyReceiptReview.nextAction || "-"}`);
+  }
+  if (steadyStateDutyReceiptReviewExecution) {
+    lines.push("");
+    appendSteadyStateDutyReceiptReviewExecutionLines(lines, steadyStateDutyReceiptReviewExecution, {
+      title: "Launch Mainline Steady-State Duty Receipt Review Execution:"
+    });
   }
   if (rolloutWideningDecisionAction) {
     lines.push("");
@@ -54170,6 +54354,61 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
         source: "developer-ops-steady-state-duty-plan-receipt"
       }
     : null;
+  const steadyStateDutyReceiptReviewLaunchDutyRecordIndexPath = latestSteadyStateDutyPlanReceipt
+    ? latestSteadyStateDutyPlanReceipt.receiptVisibility?.launchDutyRecordIndexPath
+      || latestSteadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath
+      || latestSteadyStateDutyPlanReceipt.launchOpsOverviewContextLaunchDutyRecordIndexPath
+      || "-"
+    : "-";
+  const steadyStateDutyReceiptReviewExecution = latestSteadyStateDutyPlanReceipt
+    ? {
+        version: "developer-launch-mainline-steady-state-duty-receipt-review-execution/v1",
+        mode: "developer-launch-mainline-steady-state-duty-receipt-review-execution",
+        status: latestSteadyStateDutyPlanReceipt.status || "recorded",
+        ready: (latestSteadyStateDutyPlanReceipt.status || "recorded") === "recorded"
+          || latestSteadyStateDutyPlanReceipt.receiptVisibility?.status === "visible",
+        auditLogId: latestSteadyStateDutyPlanReceipt.auditLogId || null,
+        productCode: latestSteadyStateDutyPlanReceipt.productCode || overviewStatusScope.productCode || null,
+        channel: latestSteadyStateDutyPlanReceipt.channel || overviewStatusScope.channel || "stable",
+        action: latestSteadyStateDutyPlanReceipt.action || "download",
+        fileName: latestSteadyStateDutyPlanReceipt.fileName
+          || steadyStateDutyReceiptReviewDownload?.fileName
+          || "developer-ops-steady-state-duty-board.txt",
+        format: latestSteadyStateDutyPlanReceipt.format
+          || steadyStateDutyReceiptReviewDownload?.format
+          || "steady-state-duty-board",
+        href: latestSteadyStateDutyPlanReceipt.href || steadyStateDutyReceiptReviewDownload?.href || null,
+        source: steadyStateDutyReceiptReviewDownload?.source || "developer-ops-steady-state-duty-plan-receipt",
+        receiptVisibilityStatus: latestSteadyStateDutyPlanReceipt.receiptVisibility?.status || null,
+        launchDutyRecordIndexPath: steadyStateDutyReceiptReviewLaunchDutyRecordIndexPath,
+        recommendedDownloadKey: steadyStateDutyReceiptReviewDownload?.key || null,
+        recommendedDownloadLabel: steadyStateDutyReceiptReviewDownload?.label || null,
+        recommendedDownloadFileName: steadyStateDutyReceiptReviewDownload?.fileName || null,
+        recommendedDownloadFormat: steadyStateDutyReceiptReviewDownload?.format || null,
+        recommendedDownloadHref: steadyStateDutyReceiptReviewDownload?.href || null,
+        recommendedDownloadSource: steadyStateDutyReceiptReviewDownload?.source || null,
+        recommendedDownload: steadyStateDutyReceiptReviewDownload || null,
+        operatorOrder: ["Review the steady-state duty receipt review route before stable operations handoff."],
+        nextAction: "Review the recorded steady-state duty receipt from Launch Mainline and keep it attached to the first stable operations handoff."
+      }
+    : null;
+  const steadyStateDutyReceiptReviewExecutionDownload = steadyStateDutyReceiptReviewExecution
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline steady-state duty receipt review execution",
+          "steady-state-duty-receipt-review-execution.txt",
+          "steady-state-duty-receipt-review-execution",
+          routeParams
+        ),
+        launchDutyRecordIndexPath: steadyStateDutyReceiptReviewExecution.launchDutyRecordIndexPath || null
+      }
+    : null;
+  if (steadyStateDutyReceiptReviewExecutionDownload) {
+    downloads.push([
+      "steady-state-duty-receipt-review-execution",
+      steadyStateDutyReceiptReviewExecutionDownload
+    ]);
+  }
   const rolloutWideningDecisionAction = steadyStateDutyBoard?.rolloutWideningDecisionAction
     && typeof steadyStateDutyBoard.rolloutWideningDecisionAction === "object"
       ? steadyStateDutyBoard.rolloutWideningDecisionAction
@@ -54313,6 +54552,22 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
         || latestSteadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath
         || latestSteadyStateDutyPlanReceipt.launchOpsOverviewContextLaunchDutyRecordIndexPath
         || "-"}`
+    );
+  }
+  if (steadyStateDutyReceiptReviewExecution) {
+    lines.push("");
+    appendSteadyStateDutyReceiptReviewExecutionLines(lines, steadyStateDutyReceiptReviewExecution, {
+      title: "Steady-State Duty Receipt Review Execution Route:"
+    });
+    lines.push(
+      `- steady-state-duty-receipt-review-execution: ops/steady-state-duty-receipt-review-execution.txt`
+      + ` | key=${steadyStateDutyReceiptReviewExecutionDownload?.key || "launch_mainline_steady_state_duty_receipt_review_execution"}`
+      + ` | label=${steadyStateDutyReceiptReviewExecutionDownload?.label || "Launch Mainline steady-state duty receipt review execution"}`
+      + ` | file=${steadyStateDutyReceiptReviewExecutionDownload?.fileName || "steady-state-duty-receipt-review-execution.txt"}`
+      + ` | format=${steadyStateDutyReceiptReviewExecutionDownload?.format || "steady-state-duty-receipt-review-execution"}`
+      + ` | source=${steadyStateDutyReceiptReviewExecutionDownload?.source || "developer-launch-mainline"}`
+      + ` | href=${steadyStateDutyReceiptReviewExecutionDownload?.href || "-"}`
+      + ` | launchDutyRecordIndex=${steadyStateDutyReceiptReviewExecution.launchDutyRecordIndexPath || "-"}`
     );
   }
   if (rolloutWideningDecisionAction) {

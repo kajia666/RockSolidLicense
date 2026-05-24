@@ -24205,6 +24205,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Production Signoff Entry Handoff Route:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /production-signoff-entry-handoff: [^\n]*file=production-signoff-entry-handoff\.txt[^\n]*format=production-signoff-entry-handoff[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Launch Switch Readiness Route:[\s\S]*status=blocked_until_full_test_and_signoff \| decision=hold_until_full_test_and_signoff \| currentAction=refresh_staging_readiness_status \| nextAction=reload_staging_rehearsal/
     );
     assert.match(
@@ -24288,6 +24296,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-readiness-distance\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/production-signoff-entry-handoff\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-switch-readiness\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-candidate-full-verification-gate\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/surface-review-closeout-shortcut-download\.txt/);
@@ -24359,6 +24368,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Launch Readiness Distance Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Readiness Distance:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Readiness Distance Commands:[\s\S]*current=npm\.cmd run staging:readiness:status/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/production-signoff-entry-handoff\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Production Signoff Entry Handoff Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Production Signoff Entry Commands:[\s\S]*readinessReadback=npm\.cmd run staging:readiness:status/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-switch-readiness\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Launch Switch Readiness Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Switch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| decision=hold_until_full_test_and_signoff/);
@@ -24550,6 +24563,31 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineLaunchReadinessDistanceDirectDownload.body,
       /Launch Readiness Distance Signoff:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/
     );
+    const launchMainlineProductionSignoffEntryHandoffDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=production-signoff-entry-handoff",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
+      /RockSolid Launch Mainline Production Signoff Entry Handoff Download/
+    );
+    assert.match(
+      launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
+      /Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
+    );
+    assert.match(
+      launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
+      /Production Signoff Entry Commands:[\s\S]*readinessReadback=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
+      /Production Signoff Entry Packet:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
+      /Production Signoff Entry Required Checks:[\s\S]*4\. launch_day_watch_entry_preserved \| expected=enter_after_production_signoff remains the next launch-day watch entry after sign-off archive/
+    );
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,
@@ -24702,6 +24740,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Production signoff entry handoff direct file: ops\/production-signoff-entry-handoff\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Launch switch readiness direct file: ops\/launch-switch-readiness\.txt/
     );
     assert.match(
@@ -24742,6 +24784,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*status=ready_for_first_wave_confirmation \| ready=no \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff \| manualProgress=1\/2 \| manualRemaining=1 \| surfaces=2\/3/
     );
     assert.match(
@@ -24777,6 +24823,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSummarySelectionDownload.body,
       /Launch Mainline Launch Readiness Distance:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Launch Mainline Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
     );
     assert.match(
       launchMainlineSummarySelectionDownload.body,

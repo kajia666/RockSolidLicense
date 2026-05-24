@@ -4090,6 +4090,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_handoff_download_routes"
         : normalizedFormat === "launch-readiness-distance"
           ? "launch_mainline_launch_readiness_distance"
+        : normalizedFormat === "production-signoff-entry-handoff"
+          ? "launch_mainline_production_signoff_entry_handoff"
         : normalizedFormat === "post-archive-launch-day-watch-readback"
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
@@ -22679,6 +22681,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const launchReadinessDistance = mainlineSummary.launchReadinessDistance
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
+    || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -22828,6 +22832,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendLaunchReadinessDistanceLines(lines, launchReadinessDistance, {
       title: "Launch Mainline Launch Readiness Distance:"
+    });
+  }
+  if (productionSignoffEntryHandoff) {
+    lines.push("");
+    appendProductionSignoffEntryHandoffLines(lines, productionSignoffEntryHandoff, {
+      title: "Launch Mainline Production Signoff Entry Handoff:"
     });
   }
   if (launchSwitchReadinessSummary) {
@@ -24977,6 +24987,143 @@ function buildDeveloperLaunchMainlineLaunchReadinessDistanceDownloadText(payload
   return lines.join("\n").trimEnd();
 }
 
+function getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const gate = entry?.launchCandidateFullVerificationGate || null;
+  const resultHandoff = gate?.resultHandoff && typeof gate.resultHandoff === "object"
+    ? gate.resultHandoff
+    : null;
+  const handoff = resultHandoff?.productionSignoffEntryHandoff
+    && typeof resultHandoff.productionSignoffEntryHandoff === "object"
+      ? resultHandoff.productionSignoffEntryHandoff
+      : null;
+  if (!handoff) {
+    return null;
+  }
+  return {
+    mode: "developer-launch-mainline-production-signoff-entry-handoff",
+    status: handoff.status || null,
+    currentActionKey: handoff.currentActionKey || null,
+    archiveActionKey: handoff.archiveActionKey || null,
+    nextGate: handoff.nextGate || null,
+    nextAfterSignoffActionKey: handoff.nextAfterSignoffActionKey || null,
+    productionSignoffPacket: handoff.productionSignoffPacket || resultHandoff?.productionSignoffPacket || gate?.productionSignoffPacket || null,
+    launchDutyRecordIndexPath: handoff.launchDutyRecordIndexPath || gate?.launchDutyRecordIndexPath || null,
+    launchDutyArchiveIndexPath: handoff.launchDutyArchiveIndexPath || null,
+    readinessReadbackCommand: handoff.readinessReadbackCommand || gate?.readbackAfterCommand || resultHandoff?.readbackCommand || null,
+    rehearsalReloadCommand: handoff.rehearsalReloadCommand || gate?.rehearsalReloadCommand || null,
+    signoffBackfillCommand: resultHandoff?.signoffBackfillCommand || gate?.signoffBackfillCommand || null,
+    resultReadbackCommand: resultHandoff?.readbackCommand || gate?.readbackAfterCommand || null,
+    resultHandoffStatus: resultHandoff?.status || null,
+    targetKey: resultHandoff?.targetKey || null,
+    decision: resultHandoff?.decision || null,
+    expectedFilledKey: resultHandoff?.expectedFilledKey || null,
+    expectedNextGate: resultHandoff?.expectedNextGate || handoff.nextGate || null,
+    fullTestArtifact: resultHandoff?.artifactPath || gate?.outputArtifact || null,
+    expectedArtifactPath: resultHandoff?.expectedArtifactPath || gate?.outputArtifact || null,
+    requiredChecks: Array.isArray(handoff.requiredChecks)
+      ? handoff.requiredChecks.map((item) => ({
+          key: item?.key || null,
+          expected: item?.expected || null
+        }))
+      : [],
+    nextAction: handoff.nextAction || resultHandoff?.nextAction || gate?.nextAction || null
+  };
+}
+
+function appendProductionSignoffEntryHandoffLines(lines = [], handoff = null, {
+  title = "Production Signoff Entry Handoff:"
+} = {}) {
+  if (!Array.isArray(lines) || !handoff || typeof handoff !== "object") {
+    return false;
+  }
+  const requiredChecks = Array.isArray(handoff.requiredChecks) ? handoff.requiredChecks : [];
+  lines.push(title);
+  lines.push(
+    `- status=${handoff.status || "-"}`
+    + ` | currentAction=${handoff.currentActionKey || "-"}`
+    + ` | archiveAction=${handoff.archiveActionKey || "-"}`
+    + ` | nextGate=${handoff.nextGate || "-"}`
+    + ` | nextAfterSignoff=${handoff.nextAfterSignoffActionKey || "-"}`
+  );
+  lines.push(
+    "Production Signoff Entry Packet:"
+    + ` productionSignoffPacket=${handoff.productionSignoffPacket || "-"}`
+    + ` | launchDutyRecordIndex=${handoff.launchDutyRecordIndexPath || "-"}`
+    + ` | launchDutyArchiveIndex=${handoff.launchDutyArchiveIndexPath || "-"}`
+  );
+  lines.push(
+    "Production Signoff Entry Commands:"
+    + ` readinessReadback=${handoff.readinessReadbackCommand || "-"}`
+    + ` | rehearsalReload=${handoff.rehearsalReloadCommand || "-"}`
+    + ` | signoffBackfill=${handoff.signoffBackfillCommand || "-"}`
+    + ` | resultReadback=${handoff.resultReadbackCommand || "-"}`
+  );
+  lines.push(
+    "Production Signoff Entry Result:"
+    + ` target=${handoff.targetKey || "-"}`
+    + ` | decision=${handoff.decision || "-"}`
+    + ` | expectedFilled=${handoff.expectedFilledKey || "-"}`
+    + ` | expectedGate=${handoff.expectedNextGate || "-"}`
+    + ` | fullTestArtifact=${handoff.fullTestArtifact || "-"}`
+    + ` | expectedArtifact=${handoff.expectedArtifactPath || "-"}`
+    + ` | resultHandoff=${handoff.resultHandoffStatus || "-"}`
+  );
+  if (requiredChecks.length) {
+    lines.push("Production Signoff Entry Required Checks:");
+    for (let index = 0; index < requiredChecks.length; index += 1) {
+      const item = requiredChecks[index];
+      lines.push(`${index + 1}. ${item?.key || "-"} | expected=${item?.expected || "-"}`);
+    }
+  }
+  lines.push(`Production Signoff Entry Next: ${handoff.nextAction || "-"}`);
+  return true;
+}
+
+function getDeveloperLaunchMainlineProductionSignoffEntryHandoffDownload(payload = {}) {
+  const handoff = payload.mainlineSummary?.productionSignoffEntryHandoff
+    || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
+  if (!handoff) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline production signoff entry handoff",
+      "production-signoff-entry-handoff.txt",
+      "production-signoff-entry-handoff",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: handoff.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineProductionSignoffEntryHandoffDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const handoff = payload.mainlineSummary?.productionSignoffEntryHandoff
+    || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
+  if (!handoff) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Production Signoff Entry Handoff Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendProductionSignoffEntryHandoffLines(lines, handoff);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file immediately after the guarded full-test result is attached and full_test_window_passed is backfilled.");
+  lines.push("- It shows the production sign-off packet, readiness readback, rehearsal reload, and required archive checks without reopening the longer full-verification gate.");
+  lines.push("- Do not archive the production sign-off packet until the readiness readback confirms the expected production_signoff gate.");
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -25625,6 +25772,7 @@ function buildDeveloperLaunchMainlinePayload({
   });
   if (payload.mainlineSummary && typeof payload.mainlineSummary === "object") {
     payload.mainlineSummary.launchReadinessDistance = buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+    payload.mainlineSummary.productionSignoffEntryHandoff = getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -25750,6 +25898,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const launchReadinessDistance = mainlineSummary.launchReadinessDistance
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
+    || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -25914,6 +26064,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       )
     : null;
   const launchReadinessDistanceDownload = getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload);
+  const productionSignoffEntryHandoffDownload = getDeveloperLaunchMainlineProductionSignoffEntryHandoffDownload(payload);
   const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
   const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
   const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
@@ -26508,6 +26659,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       launchReadinessDistanceDownload || {}
     );
   }
+  if (productionSignoffEntryHandoff) {
+    lines.push("");
+    appendProductionSignoffEntryHandoffLines(lines, productionSignoffEntryHandoff, {
+      title: "Production Signoff Entry Handoff Route:"
+    });
+    pushRoute(
+      "production-signoff-entry-handoff",
+      "Launch Mainline production signoff entry handoff",
+      opsFiles.productionSignoffEntryHandoff || "ops/production-signoff-entry-handoff.txt",
+      productionSignoffEntryHandoffDownload || {}
+    );
+  }
   if (launchSwitchReadinessSummary) {
     lines.push("");
     appendLaunchSwitchReadinessSummaryLines(lines, launchSwitchReadinessSummary, {
@@ -27029,6 +27192,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/production-signoff-entry-handoff.txt",
+    buildDeveloperLaunchMainlineProductionSignoffEntryHandoffDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-switch-readiness.txt",
     buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload)
   );
@@ -27485,7 +27653,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -27587,6 +27755,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "launch-readiness-distance.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineLaunchReadinessDistanceDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "production-signoff-entry-handoff") {
+    return {
+      fileName: "production-signoff-entry-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineProductionSignoffEntryHandoffDownloadText(payload)
     };
   }
   if (normalizedFormat === "launch-switch-readiness") {
@@ -28882,6 +29057,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOperatorEntry: "ops/launch-operations-operator-entry.txt",
       launchOperationsOperatorEntryDownloadRoute: "ops/launch-operations-operator-entry-download.txt",
       launchReadinessDistance: "ops/launch-readiness-distance.txt",
+      productionSignoffEntryHandoff: "ops/production-signoff-entry-handoff.txt",
       launchSwitchReadiness: "ops/launch-switch-readiness.txt",
       launchCandidateFullVerificationGate: "ops/launch-candidate-full-verification-gate.txt",
       postArchiveLaunchDayWatchReadback: "ops/post-archive-launch-day-watch-readback.txt",
@@ -29075,6 +29251,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const launchReadinessDistance = mainlineSummary.launchReadinessDistance
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
+    || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -29221,6 +29399,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Launch readiness distance direct file",
       opsFiles.launchReadinessDistance || "ops/launch-readiness-distance.txt"
+    ]);
+  }
+  if (productionSignoffEntryHandoff) {
+    handoffFiles.push([
+      "Production signoff entry handoff direct file",
+      opsFiles.productionSignoffEntryHandoff || "ops/production-signoff-entry-handoff.txt"
     ]);
   }
   if (launchSwitchReadinessSummary || launchSwitchOperatorRunbook) {
@@ -29979,6 +30163,10 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (launchReadinessDistance) {
     lines.push("");
     appendLaunchReadinessDistanceLines(lines, launchReadinessDistance);
+  }
+  if (productionSignoffEntryHandoff) {
+    lines.push("");
+    appendProductionSignoffEntryHandoffLines(lines, productionSignoffEntryHandoff);
   }
   if (launchSwitchReadinessSummary) {
     lines.push("");

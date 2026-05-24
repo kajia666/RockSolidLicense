@@ -4094,6 +4094,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_production_signoff_entry_handoff"
         : normalizedFormat === "signoff-archive-watch-handoff"
           ? "launch_mainline_signoff_archive_watch_handoff"
+        : normalizedFormat === "launch-duty-receipt-execution-handoff"
+          ? "launch_mainline_launch_duty_receipt_execution_handoff"
         : normalizedFormat === "post-archive-launch-day-watch-readback"
           ? "launch_mainline_post_archive_launch_day_watch_readback"
         : normalizedFormat === "launch-day-watch-summary-record-readback"
@@ -22687,6 +22689,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
     || getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
+  const launchDutyReceiptExecutionHandoff = mainlineSummary.launchDutyReceiptExecutionHandoff
+    || getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -22848,6 +22852,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendSignoffArchiveWatchHandoffLines(lines, signoffArchiveWatchHandoff, {
       title: "Launch Mainline Signoff Archive Watch Handoff:"
+    });
+  }
+  if (launchDutyReceiptExecutionHandoff) {
+    lines.push("");
+    appendLaunchDutyReceiptExecutionHandoffLines(lines, launchDutyReceiptExecutionHandoff, {
+      title: "Launch Mainline Launch-Duty Receipt Execution Handoff:"
     });
   }
   if (launchSwitchReadinessSummary) {
@@ -25350,6 +25360,193 @@ function buildDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownloadText(payl
   return lines.join("\n").trimEnd();
 }
 
+function getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const action = entry?.launchDutyHandoffAction && typeof entry.launchDutyHandoffAction === "object"
+    ? entry.launchDutyHandoffAction
+    : null;
+  if (!action) {
+    return null;
+  }
+  const cutoverAction = action.launchDutyCutoverExecutionAction
+    && typeof action.launchDutyCutoverExecutionAction === "object"
+      ? action.launchDutyCutoverExecutionAction
+      : null;
+  const firstPacket = action.firstReceiptWritePacket && typeof action.firstReceiptWritePacket === "object"
+    ? action.firstReceiptWritePacket
+    : null;
+  const nextPacket = action.nextReceiptWritePacket && typeof action.nextReceiptWritePacket === "object"
+    ? action.nextReceiptWritePacket
+    : null;
+  const packets = [firstPacket, nextPacket].filter((item) => item && typeof item === "object");
+  if (!packets.length && !cutoverAction) {
+    return null;
+  }
+  const currentActionKey = cutoverAction?.currentActionKey || action.currentActionKey || null;
+  const currentRecordKey = cutoverAction?.currentRecordKey || null;
+  const currentPacket = packets.find((item) => (
+    item.actionKey === currentActionKey
+    && item.recorded !== true
+  ))
+    || packets.find((item) => item.recordKey === currentRecordKey && item.recorded !== true)
+    || packets.find((item) => item.readyForReceiptWrite === true)
+    || packets.find((item) => item.recorded !== true)
+    || packets[0]
+    || null;
+  if (!currentPacket && !cutoverAction) {
+    return null;
+  }
+  const postArchiveReadback = payload.mainlineSummary?.postArchiveLaunchDayWatchReadback
+    ? normalizePostArchiveLaunchDayWatchReadback(payload.mainlineSummary.postArchiveLaunchDayWatchReadback)
+    : getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(entry);
+  const watchSummaryReadback = payload.mainlineSummary?.launchDayWatchSummaryRecordReadback
+    ? normalizeLaunchDayWatchSummaryRecordReadback(payload.mainlineSummary.launchDayWatchSummaryRecordReadback)
+    : getLaunchDayWatchSummaryRecordReadbackFromOperatorEntry(entry);
+  const receiptOperations = Array.isArray(currentPacket?.receiptOperations) ? currentPacket.receiptOperations : [];
+  const receiptPlaceholders = Array.isArray(currentPacket?.receiptPlaceholders) ? currentPacket.receiptPlaceholders : [];
+  const receiptQueue = Array.isArray(currentPacket?.receiptQueue) ? currentPacket.receiptQueue : [];
+  const sourceRecordKeys = Array.isArray(currentPacket?.sourceRecordKeys) ? currentPacket.sourceRecordKeys : [];
+  const refreshAfterWrite = currentPacket?.refreshAfterWrite
+    || currentPacket?.refreshAfterPreviousWrite
+    || cutoverAction?.refreshAfterWrite
+    || null;
+  return {
+    mode: "developer-launch-mainline-launch-duty-receipt-execution-handoff",
+    status: cutoverAction?.status || currentPacket?.status || action.status || null,
+    ready: currentPacket?.readyForReceiptWrite === true || cutoverAction?.ready === true,
+    currentRecordKey: currentPacket?.recordKey || cutoverAction?.currentRecordKey || null,
+    currentActionKey: currentPacket?.actionKey || cutoverAction?.currentActionKey || null,
+    currentArtifact: currentPacket?.artifact || cutoverAction?.currentArtifact || null,
+    currentCommand: currentPacket?.command || cutoverAction?.currentCommand || null,
+    packetStatus: currentPacket?.status || cutoverAction?.firstReceiptWritePacketStatus || cutoverAction?.nextReceiptWritePacketStatus || null,
+    packetReady: currentPacket?.readyForReceiptWrite === true,
+    recorded: currentPacket?.recorded === true,
+    recordedAt: currentPacket?.recordedAt || null,
+    previousRecordKey: cutoverAction?.previousRecordKey || null,
+    dependsOnRecordKey: currentPacket?.dependsOnRecordKey || null,
+    dependsOnRecordRecorded: currentPacket?.dependsOnRecordRecorded === true,
+    unlockActionKey: currentPacket?.unlockActionKey || null,
+    receiptOperations,
+    receiptPlaceholders,
+    receiptQueue,
+    sourceRecordKeys,
+    expectedEvidence: currentPacket?.expectedEvidence || null,
+    acceptanceCriteria: currentPacket?.acceptanceCriteria || null,
+    launchDutyRecordIndexPath: currentPacket?.launchDutyRecordIndexPath
+      || cutoverAction?.launchDutyRecordIndexPath
+      || postArchiveReadback?.launchDutyRecordIndexPath
+      || watchSummaryReadback?.launchDutyRecordIndexPath
+      || null,
+    refreshAfterWrite,
+    postArchiveReadbackStatus: postArchiveReadback?.status || null,
+    launchDayWatchSummaryReadbackStatus: watchSummaryReadback?.status || null,
+    nextAction: currentPacket?.nextAction || cutoverAction?.nextAction || action.nextAction || null
+  };
+}
+
+function appendLaunchDutyReceiptExecutionHandoffLines(lines = [], handoff = null, {
+  title = "Launch-Duty Receipt Execution Handoff:"
+} = {}) {
+  if (!Array.isArray(lines) || !handoff || typeof handoff !== "object") {
+    return false;
+  }
+  const receiptOperations = Array.isArray(handoff.receiptOperations) ? handoff.receiptOperations.join(",") : "";
+  const receiptPlaceholders = Array.isArray(handoff.receiptPlaceholders) ? handoff.receiptPlaceholders.join(",") : "";
+  const receiptQueue = Array.isArray(handoff.receiptQueue)
+    ? handoff.receiptQueue.map((item) => (
+        `${item?.recordKey || "-"}:${item?.operation || "-"}:${item?.status || "-"}`
+      )).join("; ")
+    : "";
+  const sourceRecordKeys = Array.isArray(handoff.sourceRecordKeys) ? handoff.sourceRecordKeys.join(",") : "";
+  lines.push(title);
+  lines.push(
+    `- status=${handoff.status || "-"}`
+    + ` | ready=${handoff.ready === true ? "yes" : "no"}`
+    + ` | currentRecord=${handoff.currentRecordKey || "-"}`
+    + ` | currentAction=${handoff.currentActionKey || "-"}`
+    + ` | packet=${handoff.packetStatus || "-"}`
+  );
+  lines.push(
+    "Launch-Duty Receipt Execution Artifact:"
+    + ` artifact=${handoff.currentArtifact || "-"}`
+    + ` | previousRecord=${handoff.previousRecordKey || "-"}`
+    + ` | dependsOn=${handoff.dependsOnRecordKey || "-"}`
+    + ` | dependsOnRecorded=${handoff.dependsOnRecordRecorded === true ? "yes" : "no"}`
+    + ` | unlock=${handoff.unlockActionKey || "-"}`
+    + ` | recorded=${handoff.recorded === true ? "yes" : "no"}`
+  );
+  lines.push(
+    "Launch-Duty Receipt Execution Command:"
+    + ` command=${handoff.currentCommand || "-"}`
+  );
+  lines.push(
+    "Launch-Duty Receipt Execution Queue:"
+    + ` receiptOperations=${receiptOperations || "-"}`
+    + ` | receiptPlaceholders=${receiptPlaceholders || "-"}`
+    + ` | receiptQueue=${receiptQueue || "-"}`
+  );
+  lines.push(
+    "Launch-Duty Receipt Execution Refresh:"
+    + ` method=${handoff.refreshAfterWrite?.method || "-"}`
+    + ` | href=${handoff.refreshAfterWrite?.href || "-"}`
+    + ` | status=${handoff.refreshAfterWrite?.status || "-"}`
+    + ` | launchDutyRecordIndex=${handoff.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(
+    "Launch-Duty Receipt Execution Readbacks:"
+    + ` postArchive=${handoff.postArchiveReadbackStatus || "-"}`
+    + ` | watchSummary=${handoff.launchDayWatchSummaryReadbackStatus || "-"}`
+    + ` | sourceRecords=${sourceRecordKeys || "-"}`
+  );
+  lines.push(`- expectedEvidence=${handoff.expectedEvidence || "-"}`);
+  lines.push(`Launch-Duty Receipt Execution Next: ${handoff.nextAction || "-"}`);
+  return true;
+}
+
+function getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoffDownload(payload = {}) {
+  const handoff = payload.mainlineSummary?.launchDutyReceiptExecutionHandoff
+    || getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
+  if (!handoff) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline launch-duty receipt execution handoff",
+      "launch-duty-receipt-execution-handoff.txt",
+      "launch-duty-receipt-execution-handoff",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: handoff.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoffDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const handoff = payload.mainlineSummary?.launchDutyReceiptExecutionHandoff
+    || getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
+  if (!handoff) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Launch-Duty Receipt Execution Handoff Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendLaunchDutyReceiptExecutionHandoffLines(lines, handoff);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file for the current launch-duty record write command during launch-day watch.");
+  lines.push("- It carries the record command, receipt queue, receipt placeholders, refresh route, and shared launch-duty record index.");
+  lines.push("- After running the command and refreshing Developer Ops, use the matching record readback direct file to confirm the next action.");
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -26000,6 +26197,7 @@ function buildDeveloperLaunchMainlinePayload({
     payload.mainlineSummary.launchReadinessDistance = buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
     payload.mainlineSummary.productionSignoffEntryHandoff = getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
     payload.mainlineSummary.signoffArchiveWatchHandoff = getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
+    payload.mainlineSummary.launchDutyReceiptExecutionHandoff = getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -26129,6 +26327,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
     || getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
+  const launchDutyReceiptExecutionHandoff = mainlineSummary.launchDutyReceiptExecutionHandoff
+    || getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -26295,6 +26495,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const launchReadinessDistanceDownload = getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload);
   const productionSignoffEntryHandoffDownload = getDeveloperLaunchMainlineProductionSignoffEntryHandoffDownload(payload);
   const signoffArchiveWatchHandoffDownload = getDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownload(payload);
+  const launchDutyReceiptExecutionHandoffDownload = getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoffDownload(payload);
   const productionHandoffDownload = getDeveloperLaunchMainlineProductionHandoffDownload(payload);
   const cutoverHandoffDownload = getDeveloperLaunchMainlineCutoverHandoffDownload(payload);
   const recoveryDrillHandoffDownload = getDeveloperLaunchMainlineRecoveryDrillHandoffDownload(payload);
@@ -26913,6 +27114,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       signoffArchiveWatchHandoffDownload || {}
     );
   }
+  if (launchDutyReceiptExecutionHandoff) {
+    lines.push("");
+    appendLaunchDutyReceiptExecutionHandoffLines(lines, launchDutyReceiptExecutionHandoff, {
+      title: "Launch-Duty Receipt Execution Handoff Route:"
+    });
+    pushRoute(
+      "launch-duty-receipt-execution-handoff",
+      "Launch Mainline launch-duty receipt execution handoff",
+      opsFiles.launchDutyReceiptExecutionHandoff || "ops/launch-duty-receipt-execution-handoff.txt",
+      launchDutyReceiptExecutionHandoffDownload || {}
+    );
+  }
   if (launchSwitchReadinessSummary) {
     lines.push("");
     appendLaunchSwitchReadinessSummaryLines(lines, launchSwitchReadinessSummary, {
@@ -27444,6 +27657,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/launch-duty-receipt-execution-handoff.txt",
+    buildDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoffDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/launch-switch-readiness.txt",
     buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload)
   );
@@ -27900,7 +28118,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -28016,6 +28234,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "signoff-archive-watch-handoff.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "launch-duty-receipt-execution-handoff") {
+    return {
+      fileName: "launch-duty-receipt-execution-handoff.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoffDownloadText(payload)
     };
   }
   if (normalizedFormat === "launch-switch-readiness") {
@@ -29313,6 +29538,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchReadinessDistance: "ops/launch-readiness-distance.txt",
       productionSignoffEntryHandoff: "ops/production-signoff-entry-handoff.txt",
       signoffArchiveWatchHandoff: "ops/signoff-archive-watch-handoff.txt",
+      launchDutyReceiptExecutionHandoff: "ops/launch-duty-receipt-execution-handoff.txt",
       launchSwitchReadiness: "ops/launch-switch-readiness.txt",
       launchCandidateFullVerificationGate: "ops/launch-candidate-full-verification-gate.txt",
       postArchiveLaunchDayWatchReadback: "ops/post-archive-launch-day-watch-readback.txt",
@@ -29510,6 +29736,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
     || getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
+  const launchDutyReceiptExecutionHandoff = mainlineSummary.launchDutyReceiptExecutionHandoff
+    || getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
   const postArchiveLaunchDayWatchReadback = mainlineSummary.postArchiveLaunchDayWatchReadback
     || getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(launchOperationsOperatorEntry);
   const launchDayWatchSummaryRecordReadback = mainlineSummary.launchDayWatchSummaryRecordReadback
@@ -29668,6 +29896,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Signoff archive watch handoff direct file",
       opsFiles.signoffArchiveWatchHandoff || "ops/signoff-archive-watch-handoff.txt"
+    ]);
+  }
+  if (launchDutyReceiptExecutionHandoff) {
+    handoffFiles.push([
+      "Launch-duty receipt execution handoff direct file",
+      opsFiles.launchDutyReceiptExecutionHandoff || "ops/launch-duty-receipt-execution-handoff.txt"
     ]);
   }
   if (launchSwitchReadinessSummary || launchSwitchOperatorRunbook) {
@@ -30435,6 +30669,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push("");
     appendSignoffArchiveWatchHandoffLines(lines, signoffArchiveWatchHandoff, {
       title: "Launch Mainline Signoff Archive Watch Handoff:"
+    });
+  }
+  if (launchDutyReceiptExecutionHandoff) {
+    lines.push("");
+    appendLaunchDutyReceiptExecutionHandoffLines(lines, launchDutyReceiptExecutionHandoff, {
+      title: "Launch Mainline Launch-Duty Receipt Execution Handoff:"
     });
   }
   if (launchSwitchReadinessSummary) {

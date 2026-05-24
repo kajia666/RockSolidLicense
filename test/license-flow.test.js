@@ -26059,6 +26059,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       postArchiveLaunchMainlineSummaryDownload.body,
       /Launch Mainline Post-Archive Launch-Day Watch Readback:[\s\S]*status=ready_for_launch_day_watch_summary_write \| archiveRecorded=yes \| currentAction=record_launch_day_watch_summary \| expectedCurrent=record_launch_day_watch_summary/
     );
+    assert.match(
+      postArchiveLaunchMainlineSummaryDownload.body,
+      /Launch Mainline Launch-Duty Receipt Execution Handoff:[\s\S]*status=ready_for_launch_day_watch_summary_write \| ready=yes \| currentRecord=launch_day_watch_summary \| currentAction=record_launch_day_watch_summary \| packet=ready_for_receipt_write/
+    );
     const postArchiveLaunchMainlineRoutesDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
@@ -26075,6 +26079,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       postArchiveLaunchMainlineRoutesDownload.body,
       /post-archive-launch-day-watch-direct: [^\n]*file=post-archive-launch-day-watch-readback\.txt[^\n]*format=post-archive-launch-day-watch-readback[^\n]*source=developer-launch-mainline/
+    );
+    assert.match(
+      postArchiveLaunchMainlineRoutesDownload.body,
+      /Launch-Duty Receipt Execution Handoff Route:[\s\S]*status=ready_for_launch_day_watch_summary_write \| ready=yes \| currentRecord=launch_day_watch_summary \| currentAction=record_launch_day_watch_summary \| packet=ready_for_receipt_write/
+    );
+    assert.match(
+      postArchiveLaunchMainlineRoutesDownload.body,
+      /launch-duty-receipt-execution-handoff: [^\n]*file=launch-duty-receipt-execution-handoff\.txt[^\n]*format=launch-duty-receipt-execution-handoff[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const postArchiveLaunchMainlineIndexDownload = await getText(
       baseUrl,
@@ -26093,12 +26105,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       postArchiveLaunchMainlineIndexDownload.body,
       /Included Handoff Files:[\s\S]*Post-archive launch-day watch readback direct file: ops\/post-archive-launch-day-watch-readback\.txt/
     );
+    assert.match(
+      postArchiveLaunchMainlineIndexDownload.body,
+      /Launch Mainline Launch-Duty Receipt Execution Handoff:[\s\S]*status=ready_for_launch_day_watch_summary_write \| ready=yes \| currentRecord=launch_day_watch_summary \| currentAction=record_launch_day_watch_summary/
+    );
+    assert.match(
+      postArchiveLaunchMainlineIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Launch-duty receipt execution handoff direct file: ops\/launch-duty-receipt-execution-handoff\.txt/
+    );
     const postArchiveLaunchMainlineChecksumsDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
       ownerSession.token
     );
     assert.match(postArchiveLaunchMainlineChecksumsDownload.body, /ops\/post-archive-launch-day-watch-readback\.txt/);
+    assert.match(postArchiveLaunchMainlineChecksumsDownload.body, /ops\/launch-duty-receipt-execution-handoff\.txt/);
     const postArchiveLaunchMainlineZipDownload = await getBinary(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
@@ -26106,13 +26127,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const postArchiveLaunchMainlineZipText = postArchiveLaunchMainlineZipDownload.body.toString("latin1");
     assert.match(postArchiveLaunchMainlineZipText, /ops\/post-archive-launch-day-watch-readback\.txt/);
+    assert.match(postArchiveLaunchMainlineZipText, /ops\/launch-duty-receipt-execution-handoff\.txt/);
     assert.match(
       postArchiveLaunchMainlineZipText,
       /RockSolid Launch Mainline Post-Archive Launch-Day Watch Readback Download/
     );
     assert.match(
       postArchiveLaunchMainlineZipText,
+      /RockSolid Launch Mainline Launch-Duty Receipt Execution Handoff Download/
+    );
+    assert.match(
+      postArchiveLaunchMainlineZipText,
       /Post-Archive Launch-Day Watch Readback:[\s\S]*status=ready_for_launch_day_watch_summary_write \| archiveRecorded=yes \| currentAction=record_launch_day_watch_summary \| expectedCurrent=record_launch_day_watch_summary/
+    );
+    assert.match(
+      postArchiveLaunchMainlineZipText,
+      /Launch-Duty Receipt Execution Queue:[\s\S]*receiptQueue=launch_day_watch_summary:record_cutover_walkthrough:pending_operator_receipt; launch_day_watch_summary:record_launch_day_readiness_review:pending_operator_receipt/
     );
     const postArchiveLaunchMainlineReadbackDirectDownload = await getText(
       baseUrl,
@@ -26126,6 +26156,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       postArchiveLaunchMainlineReadbackDirectDownload.body,
       /Post-Archive Launch-Day Watch Readback:[\s\S]*status=ready_for_launch_day_watch_summary_write \| archiveRecorded=yes \| currentAction=record_launch_day_watch_summary \| expectedCurrent=record_launch_day_watch_summary/
+    );
+    const postArchiveLaunchDutyReceiptExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=launch-duty-receipt-execution-handoff",
+      ownerSession.token
+    );
+    assert.match(
+      postArchiveLaunchDutyReceiptExecutionDirectDownload.body,
+      /RockSolid Launch Mainline Launch-Duty Receipt Execution Handoff Download/
+    );
+    assert.match(
+      postArchiveLaunchDutyReceiptExecutionDirectDownload.body,
+      /Launch-Duty Receipt Execution Handoff:[\s\S]*status=ready_for_launch_day_watch_summary_write \| ready=yes \| currentRecord=launch_day_watch_summary \| currentAction=record_launch_day_watch_summary \| packet=ready_for_receipt_write/
+    );
+    assert.match(
+      postArchiveLaunchDutyReceiptExecutionDirectDownload.body,
+      /Launch-Duty Receipt Execution Command:[\s\S]*command=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json --key launch_day_watch_summary/
+    );
+    assert.match(
+      postArchiveLaunchDutyReceiptExecutionDirectDownload.body,
+      /Launch-Duty Receipt Execution Queue:[\s\S]*receiptQueue=launch_day_watch_summary:record_cutover_walkthrough:pending_operator_receipt; launch_day_watch_summary:record_launch_day_readiness_review:pending_operator_receipt/
     );
 
     const launchDayWatchSummaryReadbackReceipt = await postJson(

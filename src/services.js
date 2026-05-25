@@ -16217,7 +16217,58 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.firstOperatingResultHandoffAction,
     initialLaunchOpsReadiness?.launchOperationsDailyBrief?.firstOperatingResultHandoffAction
   ].find((item) => item && typeof item === "object") || null;
+  const initialFirstOperatingResultHandoffReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(
+    initialLaunchOpsReadiness?.firstOperatingResultHandoffReceipt
+  );
+  const firstOperatingResultHandoffReceiptReadbackFromSelectedReceipt =
+    initialFirstOperatingResultHandoffReceiptPayload
+    && isSteadyStateDutyPlanFirstOperatingResultHandoffReceipt(initialFirstOperatingResultHandoffReceiptPayload)
+      ? {
+          version: "developer-ops-steady-state-duty-action-links-first-operating-result-handoff-receipt-readback-action/v1",
+          key: "first_operating_result_handoff_receipt_readback",
+          status: "recorded_ready_for_first_operating_result_review",
+          ready: true,
+          receiptRecorded: true,
+          auditLogId: initialFirstOperatingResultHandoffReceiptPayload.auditLogId || null,
+          recordedAt: initialFirstOperatingResultHandoffReceiptPayload.recordedAt
+            || initialFirstOperatingResultHandoffReceiptPayload.createdAt
+            || null,
+          recordedBy: initialFirstOperatingResultHandoffReceiptPayload.recordedBy || null,
+          currentActionKey: "review_first_operating_result_handoff",
+          receiptAction: initialFirstOperatingResultHandoffReceiptPayload.action || null,
+          receiptIntent: initialFirstOperatingResultHandoffReceiptPayload.intent || null,
+          receiptPlanKind: initialFirstOperatingResultHandoffReceiptPayload.planKind || null,
+          receiptPlanMode: initialFirstOperatingResultHandoffReceiptPayload.planMode || null,
+          receiptVisibilityStatus: initialFirstOperatingResultHandoffReceiptPayload.receiptVisibility?.status || null,
+          rolloutWideningDecisionReceiptAuditLogId:
+            initialFirstOperatingResultHandoffReceiptPayload.rolloutWideningDecisionReceiptAuditLogId || null,
+          firstOperatingResultHandoffStatus:
+            initialFirstOperatingResultHandoffReceiptPayload.firstOperatingResultHandoffStatus || null,
+          queueStatus: initialFirstOperatingResultHandoffReceiptPayload.steadyStateQueueStatus || null,
+          queueTotal: initialFirstOperatingResultHandoffReceiptPayload.steadyStateQueueTotal ?? null,
+          attentionCount: initialFirstOperatingResultHandoffReceiptPayload.steadyStateAttentionCount ?? null,
+          nextDownloadKey: initialLaunchOpsOverviewStatusDownload?.key || "ops_launch_operations_overview_status",
+          nextDownloadFileName: initialLaunchOpsOverviewStatusDownload?.fileName
+            || "developer-ops-launch-operations-overview-status.txt",
+          nextDownloadFormat: initialLaunchOpsOverviewStatusDownload?.format || "launch-operations-overview-status",
+          nextDownloadHref: initialLaunchOpsOverviewStatusDownload?.href || null,
+          launchDutyRecordIndexPath: initialFirstOperatingResultHandoffReceiptPayload.receiptVisibility?.launchDutyRecordIndexPath
+            || initialFirstOperatingResultHandoffReceiptPayload.launchReadinessNextGateLaunchDutyRecordIndexPath
+            || initialFirstOperatingResultHandoffReceiptPayload.launchOpsOverviewContextLaunchDutyRecordIndexPath
+            || null,
+          launchOpsOverviewContextLaunchDutyRecordIndexPath:
+            initialFirstOperatingResultHandoffReceiptPayload.launchOpsOverviewContextLaunchDutyRecordIndexPath || null,
+          requiredChecks: [
+            "first_operating_result_handoff_receipt_recorded",
+            "receipt_visible_in_developer_ops",
+            "launch_operations_overview_attached"
+          ],
+          blockedBy: [],
+          nextAction: "Review the first operating result handoff from the launch operations overview before widening beyond the first operating wave."
+        }
+      : null;
   const firstOperatingResultHandoffReceiptReadbackActionSources = [
+    firstOperatingResultHandoffReceiptReadbackFromSelectedReceipt,
     initialLaunchOpsReadiness?.launchOperationsShiftActionPlan?.firstOperatingResultHandoffReceiptReadbackAction,
     initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.firstOperatingResultHandoffReceiptReadbackAction,
     initialLaunchOpsReadiness?.launchOperationsDailyBrief?.firstOperatingResultHandoffReceiptReadbackAction,
@@ -34934,6 +34985,19 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     item.firstOperatingResultHandoffStatus || metadata.firstOperatingResultHandoffStatus,
     ""
   );
+  const firstOperatingResultHandoffReceiptAuditLogId = String(
+    item.firstOperatingResultHandoffReceiptAuditLogId
+      ?? metadata.firstOperatingResultHandoffReceiptAuditLogId
+      ?? ""
+  ).trim();
+  const firstOperatingResultReviewStatus = normalizeDeveloperOpsConfirmationToken(
+    item.firstOperatingResultReviewStatus || metadata.firstOperatingResultReviewStatus,
+    ""
+  );
+  const firstOperatingResultReviewReady = readDeveloperOpsOptionalBoolean(
+    item.firstOperatingResultReviewReady,
+    metadata.firstOperatingResultReviewReady
+  );
   const focusKind = normalizeDeveloperOpsConfirmationToken(item.focusKind || metadata.focusKind, "");
   const focusReason = String(item.focusReason ?? metadata.focusReason ?? "").trim();
   const note = String(item.note ?? metadata.note ?? "").trim();
@@ -34974,6 +35038,9 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
     steadyStateAttentionCount,
     rolloutWideningDecisionReceiptAuditLogId,
     firstOperatingResultHandoffStatus,
+    firstOperatingResultHandoffReceiptAuditLogId,
+    firstOperatingResultReviewStatus,
+    firstOperatingResultReviewReady,
     focusKind,
     focusReason,
     note,
@@ -35016,6 +35083,9 @@ function buildSteadyStateDutyPlanReceiptPayload(item = null) {
       steadyStateAttentionCount,
       rolloutWideningDecisionReceiptAuditLogId,
       firstOperatingResultHandoffStatus,
+      firstOperatingResultHandoffReceiptAuditLogId,
+      firstOperatingResultReviewStatus,
+      firstOperatingResultReviewReady,
       focusKind,
       focusReason,
       note,
@@ -35062,6 +35132,9 @@ function buildSteadyStateDutyPlanReceiptVisibility(receipt = {}) {
     steadyStateAttentionCount: readDeveloperOpsOptionalNonNegativeInteger(receipt.steadyStateAttentionCount),
     rolloutWideningDecisionReceiptAuditLogId: String(receipt.rolloutWideningDecisionReceiptAuditLogId || "").trim(),
     firstOperatingResultHandoffStatus: normalizeDeveloperOpsConfirmationToken(receipt.firstOperatingResultHandoffStatus, ""),
+    firstOperatingResultHandoffReceiptAuditLogId: String(receipt.firstOperatingResultHandoffReceiptAuditLogId || "").trim(),
+    firstOperatingResultReviewStatus: normalizeDeveloperOpsConfirmationToken(receipt.firstOperatingResultReviewStatus, ""),
+    firstOperatingResultReviewReady: readDeveloperOpsOptionalBoolean(receipt.firstOperatingResultReviewReady),
     focusKind: normalizeDeveloperOpsConfirmationToken(receipt.focusKind, ""),
     focusReason: String(receipt.focusReason || "").trim(),
     note: String(receipt.note || "").trim()
@@ -35213,6 +35286,7 @@ function buildSnapshotLatestSteadyStateDutyPlanReceipts(auditLogs = [], limit = 
   };
   appendFirstMatch(isSteadyStateDutyPlanRolloutWideningDecisionReceipt);
   appendFirstMatch(isSteadyStateDutyPlanFirstOperatingResultHandoffReceipt);
+  appendFirstMatch(isSteadyStateDutyPlanFirstOperatingResultReviewReceipt);
   appendFirstMatch(isSteadyStateDutyPlanPostSignoffArchiveReceipt);
   appendFirstMatch((item) => getLaunchDutyRecordIndexStateProgressScore(item).hasState);
   appendFirstMatch((item) => getLaunchDutyPacketReviewStateProgressScore(item).hasState);
@@ -35427,6 +35501,31 @@ function selectSteadyStateDutyPlanFirstOperatingResultHandoffReceiptForLaunchDut
   const candidates = filterSteadyStateDutyPlanReceiptsForLaunchDuty(receipts, { productCode, channel })
     .map((item) => buildSteadyStateDutyPlanReceiptPayload(item))
     .filter((item) => item?.status === "recorded" && isSteadyStateDutyPlanFirstOperatingResultHandoffReceipt(item));
+  return candidates
+    .slice()
+    .sort((left, right) => snapshotDateMs(right?.recordedAt || right?.createdAt) - snapshotDateMs(left?.recordedAt || left?.createdAt))
+    [0] || null;
+}
+
+function isSteadyStateDutyPlanFirstOperatingResultReviewReceipt(receipt = null) {
+  const payload = buildSteadyStateDutyPlanReceiptPayload(receipt);
+  if (!payload) {
+    return false;
+  }
+  return payload.action === "review_first_operating_result_handoff"
+    || payload.intent === "review_first_operating_result_handoff"
+    || payload.planKind === "first_operating_result_review"
+    || payload.focusKind === "first_operating_result_review"
+    || (payload.planMode === "review" && /steady_state_rollout/.test(payload.targetType || ""));
+}
+
+function selectSteadyStateDutyPlanFirstOperatingResultReviewReceiptForLaunchDuty(receipts = [], {
+  productCode = "",
+  channel = ""
+} = {}) {
+  const candidates = filterSteadyStateDutyPlanReceiptsForLaunchDuty(receipts, { productCode, channel })
+    .map((item) => buildSteadyStateDutyPlanReceiptPayload(item))
+    .filter((item) => item?.status === "recorded" && isSteadyStateDutyPlanFirstOperatingResultReviewReceipt(item));
   return candidates
     .slice()
     .sort((left, right) => snapshotDateMs(right?.recordedAt || right?.createdAt) - snapshotDateMs(left?.recordedAt || left?.createdAt))
@@ -41419,6 +41518,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
   launchOperationsDailyBrief = null,
   launchOperationsShiftActionPlan = null,
   latestSteadyStateDutyPlanReceipt = null,
+  firstOperatingResultReviewReceipt = null,
   launchReadinessNextGate = null,
   launchReadinessNextGateHandoff = null
 } = {}) {
@@ -41502,6 +41602,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     || dailyBrief?.firstOperatingResultHandoffReceiptReadbackAction
     || handoffSummary?.firstOperatingResultHandoffReceiptReadbackAction
     || null;
+  const firstOperatingResultReviewReceiptPayload = buildSteadyStateDutyPlanReceiptPayload(firstOperatingResultReviewReceipt);
   const firstOperatingResultHandoffAction = shiftPlan?.firstOperatingResultHandoffAction
     || dailyBrief?.firstOperatingResultHandoffAction
     || handoffSummary?.firstOperatingResultHandoffAction
@@ -41541,6 +41642,62 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
   const firstOperatingResultReviewSourceReady = firstOperatingResultHandoffReceiptReadbackAction?.ready === true
     && firstOperatingResultHandoffReceiptReadbackAction?.receiptRecorded === true
     && firstOperatingResultHandoffReceiptReadbackAction?.currentActionKey === "review_first_operating_result_handoff";
+  const firstOperatingResultReviewReceiptRecorded = Boolean(
+    firstOperatingResultReviewReceiptPayload?.auditLogId
+    && isSteadyStateDutyPlanFirstOperatingResultReviewReceipt(firstOperatingResultReviewReceiptPayload)
+  );
+  const firstOperatingResultReviewReceiptPlanPayload = firstOperatingResultHandoffReceiptReadbackAction
+    ? compactRouteParams({
+        productCode,
+        channel,
+        action: "review_first_operating_result_handoff",
+        intent: "review_first_operating_result_handoff",
+        planKind: "first_operating_result_review",
+        planMode: "review",
+        targetType: "steady_state_rollout",
+        href: firstOperatingResultHandoffReceiptReadbackAction.nextDownloadHref || overviewDownload?.href || "",
+        fileName: overviewDownload?.fileName || "developer-ops-launch-operations-overview-status.txt",
+        format: firstOperatingResultHandoffReceiptReadbackAction.nextDownloadFormat
+          || overviewDownload?.format
+          || "launch-operations-overview-status",
+        focusKind: "first_operating_result_review",
+        focusReason: "Review the first operating result handoff from the launch operations overview before widening beyond the first operating wave.",
+        launchOpsOverviewContextKind: launchOpsOverviewContext?.kind || "",
+        launchOpsOverviewDownloadKey: overviewDownload?.key || launchOpsOverviewContext?.downloadKey || "",
+        launchOpsOverviewDownloadFileName: overviewDownload?.fileName || launchOpsOverviewContext?.downloadFileName || "",
+        launchOpsOverviewDownloadFormat: overviewDownload?.format || launchOpsOverviewContext?.downloadFormat || "",
+        launchOpsOverviewDownloadHref: overviewDownload?.href || launchOpsOverviewContext?.downloadHref || "",
+        launchOpsOverviewContextLaunchDutyRecordIndexPath: launchOpsOverviewContextRecordIndexPath,
+        launchReadinessNextGateStatus: currentLaunchReadinessNextGate?.status || "",
+        launchReadinessNextGateDecision: currentLaunchReadinessNextGate?.decision || "",
+        launchReadinessNextGateCurrentGate: currentLaunchReadinessNextGate?.currentGate || "",
+        launchReadinessNextGateCanEnterInitialLaunch: currentLaunchReadinessNextGate?.canEnterInitialLaunch === true,
+        launchReadinessNextGateLaunchDutyRecordIndexPath: currentLaunchReadinessNextGate?.launchDutyRecordIndexPath || "",
+        watchRecordDraftStatus: watchRecordDraftStatus || "",
+        watchRecordDraftRecordCount: watchRecordDraftRecordCount ?? "",
+        productionSignoffPacket: productionSignoffPacket || "",
+        launchDayWatchEntry: launchDayWatchEntry || "",
+        firstWaveLifecycleStatus: firstWaveLifecycle?.status || "",
+        firstWaveLifecycleNextActionKey: firstWaveLifecycle?.nextActionKey || "",
+        firstWaveLifecycleNextOperation: firstWaveLifecycle?.nextOperation || "",
+        firstWaveLifecyclePrimaryDownloadKey: firstWaveLifecycle?.primaryDownloadKey || "",
+        firstWaveLifecyclePrimaryDownloadFormat: firstWaveLifecycle?.primaryDownloadFormat || "",
+        rolloutWideningDecisionReceiptAuditLogId:
+          firstOperatingResultHandoffReceiptReadbackAction.rolloutWideningDecisionReceiptAuditLogId || "",
+        firstOperatingResultHandoffStatus:
+          firstOperatingResultHandoffReceiptReadbackAction.firstOperatingResultHandoffStatus || "",
+        firstOperatingResultHandoffReceiptAuditLogId:
+          firstOperatingResultHandoffReceiptReadbackAction.auditLogId || "",
+        firstOperatingResultReviewStatus: firstOperatingResultReviewSourceReady
+          ? "ready_for_first_operating_result_review"
+          : "awaiting_first_operating_result_handoff_receipt",
+        firstOperatingResultReviewReady: firstOperatingResultReviewSourceReady,
+        steadyStateQueueStatus: firstOperatingResultHandoffReceiptReadbackAction.queueStatus || "",
+        steadyStateQueueTotal: firstOperatingResultHandoffReceiptReadbackAction.queueTotal ?? "",
+        steadyStateAttentionCount: firstOperatingResultHandoffReceiptReadbackAction.attentionCount ?? "",
+        note: "launch_operations_overview:first_operating_result_review"
+      })
+    : null;
   const firstOperatingResultReviewAction = firstOperatingResultHandoffReceiptReadbackAction
     && typeof firstOperatingResultHandoffReceiptReadbackAction === "object"
       ? withLaunchOpsOverviewContextRecordIndex({
@@ -41594,9 +41751,95 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
           nextAction: firstOperatingResultReviewSourceReady
             ? "Review the first operating result handoff from the launch operations overview before widening beyond the first operating wave."
             : firstOperatingResultHandoffReceiptReadbackAction.nextAction
-              || "Record the first operating result handoff receipt before reviewing the first operating result."
+              || "Record the first operating result handoff receipt before reviewing the first operating result.",
+          receiptPlan: firstOperatingResultReviewSourceReady
+            ? {
+                status: "ready",
+                method: "POST",
+                route: "/api/developer/ops/steady-state-duty-plan/receipt",
+                eventType: "developer.ops.steady-state-duty-plan.receipt",
+                entityType: "developer_ops_steady_state_duty_plan",
+                payload: firstOperatingResultReviewReceiptPlanPayload,
+                operatorHint: "Post this receipt payload after reviewing the first operating result handoff so Developer Ops can attach audit evidence."
+              }
+            : null
         })
       : null;
+  const firstOperatingResultReviewReceiptReadbackAction = firstOperatingResultReviewAction
+    ? withLaunchOpsOverviewContextRecordIndex({
+        version: "developer-ops-launch-operations-overview-first-operating-result-review-receipt-readback-action/v1",
+        key: "first_operating_result_review_receipt_readback",
+        status: firstOperatingResultReviewReceiptRecorded
+          ? "recorded_ready_for_rollout_widening_followup"
+          : "awaiting_first_operating_result_review_receipt",
+        ready: firstOperatingResultReviewReceiptRecorded,
+        receiptRecorded: firstOperatingResultReviewReceiptRecorded,
+        auditLogId: firstOperatingResultReviewReceiptPayload?.auditLogId || null,
+        recordedAt: firstOperatingResultReviewReceiptPayload?.recordedAt
+          || firstOperatingResultReviewReceiptPayload?.createdAt
+          || null,
+        recordedBy: firstOperatingResultReviewReceiptPayload?.recordedBy || null,
+        currentActionKey: firstOperatingResultReviewReceiptRecorded
+          ? "prepare_rollout_widening_followup"
+          : firstOperatingResultReviewAction.actionKey || "review_first_operating_result_handoff",
+        receiptAction: firstOperatingResultReviewReceiptPayload?.action || null,
+        receiptIntent: firstOperatingResultReviewReceiptPayload?.intent || null,
+        receiptPlanKind: firstOperatingResultReviewReceiptPayload?.planKind || null,
+        receiptPlanMode: firstOperatingResultReviewReceiptPayload?.planMode || null,
+        receiptVisibilityStatus: firstOperatingResultReviewReceiptPayload?.receiptVisibility?.status || null,
+        firstOperatingResultHandoffReceiptAuditLogId:
+          firstOperatingResultReviewReceiptPayload?.firstOperatingResultHandoffReceiptAuditLogId
+          || firstOperatingResultReviewAction.auditLogId
+          || null,
+        reviewSourceStatus: firstOperatingResultReviewReceiptPayload?.firstOperatingResultReviewStatus
+          || firstOperatingResultReviewAction.status
+          || null,
+        reviewReady: firstOperatingResultReviewReceiptPayload?.firstOperatingResultReviewReady
+          ?? (firstOperatingResultReviewAction.ready === true),
+        rolloutWideningDecisionReceiptAuditLogId:
+          firstOperatingResultReviewReceiptPayload?.rolloutWideningDecisionReceiptAuditLogId
+          || firstOperatingResultReviewAction.rolloutWideningDecisionReceiptAuditLogId
+          || null,
+        firstOperatingResultHandoffStatus:
+          firstOperatingResultReviewReceiptPayload?.firstOperatingResultHandoffStatus
+          || firstOperatingResultReviewAction.firstOperatingResultHandoffStatus
+          || null,
+        queueStatus: firstOperatingResultReviewReceiptPayload?.steadyStateQueueStatus
+          || firstOperatingResultReviewAction.queueStatus
+          || null,
+        queueTotal: firstOperatingResultReviewReceiptPayload?.steadyStateQueueTotal
+          ?? firstOperatingResultReviewAction.queueTotal
+          ?? null,
+        attentionCount: firstOperatingResultReviewReceiptPayload?.steadyStateAttentionCount
+          ?? firstOperatingResultReviewAction.attentionCount
+          ?? null,
+        nextDownloadKey: firstOperatingResultReviewReceiptRecorded
+          ? overviewDownload?.key || "ops_launch_operations_overview_status"
+          : firstOperatingResultReviewAction.nextDownloadKey || overviewDownload?.key || "ops_launch_operations_overview_status",
+        nextDownloadFileName: overviewDownload?.fileName || "developer-ops-launch-operations-overview-status.txt",
+        nextDownloadFormat: firstOperatingResultReviewReceiptRecorded
+          ? overviewDownload?.format || "launch-operations-overview-status"
+          : firstOperatingResultReviewAction.nextDownloadFormat || overviewDownload?.format || "launch-operations-overview-status",
+        nextDownloadHref: firstOperatingResultReviewReceiptRecorded
+          ? overviewDownload?.href || null
+          : firstOperatingResultReviewAction.nextDownloadHref || overviewDownload?.href || null,
+        nextDownloadSource: overviewDownload?.source || "developer-ops",
+        requiredChecks: firstOperatingResultReviewReceiptRecorded
+          ? [
+              "first_operating_result_review_receipt_recorded",
+              "receipt_visible_in_developer_ops",
+              "rollout_widening_followup_ready"
+            ]
+          : [
+              "first_operating_result_handoff_receipt_recorded",
+              "first_operating_result_review_completed"
+            ],
+        blockedBy: firstOperatingResultReviewReceiptRecorded ? [] : ["first_operating_result_review_receipt"],
+        nextAction: firstOperatingResultReviewReceiptRecorded
+          ? "Prepare the rollout widening follow-up from the launch operations overview after the first operating result review."
+          : "Record the first operating result review receipt after reviewing the handoff."
+      })
+    : null;
   const panels = [
     withLaunchOpsOverviewContextRecordIndex({
       key: "launch_operations_evidence_chain",
@@ -41672,6 +41915,14 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
       ready: firstOperatingResultReviewAction?.ready === true,
       href: firstOperatingResultReviewAction?.nextDownloadHref || overviewDownload?.href || null,
       fileName: firstOperatingResultReviewAction?.nextDownloadFileName || overviewDownload?.fileName || null
+    }),
+    withLaunchOpsOverviewContextRecordIndex({
+      key: "first_operating_result_review_receipt",
+      label: "First Operating Result Review Receipt",
+      status: firstOperatingResultReviewReceiptReadbackAction?.status || "awaiting_first_operating_result_review_receipt",
+      ready: firstOperatingResultReviewReceiptReadbackAction?.ready === true,
+      href: firstOperatingResultReviewReceiptReadbackAction?.nextDownloadHref || overviewDownload?.href || null,
+      fileName: firstOperatingResultReviewReceiptReadbackAction?.nextDownloadFileName || overviewDownload?.fileName || null
     })
   ];
   const receiptVisible = receiptVisibilitySummary?.status === "visible";
@@ -41726,6 +41977,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     rolloutWideningReceiptReadbackAction,
     firstOperatingResultHandoffReceiptReadbackAction,
     firstOperatingResultReviewAction,
+    firstOperatingResultReviewReceiptReadbackAction,
     firstOperatingResultHandoffAction,
     receiptVisibilityStatus: receiptVisibilitySummary?.status || "pending",
     receiptVisibilitySummary,
@@ -41736,7 +41988,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     panels,
     readyPanelCount,
     panelCount: panels.length,
-    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, signoff=${productionSignoffPacket || "-"}, watchEntry=${launchDayWatchEntry || "-"}, rollout=${rolloutWideningDecisionAction?.status || "-"}, rolloutReady=${rolloutWideningDecisionAction?.ready === true}, rolloutQueue=${rolloutWideningDecisionAction?.queueTotal ?? "-"}, rolloutAttention=${rolloutWideningDecisionAction?.attentionCount ?? "-"}, firstResultReview=${firstOperatingResultReviewAction?.status || "-"}, next=${nextAction?.key || "-"}.`
+    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, signoff=${productionSignoffPacket || "-"}, watchEntry=${launchDayWatchEntry || "-"}, rollout=${rolloutWideningDecisionAction?.status || "-"}, rolloutReady=${rolloutWideningDecisionAction?.ready === true}, rolloutQueue=${rolloutWideningDecisionAction?.queueTotal ?? "-"}, rolloutAttention=${rolloutWideningDecisionAction?.attentionCount ?? "-"}, firstResultReview=${firstOperatingResultReviewAction?.status || "-"}, firstResultReviewReceipt=${firstOperatingResultReviewReceiptReadbackAction?.status || "-"}, next=${nextAction?.key || "-"}.`
   };
 }
 
@@ -46524,6 +46776,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
       channel: latestReceipt?.channel || scope.channel || "stable"
     }
   );
+  const firstOperatingResultReviewReceipt = selectSteadyStateDutyPlanFirstOperatingResultReviewReceiptForLaunchDuty(
+    steadyStateDutyPlanReceipts,
+    {
+      productCode: latestReceipt?.productCode || scope.productCode || "",
+      channel: latestReceipt?.channel || scope.channel || "stable"
+    }
+  );
   const postSignoffArchiveReceipt = selectSteadyStateDutyPlanPostSignoffArchiveReceiptForLaunchDuty(
     steadyStateDutyPlanReceipts,
     {
@@ -46912,6 +47171,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsDailyBrief,
     launchOperationsShiftActionPlan,
     latestSteadyStateDutyPlanReceipt,
+    firstOperatingResultReviewReceipt,
     launchReadinessNextGate,
     launchReadinessNextGateHandoff
   });
@@ -47314,6 +47574,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     latestSteadyStateDutyPlanReceipt: buildSteadyStateDutyPlanReceiptPayload(latestSteadyStateDutyPlanReceipt),
     rolloutWideningDecisionReceipt: buildSteadyStateDutyPlanReceiptPayload(rolloutWideningDecisionReceipt),
     firstOperatingResultHandoffReceipt: buildSteadyStateDutyPlanReceiptPayload(firstOperatingResultHandoffReceipt),
+    firstOperatingResultReviewReceipt: buildSteadyStateDutyPlanReceiptPayload(firstOperatingResultReviewReceipt),
     postSignoffArchiveReceipt: buildSteadyStateDutyPlanReceiptPayload(postSignoffArchiveReceipt),
     launchDutyRecordIndexReceiptSelection,
     launchDutyPacketReviewReceiptSelection,
@@ -56524,7 +56785,8 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     launchOperationsHandoffSummary: readiness.launchOperationsHandoffSummary || null,
     launchOperationsDailyBrief: readiness.launchOperationsDailyBrief || null,
     launchOperationsShiftActionPlan: readiness.launchOperationsShiftActionPlan || null,
-    latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null
+    latestSteadyStateDutyPlanReceipt: readiness.latestSteadyStateDutyPlanReceipt || null,
+    firstOperatingResultReviewReceipt: readiness.firstOperatingResultReviewReceipt || null
   });
   const panels = Array.isArray(overview?.panels) ? overview.panels : [];
   const rolloutWideningDecisionAction = overview?.rolloutWideningDecisionAction
@@ -56538,6 +56800,10 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
   const firstOperatingResultReviewAction = overview?.firstOperatingResultReviewAction
     && typeof overview.firstOperatingResultReviewAction === "object"
       ? overview.firstOperatingResultReviewAction
+      : null;
+  const firstOperatingResultReviewReceiptReadbackAction = overview?.firstOperatingResultReviewReceiptReadbackAction
+    && typeof overview.firstOperatingResultReviewReceiptReadbackAction === "object"
+      ? overview.firstOperatingResultReviewReceiptReadbackAction
       : null;
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(overview?.launchOpsOverviewContext);
   const {
@@ -56626,6 +56892,28 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
       `- firstOperatingResultReviewNext=${firstOperatingResultReviewAction.actionKey || "-"}`
       + ` | nextDownload=${firstOperatingResultReviewAction.nextDownloadFormat || "-"}`
       + ` | launchDutyRecordIndex=${firstOperatingResultReviewAction.launchDutyRecordIndexPath || "-"}`
+      + ` | blockedBy=${blockedBy || "-"}`
+      + ` | checks=${requiredChecks || "-"}`
+    );
+  }
+  if (firstOperatingResultReviewReceiptReadbackAction) {
+    const blockedBy = Array.isArray(firstOperatingResultReviewReceiptReadbackAction.blockedBy)
+      ? firstOperatingResultReviewReceiptReadbackAction.blockedBy.join(",")
+      : "";
+    const requiredChecks = Array.isArray(firstOperatingResultReviewReceiptReadbackAction.requiredChecks)
+      ? firstOperatingResultReviewReceiptReadbackAction.requiredChecks.join(",")
+      : "";
+    lines.push(
+      `- firstOperatingResultReviewReceiptReadback=${firstOperatingResultReviewReceiptReadbackAction.status || "-"}`
+      + ` | receiptRecorded=${firstOperatingResultReviewReceiptReadbackAction.receiptRecorded === true}`
+      + ` | audit=${firstOperatingResultReviewReceiptReadbackAction.auditLogId || "-"}`
+      + ` | sourceHandoffReceipt=${firstOperatingResultReviewReceiptReadbackAction.firstOperatingResultHandoffReceiptAuditLogId || "-"}`
+      + ` | ready=${firstOperatingResultReviewReceiptReadbackAction.ready === true}`
+    );
+    lines.push(
+      `- firstOperatingResultReviewReceiptNext=${firstOperatingResultReviewReceiptReadbackAction.currentActionKey || "-"}`
+      + ` | nextDownload=${firstOperatingResultReviewReceiptReadbackAction.nextDownloadFormat || "-"}`
+      + ` | launchDutyRecordIndex=${firstOperatingResultReviewReceiptReadbackAction.launchDutyRecordIndexPath || "-"}`
       + ` | blockedBy=${blockedBy || "-"}`
       + ` | checks=${requiredChecks || "-"}`
     );
@@ -73929,6 +74217,19 @@ export function createServices(db, config, runtimeState = null, mainStore = null
         body.firstOperatingResultHandoffStatus || body.dutyPlanFirstOperatingResultHandoffStatus,
         ""
       );
+      const firstOperatingResultHandoffReceiptAuditLogId = String(
+        body.firstOperatingResultHandoffReceiptAuditLogId
+          ?? body.dutyPlanFirstOperatingResultHandoffReceiptAuditLogId
+          ?? ""
+      ).trim().slice(0, 120);
+      const firstOperatingResultReviewStatus = normalizeDeveloperOpsConfirmationToken(
+        body.firstOperatingResultReviewStatus || body.dutyPlanFirstOperatingResultReviewStatus,
+        ""
+      );
+      const firstOperatingResultReviewReady = readDeveloperOpsOptionalBoolean(
+        body.firstOperatingResultReviewReady,
+        body.dutyPlanFirstOperatingResultReviewReady
+      );
       const focusKind = normalizeDeveloperOpsConfirmationToken(body.focusKind || body.dutyPlanFocusKind, "");
       const focusReason = String(body.focusReason ?? body.dutyPlanFocusReason ?? "").trim().slice(0, 500);
       const note = String(body.note ?? body.notes ?? "").trim().slice(0, 500);
@@ -73986,6 +74287,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           steadyStateAttentionCount,
           rolloutWideningDecisionReceiptAuditLogId,
           firstOperatingResultHandoffStatus,
+          firstOperatingResultHandoffReceiptAuditLogId,
+          firstOperatingResultReviewStatus,
+          firstOperatingResultReviewReady,
           focusKind,
           focusReason,
           note,
@@ -74032,6 +74336,9 @@ export function createServices(db, config, runtimeState = null, mainStore = null
           steadyStateAttentionCount,
           rolloutWideningDecisionReceiptAuditLogId,
           firstOperatingResultHandoffStatus,
+          firstOperatingResultHandoffReceiptAuditLogId,
+          firstOperatingResultReviewStatus,
+          firstOperatingResultReviewReady,
           focusKind,
           focusReason,
           note,
@@ -74189,7 +74496,7 @@ export function createServices(db, config, runtimeState = null, mainStore = null
       const steadyStateDutyPlanReceiptAuditLogs = shouldBackfillProtectiveAuditRows
         ? queryAuditLogRows(db, {
             eventType: "developer.ops.steady-state-duty-plan.receipt",
-            limit: 10,
+            limit: 40,
             developerId: null,
             productCodes: scopedProductCodes
           })

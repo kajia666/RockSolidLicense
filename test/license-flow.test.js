@@ -26016,6 +26016,205 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`nextRolloutWideningDecisionReceiptReadback=recorded_ready_for_widened_rollout_monitoring \\| receiptRecorded=true \\| audit=${nextRolloutWideningDecisionReceipt.auditLogId} \\| followupReceipt=${rolloutWideningFollowupReceipt.auditLogId}`)
     );
 
+    const launchMainlineNextRolloutDecision = await getJson(
+      baseUrl,
+      "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    const nextRolloutWideningDecisionExecution = launchMainlineNextRolloutDecision.mainlineSummary
+      .nextRolloutWideningDecisionExecution;
+    assert.ok(nextRolloutWideningDecisionExecution);
+    assert.equal(
+      nextRolloutWideningDecisionExecution.version,
+      "developer-launch-mainline-next-rollout-widening-decision-execution/v1"
+    );
+    assert.equal(nextRolloutWideningDecisionExecution.status, "ready_for_next_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionExecution.ready, true);
+    assert.equal(nextRolloutWideningDecisionExecution.actionKey, "review_rollout_widening_decision");
+    assert.equal(
+      nextRolloutWideningDecisionExecution.rolloutWideningFollowupReceiptAuditLogId,
+      rolloutWideningFollowupReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionExecution.firstOperatingResultReviewReceiptAuditLogId,
+      firstOperatingResultReviewReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionExecution.firstOperatingResultHandoffReceiptAuditLogId,
+      firstOperatingResultHandoffReceipt.auditLogId
+    );
+    assert.equal(nextRolloutWideningDecisionExecution.decisionSourceStatus, "recorded_ready_for_next_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionExecution.nextDownloadKey, "ops_launch_operations_overview_status");
+    assert.equal(nextRolloutWideningDecisionExecution.nextDownloadFileName, "developer-ops-launch-operations-overview-status.txt");
+    assert.equal(nextRolloutWideningDecisionExecution.nextDownloadFormat, "launch-operations-overview-status");
+    assert.equal(nextRolloutWideningDecisionExecution.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    assert.deepEqual(nextRolloutWideningDecisionExecution.blockedBy, []);
+    assert.deepEqual(nextRolloutWideningDecisionExecution.requiredChecks, [
+      "rollout_widening_followup_receipt_recorded",
+      "receipt_visible_in_developer_ops",
+      "launch_operations_overview_attached"
+    ]);
+    const nextRolloutWideningDecisionReceiptReadbackExecution = launchMainlineNextRolloutDecision.mainlineSummary
+      .nextRolloutWideningDecisionReceiptReadbackExecution;
+    assert.ok(nextRolloutWideningDecisionReceiptReadbackExecution);
+    assert.equal(
+      nextRolloutWideningDecisionReceiptReadbackExecution.version,
+      "developer-launch-mainline-next-rollout-widening-decision-receipt-readback-execution/v1"
+    );
+    assert.equal(
+      nextRolloutWideningDecisionReceiptReadbackExecution.status,
+      "recorded_ready_for_widened_rollout_monitoring"
+    );
+    assert.equal(nextRolloutWideningDecisionReceiptReadbackExecution.ready, true);
+    assert.equal(nextRolloutWideningDecisionReceiptReadbackExecution.receiptRecorded, true);
+    assert.equal(nextRolloutWideningDecisionReceiptReadbackExecution.auditLogId, nextRolloutWideningDecisionReceipt.auditLogId);
+    assert.equal(nextRolloutWideningDecisionReceiptReadbackExecution.currentActionKey, "monitor_widened_rollout_window");
+    assert.equal(
+      nextRolloutWideningDecisionReceiptReadbackExecution.rolloutWideningFollowupReceiptAuditLogId,
+      rolloutWideningFollowupReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionReceiptReadbackExecution.firstOperatingResultReviewReceiptAuditLogId,
+      firstOperatingResultReviewReceipt.auditLogId
+    );
+    assert.equal(nextRolloutWideningDecisionReceiptReadbackExecution.decisionSourceStatus, "ready_for_next_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceiptReadbackExecution.nextDownloadKey, "ops_launch_operations_overview_status");
+    assert.equal(nextRolloutWideningDecisionReceiptReadbackExecution.nextDownloadFileName, "developer-ops-launch-operations-overview-status.txt");
+    assert.equal(nextRolloutWideningDecisionReceiptReadbackExecution.nextDownloadFormat, "launch-operations-overview-status");
+    assert.equal(
+      nextRolloutWideningDecisionReceiptReadbackExecution.launchDutyRecordIndexPath,
+      expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.deepEqual(nextRolloutWideningDecisionReceiptReadbackExecution.blockedBy, []);
+    assert.deepEqual(nextRolloutWideningDecisionReceiptReadbackExecution.requiredChecks, [
+      "next_rollout_widening_decision_receipt_recorded",
+      "receipt_visible_in_developer_ops",
+      "widened_rollout_monitoring_ready"
+    ]);
+    assert.match(
+      launchMainlineNextRolloutDecision.summaryText,
+      new RegExp(
+        `Launch Mainline Next Rollout Widening Decision Execution:[\\s\\S]*status=ready_for_next_rollout_widening_decision \\| ready=yes \\| action=review_rollout_widening_decision \\| followupReceipt=${rolloutWideningFollowupReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineNextRolloutDecision.summaryText,
+      new RegExp(
+        `Launch Mainline Next Rollout Widening Decision Receipt Readback Execution:[\\s\\S]*status=recorded_ready_for_widened_rollout_monitoring \\| ready=yes \\| current=monitor_widened_rollout_window \\| receiptRecorded=true \\| audit=${nextRolloutWideningDecisionReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    const launchMainlineNextRolloutRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-download-routes",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineNextRolloutRoutesDownload.body,
+      new RegExp(
+        `Next Rollout Widening Decision Execution Route:[\\s\\S]*status=ready_for_next_rollout_widening_decision \\| ready=yes \\| action=review_rollout_widening_decision \\| followupReceipt=${rolloutWideningFollowupReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineNextRolloutRoutesDownload.body,
+      /next-rollout-widening-decision-execution: [^\n]*file=next-rollout-widening-decision-execution\.txt[^\n]*format=next-rollout-widening-decision-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineNextRolloutRoutesDownload.body,
+      new RegExp(
+        `Next Rollout Widening Decision Receipt Readback Execution Route:[\\s\\S]*status=recorded_ready_for_widened_rollout_monitoring \\| ready=yes \\| current=monitor_widened_rollout_window \\| receiptRecorded=true \\| audit=${nextRolloutWideningDecisionReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineNextRolloutRoutesDownload.body,
+      /next-rollout-widening-decision-receipt-readback-execution: [^\n]*file=next-rollout-widening-decision-receipt-readback-execution\.txt[^\n]*format=next-rollout-widening-decision-receipt-readback-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchMainlineNextRolloutPostLaunchIndexDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=post-launch-handoff-index",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineNextRolloutPostLaunchIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Next rollout widening decision execution direct file: ops\/next-rollout-widening-decision-execution\.txt/
+    );
+    assert.match(
+      launchMainlineNextRolloutPostLaunchIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Next rollout widening decision receipt readback execution direct file: ops\/next-rollout-widening-decision-receipt-readback-execution\.txt/
+    );
+    const launchMainlineNextRolloutChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineNextRolloutChecksumsDownload.body,
+      /ops\/next-rollout-widening-decision-execution\.txt/
+    );
+    assert.match(
+      launchMainlineNextRolloutChecksumsDownload.body,
+      /ops\/next-rollout-widening-decision-receipt-readback-execution\.txt/
+    );
+    const launchMainlineNextRolloutZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const launchMainlineNextRolloutZipText = launchMainlineNextRolloutZipDownload.body.toString("latin1");
+    assert.match(
+      launchMainlineNextRolloutZipText,
+      /ops\/next-rollout-widening-decision-execution\.txt/
+    );
+    assert.match(
+      launchMainlineNextRolloutZipText,
+      /RockSolid Launch Mainline Next Rollout Widening Decision Execution Download/
+    );
+    assert.match(
+      launchMainlineNextRolloutZipText,
+      /ops\/next-rollout-widening-decision-receipt-readback-execution\.txt/
+    );
+    assert.match(
+      launchMainlineNextRolloutZipText,
+      /RockSolid Launch Mainline Next Rollout Widening Decision Receipt Readback Execution Download/
+    );
+    const launchMainlineNextRolloutDecisionExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=next-rollout-widening-decision-execution",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineNextRolloutDecisionExecutionDirectDownload.body,
+      /RockSolid Launch Mainline Next Rollout Widening Decision Execution Download/
+    );
+    assert.match(
+      launchMainlineNextRolloutDecisionExecutionDirectDownload.body,
+      new RegExp(
+        `Next Rollout Widening Decision Execution:[\\s\\S]*status=ready_for_next_rollout_widening_decision \\| ready=yes \\| action=review_rollout_widening_decision \\| followupReceipt=${rolloutWideningFollowupReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineNextRolloutDecisionExecutionDirectDownload.body,
+      /Next Rollout Widening Decision Blockers:[^\n]*blockedBy=-[^\n]*checks=rollout_widening_followup_receipt_recorded,receipt_visible_in_developer_ops,launch_operations_overview_attached[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchMainlineNextRolloutDecisionReceiptReadbackExecutionDirectDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=next-rollout-widening-decision-receipt-readback-execution",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineNextRolloutDecisionReceiptReadbackExecutionDirectDownload.body,
+      /RockSolid Launch Mainline Next Rollout Widening Decision Receipt Readback Execution Download/
+    );
+    assert.match(
+      launchMainlineNextRolloutDecisionReceiptReadbackExecutionDirectDownload.body,
+      new RegExp(
+        `Next Rollout Widening Decision Receipt Readback Execution:[\\s\\S]*status=recorded_ready_for_widened_rollout_monitoring \\| ready=yes \\| current=monitor_widened_rollout_window \\| receiptRecorded=true \\| audit=${nextRolloutWideningDecisionReceipt.auditLogId} \\| file=developer-ops-launch-operations-overview-status\\.txt \\| format=launch-operations-overview-status`
+      )
+    );
+    assert.match(
+      launchMainlineNextRolloutDecisionReceiptReadbackExecutionDirectDownload.body,
+      /Next Rollout Widening Decision Receipt Readback Blockers:[^\n]*blockedBy=-[^\n]*checks=next_rollout_widening_decision_receipt_recorded,receipt_visible_in_developer_ops,widened_rollout_monitoring_ready[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+
     const launchOperationsChecksumsDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=checksums",

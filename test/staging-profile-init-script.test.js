@@ -88,6 +88,94 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     const fullTestOutputFile = "artifacts/staging/PILOT_ALPHA/beta/full-test-output.txt";
     const fullTestSignoffBackfillCommand = "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/full-test-output.txt --decision ready-for-production-signoff --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const postFullTestReadinessStatusCommand = "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
+    const productionSignoffBackfillCommands = [
+      {
+        key: "staging_artifacts_archived",
+        status: "blocked_after_post_full_test_readiness_status",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/staging-artifacts-archive.txt",
+        receiptIds: [],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/staging-artifacts-archive.txt --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "launch_mainline_receipts_visible",
+        status: "blocked_after_staging_artifacts_archived",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/launch-mainline-receipts-visible.json",
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --condition-key launch_mainline_receipts_visible --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/launch-mainline-receipts-visible.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "launch_ops_overview_status_visible",
+        status: "blocked_after_launch_mainline_receipts_visible",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/launch-ops-overview-status-visible.json",
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --condition-key launch_ops_overview_status_visible --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/launch-ops-overview-status-visible.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "backup_restore_drill_passed",
+        status: "blocked_after_launch_ops_overview_status_visible",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt",
+        receiptIds: ["<record_recovery_drill-receipt-id>", "<record_backup_verification-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --condition-key backup_restore_drill_passed --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "rollback_path_confirmed",
+        status: "blocked_after_backup_restore_drill_passed",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/rollback-path-confirmed.md",
+        receiptIds: ["<record_rollback_walkthrough-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --condition-key rollback_path_confirmed --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/rollback-path-confirmed.md --receipt-id <record_rollback_walkthrough-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "operator_signoff_recorded",
+        status: "blocked_after_rollback_path_confirmed",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/operator-production-signoff.md",
+        receiptIds: [],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --condition-key operator_signoff_recorded --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/operator-production-signoff.md --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      }
+    ].map((item) => ({
+      ...item,
+      nextAction: "Backfill this production sign-off condition, refresh readiness, then continue the sign-off and receipt visibility queue."
+    }));
+    const receiptVisibilityBackfillCommands = [
+      {
+        key: "launchMainline",
+        status: "blocked_after_operator_signoff_recorded",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/launch-mainline-receipt-visibility.json",
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --receipt-lane launchMainline --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/launch-mainline-receipt-visibility.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "launchReview",
+        status: "blocked_after_launchMainline_receipt_visibility",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/launch-review-receipt-visibility.json",
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --receipt-lane launchReview --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/launch-review-receipt-visibility.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "launchSmoke",
+        status: "blocked_after_launchReview_receipt_visibility",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/launch-smoke-receipt-visibility.json",
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --receipt-lane launchSmoke --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/launch-smoke-receipt-visibility.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "developerOps",
+        status: "blocked_after_launchSmoke_receipt_visibility",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/developer-ops-receipt-visibility.json",
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --receipt-lane developerOps --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/developer-ops-receipt-visibility.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      },
+      {
+        key: "launchOpsOverviewStatus",
+        status: "blocked_after_developerOps_receipt_visibility",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/launch-ops-overview-status-receipt-visibility.json",
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"],
+        command: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --receipt-lane launchOpsOverviewStatus --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/launch-ops-overview-status-receipt-visibility.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      }
+    ].map((item) => ({
+      ...item,
+      nextAction: "Backfill this receipt-visibility lane, refresh readiness, then continue toward launch-day watch."
+    }));
+    const postProductionSignoffReadinessStatusCommand = postFullTestReadinessStatusCommand;
     const postFirstWaveCloseoutReadinessStatusCommand = "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const postFirstWaveCloseoutRehearsalReloadCommand = "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json";
     const launchDutyRecordIndexFile = "artifacts/staging/PILOT_ALPHA/beta/launch-duty-record-index.json";
@@ -175,6 +263,26 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         nextAction: "Record first-wave closeout after the incident, rollback, and stabilization handoff source records exist."
       }
     ];
+    assert.deepEqual(
+      output.productionSignoffBackfillCommands.map((item) => [item.key, item.status, item.artifactPath, item.command]),
+      productionSignoffBackfillCommands.map((item) => [item.key, item.status, item.artifactPath, item.command])
+    );
+    assert.deepEqual(
+      output.receiptVisibilityBackfillCommands.map((item) => [item.key, item.status, item.artifactPath, item.command]),
+      receiptVisibilityBackfillCommands.map((item) => [item.key, item.status, item.artifactPath, item.command])
+    );
+    assert.deepEqual(
+      output.operatorNextCommands
+        .filter((item) => item.key.startsWith("backfill_production_signoff_"))
+        .map((item) => [item.targetKey, item.status, item.command]),
+      productionSignoffBackfillCommands.map((item) => [item.key, item.status, item.command])
+    );
+    assert.deepEqual(
+      output.operatorNextCommands
+        .filter((item) => item.key.startsWith("backfill_receipt_visibility_"))
+        .map((item) => [item.targetKey, item.status, item.command]),
+      receiptVisibilityBackfillCommands.map((item) => [item.key, item.status, item.command])
+    );
     assert.deepEqual(output, {
       status: "written",
       mode: "staging-profile-init",
@@ -229,6 +337,9 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       fullTestOutputFile,
       fullTestSignoffBackfillCommand,
       postFullTestReadinessStatusCommand,
+      productionSignoffBackfillCommands,
+      receiptVisibilityBackfillCommands,
+      postProductionSignoffReadinessStatusCommand,
       postFirstWaveCloseoutReadinessStatusCommand,
       postFirstWaveCloseoutRehearsalReloadCommand,
       stableOperationsHandoff: {
@@ -379,9 +490,35 @@ test("staging profile init writes a secret-free profile with launch-duty output 
           targetKey: "production_signoff",
           nextAction: "Refresh readiness after full_test_window_passed backfill to confirm production sign-off blockers."
         },
+        ...productionSignoffBackfillCommands.map((item) => ({
+          key: `backfill_production_signoff_${item.key}`,
+          status: item.status,
+          command: item.command,
+          artifactPath: item.artifactPath,
+          targetKey: item.key,
+          receiptIds: item.receiptIds,
+          nextAction: "Backfill this production sign-off condition, refresh readiness, then continue the sign-off and receipt visibility queue."
+        })),
+        ...receiptVisibilityBackfillCommands.map((item) => ({
+          key: `backfill_receipt_visibility_${item.key}`,
+          status: item.status,
+          command: item.command,
+          artifactPath: item.artifactPath,
+          targetKey: item.key,
+          receiptIds: item.receiptIds,
+          nextAction: "Backfill this receipt-visibility lane, refresh readiness, then continue toward launch-day watch."
+        })),
+        {
+          key: "post_production_signoff_readiness_status",
+          status: "blocked_after_launchOpsOverviewStatus_receipt_visibility",
+          command: postProductionSignoffReadinessStatusCommand,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+          targetKey: "launch_day_watch",
+          nextAction: "Refresh readiness after all production sign-off conditions and receipt visibility lanes are backfilled."
+        },
         {
           key: "record_launch_day_watch_summary",
-          status: "blocked_after_post_full_test_readiness_status",
+          status: "blocked_after_production_signoff_readiness_status",
           command: launchDayWatchRecordCommand,
           artifactPath: launchDayWatchSummaryFile,
           targetKey: "launch_day_watch_summary",
@@ -473,7 +610,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
           nextAction: "Hand off the completed record index and first-wave closeout artifact to the stable-operations owner."
         }
       ],
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, signoff backfill, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff."
     });
     assert.deepEqual(profile, {
       baseUrl: "https://staging.example.com",
@@ -590,13 +727,18 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Full-test window: npm\.cmd test/);
     assert.match(result.stdout, /Full-test signoff backfill: npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/full-test-output\.txt --decision ready-for-production-signoff --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Post-full-test readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Production signoff backfill 1\. staging_artifacts_archived: blocked_after_post_full_test_readiness_status -> npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/staging-artifacts-archive\.txt --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Production signoff backfill 6\. operator_signoff_recorded: blocked_after_rollback_path_confirmed -> npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --condition-key operator_signoff_recorded --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/operator-production-signoff\.md --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Receipt visibility backfill 1\. launchMainline: blocked_after_operator_signoff_recorded -> npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --receipt-lane launchMainline --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/launch-mainline-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Receipt visibility backfill 5\. launchOpsOverviewStatus: blocked_after_developerOps_receipt_visibility -> npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --receipt-lane launchOpsOverviewStatus --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/launch-ops-overview-status-receipt-visibility\.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Post-production-signoff readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Launch-day watch record: npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/launch-day-watch-summary\.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Stabilization record 1\. receipt_visibility_snapshot: blocked_after_launch_day_watch_summary -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key receipt_visibility_snapshot --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/receipt-visibility-snapshot\.txt --value-json <redacted-json> --receipt-id <record_post_launch_ops_sweep-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Stabilization record 5\. first_wave_closeout: blocked_until_source_records -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key first_wave_closeout --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md --value-json <redacted-json> --receipt-id <record_launch_closeout_review-receipt-id> --source-record first_wave_incident_log=artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-incident-log\.md --source-record rollback_signal_review=artifacts\/staging\/PILOT_ALPHA\/beta\/rollback-signal-review\.md --source-record stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/beta\/stabilization-owner-handoff\.md --record-index-file artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Post-first-wave closeout readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Post-first-wave closeout rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json/);
     assert.match(result.stdout, /Stable-operations handoff: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json; artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md/);
-    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, signoff backfill, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff\./);
+    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

@@ -257,6 +257,110 @@ function buildFullTestSignoffBackfillCommand({ closeoutInputFile, readinessActio
   ].join(" ");
 }
 
+function buildSignoffBackfillCommand({ closeoutInputFile, readinessActionQueueFile, keyFlag, key, artifactPath, receiptIds = [] }) {
+  return [
+    "npm.cmd run staging:signoff:backfill --",
+    "--input-file",
+    commandValue(closeoutInputFile),
+    keyFlag,
+    key,
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(artifactPath),
+    ...receiptIds.flatMap((receiptId) => ["--receipt-id", receiptId]),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
+function receiptVisibilityLaneFileName(key) {
+  return `${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}-receipt-visibility.json`;
+}
+
+function buildProductionSignoffBackfillCommands({
+  closeoutInputFile,
+  readinessActionQueueFile,
+  artifactPaths
+}) {
+  const targets = [
+    {
+      key: "staging_artifacts_archived",
+      artifactPath: artifactPaths.stagingArtifactsArchiveFile,
+      receiptIds: []
+    },
+    {
+      key: "launch_mainline_receipts_visible",
+      artifactPath: artifactPaths.launchMainlineReceiptsVisibleFile,
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    },
+    {
+      key: "launch_ops_overview_status_visible",
+      artifactPath: artifactPaths.launchOpsOverviewStatusVisibleFile,
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    },
+    {
+      key: "backup_restore_drill_passed",
+      artifactPath: artifactPaths.backupRestoreArtifactFile,
+      receiptIds: ["<record_recovery_drill-receipt-id>", "<record_backup_verification-receipt-id>"]
+    },
+    {
+      key: "rollback_path_confirmed",
+      artifactPath: artifactPaths.rollbackPathConfirmedFile,
+      receiptIds: ["<record_rollback_walkthrough-receipt-id>"]
+    },
+    {
+      key: "operator_signoff_recorded",
+      artifactPath: artifactPaths.operatorProductionSignoffFile,
+      receiptIds: []
+    }
+  ];
+  return targets.map((item, index) => ({
+    ...item,
+    status: index === 0 ? "blocked_after_post_full_test_readiness_status" : `blocked_after_${targets[index - 1].key}`,
+    command: buildSignoffBackfillCommand({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      keyFlag: "--condition-key",
+      key: item.key,
+      artifactPath: item.artifactPath,
+      receiptIds: item.receiptIds
+    }),
+    nextAction: "Backfill this production sign-off condition, refresh readiness, then continue the sign-off and receipt visibility queue."
+  }));
+}
+
+function buildReceiptVisibilityBackfillCommands({
+  closeoutInputFile,
+  readinessActionQueueFile,
+  archiveRoot
+}) {
+  const targets = [
+    "launchMainline",
+    "launchReview",
+    "launchSmoke",
+    "developerOps",
+    "launchOpsOverviewStatus"
+  ].map((key) => ({
+    key,
+    artifactPath: path.posix.join(archiveRoot, receiptVisibilityLaneFileName(key)),
+    receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+  }));
+  return targets.map((item, index) => ({
+    ...item,
+    status: index === 0 ? "blocked_after_operator_signoff_recorded" : `blocked_after_${targets[index - 1].key}_receipt_visibility`,
+    command: buildSignoffBackfillCommand({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      keyFlag: "--receipt-lane",
+      key: item.key,
+      artifactPath: item.artifactPath,
+      receiptIds: item.receiptIds
+    }),
+    nextAction: "Backfill this receipt-visibility lane, refresh readiness, then continue toward launch-day watch."
+  }));
+}
+
 function buildRehearsalReloadCommand(closeoutInputFile) {
   return `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(closeoutInputFile)}`;
 }
@@ -423,6 +527,9 @@ function buildOperatorNextCommands({
   fullTestOutputFile,
   fullTestSignoffBackfillCommand,
   postFullTestReadinessStatusCommand,
+  productionSignoffBackfillCommands,
+  receiptVisibilityBackfillCommands,
+  postProductionSignoffReadinessStatusCommand,
   postFirstWaveCloseoutReadinessStatusCommand,
   postFirstWaveCloseoutRehearsalReloadCommand,
   stableOperationsHandoff,
@@ -444,6 +551,25 @@ function buildOperatorNextCommands({
     recordIndexFile: launchDutyRecordIndexFile,
     nextAction: item.nextAction
   }));
+  const productionSignoffOperatorCommands = productionSignoffBackfillCommands.map((item) => ({
+    key: `backfill_production_signoff_${item.key}`,
+    status: item.status,
+    command: item.command,
+    artifactPath: item.artifactPath,
+    targetKey: item.key,
+    receiptIds: item.receiptIds,
+    nextAction: item.nextAction
+  }));
+  const receiptVisibilityOperatorCommands = receiptVisibilityBackfillCommands.map((item) => ({
+    key: `backfill_receipt_visibility_${item.key}`,
+    status: item.status,
+    command: item.command,
+    artifactPath: item.artifactPath,
+    targetKey: item.key,
+    receiptIds: item.receiptIds,
+    nextAction: item.nextAction
+  }));
+  const lastReceiptVisibilityKey = receiptVisibilityBackfillCommands.at(-1)?.key || "receipt_visibility";
   const stableOperationsOperatorCommands = [
     {
       key: "post_first_wave_closeout_readiness_status",
@@ -611,9 +737,19 @@ function buildOperatorNextCommands({
       targetKey: "production_signoff",
       nextAction: "Refresh readiness after full_test_window_passed backfill to confirm production sign-off blockers."
     },
+    ...productionSignoffOperatorCommands,
+    ...receiptVisibilityOperatorCommands,
+    {
+      key: "post_production_signoff_readiness_status",
+      status: `blocked_after_${lastReceiptVisibilityKey}_receipt_visibility`,
+      command: postProductionSignoffReadinessStatusCommand,
+      artifactPath: readinessActionQueueFile,
+      targetKey: "launch_day_watch",
+      nextAction: "Refresh readiness after all production sign-off conditions and receipt visibility lanes are backfilled."
+    },
     {
       key: "record_launch_day_watch_summary",
-      status: "blocked_after_post_full_test_readiness_status",
+      status: "blocked_after_production_signoff_readiness_status",
       command: launchDayWatchRecordCommand,
       artifactPath: launchDayWatchSummaryFile,
       targetKey: "launch_day_watch_summary",
@@ -710,6 +846,9 @@ function writeResult(result, json) {
     const fullTestWindow = result.operatorNextCommands?.find((item) => item.key === "run_full_test_window");
     const fullTestSignoffBackfill = result.operatorNextCommands?.find((item) => item.key === "backfill_full_test_window_passed");
     const postFullTestReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_full_test_readiness_status");
+    const productionSignoffBackfills = (result.operatorNextCommands || []).filter((item) => item.key?.startsWith("backfill_production_signoff_"));
+    const receiptVisibilityBackfills = (result.operatorNextCommands || []).filter((item) => item.key?.startsWith("backfill_receipt_visibility_"));
+    const postProductionSignoffReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_production_signoff_readiness_status");
     const launchDayWatchRecord = result.operatorNextCommands?.find((item) => item.key === "record_launch_day_watch_summary");
     const stabilizationRecords = (result.operatorNextCommands || []).filter((item) => item.key?.startsWith("record_stabilization_"));
     const postFirstWaveCloseoutReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_first_wave_closeout_readiness_status");
@@ -771,6 +910,19 @@ function writeResult(result, json) {
     if (postFullTestReadinessStatus) {
       console.log(`Post-full-test readiness status: ${postFullTestReadinessStatus.command}`);
     }
+    if (productionSignoffBackfills.length) {
+      productionSignoffBackfills.forEach((item, index) => {
+        console.log(`Production signoff backfill ${index + 1}. ${item.targetKey}: ${item.status} -> ${item.command}`);
+      });
+    }
+    if (receiptVisibilityBackfills.length) {
+      receiptVisibilityBackfills.forEach((item, index) => {
+        console.log(`Receipt visibility backfill ${index + 1}. ${item.targetKey}: ${item.status} -> ${item.command}`);
+      });
+    }
+    if (postProductionSignoffReadinessStatus) {
+      console.log(`Post-production-signoff readiness status: ${postProductionSignoffReadinessStatus.command}`);
+    }
     if (launchDayWatchRecord) {
       console.log(`Launch-day watch record: ${launchDayWatchRecord.command}`);
     }
@@ -810,6 +962,11 @@ function main() {
     const launchMainlineEvidenceReceiptsFile = path.posix.join(archiveRoot, "launch-mainline-evidence-receipts.json");
     const receiptVisibilityReviewFile = path.posix.join(archiveRoot, "receipt-visibility-review.txt");
     const fullTestOutputFile = path.posix.join(archiveRoot, "full-test-output.txt");
+    const stagingArtifactsArchiveFile = path.posix.join(archiveRoot, "staging-artifacts-archive.txt");
+    const launchMainlineReceiptsVisibleFile = path.posix.join(archiveRoot, "launch-mainline-receipts-visible.json");
+    const launchOpsOverviewStatusVisibleFile = path.posix.join(archiveRoot, "launch-ops-overview-status-visible.json");
+    const rollbackPathConfirmedFile = path.posix.join(archiveRoot, "rollback-path-confirmed.md");
+    const operatorProductionSignoffFile = path.posix.join(archiveRoot, "operator-production-signoff.md");
     const launchDutyRecordIndexFile = path.posix.join(archiveRoot, "launch-duty-record-index.json");
     const launchDayWatchSummaryFile = path.posix.join(archiveRoot, "launch-day-watch-summary.md");
     const receiptVisibilitySnapshotFile = path.posix.join(archiveRoot, "receipt-visibility-snapshot.txt");
@@ -871,6 +1028,24 @@ function main() {
       fullTestOutputFile
     });
     const postFullTestReadinessStatusCommand = postCloseoutInitStatusCommand;
+    const productionSignoffBackfillCommands = buildProductionSignoffBackfillCommands({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      artifactPaths: {
+        stagingArtifactsArchiveFile,
+        launchMainlineReceiptsVisibleFile,
+        launchOpsOverviewStatusVisibleFile,
+        backupRestoreArtifactFile,
+        rollbackPathConfirmedFile,
+        operatorProductionSignoffFile
+      }
+    });
+    const receiptVisibilityBackfillCommands = buildReceiptVisibilityBackfillCommands({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      archiveRoot
+    });
+    const postProductionSignoffReadinessStatusCommand = postCloseoutInitStatusCommand;
     const postFirstWaveCloseoutReadinessStatusCommand = postCloseoutInitStatusCommand;
     const postFirstWaveCloseoutRehearsalReloadCommand = buildRehearsalReloadCommand(closeoutInputFile);
     const launchDayWatchRecordCommand = buildLaunchDutyRecordCommand({
@@ -954,6 +1129,9 @@ function main() {
       fullTestOutputFile,
       fullTestSignoffBackfillCommand,
       postFullTestReadinessStatusCommand,
+      productionSignoffBackfillCommands,
+      receiptVisibilityBackfillCommands,
+      postProductionSignoffReadinessStatusCommand,
       postFirstWaveCloseoutReadinessStatusCommand,
       postFirstWaveCloseoutRehearsalReloadCommand,
       stableOperationsHandoff: toPublicStableOperationsHandoff(stableOperationsHandoff),
@@ -980,6 +1158,9 @@ function main() {
         fullTestOutputFile,
         fullTestSignoffBackfillCommand,
         postFullTestReadinessStatusCommand,
+        productionSignoffBackfillCommands,
+        receiptVisibilityBackfillCommands,
+        postProductionSignoffReadinessStatusCommand,
         postFirstWaveCloseoutReadinessStatusCommand,
         postFirstWaveCloseoutRehearsalReloadCommand,
         stableOperationsHandoff,
@@ -990,7 +1171,7 @@ function main() {
         routeMapGateDryRunFile,
         routeMapGateOutputFile
       }),
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, signoff backfill, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff."
     }, options.json);
   } catch (error) {
     writeResult({

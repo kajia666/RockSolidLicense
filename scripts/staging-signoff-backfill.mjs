@@ -10,6 +10,16 @@ const RECEIPT_VISIBILITY_KEYS = [
   "launchOpsOverviewStatus"
 ];
 
+const CLOSEOUT_EVIDENCE_KEYS = [
+  "route_map_gate_result",
+  "backup_restore_drill_result",
+  "live_write_smoke_result",
+  "launch_smoke_handoff",
+  "launch_mainline_evidence_receipts",
+  "receipt_visibility_review",
+  "operator_go_no_go"
+];
+
 const DEFAULT_ARTIFACT_ROOT = "artifacts/staging/<productCode>/<channel>";
 
 const PRODUCTION_SIGNOFF_TARGETS = {
@@ -162,6 +172,84 @@ function buildNextBackfillCommand({ outputFile, target, actionsFile = null, incl
     decisionArg.trimStart(),
     actionsArg.trimStart()
   ].filter(Boolean).join(" ");
+}
+
+function buildCloseoutEvidenceBackfillCommand({
+  outputFile,
+  actionsFile = null,
+  key,
+  artifactPath,
+  receiptIds = []
+}) {
+  const actionsArg = actionsFile ? ["--actions-file", commandValue(actionsFile)] : [];
+  return [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    commandValue(outputFile),
+    "--key",
+    key,
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(artifactPath),
+    ...receiptIds.flatMap((receiptId) => ["--receipt-id", receiptId]),
+    ...actionsArg
+  ].join(" ");
+}
+
+function buildSignoffEvidenceBackfillCommand({
+  outputFile,
+  actionsFile = null,
+  keyFlag,
+  key,
+  artifactPath,
+  receiptIds = [],
+  decision = null
+}) {
+  const actionsArg = actionsFile ? ["--actions-file", commandValue(actionsFile)] : [];
+  const decisionArg = decision ? ["--decision", decision] : [];
+  return [
+    "npm.cmd run staging:signoff:backfill --",
+    "--input-file",
+    commandValue(outputFile),
+    keyFlag,
+    key,
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(artifactPath),
+    ...receiptIds.flatMap((receiptId) => ["--receipt-id", receiptId]),
+    ...decisionArg,
+    ...actionsArg
+  ].join(" ");
+}
+
+function buildLaunchDutyRecordCommand({
+  outputFile,
+  actionsFile = null,
+  recordIndexFile,
+  key,
+  artifactPath,
+  receiptIds = [],
+  sourceRecords = []
+}) {
+  const actionsArg = actionsFile ? ["--actions-file", commandValue(actionsFile)] : [];
+  return [
+    "npm.cmd run staging:launch-duty:record --",
+    "--closeout-input-file",
+    commandValue(outputFile),
+    "--key",
+    key,
+    "--artifact-path",
+    commandValue(artifactPath),
+    "--value-json",
+    "<redacted-json>",
+    ...receiptIds.flatMap((receiptId) => ["--receipt-id", receiptId]),
+    ...sourceRecords.flatMap((record) => ["--source-record", commandValue(`${record.key}=${record.artifactPath}`)]),
+    "--record-index-file",
+    commandValue(recordIndexFile),
+    ...actionsArg
+  ].join(" ");
 }
 
 function buildOperatorNextCommands({
@@ -397,6 +485,284 @@ function buildReceiptLaneTarget(key, artifactRoot) {
   };
 }
 
+function fieldReceiptIds(field) {
+  if (Array.isArray(field?.receiptIds)) {
+    return field.receiptIds;
+  }
+  if (field?.value && typeof field.value === "object" && Array.isArray(field.value.receiptIds)) {
+    return field.value.receiptIds;
+  }
+  const receiptOperations = Array.isArray(field?.receiptOperations) ? field.receiptOperations : [];
+  return receiptOperations.map((operation) => `<${operation}-receipt-id>`);
+}
+
+function buildLaunchEvidenceItem({
+  order,
+  key,
+  type,
+  status,
+  artifactPath,
+  command,
+  receiptIds = [],
+  sourceRecordKeys = []
+}) {
+  const item = {
+    order,
+    key,
+    type,
+    status,
+    artifactPath,
+    command,
+    receiptIds: Array.isArray(receiptIds) ? receiptIds.slice() : []
+  };
+  if (Array.isArray(sourceRecordKeys) && sourceRecordKeys.length) {
+    item.sourceRecordKeys = sourceRecordKeys.slice();
+  }
+  return item;
+}
+
+function buildSignoffBackfillLaunchEvidenceReadinessGate({
+  closeoutInput,
+  outputFile,
+  actionsFile,
+  artifactRoot,
+  readinessStatusCommand,
+  rehearsalCommand,
+  signoffProgress
+}) {
+  const archiveRoot = artifactRoot || DEFAULT_ARTIFACT_ROOT;
+  const acceptanceFields = Array.isArray(closeoutInput?.acceptanceFields) ? closeoutInput.acceptanceFields : [];
+  const fieldByKey = new Map(acceptanceFields.map((field) => [field?.key, field]));
+  const closeoutEvidenceItems = CLOSEOUT_EVIDENCE_KEYS.map((key, index) => {
+    const field = fieldByKey.get(key) || {};
+    const artifactPath = field.artifactPath || path.posix.join(archiveRoot, `${key}.txt`);
+    const receiptIds = fieldReceiptIds(field);
+    return buildLaunchEvidenceItem({
+      order: index + 1,
+      key,
+      type: "closeout_evidence",
+      status: isFilled(field) ? "filled" : field.status || "pending_operator_entry",
+      artifactPath,
+      command: buildCloseoutEvidenceBackfillCommand({
+        outputFile,
+        actionsFile,
+        key,
+        artifactPath,
+        receiptIds
+      }),
+      receiptIds
+    });
+  });
+  const conditionByKey = new Map(
+    (Array.isArray(closeoutInput?.productionSignoff?.conditions) ? closeoutInput.productionSignoff.conditions : [])
+      .map((condition) => [condition?.key, condition])
+  );
+  const signoffDefinitions = [
+    {
+      key: "full_test_window_passed",
+      status: "blocked_after_full_test_window",
+      fileName: "full-test-output.txt",
+      receiptIds: [],
+      decision: "ready-for-production-signoff"
+    },
+    {
+      key: "staging_artifacts_archived",
+      status: "blocked_after_post_full_test_readiness_status",
+      fileName: "staging-artifacts-archive.txt",
+      receiptIds: []
+    },
+    {
+      key: "launch_mainline_receipts_visible",
+      status: "blocked_after_staging_artifacts_archived",
+      fileName: "launch-mainline-receipts-visible.json",
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    },
+    {
+      key: "launch_ops_overview_status_visible",
+      status: "blocked_after_launch_mainline_receipts_visible",
+      fileName: "launch-ops-overview-status-visible.json",
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    },
+    {
+      key: "backup_restore_drill_passed",
+      status: "blocked_after_launch_ops_overview_status_visible",
+      fileName: "backup-restore-drill.txt",
+      receiptIds: ["<record_recovery_drill-receipt-id>", "<record_backup_verification-receipt-id>"]
+    },
+    {
+      key: "rollback_path_confirmed",
+      status: "blocked_after_backup_restore_drill_passed",
+      fileName: "rollback-path-confirmed.md",
+      receiptIds: ["<record_rollback_walkthrough-receipt-id>"]
+    },
+    {
+      key: "operator_signoff_recorded",
+      status: "blocked_after_rollback_path_confirmed",
+      fileName: "operator-production-signoff.md",
+      receiptIds: []
+    }
+  ];
+  const productionSignoffEvidenceItems = signoffDefinitions.map((definition, index) => {
+    const condition = conditionByKey.get(definition.key) || {};
+    const target = PRODUCTION_SIGNOFF_TARGETS[definition.key] || {};
+    const artifactPath = condition.artifactPath || path.posix.join(archiveRoot, target.fileName || definition.fileName);
+    return buildLaunchEvidenceItem({
+      order: index + 8,
+      key: definition.key,
+      type: "production_signoff_condition",
+      status: isFilled(condition) ? "filled" : definition.status,
+      artifactPath,
+      command: buildSignoffEvidenceBackfillCommand({
+        outputFile,
+        actionsFile,
+        keyFlag: "--condition-key",
+        key: definition.key,
+        artifactPath,
+        receiptIds: definition.receiptIds,
+        decision: definition.decision
+      }),
+      receiptIds: definition.receiptIds
+    });
+  });
+  const receiptDefinitions = [
+    ["launchMainline", "blocked_after_operator_signoff_recorded", "launch-mainline-receipt-visibility.json"],
+    ["launchReview", "blocked_after_launchMainline_receipt_visibility", "launch-review-receipt-visibility.json"],
+    ["launchSmoke", "blocked_after_launchReview_receipt_visibility", "launch-smoke-receipt-visibility.json"],
+    ["developerOps", "blocked_after_launchSmoke_receipt_visibility", "developer-ops-receipt-visibility.json"],
+    ["launchOpsOverviewStatus", "blocked_after_developerOps_receipt_visibility", "launch-ops-overview-status-receipt-visibility.json"]
+  ];
+  const receiptVisibility = closeoutInput?.receiptVisibility || closeoutInput?.productionSignoff?.receiptVisibility || {};
+  const receiptVisibilityEvidenceItems = receiptDefinitions.map(([key, status, fileName], index) => {
+    const artifactPath = path.posix.join(archiveRoot, fileName);
+    const value = receiptVisibility[key];
+    return buildLaunchEvidenceItem({
+      order: index + 15,
+      key,
+      type: "receipt_visibility_lane",
+      status: isReceiptVisibilityVisible(value) ? "visible" : status,
+      artifactPath,
+      command: buildSignoffEvidenceBackfillCommand({
+        outputFile,
+        actionsFile,
+        keyFlag: "--receipt-lane",
+        key,
+        artifactPath,
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+      }),
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    });
+  });
+  const launchDutyRecordIndexPath = path.posix.join(archiveRoot, "launch-duty-record-index.json");
+  const launchDayWatchArtifact = path.posix.join(archiveRoot, "launch-day-watch-summary.md");
+  const firstWaveCloseoutArtifact = path.posix.join(archiveRoot, "first-wave-closeout.md");
+  const firstWaveSourceRecords = [
+    { key: "first_wave_incident_log", artifactPath: path.posix.join(archiveRoot, "first-wave-incident-log.md") },
+    { key: "rollback_signal_review", artifactPath: path.posix.join(archiveRoot, "rollback-signal-review.md") },
+    { key: "stabilization_owner_handoff", artifactPath: path.posix.join(archiveRoot, "stabilization-owner-handoff.md") }
+  ];
+  const launchDutyEvidenceItems = [
+    buildLaunchEvidenceItem({
+      order: 20,
+      key: "launch_day_watch_summary",
+      type: "launch_duty_record",
+      status: "blocked_after_production_signoff_readiness_status",
+      artifactPath: launchDayWatchArtifact,
+      command: buildLaunchDutyRecordCommand({
+        outputFile,
+        actionsFile,
+        recordIndexFile: launchDutyRecordIndexPath,
+        key: "launch_day_watch_summary",
+        artifactPath: launchDayWatchArtifact,
+        receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
+      }),
+      receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
+    }),
+    buildLaunchEvidenceItem({
+      order: 21,
+      key: "first_wave_closeout",
+      type: "launch_duty_record",
+      status: "blocked_until_source_records",
+      artifactPath: firstWaveCloseoutArtifact,
+      command: buildLaunchDutyRecordCommand({
+        outputFile,
+        actionsFile,
+        recordIndexFile: launchDutyRecordIndexPath,
+        key: "first_wave_closeout",
+        artifactPath: firstWaveCloseoutArtifact,
+        receiptIds: ["<record_launch_closeout_review-receipt-id>"],
+        sourceRecords: firstWaveSourceRecords
+      }),
+      receiptIds: ["<record_launch_closeout_review-receipt-id>"],
+      sourceRecordKeys: firstWaveSourceRecords.map((record) => record.key)
+    })
+  ];
+  const evidenceItems = [
+    ...closeoutEvidenceItems,
+    ...productionSignoffEvidenceItems,
+    ...receiptVisibilityEvidenceItems,
+    ...launchDutyEvidenceItems
+  ];
+  const closeoutCompleted = closeoutEvidenceItems.filter((item) => item.status === "filled").length;
+  const productionSignoffCompleted = productionSignoffEvidenceItems.filter((item) => item.status === "filled").length;
+  const receiptVisibilityCompleted = receiptVisibilityEvidenceItems.filter((item) => item.status === "visible").length;
+  const launchDutyCompleted = launchDutyEvidenceItems.filter((item) => item.status === "recorded").length;
+  const completedEvidenceCount = closeoutCompleted + productionSignoffCompleted + receiptVisibilityCompleted + launchDutyCompleted;
+  const currentEvidence = signoffProgress?.currentTarget
+    ? evidenceItems.find((item) => item.key === signoffProgress.currentTarget.key && item.type === signoffProgress.currentTarget.type)
+    : evidenceItems.find((item) => !["filled", "visible", "recorded"].includes(item.status));
+
+  return {
+    version: "staging-signoff-backfill-launch-evidence-gate/v1",
+    status: completedEvidenceCount < evidenceItems.length
+      ? "blocked_until_real_launch_evidence_attached"
+      : "ready_for_stabilization_handoff",
+    currentGate: "production_signoff_backfill",
+    currentEvidenceKey: currentEvidence?.key || null,
+    currentEvidenceType: currentEvidence?.type || null,
+    currentEvidenceStatus: currentEvidence?.status || null,
+    currentCommand: signoffProgress?.nextBackfillCommand || currentEvidence?.command || null,
+    currentArtifactPath: signoffProgress?.currentTarget?.artifactPath || currentEvidence?.artifactPath || null,
+    closeoutInputFile: outputFile,
+    readinessActionQueueFile: actionsFile || null,
+    archiveRoot,
+    evidenceCount: evidenceItems.length,
+    closeoutEvidenceCount: closeoutEvidenceItems.length,
+    productionSignoffEvidenceCount: productionSignoffEvidenceItems.length,
+    receiptVisibilityEvidenceCount: receiptVisibilityEvidenceItems.length,
+    launchDutyEvidenceCount: launchDutyEvidenceItems.length,
+    completedEvidenceCount,
+    pendingEvidenceCount: evidenceItems.length - completedEvidenceCount,
+    readinessStatusCommand,
+    rehearsalReloadCommand: rehearsalCommand,
+    fullTestCommand: "npm.cmd test",
+    fullTestOutputArtifact: path.posix.join(archiveRoot, "full-test-output.txt"),
+    productionSignoffPacket: path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
+    launchDayWatchArtifact,
+    firstWaveCloseoutArtifact,
+    launchDutyRecordIndexPath,
+    progress: {
+      closeout: {
+        completed: closeoutCompleted,
+        total: closeoutEvidenceItems.length
+      },
+      productionSignoff: {
+        completed: productionSignoffCompleted,
+        total: productionSignoffEvidenceItems.length
+      },
+      receiptVisibility: {
+        completed: receiptVisibilityCompleted,
+        total: receiptVisibilityEvidenceItems.length
+      },
+      launchDuty: {
+        completed: launchDutyCompleted,
+        total: launchDutyEvidenceItems.length
+      }
+    },
+    evidenceItems,
+    nextAction: "Run readinessStatusCommand, verify the backfilled sign-off or receipt evidence is reflected, then continue the next launch evidence command."
+  };
+}
+
 function backfillCondition(payload, options, value) {
   const productionSignoff = payload.productionSignoff && typeof payload.productionSignoff === "object"
     ? payload.productionSignoff
@@ -516,6 +882,27 @@ function writeResult(result, json) {
       }
     }
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
+    if (result.launchEvidenceReadinessGate) {
+      const gate = result.launchEvidenceReadinessGate;
+      console.log(
+        `Launch evidence gate: ${gate.status || "-"}`
+          + ` (current=${gate.currentEvidenceKey || "-"}, pending=${gate.pendingEvidenceCount ?? "-"}/${gate.evidenceCount ?? "-"})`
+      );
+      console.log(`Launch evidence current: ${gate.currentEvidenceType || "-"}/${gate.currentEvidenceKey || "-"} -> ${gate.currentCommand || "-"}`);
+      console.log(`Launch evidence artifact: ${gate.currentArtifactPath || "-"}`);
+      console.log(
+        `Launch evidence progress: closeout=${gate.progress?.closeout?.completed ?? "-"}/${gate.progress?.closeout?.total ?? "-"}`
+          + `, signoff=${gate.progress?.productionSignoff?.completed ?? "-"}/${gate.progress?.productionSignoff?.total ?? "-"}`
+          + `, receipts=${gate.progress?.receiptVisibility?.completed ?? "-"}/${gate.progress?.receiptVisibility?.total ?? "-"}`
+          + `, launchDuty=${gate.progress?.launchDuty?.completed ?? "-"}/${gate.progress?.launchDuty?.total ?? "-"}`
+      );
+      console.log(`Launch evidence readiness status: ${gate.readinessStatusCommand || "-"}`);
+      console.log(`Launch evidence full-test: ${gate.fullTestCommand || "-"} -> ${gate.fullTestOutputArtifact || "-"}`);
+      console.log(`Launch evidence production signoff packet: ${gate.productionSignoffPacket || "-"}`);
+      console.log(`Launch evidence launch-day watch: ${gate.launchDayWatchArtifact || "-"}`);
+      console.log(`Launch evidence first-wave closeout: ${gate.firstWaveCloseoutArtifact || "-"}`);
+      console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
+    }
     if (result.launchDutyReadyHandoff) {
       const handoff = result.launchDutyReadyHandoff;
       console.log(`Launch duty readiness: ${handoff.status}`);
@@ -583,6 +970,15 @@ function main() {
       productionDecision: productionSignoff.decision || null,
       readinessStatusCommand: nextStatusCommand
     });
+    const launchEvidenceReadinessGate = buildSignoffBackfillLaunchEvidenceReadinessGate({
+      closeoutInput: nextPayload,
+      outputFile,
+      actionsFile,
+      artifactRoot,
+      readinessStatusCommand: nextStatusCommand,
+      rehearsalCommand: nextCommand,
+      signoffProgress
+    });
     const launchDutyReadyHandoff = buildLaunchDutyReadyHandoff({
       outputFile,
       actionsFile,
@@ -626,6 +1022,7 @@ function main() {
       missingConditionCount: conditions.length - filledConditionCount,
       missingReceiptLaneCount: RECEIPT_VISIBILITY_KEYS.length - visibleReceiptLaneCount,
       signoffProgress,
+      launchEvidenceReadinessGate,
       ...(launchDutyReadyHandoff ? { launchDutyReadyHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,

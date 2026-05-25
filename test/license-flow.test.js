@@ -30639,11 +30639,40 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
+      /Launch Mainline Stable Operations Packet Review Bridge Route:[\s\S]*status=ready_for_packet_result_review \| ready=yes \| current=run_record_index \| next=artifact_manifest \| progress=0\/6/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
+      /stable-operations-packet-review-bridge: [^\n]*file=stable-operations-packet-review-bridge\.txt[^\n]*format=stable-operations-packet-review-bridge[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
       /Launch Mainline Stable Operations Transition Shortcut Route:[\s\S]*status=blocked_until_packet_result_review \| current=review_staging_packet_results \| nextDownload=launch-operations-operator-entry \| href=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry/
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
       /stable-operations-transition-shortcut: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchMainlineCloseoutRecordedPacketReviewBridgeDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stable-operations-packet-review-bridge",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedPacketReviewBridgeDownload.body,
+      /RockSolid Launch Mainline Stable Operations Packet Review Bridge Download/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedPacketReviewBridgeDownload.body,
+      /Launch Mainline Stable Operations Packet Review Bridge:[\s\S]*status=ready_for_packet_result_review \| ready=yes \| current=run_record_index \| next=artifact_manifest \| progress=0\/6/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedPacketReviewBridgeDownload.body,
+      /Packet Review Receipt Selection:[\s\S]*selectedProgress=0\/6[\s\S]*selectedComplete=no/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedPacketReviewBridgeDownload.body,
+      /Download:[\s\S]*format=stable-operations-packet-review-bridge/
     );
     const launchMainlineCloseoutRecordedIndexDownload = await getText(
       baseUrl,
@@ -30668,6 +30697,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
+      /Included Handoff Files:[\s\S]*Stable operations packet review bridge direct file: ops\/stable-operations-packet-review-bridge\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
       /Included Handoff Files:[\s\S]*First-wave closeout record readback: ops\/launch-operations-operator-entry\.txt/
     );
     assert.match(
@@ -30684,6 +30717,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/rollback-signal-review-record-readback\.txt/);
     assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/stabilization-owner-handoff-record-readback\.txt/);
     assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/first-wave-closeout-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesChecksumsDownload.body, /ops\/stable-operations-packet-review-bridge\.txt/);
     const launchDutyReadbackDirectFilesZipDownload = await getBinary(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
@@ -30695,11 +30729,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchDutyReadbackDirectFilesZipText, /ops\/rollback-signal-review-record-readback\.txt/);
     assert.match(launchDutyReadbackDirectFilesZipText, /ops\/stabilization-owner-handoff-record-readback\.txt/);
     assert.match(launchDutyReadbackDirectFilesZipText, /ops\/first-wave-closeout-record-readback\.txt/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /ops\/stable-operations-packet-review-bridge\.txt/);
     assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline Receipt Visibility Snapshot Record Readback Download/);
     assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline First-Wave Incident Log Record Readback Download/);
     assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline Rollback Signal Review Record Readback Download/);
     assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline Stabilization Owner Handoff Record Readback Download/);
     assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline First-Wave Closeout Record Readback Download/);
+    assert.match(launchDutyReadbackDirectFilesZipText, /RockSolid Launch Mainline Stable Operations Packet Review Bridge Download/);
     assert.match(
       launchDutyReadbackDirectFilesZipText,
       /First-Wave Closeout Record Readback:[\s\S]*status=ready_for_stable_operations_handoff \| recorded=yes \| record=first_wave_closeout \| currentAction=refresh_staging_readiness_after_first_wave_closeout/
@@ -30712,6 +30748,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       firstWaveCloseoutReadbackDirectDownload.body,
       /First-Wave Closeout Record Readback:[\s\S]*status=ready_for_stable_operations_handoff \| recorded=yes \| record=first_wave_closeout \| currentAction=refresh_staging_readiness_after_first_wave_closeout/
+    );
+    assert.ok(Array.isArray(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.initialLaunchOpsReadiness.launchOperationsOperatorEntry.quickAccessDownloads
+    ));
+    assert.ok(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.initialLaunchOpsReadiness.launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+        item.key === "launch_mainline_stable_operations_packet_review_bridge"
+        && item.fileName === "stable-operations-packet-review-bridge.txt"
+        && item.format === "stable-operations-packet-review-bridge"
+      ))
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,

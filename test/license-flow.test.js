@@ -25897,6 +25897,125 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(`rolloutWideningFollowupReceiptReadback=recorded_ready_for_next_rollout_widening_decision \\| receiptRecorded=true \\| audit=${rolloutWideningFollowupReceipt.auditLogId} \\| reviewReceipt=${firstOperatingResultReviewReceipt.auditLogId}`)
     );
 
+    const nextRolloutWideningDecisionAction = rolloutWideningFollowupReceiptOverview.nextRolloutWideningDecisionAction;
+    assert.ok(nextRolloutWideningDecisionAction);
+    assert.equal(nextRolloutWideningDecisionAction.status, "ready_for_next_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionAction.ready, true);
+    assert.equal(nextRolloutWideningDecisionAction.actionKey, "review_rollout_widening_decision");
+    assert.equal(
+      nextRolloutWideningDecisionAction.rolloutWideningFollowupReceiptAuditLogId,
+      rolloutWideningFollowupReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionAction.firstOperatingResultReviewReceiptAuditLogId,
+      firstOperatingResultReviewReceipt.auditLogId
+    );
+    assert.equal(nextRolloutWideningDecisionAction.decisionSourceStatus, "recorded_ready_for_next_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionAction.nextDownloadFormat, "launch-operations-overview-status");
+    const nextRolloutWideningDecisionReceiptPayload = nextRolloutWideningDecisionAction.receiptPlan?.payload;
+    assert.ok(nextRolloutWideningDecisionReceiptPayload);
+    assert.equal(nextRolloutWideningDecisionAction.receiptPlan.route, "/api/developer/ops/steady-state-duty-plan/receipt");
+    assert.equal(nextRolloutWideningDecisionReceiptPayload.action, "review_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceiptPayload.intent, "review_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceiptPayload.planKind, "rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceiptPayload.planMode, "decision_review");
+    assert.equal(nextRolloutWideningDecisionReceiptPayload.targetType, "steady_state_rollout");
+    assert.equal(
+      nextRolloutWideningDecisionReceiptPayload.rolloutWideningFollowupReceiptAuditLogId,
+      rolloutWideningFollowupReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionReceiptPayload.firstOperatingResultReviewReceiptAuditLogId,
+      firstOperatingResultReviewReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionReceiptPayload.firstOperatingResultHandoffReceiptAuditLogId,
+      firstOperatingResultHandoffReceipt.auditLogId
+    );
+    assert.equal(nextRolloutWideningDecisionReceiptPayload.rolloutWideningDecisionStatus, "ready_for_next_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceiptPayload.rolloutWideningDecisionReady, true);
+    assert.ok(rolloutWideningFollowupReceiptOverview.panels.some((item) => (
+      item.key === "next_rollout_widening_decision"
+      && item.status === "ready_for_next_rollout_widening_decision"
+      && item.ready === true
+      && item.fileName === "developer-ops-launch-operations-overview-status.txt"
+      && /format=launch-operations-overview-status/.test(item.href || "")
+    )));
+    assert.match(
+      rolloutWideningFollowupReceiptOverviewStatusDownload.body,
+      new RegExp(`nextRolloutWideningDecision=ready_for_next_rollout_widening_decision \\| action=review_rollout_widening_decision \\| followupReceipt=${rolloutWideningFollowupReceipt.auditLogId} \\| source=recorded_ready_for_next_rollout_widening_decision`)
+    );
+
+    const nextRolloutWideningDecisionReceipt = await postJson(
+      baseUrl,
+      "/api/developer/ops/steady-state-duty-plan/receipt",
+      {
+        ...nextRolloutWideningDecisionReceiptPayload,
+        note: "next rollout widening decision reviewed after followup receipt readback"
+      },
+      ownerSession.token
+    );
+    assert.equal(nextRolloutWideningDecisionReceipt.version, "developer-ops-steady-state-duty-plan-receipt/v1");
+    assert.equal(nextRolloutWideningDecisionReceipt.status, "recorded");
+    assert.equal(nextRolloutWideningDecisionReceipt.action, "review_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceipt.intent, "review_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceipt.planKind, "rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceipt.planMode, "decision_review");
+    assert.equal(nextRolloutWideningDecisionReceipt.targetType, "steady_state_rollout");
+    assert.equal(
+      nextRolloutWideningDecisionReceipt.rolloutWideningFollowupReceiptAuditLogId,
+      rolloutWideningFollowupReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionReceipt.firstOperatingResultReviewReceiptAuditLogId,
+      firstOperatingResultReviewReceipt.auditLogId
+    );
+    assert.equal(nextRolloutWideningDecisionReceipt.rolloutWideningDecisionStatus, "ready_for_next_rollout_widening_decision");
+    assert.equal(nextRolloutWideningDecisionReceipt.rolloutWideningDecisionReady, true);
+    assert.ok(nextRolloutWideningDecisionReceipt.auditLogId);
+
+    const nextRolloutWideningDecisionReceiptSnapshot = await getJson(
+      baseUrl,
+      "/api/developer/ops/export?productCode=EXPORT_CLOSEOUT_READY&limit=80",
+      ownerSession.token
+    );
+    const nextRolloutWideningDecisionReceiptOverview = nextRolloutWideningDecisionReceiptSnapshot.summary
+      .initialLaunchOpsReadiness.launchOperationsOverviewStatus;
+    assert.ok(nextRolloutWideningDecisionReceiptOverview.nextRolloutWideningDecisionReceiptReadbackAction);
+    assert.equal(
+      nextRolloutWideningDecisionReceiptOverview.nextRolloutWideningDecisionReceiptReadbackAction.status,
+      "recorded_ready_for_widened_rollout_monitoring"
+    );
+    assert.equal(nextRolloutWideningDecisionReceiptOverview.nextRolloutWideningDecisionReceiptReadbackAction.ready, true);
+    assert.equal(
+      nextRolloutWideningDecisionReceiptOverview.nextRolloutWideningDecisionReceiptReadbackAction.auditLogId,
+      nextRolloutWideningDecisionReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionReceiptOverview.nextRolloutWideningDecisionReceiptReadbackAction.rolloutWideningFollowupReceiptAuditLogId,
+      rolloutWideningFollowupReceipt.auditLogId
+    );
+    assert.equal(
+      nextRolloutWideningDecisionReceiptOverview.nextRolloutWideningDecisionReceiptReadbackAction.currentActionKey,
+      "monitor_widened_rollout_window"
+    );
+    assert.ok(nextRolloutWideningDecisionReceiptOverview.panels.some((item) => (
+      item.key === "next_rollout_widening_decision_receipt"
+      && item.status === "recorded_ready_for_widened_rollout_monitoring"
+      && item.ready === true
+      && item.fileName === "developer-ops-launch-operations-overview-status.txt"
+      && /format=launch-operations-overview-status/.test(item.href || "")
+    )));
+    const nextRolloutWideningDecisionReceiptOverviewStatusDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-overview-status",
+      ownerSession.token
+    );
+    assert.match(
+      nextRolloutWideningDecisionReceiptOverviewStatusDownload.body,
+      new RegExp(`nextRolloutWideningDecisionReceiptReadback=recorded_ready_for_widened_rollout_monitoring \\| receiptRecorded=true \\| audit=${nextRolloutWideningDecisionReceipt.auditLogId} \\| followupReceipt=${rolloutWideningFollowupReceipt.auditLogId}`)
+    );
+
     const launchOperationsChecksumsDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=checksums",

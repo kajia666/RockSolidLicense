@@ -481,6 +481,65 @@ function buildLaunchDutyRecordCommand({
   ].join(" ");
 }
 
+function buildLaunchSwitchOperatorQueueCheckpoint({
+  operatorNextCommands,
+  closeoutBackfill,
+  filledCloseoutInputFile,
+  readinessActionQueueFile,
+  currentCommand,
+  smokePreflightCommand,
+  launchSmokeCommand,
+  postSmokeCloseoutChecks,
+  receiptVisibilityQueue,
+  postSmokeReadinessGate,
+  productionSignoffLaunchDayWatch,
+  launchDutyRecordIndexPath
+}) {
+  const currentOperatorCommand = operatorNextCommands.find((item) => item.status === "current")
+    || operatorNextCommands[0]
+    || {};
+  const nextMilestone = operatorNextCommands.find((item) => item.key === "refresh_staging_readiness_after_route_map")
+    || operatorNextCommands.find((item) => item.status !== "current")
+    || {};
+  const currentCommandCount = operatorNextCommands.filter((item) => item.status === "current").length;
+  const stableOperationsKeys = new Set([
+    "refresh_staging_readiness_after_first_wave_closeout",
+    "reload_staging_rehearsal_for_stable_operations",
+    "handoff_stable_operations"
+  ]);
+
+  return {
+    mode: "launch-route-map-gate-operator-queue-checkpoint",
+    status: currentOperatorCommand.key === "backfill_route_map_gate_result"
+      ? "awaiting_route_map_gate_backfill"
+      : "awaiting_launch_switch_operator_queue",
+    currentActionKey: currentOperatorCommand.key || null,
+    currentCommand: currentOperatorCommand.command || null,
+    currentArtifactPath: currentOperatorCommand.artifactPath || closeoutBackfill.artifactPath || null,
+    actionQueueFile: readinessActionQueueFile,
+    closeoutInputFile: filledCloseoutInputFile,
+    readinessStatusCommand: currentCommand,
+    smokePreflightCommand,
+    launchSmokeCommand,
+    fullTestCommand: postSmokeReadinessGate.fullTestCommand,
+    launchDutyRecordIndexPath,
+    totalCommandCount: operatorNextCommands.length,
+    currentCommandCount,
+    blockedCommandCount: Math.max(operatorNextCommands.length - currentCommandCount, 0),
+    queueCounts: {
+      preSmokeCommandCount: 4,
+      postSmokeBackfillCount: postSmokeCloseoutChecks.evidenceChecks.length,
+      receiptVisibilityDownloadCount: receiptVisibilityQueue.length,
+      fullTestSignoffCommandCount: postSmokeReadinessGate.expectedGateProgression.length,
+      launchDutyRecordCount: 1 + productionSignoffLaunchDayWatch.stabilizationRecordQueue.length,
+      stableOperationsCommandCount: operatorNextCommands.filter((item) => stableOperationsKeys.has(item.key)).length
+    },
+    nextMilestoneKey: nextMilestone.key || null,
+    nextMilestoneCommand: nextMilestone.command || currentCommand,
+    nextAction: "Run the route-map gate backfill, then refresh staging readiness before smoke preflight."
+  };
+}
+
 function buildLaunchSwitchWatchHandoff() {
   const artifactRoot = defaultArtifactRoot();
   const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile();
@@ -1012,6 +1071,20 @@ function buildLaunchSwitchWatchHandoff() {
     order: index + 1,
     ...item
   }));
+  const operatorQueueCheckpoint = buildLaunchSwitchOperatorQueueCheckpoint({
+    operatorNextCommands,
+    closeoutBackfill,
+    filledCloseoutInputFile,
+    readinessActionQueueFile,
+    currentCommand,
+    smokePreflightCommand,
+    launchSmokeCommand,
+    postSmokeCloseoutChecks,
+    receiptVisibilityQueue,
+    postSmokeReadinessGate,
+    productionSignoffLaunchDayWatch,
+    launchDutyRecordIndexPath
+  });
   return {
     version: "launch-route-map-gate-switch-watch-handoff/v1",
     status: "ready_for_staging_readiness_and_launch_smoke_switch",
@@ -1030,6 +1103,7 @@ function buildLaunchSwitchWatchHandoff() {
     readinessActionQueueFile,
     launchDutyRecordIndexPath,
     backfillSequence,
+    operatorQueueCheckpoint,
     operatorNextCommands,
     nextAction: "Refresh staging readiness after route_map_gate_result is backfilled, then run launchSmokeCommand with staging smoke credentials to produce the remaining closeout and receipt-visibility evidence."
   };
@@ -1050,6 +1124,27 @@ function payload(status = "pass") {
     launchSmokeReceiptVisibilityQueue: buildLaunchSmokeReceiptVisibilityQueue(),
     commands: commands.map(publicCommand)
   };
+}
+
+function printLaunchSwitchOperatorQueueCheckpoint(checkpoint) {
+  if (!checkpoint) {
+    return;
+  }
+  console.log(
+    `Launch switch operator checkpoint: ${checkpoint.currentActionKey || "-"}`
+      + ` (status=${checkpoint.status || "-"}, total=${checkpoint.totalCommandCount ?? "-"}, blocked=${checkpoint.blockedCommandCount ?? "-"})`
+  );
+  console.log(`Launch switch checkpoint current: ${checkpoint.currentCommand || "-"}`);
+  console.log(`Launch switch checkpoint readiness: ${checkpoint.readinessStatusCommand || "-"}`);
+  console.log(
+    `Launch switch checkpoint counts: preSmoke=${checkpoint.queueCounts?.preSmokeCommandCount ?? "-"}`
+      + `, postSmoke=${checkpoint.queueCounts?.postSmokeBackfillCount ?? "-"}`
+      + `, receipts=${checkpoint.queueCounts?.receiptVisibilityDownloadCount ?? "-"}`
+      + `, fullTestSignoff=${checkpoint.queueCounts?.fullTestSignoffCommandCount ?? "-"}`
+      + `, launchDutyRecords=${checkpoint.queueCounts?.launchDutyRecordCount ?? "-"}`
+      + `, stableOps=${checkpoint.queueCounts?.stableOperationsCommandCount ?? "-"}`
+  );
+  console.log(`Launch switch checkpoint next milestone: ${checkpoint.nextMilestoneKey || "-"} -> ${checkpoint.nextMilestoneCommand || "-"}`);
 }
 
 function printHelp() {
@@ -1145,6 +1240,7 @@ if (dryRun) {
       + ` | rehearsal=${stableOperationsHandoff.rehearsalReloadCommand}`
     );
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
+    printLaunchSwitchOperatorQueueCheckpoint(launchSwitchWatchHandoff.operatorQueueCheckpoint);
     console.log("Launch switch operator queue:");
     for (const item of launchSwitchWatchHandoff.operatorNextCommands) {
       if (item.kind === "download_queue") {

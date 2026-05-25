@@ -239,6 +239,34 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
       [22, "handoff_stable_operations", "blocked_after_rehearsal_reload", "handoff"]
     ]
   );
+  assert.deepEqual(output.launchSwitchWatchHandoff.operatorQueueCheckpoint, {
+    mode: "launch-route-map-gate-operator-queue-checkpoint",
+    status: "awaiting_route_map_gate_backfill",
+    currentActionKey: "backfill_route_map_gate_result",
+    currentCommand: output.closeoutBackfill.command,
+    currentArtifactPath: "artifacts/staging/ROUTE_MAP_GATE/stable/route-map-gate-output.txt",
+    actionQueueFile: "artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
+    closeoutInputFile: "artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json",
+    readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
+    smokePreflightCommand: "npm.cmd run staging:preflight -- --base-url https://staging.example.com --product-code ROUTE_MAP_GATE --channel stable",
+    launchSmokeCommand: "npm.cmd run launch:smoke:staging -- --base-url https://staging.example.com --allow-live-writes --product-code ROUTE_MAP_GATE --channel stable --closeout-input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
+    fullTestCommand: "npm.cmd test",
+    launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json",
+    totalCommandCount: 22,
+    currentCommandCount: 1,
+    blockedCommandCount: 21,
+    queueCounts: {
+      preSmokeCommandCount: 4,
+      postSmokeBackfillCount: 4,
+      receiptVisibilityDownloadCount: 5,
+      fullTestSignoffCommandCount: 3,
+      launchDutyRecordCount: 6,
+      stableOperationsCommandCount: 3
+    },
+    nextMilestoneKey: "refresh_staging_readiness_after_route_map",
+    nextMilestoneCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
+    nextAction: "Run the route-map gate backfill, then refresh staging readiness before smoke preflight."
+  });
   assert.equal(
     output.launchSwitchWatchHandoff.operatorNextCommands[0].command,
     output.closeoutBackfill.command
@@ -495,6 +523,11 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /Stabilization record 5\. first_wave_closeout: blocked_until_source_records -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key first_wave_closeout --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md --value-json <redacted-json> --receipt-id <record_launch_closeout_review-receipt-id> --source-record first_wave_incident_log=artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-incident-log\.md --source-record rollback_signal_review=artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md --source-record stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md --record-index-file artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md \| sources=first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
   assert.match(result.stdout, /Launch switch stable-operations handoff: blocked_until_first_wave_closeout_recorded \| readiness=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md \| rehearsal=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
   assert.match(result.stdout, /Launch switch record index: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
+  assert.match(result.stdout, /Launch switch operator checkpoint: backfill_route_map_gate_result \(status=awaiting_route_map_gate_backfill, total=22, blocked=21\)/);
+  assert.match(result.stdout, /Launch switch checkpoint current: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch switch checkpoint readiness: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch switch checkpoint counts: preSmoke=4, postSmoke=4, receipts=5, fullTestSignoff=3, launchDutyRecords=6, stableOps=3/);
+  assert.match(result.stdout, /Launch switch checkpoint next milestone: refresh_staging_readiness_after_route_map -> npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /Launch switch operator queue:/);
   assert.match(result.stdout, /1\. backfill_route_map_gate_result: current command -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /3\. run_staging_smoke_preflight: blocked_after_readiness_refresh command -> npm\.cmd run staging:preflight -- --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel stable/);

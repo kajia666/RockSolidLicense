@@ -200,6 +200,30 @@ test("launch smoke script runs the first-wave operations preflight", () => {
       [5, "download_ops_handoff_index", output.handoff.downloads.opsHandoffIndex.route]
     ]
   );
+  assert.deepEqual(output.handoff.operatorQueueCheckpoint, {
+    mode: "launch-smoke-operator-queue-checkpoint",
+    status: "awaiting_launch_review_handoff",
+    currentActionKey: "open_launch_review",
+    currentTarget: "/developer/launch-review?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave",
+    currentKind: "workspace",
+    currentCloseoutBackfillKey: "live_write_smoke_result",
+    currentCloseoutBackfillCommand: output.handoff.closeoutBackfill.commands[0].command,
+    currentCloseoutArtifactPath: "artifacts/staging/SMOKE_ALPHA/stable/live-write-smoke-output.json",
+    closeoutInputFile: "artifacts/staging/SMOKE_ALPHA/stable/filled-closeout-input.json",
+    actionQueueFile: "artifacts/staging/SMOKE_ALPHA/stable/readiness-action-queue.md",
+    readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/SMOKE_ALPHA/stable/filled-closeout-input.json --actions-file artifacts/staging/SMOKE_ALPHA/stable/readiness-action-queue.md",
+    launchDutyRecordIndexPath: "artifacts/staging/SMOKE_ALPHA/stable/launch-duty-record-index.json",
+    totalHandoffCommandCount: 9,
+    currentHandoffCommandCount: 1,
+    nextHandoffCommandCount: 8,
+    receiptVisibilityDownloadCount: 5,
+    closeoutBackfillCommandCount: 4,
+    currentCloseoutBackfillCount: 1,
+    nextCloseoutBackfillCount: 3,
+    nextMilestoneKey: "verify_launch_review_receipt_visibility",
+    nextMilestoneTarget: "/api/developer/launch-review/download?productCode=SMOKE_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary",
+    nextAction: "Open Launch Review, verify receipt visibility, then run the current closeout backfill and readiness status."
+  });
 
   const checkNames = output.checks.map((item) => item.name);
   assert.deepEqual(checkNames, [
@@ -235,6 +259,12 @@ test("launch smoke plain output prints the ordered launch-duty handoff queue", (
 
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Launch smoke operator checkpoint: open_launch_review \(status=awaiting_launch_review_handoff, handoff=9, next=8\)/);
+  assert.match(result.stdout, /Launch smoke checkpoint target: \/developer\/launch-review\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave/);
+  assert.match(result.stdout, /Launch smoke checkpoint closeout: live_write_smoke_result -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json --key live_write_smoke_result --value-json/);
+  assert.match(result.stdout, /Launch smoke checkpoint readiness: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Launch smoke checkpoint counts: receipts=5, closeoutBackfills=4, currentCloseout=1, nextCloseout=3/);
+  assert.match(result.stdout, /Launch smoke checkpoint next milestone: verify_launch_review_receipt_visibility -> \/api\/developer\/launch-review\/download\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary/);
   assert.match(result.stdout, /Current handoff: open_launch_review -> \/developer\/launch-review\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave/);
   assert.match(result.stdout, /Launch-duty handoff queue:/);
   assert.match(result.stdout, /1\. open_launch_review: current workspace -> \/developer\/launch-review\?productCode=SMOKE_PLAIN_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave/);

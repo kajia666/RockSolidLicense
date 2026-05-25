@@ -470,6 +470,50 @@ function buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed }) {
   };
 }
 
+function buildLaunchSmokeOperatorQueueCheckpoint(handoff) {
+  const operatorNextCommands = Array.isArray(handoff.operatorNextCommands) ? handoff.operatorNextCommands : [];
+  const receiptVisibilityOperatorQueue = Array.isArray(handoff.receiptVisibilityOperatorQueue)
+    ? handoff.receiptVisibilityOperatorQueue
+    : [];
+  const closeoutBackfill = handoff.closeoutBackfill || {};
+  const closeoutCommands = Array.isArray(closeoutBackfill.commands) ? closeoutBackfill.commands : [];
+  const currentHandoff = operatorNextCommands.find((item) => item.status === "current") || operatorNextCommands[0] || {};
+  const currentCloseoutBackfill = closeoutCommands.find((item) => item.status === "current") || closeoutCommands[0] || {};
+  const nextMilestone = operatorNextCommands.find((item) => item.key === "verify_launch_review_receipt_visibility")
+    || operatorNextCommands.find((item) => item.status !== "current")
+    || {};
+  const currentHandoffCommandCount = operatorNextCommands.filter((item) => item.status === "current").length;
+  const currentCloseoutBackfillCount = closeoutCommands.filter((item) => item.status === "current").length;
+  return {
+    mode: "launch-smoke-operator-queue-checkpoint",
+    status: currentHandoff.key === "open_launch_review"
+      ? "awaiting_launch_review_handoff"
+      : "awaiting_launch_smoke_operator_queue",
+    currentActionKey: currentHandoff.key || null,
+    currentTarget: currentHandoff.target || null,
+    currentKind: currentHandoff.kind || null,
+    currentCloseoutBackfillKey: currentCloseoutBackfill.key || null,
+    currentCloseoutBackfillCommand: currentCloseoutBackfill.command || null,
+    currentCloseoutArtifactPath: currentCloseoutBackfill.artifactPath || null,
+    closeoutInputFile: closeoutBackfill.filledCloseoutInputFile || null,
+    actionQueueFile: closeoutBackfill.readinessActionQueueFile || null,
+    readinessStatusCommand: closeoutBackfill.statusCommand || null,
+    launchDutyRecordIndexPath: receiptVisibilityOperatorQueue[0]?.launchDutyRecordIndexPath
+      || currentCloseoutBackfill.valueJson?.launchDutyRecordIndexPath
+      || null,
+    totalHandoffCommandCount: operatorNextCommands.length,
+    currentHandoffCommandCount,
+    nextHandoffCommandCount: Math.max(operatorNextCommands.length - currentHandoffCommandCount, 0),
+    receiptVisibilityDownloadCount: receiptVisibilityOperatorQueue.length,
+    closeoutBackfillCommandCount: closeoutCommands.length,
+    currentCloseoutBackfillCount,
+    nextCloseoutBackfillCount: Math.max(closeoutCommands.length - currentCloseoutBackfillCount, 0),
+    nextMilestoneKey: nextMilestone.key || null,
+    nextMilestoneTarget: nextMilestone.target || null,
+    nextAction: "Open Launch Review, verify receipt visibility, then run the current closeout backfill and readiness status."
+  };
+}
+
 function parseAttachmentFileName(contentDisposition) {
   if (!contentDisposition) {
     return null;
@@ -751,6 +795,7 @@ function buildLaunchDutyHandoff({
   handoff.operatorNextCommands = buildLaunchDutyOperatorNextCommands(handoff.operatorChecklist);
   handoff.receiptVisibilityOperatorQueue = buildLaunchSmokeReceiptVisibilityOperatorQueue({ options, handoff });
   handoff.closeoutBackfill = buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed });
+  handoff.operatorQueueCheckpoint = buildLaunchSmokeOperatorQueueCheckpoint(handoff);
   return handoff;
 }
 
@@ -1213,6 +1258,7 @@ function writeResult(result, json) {
     console.log(`Ops handoff index: ${result.summary.ops.handoffIndexFileName}`);
     console.log(`Launch Ops overview: ${result.summary.ops.launchOperationsOverviewStatus}`);
     if (result.handoff) {
+      printLaunchSmokeOperatorQueueCheckpoint(result.handoff.operatorQueueCheckpoint);
       const operatorNextCommands = result.handoff.operatorNextCommands || [];
       const currentHandoff = operatorNextCommands.find((item) => item.status === "current");
       console.log("Next launch-duty handoff:");
@@ -1262,6 +1308,26 @@ function writeResult(result, json) {
   for (const check of result.checks) {
     console.error(`- ${check.status.toUpperCase()} ${check.name} (${check.durationMs}ms)`);
   }
+}
+
+function printLaunchSmokeOperatorQueueCheckpoint(checkpoint) {
+  if (!checkpoint) {
+    return;
+  }
+  console.log(
+    `Launch smoke operator checkpoint: ${checkpoint.currentActionKey || "-"}`
+      + ` (status=${checkpoint.status || "-"}, handoff=${checkpoint.totalHandoffCommandCount ?? "-"}, next=${checkpoint.nextHandoffCommandCount ?? "-"})`
+  );
+  console.log(`Launch smoke checkpoint target: ${checkpoint.currentTarget || "-"}`);
+  console.log(`Launch smoke checkpoint closeout: ${checkpoint.currentCloseoutBackfillKey || "-"} -> ${checkpoint.currentCloseoutBackfillCommand || "-"}`);
+  console.log(`Launch smoke checkpoint readiness: ${checkpoint.readinessStatusCommand || "-"}`);
+  console.log(
+    `Launch smoke checkpoint counts: receipts=${checkpoint.receiptVisibilityDownloadCount ?? "-"}`
+      + `, closeoutBackfills=${checkpoint.closeoutBackfillCommandCount ?? "-"}`
+      + `, currentCloseout=${checkpoint.currentCloseoutBackfillCount ?? "-"}`
+      + `, nextCloseout=${checkpoint.nextCloseoutBackfillCount ?? "-"}`
+  );
+  console.log(`Launch smoke checkpoint next milestone: ${checkpoint.nextMilestoneKey || "-"} -> ${checkpoint.nextMilestoneTarget || "-"}`);
 }
 
 async function main() {

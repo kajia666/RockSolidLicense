@@ -1007,6 +1007,39 @@ function buildStagingRehearsalExecutionSummary(result) {
   };
 }
 
+function buildOperatorQueueCheckpoint(result) {
+  const finalPacket = result.finalRehearsalPacket || {};
+  const operatorExecutionPlan = result.operatorExecutionPlan || {};
+  const goLiveExecutionEntry = operatorExecutionPlan.goLiveExecutionEntry || finalPacket.goLiveExecutionEntry || {};
+  const launchDutyCurrentAction = operatorExecutionPlan.launchDutyCurrentAction || finalPacket.launchDutyCurrentAction || {};
+  const launchDutyCompletionHandoff = result.launchDutyCompletionHandoff
+    || launchDutyCurrentAction.completionHandoff
+    || null;
+
+  if (!launchDutyCompletionHandoff) {
+    return null;
+  }
+
+  return {
+    mode: "staging-rehearsal-operator-queue-checkpoint",
+    status: "ready_for_stable_operations_handoff",
+    currentPhase: goLiveExecutionEntry.currentPhase || launchDutyCurrentAction.stage || "stable_operations_handoff",
+    currentActionKey: launchDutyCurrentAction.key || "stable_operations_handoff",
+    currentActionStatus: launchDutyCurrentAction.status || "ready_for_stabilization_handoff",
+    currentCommand: launchDutyCurrentAction.command || null,
+    currentPacketPath: launchDutyCurrentAction.packetPath || null,
+    recordIndexFile: launchDutyCurrentAction.recordIndexFile || launchDutyCompletionHandoff.recordIndexFile || null,
+    recordedCount: launchDutyCompletionHandoff.recordedCount ?? 0,
+    pendingCount: launchDutyCompletionHandoff.pendingCount ?? 0,
+    completionHandoffStatus: launchDutyCompletionHandoff.status || null,
+    completionHandoffArtifacts: Array.isArray(launchDutyCompletionHandoff.handoffArtifacts)
+      ? launchDutyCompletionHandoff.handoffArtifacts
+      : [],
+    completionHandoffNextAction: launchDutyCompletionHandoff.nextAction || null,
+    nextAction: launchDutyCompletionHandoff.nextAction || launchDutyCurrentAction.nextAction || "Hand off the completed launch-duty record index and first-wave closeout artifact to stable operations."
+  };
+}
+
 const GO_LIVE_ACTION_PHASES = {
   staging_profile: "real_staging_inputs",
   required_secret_env: "real_staging_inputs",
@@ -8407,9 +8440,13 @@ function buildResult(options) {
     ...resultWithStagingProductionSignoffPacket,
     stagingLaunchDutyArchiveIndex: gatesPassed ? buildStagingLaunchDutyArchiveIndex(resultWithStagingProductionSignoffPacket) : null
   };
-  return {
+  const resultWithOperatorExecutionPlan = {
     ...resultWithStagingLaunchDutyArchiveIndex,
     operatorExecutionPlan: gatesPassed ? buildStagingOperatorExecutionPlan(resultWithStagingLaunchDutyArchiveIndex) : null
+  };
+  return {
+    ...resultWithOperatorExecutionPlan,
+    operatorQueueCheckpoint: gatesPassed ? buildOperatorQueueCheckpoint(resultWithOperatorExecutionPlan) : null
   };
 }
 
@@ -9095,6 +9132,21 @@ function appendLaunchDutyCompletionHandoff(lines, handoff = {}) {
   lines.push(`- Launch duty completion status refresh: \`${handoff.statusCommand || "-"}\``);
   lines.push(`- Launch duty completion rehearsal reload: \`${handoff.rehearsalReloadCommand || "-"}\``);
   lines.push(`- Launch duty completion next action: ${handoff.nextAction || "-"}`);
+}
+
+function writeOperatorQueueCheckpointPlain(checkpoint = null) {
+  if (!checkpoint) {
+    return;
+  }
+  console.log(`Operator queue checkpoint: ${checkpoint.currentActionKey || "-"} (status=${checkpoint.status || "-"}, currentPhase=${checkpoint.currentPhase || "-"})`);
+  console.log(`Operator checkpoint current: ${checkpoint.currentCommand || "none"}`);
+  console.log(`Operator checkpoint record index: ${checkpoint.recordIndexFile || "-"}`);
+  console.log(`Operator checkpoint progress: ${checkpoint.recordedCount ?? 0}/6 recorded, ${checkpoint.pendingCount ?? 0} pending`);
+  console.log(`Operator checkpoint completion handoff: ${checkpoint.completionHandoffStatus || "-"}`);
+  if (Array.isArray(checkpoint.completionHandoffArtifacts) && checkpoint.completionHandoffArtifacts.length) {
+    console.log(`Operator checkpoint completion artifacts: ${checkpoint.completionHandoffArtifacts.join("; ")}`);
+  }
+  console.log(`Operator checkpoint next action: ${checkpoint.nextAction || "-"}`);
 }
 
 function writeLaunchDutyCurrentActionPlain(action = {}) {
@@ -11462,6 +11514,7 @@ function writeResult(result, json) {
       console.log(`Output archive entrypoint: ${outputWriteSummary.archiveEntrypoint?.key || "-"} (${outputWriteSummary.archiveEntrypoint?.status || "-"}) -> ${outputWriteSummary.archiveEntrypoint?.path || "-"}`);
       console.log(`Output write next action: ${outputWriteSummary.nextAction || "-"}`);
     }
+    writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     writeRealStagingRunFocusPlain(realStagingRunFocus);
     writeBackupRestoreDrillPacketPlain(backupRestoreDrillPacket);
     writeRunRecordArchiveSummaryPlain(runRecordIndex, artifactManifest);

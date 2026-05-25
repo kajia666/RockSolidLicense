@@ -6383,6 +6383,22 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.sourceFocus, "launchDutyCompletionHandoff");
     assert.equal(output.operatorExecutionPlan.goLiveExecutionEntry.currentActionKey, "stable_operations_handoff");
     assert.deepEqual(output.operatorExecutionPlan.goLiveExecutionEntry.launchDutyCompletionHandoff, completionHandoff);
+    assert.deepEqual(output.operatorQueueCheckpoint, {
+      mode: "staging-rehearsal-operator-queue-checkpoint",
+      status: "ready_for_stable_operations_handoff",
+      currentPhase: "stable_operations_handoff",
+      currentActionKey: "stable_operations_handoff",
+      currentActionStatus: "ready_for_stabilization_handoff",
+      currentCommand: null,
+      currentPacketPath: firstWaveCloseoutArtifactPath,
+      recordIndexFile,
+      recordedCount: 6,
+      pendingCount: 0,
+      completionHandoffStatus: "ready_for_stabilization_handoff",
+      completionHandoffArtifacts: [recordIndexFile, firstWaveCloseoutArtifactPath],
+      completionHandoffNextAction: completionHandoff.nextAction,
+      nextAction: completionHandoff.nextAction
+    });
     assert.equal(output.finalRehearsalPacket.launchDutyCurrentAction.key, "stable_operations_handoff");
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyCurrentAction.key, "stable_operations_handoff");
     assert.equal(output.stagingRehearsalExecutionSummary.operatorFocus.launchDutyFocus.status, "ready_for_stable_operations_handoff");
@@ -6403,6 +6419,13 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     ]);
     assert.equal(plain.status, 0, plain.stderr || plain.stdout);
     assert.equal(plain.stderr, "");
+    assert.match(plain.stdout, /Operator queue checkpoint: stable_operations_handoff \(status=ready_for_stable_operations_handoff, currentPhase=stable_operations_handoff\)/);
+    assert.match(plain.stdout, /Operator checkpoint current: none/);
+    assert.match(plain.stdout, /Operator checkpoint record index: .*launch-duty-record-index\.json/);
+    assert.match(plain.stdout, /Operator checkpoint progress: 6\/6 recorded, 0 pending/);
+    assert.match(plain.stdout, /Operator checkpoint completion handoff: ready_for_stabilization_handoff/);
+    assert.match(plain.stdout, /Operator checkpoint completion artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(plain.stdout, /Operator checkpoint next action: Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner\./);
     assert.match(plain.stdout, /Launch duty current action: stable_operations_handoff \(stage=stable_operations_handoff, source=launchDutyCompletionHandoff\)/);
     assert.match(plain.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
     assert.match(plain.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);

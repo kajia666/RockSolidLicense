@@ -1242,6 +1242,56 @@ test("staging readiness status reports stabilization handoff when launch-duty re
     assert.equal(output.launchDutyNextRun, undefined);
     assert.equal(output.launchDutyWatchHandoff, undefined);
     assert.deepEqual(output.launchDutyCompletionHandoff, completionHandoff);
+    assert.deepEqual(
+      {
+        status: output.launchEvidenceReadinessGate?.status,
+        currentGate: output.launchEvidenceReadinessGate?.currentGate,
+        currentEvidenceKey: output.launchEvidenceReadinessGate?.currentEvidenceKey,
+        currentEvidenceType: output.launchEvidenceReadinessGate?.currentEvidenceType,
+        currentEvidenceStatus: output.launchEvidenceReadinessGate?.currentEvidenceStatus,
+        currentLaunchDutyRecordKey: output.launchEvidenceReadinessGate?.currentLaunchDutyRecordKey,
+        currentCommand: output.launchEvidenceReadinessGate?.currentCommand,
+        currentArtifactPath: output.launchEvidenceReadinessGate?.currentArtifactPath,
+        completedEvidenceCount: output.launchEvidenceReadinessGate?.completedEvidenceCount,
+        pendingEvidenceCount: output.launchEvidenceReadinessGate?.pendingEvidenceCount,
+        progress: output.launchEvidenceReadinessGate?.progress,
+        launchDutyRecordProgress: output.launchEvidenceReadinessGate?.launchDutyRecordProgress,
+        stableOperationsHandoff: output.launchEvidenceReadinessGate?.stableOperationsHandoff
+      },
+      {
+        status: "ready_for_stabilization_handoff",
+        currentGate: "stable_operations_handoff",
+        currentEvidenceKey: "first_wave_closeout",
+        currentEvidenceType: "launch_duty_record",
+        currentEvidenceStatus: "recorded",
+        currentLaunchDutyRecordKey: null,
+        currentCommand: completionHandoff.rehearsalReloadCommand,
+        currentArtifactPath: firstWaveCloseoutArtifactPath,
+        completedEvidenceCount: 21,
+        pendingEvidenceCount: 0,
+        progress: {
+          closeout: { completed: 7, total: 7 },
+          productionSignoff: { completed: 7, total: 7 },
+          receiptVisibility: { completed: 5, total: 5 },
+          launchDuty: { completed: 2, total: 2 }
+        },
+        launchDutyRecordProgress: {
+          recorded: 6,
+          pending: 0,
+          total: 6,
+          nextRecordKey: null
+        },
+        stableOperationsHandoff: {
+          status: "ready_for_stabilization_handoff",
+          handoffArtifacts: [recordIndexFile, firstWaveCloseoutArtifactPath],
+          nextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner."
+        }
+      }
+    );
+    assert.equal(
+      output.launchEvidenceReadinessGate.evidenceItems.find((item) => item.key === "first_wave_closeout")?.artifactPath,
+      firstWaveCloseoutArtifactPath
+    );
     assert.deepEqual(output.nextStep, {
       key: "reload_rehearsal_for_stabilization_handoff",
       targetKey: null,
@@ -1301,6 +1351,11 @@ test("staging readiness status reports stabilization handoff when launch-duty re
     assert.match(markdown, /Completion status command: `npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md`/);
     assert.match(markdown, /Completion rehearsal reload: `npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json`/);
     assert.match(markdown, /Completion source records: first_wave_incident_log=.*first-wave-incident-log\.md; rollback_signal_review=.*rollback-signal-review\.md; stabilization_owner_handoff=.*stabilization-owner-handoff\.md/);
+    assert.match(markdown, /Launch evidence gate: `ready_for_stabilization_handoff` \(current `first_wave_closeout`, pending `0\/21`\)/);
+    assert.match(markdown, /Launch evidence progress: closeout `7\/7`, signoff `7\/7`, receipts `5\/5`, launchDuty `2\/2`/);
+    assert.match(markdown, /Launch evidence launch-duty records: `6\/6` recorded, `0` pending, next `-`/);
+    assert.match(markdown, /Launch evidence stable handoff: `ready_for_stabilization_handoff` -> `.*launch-duty-record-index\.json`; `.*first-wave-closeout\.md`/);
+    assert.match(markdown, /- 21\. `launch_duty_record\/first_wave_closeout` \[recorded\] artifact `.*first-wave-closeout\.md`/);
     assert.match(markdown, /current: reload_rehearsal_for_stabilization_handoff -> `npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json`/);
     assert.match(markdown, /blocked_after_rehearsal_reload: handoff_stabilization_owner -> `.*first-wave-closeout\.md`/);
 
@@ -1309,6 +1364,11 @@ test("staging readiness status reports stabilization handoff when launch-duty re
     assert.equal(plain.stderr, "");
     assert.match(plain.stdout, /Current gate: stable_operations_handoff/);
     assert.match(plain.stdout, /Next step: reload_rehearsal_for_stabilization_handoff/);
+    assert.match(plain.stdout, /Launch evidence gate: ready_for_stabilization_handoff \(current=first_wave_closeout, pending=0\/21\)/);
+    assert.match(plain.stdout, /Launch evidence current: launch_duty_record\/first_wave_closeout -> npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(plain.stdout, /Launch evidence progress: closeout=7\/7, signoff=7\/7, receipts=5\/5, launchDuty=2\/2/);
+    assert.match(plain.stdout, /Launch evidence launch-duty records: 6\/6 recorded, 0 pending, next=-/);
+    assert.match(plain.stdout, /Launch evidence stable handoff: ready_for_stabilization_handoff -> .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(plain.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
     assert.match(plain.stdout, /Launch duty completion progress: 6\/6 recorded, 0 pending/);
     assert.match(plain.stdout, /Launch duty completion first-wave closeout: .*first-wave-closeout\.md/);

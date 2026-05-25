@@ -1174,6 +1174,13 @@ function completedLaunchDutyRecordKeys(launchDutyCompletionHandoff = null) {
     : [];
 }
 
+function launchDutyCompletionArtifactPath(key, launchDutyCompletionHandoff = null) {
+  if (key === "first_wave_closeout" && launchDutyCompletionHandoff?.firstWaveCloseoutArtifactPath) {
+    return launchDutyCompletionHandoff.firstWaveCloseoutArtifactPath;
+  }
+  return null;
+}
+
 function buildLaunchEvidenceItem({
   order,
   key,
@@ -1290,6 +1297,7 @@ function buildStagingLaunchEvidenceReadinessGate({
   ];
   for (const definition of launchDutyDefinitions) {
     const queueItem = findActionQueueItem(actionQueue, definition.key);
+    const completionArtifactPath = launchDutyCompletionArtifactPath(definition.key, launchDutyCompletionHandoff);
     evidenceItems.push(buildLaunchEvidenceItem({
       order: order++,
       key: definition.key,
@@ -1301,7 +1309,7 @@ function buildStagingLaunchEvidenceReadinessGate({
           : definition.key === "launch_day_watch_summary"
             ? "blocked_until_production_signoff"
             : "blocked_until_launch_day_watch",
-      artifactPath: queueItem?.evidence?.artifactPathHint || definition.artifactPath,
+      artifactPath: completionArtifactPath || queueItem?.evidence?.artifactPathHint || queueItem?.artifactPathHint || definition.artifactPath,
       command: queueItem?.command || null,
       receiptOperations: definition.receiptOperations,
       sourceRecordKeys: definition.sourceRecordKeys
@@ -1314,7 +1322,11 @@ function buildStagingLaunchEvidenceReadinessGate({
     || item.status === "recorded"
   )).length;
   const pendingEvidenceCount = evidenceItems.length - completedEvidenceCount;
-  const currentItem = evidenceItems.find((item) => item.key === currentEvidenceCheckpoint?.currentTargetKey)
+  const completedLaunchDutyCurrentItem = launchDutyCompletionHandoff
+    ? evidenceItems.find((item) => item.key === "first_wave_closeout")
+    : null;
+  const currentItem = completedLaunchDutyCurrentItem
+    || evidenceItems.find((item) => item.key === currentEvidenceCheckpoint?.currentTargetKey)
     || evidenceItems.find((item) => item.status === "current")
     || evidenceItems.find((item) => !["filled", "visible", "recorded"].includes(item.status))
     || evidenceItems[0]
@@ -1332,6 +1344,10 @@ function buildStagingLaunchEvidenceReadinessGate({
     launchStatus,
     currentEvidenceKey: currentItem?.key || null,
     currentEvidenceType: currentItem?.type || null,
+    currentEvidenceStatus: currentItem?.status || null,
+    currentLaunchDutyRecordKey: launchDutyCompletionHandoff
+      ? null
+      : currentItem?.type === "launch_duty_record" ? currentItem.key : null,
     currentCommand: currentEvidenceCheckpoint?.currentCommand || currentItem?.command || null,
     currentArtifactPath: currentEvidenceCheckpoint?.artifactPathHint || currentItem?.artifactPath || null,
     evidenceCount: evidenceItems.length,
@@ -1349,6 +1365,22 @@ function buildStagingLaunchEvidenceReadinessGate({
     launchDayWatchArtifact: path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
     firstWaveCloseoutArtifact: path.posix.join(archiveRoot, "first-wave-closeout.md"),
     launchDutyRecordIndexPath: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    launchDutyRecordProgress: launchDutyCompletionHandoff
+      ? {
+        recorded: launchDutyCompletionHandoff.recordedCount ?? completedRecordKeys.length,
+        pending: launchDutyCompletionHandoff.pendingCount ?? 0,
+        total: (launchDutyCompletionHandoff.recordedCount ?? completedRecordKeys.length)
+          + (launchDutyCompletionHandoff.pendingCount ?? 0),
+        nextRecordKey: null
+      }
+      : null,
+    stableOperationsHandoff: launchDutyCompletionHandoff
+      ? {
+        status: launchDutyCompletionHandoff.status || "ready_for_stabilization_handoff",
+        handoffArtifacts: launchDutyCompletionHandoff.handoffArtifacts || [],
+        nextAction: launchDutyCompletionHandoff.nextAction || null
+      }
+      : null,
     progress: {
       closeout: {
         completed: evidenceSummary.closeout.filledCount,
@@ -1535,6 +1567,23 @@ function renderLaunchEvidenceReadinessGateMarkdown(result) {
     `Launch evidence first-wave closeout: \`${gate.firstWaveCloseoutArtifact || "-"}\``,
     ""
   ];
+  if (gate.launchDutyRecordProgress) {
+    lines.splice(
+      10,
+      0,
+      `Launch evidence launch-duty records: \`${gate.launchDutyRecordProgress.recorded ?? "-"}/${gate.launchDutyRecordProgress.total ?? "-"}\` recorded, \`${gate.launchDutyRecordProgress.pending ?? "-"}\` pending, next \`${gate.launchDutyRecordProgress.nextRecordKey || "-"}\``
+    );
+  }
+  if (gate.stableOperationsHandoff) {
+    const handoffArtifacts = Array.isArray(gate.stableOperationsHandoff.handoffArtifacts)
+      ? gate.stableOperationsHandoff.handoffArtifacts.map((item) => `\`${item}\``).join("; ")
+      : "-";
+    lines.splice(
+      gate.launchDutyRecordProgress ? 11 : 10,
+      0,
+      `Launch evidence stable handoff: \`${gate.stableOperationsHandoff.status || "-"}\` -> ${handoffArtifacts || "-"}`
+    );
+  }
   const evidenceItems = Array.isArray(gate.evidenceItems) ? gate.evidenceItems : [];
   for (const item of evidenceItems) {
     const receipts = Array.isArray(item.receiptOperations) && item.receiptOperations.length
@@ -2050,6 +2099,16 @@ function writeLaunchEvidenceReadinessGatePlain(gate) {
       + `, receipts=${gate.progress?.receiptVisibility?.completed ?? "-"}/${gate.progress?.receiptVisibility?.total ?? "-"}`
       + `, launchDuty=${gate.progress?.launchDuty?.completed ?? "-"}/${gate.progress?.launchDuty?.total ?? "-"}`
   );
+  if (gate.launchDutyRecordProgress) {
+    console.log(
+      `Launch evidence launch-duty records: ${gate.launchDutyRecordProgress.recorded ?? "-"}/${gate.launchDutyRecordProgress.total ?? "-"} recorded`
+        + `, ${gate.launchDutyRecordProgress.pending ?? "-"} pending`
+        + `, next=${gate.launchDutyRecordProgress.nextRecordKey || "-"}`
+    );
+  }
+  if (gate.stableOperationsHandoff) {
+    console.log(`Launch evidence stable handoff: ${gate.stableOperationsHandoff.status || "-"} -> ${gate.stableOperationsHandoff.handoffArtifacts?.join("; ") || "-"}`);
+  }
   console.log(`Launch evidence status refresh: ${gate.readinessStatusCommand || "-"}`);
   console.log(`Launch evidence rehearsal reload: ${gate.rehearsalReloadCommand || "-"}`);
   console.log(`Launch evidence full-test: ${gate.fullTestCommand || "-"} -> ${gate.fullTestOutputArtifact || "-"}`);

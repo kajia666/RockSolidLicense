@@ -11697,6 +11697,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline first operating result handoff execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline first operating result handoff receipt readback execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
       /Launch Mainline first operating result review execution/
     );
     assert.match(
@@ -11726,6 +11734,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchSmokeSummary.body,
       /Launch Mainline rollout widening decision execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline first operating result handoff execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline first operating result handoff receipt readback execution/
     );
     assert.match(
       stabilizationGateLaunchSmokeSummary.body,
@@ -11768,6 +11784,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       stabilizationGateLaunchReviewHandoffRoutes.body,
+      /first-operating-result-handoff-execution\.txt[^\n]*format=first-operating-result-handoff-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /first-operating-result-handoff-receipt-readback-execution\.txt[^\n]*format=first-operating-result-handoff-receipt-readback-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
       /first-operating-result-review-execution\.txt[^\n]*format=first-operating-result-review-execution/
     );
     assert.match(
@@ -11804,6 +11828,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,
       /rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /first-operating-result-handoff-execution\.txt[^\n]*format=first-operating-result-handoff-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /first-operating-result-handoff-receipt-readback-execution\.txt[^\n]*format=first-operating-result-handoff-receipt-readback-execution/
     );
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,

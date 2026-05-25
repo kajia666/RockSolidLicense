@@ -12498,6 +12498,26 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineFirstOperatingResultHandoffExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline first operating result handoff execution",
+    "first-operating-result-handoff-execution.txt",
+    "first-operating-result-handoff-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline first operating result handoff receipt readback execution",
+    "first-operating-result-handoff-receipt-readback-execution.txt",
+    "first-operating-result-handoff-receipt-readback-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlineFirstOperatingResultReviewExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline first operating result review execution",
     "first-operating-result-review-execution.txt",
@@ -13199,6 +13219,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineHandoffRoutesDownload);
   pushRecommendedDownload(mainlineRolloutWideningDecisionExecutionDownload);
+  pushRecommendedDownload(mainlineFirstOperatingResultHandoffExecutionDownload);
+  pushRecommendedDownload(mainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload);
   pushRecommendedDownload(mainlineFirstOperatingResultReviewExecutionDownload);
   pushRecommendedDownload(mainlineNextRolloutWideningDecisionExecutionDownload);
   pushRecommendedDownload(mainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload);
@@ -13375,6 +13397,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: mainlineHandoffRoutesDownload,
       launchMainlineRolloutWideningDecisionExecution: mainlineRolloutWideningDecisionExecutionDownload,
+      launchMainlineFirstOperatingResultHandoffExecution: mainlineFirstOperatingResultHandoffExecutionDownload,
+      launchMainlineFirstOperatingResultHandoffReceiptReadbackExecution: mainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload,
       launchMainlineFirstOperatingResultReviewExecution: mainlineFirstOperatingResultReviewExecutionDownload,
       launchMainlineNextRolloutWideningDecisionExecution: mainlineNextRolloutWideningDecisionExecutionDownload,
       launchMainlineNextRolloutWideningDecisionReceiptReadbackExecution: mainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload,
@@ -13726,6 +13750,8 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
       downloads.launchMainlineRolloutWideningDecisionExecution,
+      downloads.launchMainlineFirstOperatingResultHandoffExecution,
+      downloads.launchMainlineFirstOperatingResultHandoffReceiptReadbackExecution,
       downloads.launchMainlineFirstOperatingResultReviewExecution,
       downloads.launchMainlineNextRolloutWideningDecisionExecution,
       downloads.launchMainlineNextRolloutWideningDecisionReceiptReadbackExecution,
@@ -14325,6 +14351,28 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineFirstOperatingResultHandoffExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline first operating result handoff execution",
+    "first-operating-result-handoff-execution.txt",
+    "first-operating-result-handoff-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline first operating result handoff receipt readback execution",
+    "first-operating-result-handoff-receipt-readback-execution.txt",
+    "first-operating-result-handoff-receipt-readback-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchMainlineFirstOperatingResultReviewExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline first operating result review execution",
     "first-operating-result-review-execution.txt",
@@ -14496,6 +14544,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineRehearsalGuideDownload,
     launchMainlineHandoffRoutesDownload,
     launchMainlineRolloutWideningDecisionExecutionDownload,
+    launchMainlineFirstOperatingResultHandoffExecutionDownload,
+    launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload,
     launchMainlineFirstOperatingResultReviewExecutionDownload,
     launchMainlineNextRolloutWideningDecisionExecutionDownload,
     launchMainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload,
@@ -15141,6 +15191,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
       launchMainlineRolloutWideningDecisionExecution: launchMainlineRolloutWideningDecisionExecutionDownload,
+      launchMainlineFirstOperatingResultHandoffExecution: launchMainlineFirstOperatingResultHandoffExecutionDownload,
+      launchMainlineFirstOperatingResultHandoffReceiptReadbackExecution: launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload,
       launchMainlineFirstOperatingResultReviewExecution: launchMainlineFirstOperatingResultReviewExecutionDownload,
       launchMainlineNextRolloutWideningDecisionExecution: launchMainlineNextRolloutWideningDecisionExecutionDownload,
       launchMainlineNextRolloutWideningDecisionReceiptReadbackExecution: launchMainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload,
@@ -15424,6 +15476,8 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
       downloads.launchMainlineRolloutWideningDecisionExecution,
+      downloads.launchMainlineFirstOperatingResultHandoffExecution,
+      downloads.launchMainlineFirstOperatingResultHandoffReceiptReadbackExecution,
       downloads.launchMainlineFirstOperatingResultReviewExecution,
       downloads.launchMainlineNextRolloutWideningDecisionExecution,
       downloads.launchMainlineNextRolloutWideningDecisionReceiptReadbackExecution,

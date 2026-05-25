@@ -11721,6 +11721,34 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline post-archive launch-day watch readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline launch-day watch summary record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline receipt visibility snapshot record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline first-wave incident log record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline rollback signal review record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline stabilization owner handoff record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline first-wave closeout record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
       /Launch Mainline stable operations handoff execution/
     );
     assert.match(
@@ -11802,6 +11830,34 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchSmokeSummary.body,
       /Launch Mainline stabilization receipt execution handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline post-archive launch-day watch readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline launch-day watch summary record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline receipt visibility snapshot record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline first-wave incident log record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline rollback signal review record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline stabilization owner handoff record readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline first-wave closeout record readback/
     );
     assert.match(
       stabilizationGateLaunchSmokeSummary.body,
@@ -11896,6 +11952,34 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       stabilizationGateLaunchReviewHandoffRoutes.body,
+      /post-archive-launch-day-watch-readback\.txt[^\n]*format=post-archive-launch-day-watch-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /launch-day-watch-summary-record-readback\.txt[^\n]*format=launch-day-watch-summary-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /receipt-visibility-snapshot-record-readback\.txt[^\n]*format=receipt-visibility-snapshot-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /first-wave-incident-log-record-readback\.txt[^\n]*format=first-wave-incident-log-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /rollback-signal-review-record-readback\.txt[^\n]*format=rollback-signal-review-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /stabilization-owner-handoff-record-readback\.txt[^\n]*format=stabilization-owner-handoff-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /first-wave-closeout-record-readback\.txt[^\n]*format=first-wave-closeout-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
       /stable-operations-handoff-execution\.txt[^\n]*format=stable-operations-handoff-execution/
     );
     assert.match(
@@ -11984,6 +12068,34 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,
       /stabilization-receipt-execution-handoff\.txt[^\n]*format=stabilization-receipt-execution-handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /post-archive-launch-day-watch-readback\.txt[^\n]*format=post-archive-launch-day-watch-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /launch-day-watch-summary-record-readback\.txt[^\n]*format=launch-day-watch-summary-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /receipt-visibility-snapshot-record-readback\.txt[^\n]*format=receipt-visibility-snapshot-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /first-wave-incident-log-record-readback\.txt[^\n]*format=first-wave-incident-log-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /rollback-signal-review-record-readback\.txt[^\n]*format=rollback-signal-review-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /stabilization-owner-handoff-record-readback\.txt[^\n]*format=stabilization-owner-handoff-record-readback/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /first-wave-closeout-record-readback\.txt[^\n]*format=first-wave-closeout-record-readback/
     );
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,

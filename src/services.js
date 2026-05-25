@@ -12562,6 +12562,76 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlinePostArchiveLaunchDayWatchReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline post-archive launch-day watch readback",
+    "post-archive-launch-day-watch-readback.txt",
+    "post-archive-launch-day-watch-readback",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineLaunchDayWatchSummaryRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch-day watch summary record readback",
+    "launch-day-watch-summary-record-readback.txt",
+    "launch-day-watch-summary-record-readback",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineReceiptVisibilitySnapshotRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline receipt visibility snapshot record readback",
+    "receipt-visibility-snapshot-record-readback.txt",
+    "receipt-visibility-snapshot-record-readback",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineFirstWaveIncidentLogRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline first-wave incident log record readback",
+    "first-wave-incident-log-record-readback.txt",
+    "first-wave-incident-log-record-readback",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineRollbackSignalReviewRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline rollback signal review record readback",
+    "rollback-signal-review-record-readback.txt",
+    "rollback-signal-review-record-readback",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineStabilizationOwnerHandoffRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stabilization owner handoff record readback",
+    "stabilization-owner-handoff-record-readback.txt",
+    "stabilization-owner-handoff-record-readback",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineFirstWaveCloseoutRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline first-wave closeout record readback",
+    "first-wave-closeout-record-readback.txt",
+    "first-wave-closeout-record-readback",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlineStableOperationsHandoffExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline stable operations handoff execution",
     "stable-operations-handoff-execution.txt",
@@ -13339,6 +13409,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineSignoffArchiveWatchHandoffDownload);
   pushRecommendedDownload(mainlineLaunchDutyReceiptExecutionHandoffDownload);
   pushRecommendedDownload(mainlineStabilizationReceiptExecutionHandoffDownload);
+  pushRecommendedDownload(mainlinePostArchiveLaunchDayWatchReadbackDownload);
+  pushRecommendedDownload(mainlineLaunchDayWatchSummaryRecordReadbackDownload);
+  pushRecommendedDownload(mainlineReceiptVisibilitySnapshotRecordReadbackDownload);
+  pushRecommendedDownload(mainlineFirstWaveIncidentLogRecordReadbackDownload);
+  pushRecommendedDownload(mainlineRollbackSignalReviewRecordReadbackDownload);
+  pushRecommendedDownload(mainlineStabilizationOwnerHandoffRecordReadbackDownload);
+  pushRecommendedDownload(mainlineFirstWaveCloseoutRecordReadbackDownload);
   pushRecommendedDownload(mainlineStableOperationsHandoffExecutionDownload);
   pushRecommendedDownload(mainlineStableOperationsTransitionReviewDownload);
   pushRecommendedDownload(mainlineSteadyStateHandoffLandingExecutionDownload);
@@ -13528,6 +13605,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchMainlineSignoffArchiveWatchHandoff: mainlineSignoffArchiveWatchHandoffDownload,
       launchMainlineLaunchDutyReceiptExecutionHandoff: mainlineLaunchDutyReceiptExecutionHandoffDownload,
       launchMainlineStabilizationReceiptExecutionHandoff: mainlineStabilizationReceiptExecutionHandoffDownload,
+      launchMainlinePostArchiveLaunchDayWatchReadback: mainlinePostArchiveLaunchDayWatchReadbackDownload,
+      launchMainlineLaunchDayWatchSummaryRecordReadback: mainlineLaunchDayWatchSummaryRecordReadbackDownload,
+      launchMainlineReceiptVisibilitySnapshotRecordReadback: mainlineReceiptVisibilitySnapshotRecordReadbackDownload,
+      launchMainlineFirstWaveIncidentLogRecordReadback: mainlineFirstWaveIncidentLogRecordReadbackDownload,
+      launchMainlineRollbackSignalReviewRecordReadback: mainlineRollbackSignalReviewRecordReadbackDownload,
+      launchMainlineStabilizationOwnerHandoffRecordReadback: mainlineStabilizationOwnerHandoffRecordReadbackDownload,
+      launchMainlineFirstWaveCloseoutRecordReadback: mainlineFirstWaveCloseoutRecordReadbackDownload,
       launchMainlineStableOperationsHandoffExecution: mainlineStableOperationsHandoffExecutionDownload,
       launchMainlineStableOperationsTransitionReview: mainlineStableOperationsTransitionReviewDownload,
       launchMainlineSteadyStateHandoffLandingExecution: mainlineSteadyStateHandoffLandingExecutionDownload,
@@ -13892,6 +13976,13 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSignoffArchiveWatchHandoff,
       downloads.launchMainlineLaunchDutyReceiptExecutionHandoff,
       downloads.launchMainlineStabilizationReceiptExecutionHandoff,
+      downloads.launchMainlinePostArchiveLaunchDayWatchReadback,
+      downloads.launchMainlineLaunchDayWatchSummaryRecordReadback,
+      downloads.launchMainlineReceiptVisibilitySnapshotRecordReadback,
+      downloads.launchMainlineFirstWaveIncidentLogRecordReadback,
+      downloads.launchMainlineRollbackSignalReviewRecordReadback,
+      downloads.launchMainlineStabilizationOwnerHandoffRecordReadback,
+      downloads.launchMainlineFirstWaveCloseoutRecordReadback,
       downloads.launchMainlineStableOperationsHandoffExecution,
       downloads.launchMainlineStableOperationsTransitionReview,
       downloads.launchMainlineSteadyStateHandoffLandingExecution,
@@ -14564,6 +14655,83 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlinePostArchiveLaunchDayWatchReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline post-archive launch-day watch readback",
+    "post-archive-launch-day-watch-readback.txt",
+    "post-archive-launch-day-watch-readback",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineLaunchDayWatchSummaryRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch-day watch summary record readback",
+    "launch-day-watch-summary-record-readback.txt",
+    "launch-day-watch-summary-record-readback",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineReceiptVisibilitySnapshotRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline receipt visibility snapshot record readback",
+    "receipt-visibility-snapshot-record-readback.txt",
+    "receipt-visibility-snapshot-record-readback",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineFirstWaveIncidentLogRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline first-wave incident log record readback",
+    "first-wave-incident-log-record-readback.txt",
+    "first-wave-incident-log-record-readback",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineRollbackSignalReviewRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline rollback signal review record readback",
+    "rollback-signal-review-record-readback.txt",
+    "rollback-signal-review-record-readback",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineStabilizationOwnerHandoffRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stabilization owner handoff record readback",
+    "stabilization-owner-handoff-record-readback.txt",
+    "stabilization-owner-handoff-record-readback",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineFirstWaveCloseoutRecordReadbackDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline first-wave closeout record readback",
+    "first-wave-closeout-record-readback.txt",
+    "first-wave-closeout-record-readback",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchMainlineStableOperationsHandoffExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline stable operations handoff execution",
     "stable-operations-handoff-execution.txt",
@@ -14818,6 +14986,13 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineSignoffArchiveWatchHandoffDownload,
     launchMainlineLaunchDutyReceiptExecutionHandoffDownload,
     launchMainlineStabilizationReceiptExecutionHandoffDownload,
+    launchMainlinePostArchiveLaunchDayWatchReadbackDownload,
+    launchMainlineLaunchDayWatchSummaryRecordReadbackDownload,
+    launchMainlineReceiptVisibilitySnapshotRecordReadbackDownload,
+    launchMainlineFirstWaveIncidentLogRecordReadbackDownload,
+    launchMainlineRollbackSignalReviewRecordReadbackDownload,
+    launchMainlineStabilizationOwnerHandoffRecordReadbackDownload,
+    launchMainlineFirstWaveCloseoutRecordReadbackDownload,
     launchMainlineStableOperationsHandoffExecutionDownload,
     launchMainlineStableOperationsTransitionReviewDownload,
     launchMainlineSteadyStateHandoffLandingExecutionDownload,
@@ -15476,6 +15651,13 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchMainlineSignoffArchiveWatchHandoff: launchMainlineSignoffArchiveWatchHandoffDownload,
       launchMainlineLaunchDutyReceiptExecutionHandoff: launchMainlineLaunchDutyReceiptExecutionHandoffDownload,
       launchMainlineStabilizationReceiptExecutionHandoff: launchMainlineStabilizationReceiptExecutionHandoffDownload,
+      launchMainlinePostArchiveLaunchDayWatchReadback: launchMainlinePostArchiveLaunchDayWatchReadbackDownload,
+      launchMainlineLaunchDayWatchSummaryRecordReadback: launchMainlineLaunchDayWatchSummaryRecordReadbackDownload,
+      launchMainlineReceiptVisibilitySnapshotRecordReadback: launchMainlineReceiptVisibilitySnapshotRecordReadbackDownload,
+      launchMainlineFirstWaveIncidentLogRecordReadback: launchMainlineFirstWaveIncidentLogRecordReadbackDownload,
+      launchMainlineRollbackSignalReviewRecordReadback: launchMainlineRollbackSignalReviewRecordReadbackDownload,
+      launchMainlineStabilizationOwnerHandoffRecordReadback: launchMainlineStabilizationOwnerHandoffRecordReadbackDownload,
+      launchMainlineFirstWaveCloseoutRecordReadback: launchMainlineFirstWaveCloseoutRecordReadbackDownload,
       launchMainlineStableOperationsHandoffExecution: launchMainlineStableOperationsHandoffExecutionDownload,
       launchMainlineStableOperationsTransitionReview: launchMainlineStableOperationsTransitionReviewDownload,
       launchMainlineSteadyStateHandoffLandingExecution: launchMainlineSteadyStateHandoffLandingExecutionDownload,
@@ -15772,6 +15954,13 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSignoffArchiveWatchHandoff,
       downloads.launchMainlineLaunchDutyReceiptExecutionHandoff,
       downloads.launchMainlineStabilizationReceiptExecutionHandoff,
+      downloads.launchMainlinePostArchiveLaunchDayWatchReadback,
+      downloads.launchMainlineLaunchDayWatchSummaryRecordReadback,
+      downloads.launchMainlineReceiptVisibilitySnapshotRecordReadback,
+      downloads.launchMainlineFirstWaveIncidentLogRecordReadback,
+      downloads.launchMainlineRollbackSignalReviewRecordReadback,
+      downloads.launchMainlineStabilizationOwnerHandoffRecordReadback,
+      downloads.launchMainlineFirstWaveCloseoutRecordReadback,
       downloads.launchMainlineStableOperationsHandoffExecution,
       downloads.launchMainlineStableOperationsTransitionReview,
       downloads.launchMainlineSteadyStateHandoffLandingExecution,

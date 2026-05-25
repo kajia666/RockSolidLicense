@@ -12488,6 +12488,26 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineNextRolloutWideningDecisionExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline next rollout widening decision execution",
+    "next-rollout-widening-decision-execution.txt",
+    "next-rollout-widening-decision-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline next rollout widening decision receipt readback execution",
+    "next-rollout-widening-decision-receipt-readback-execution.txt",
+    "next-rollout-widening-decision-receipt-readback-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlineWidenedRolloutMonitoringExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline widened rollout monitoring execution",
     "widened-rollout-monitoring-execution.txt",
@@ -13158,6 +13178,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineSummaryDownload);
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineHandoffRoutesDownload);
+  pushRecommendedDownload(mainlineNextRolloutWideningDecisionExecutionDownload);
+  pushRecommendedDownload(mainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload);
   pushRecommendedDownload(mainlineWidenedRolloutMonitoringExecutionDownload);
   pushRecommendedDownload(mainlineWidenedRolloutMonitoringResultReviewExecutionDownload);
   pushRecommendedDownload(mainlineWidenedRolloutNextDecisionExecutionDownload);
@@ -13330,6 +13352,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchMainlineSummary: mainlineSummaryDownload,
       launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: mainlineHandoffRoutesDownload,
+      launchMainlineNextRolloutWideningDecisionExecution: mainlineNextRolloutWideningDecisionExecutionDownload,
+      launchMainlineNextRolloutWideningDecisionReceiptReadbackExecution: mainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload,
       launchMainlineWidenedRolloutMonitoringExecution: mainlineWidenedRolloutMonitoringExecutionDownload,
       launchMainlineWidenedRolloutMonitoringResultReviewExecution: mainlineWidenedRolloutMonitoringResultReviewExecutionDownload,
       launchMainlineWidenedRolloutNextDecisionExecution: mainlineWidenedRolloutNextDecisionExecutionDownload,
@@ -13677,6 +13701,8 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineNextRolloutWideningDecisionExecution,
+      downloads.launchMainlineNextRolloutWideningDecisionReceiptReadbackExecution,
       downloads.launchMainlineWidenedRolloutMonitoringExecution,
       downloads.launchMainlineWidenedRolloutMonitoringResultReviewExecution,
       downloads.launchMainlineWidenedRolloutNextDecisionExecution,
@@ -14262,6 +14288,28 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineNextRolloutWideningDecisionExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline next rollout widening decision execution",
+    "next-rollout-widening-decision-execution.txt",
+    "next-rollout-widening-decision-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline next rollout widening decision receipt readback execution",
+    "next-rollout-widening-decision-receipt-readback-execution.txt",
+    "next-rollout-widening-decision-receipt-readback-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchMainlineWidenedRolloutMonitoringExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline widened rollout monitoring execution",
     "widened-rollout-monitoring-execution.txt",
@@ -14399,6 +14447,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
     launchMainlineHandoffRoutesDownload,
+    launchMainlineNextRolloutWideningDecisionExecutionDownload,
+    launchMainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload,
     launchMainlineWidenedRolloutMonitoringExecutionDownload,
     launchMainlineWidenedRolloutMonitoringResultReviewExecutionDownload,
     launchMainlineWidenedRolloutNextDecisionExecutionDownload,
@@ -15040,6 +15090,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchMainlineSummary: launchMainlineSummaryDownload,
       launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
+      launchMainlineNextRolloutWideningDecisionExecution: launchMainlineNextRolloutWideningDecisionExecutionDownload,
+      launchMainlineNextRolloutWideningDecisionReceiptReadbackExecution: launchMainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload,
       launchMainlineWidenedRolloutMonitoringExecution: launchMainlineWidenedRolloutMonitoringExecutionDownload,
       launchMainlineWidenedRolloutMonitoringResultReviewExecution: launchMainlineWidenedRolloutMonitoringResultReviewExecutionDownload,
       launchMainlineWidenedRolloutNextDecisionExecution: launchMainlineWidenedRolloutNextDecisionExecutionDownload,
@@ -15319,6 +15371,8 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineNextRolloutWideningDecisionExecution,
+      downloads.launchMainlineNextRolloutWideningDecisionReceiptReadbackExecution,
       downloads.launchMainlineWidenedRolloutMonitoringExecution,
       downloads.launchMainlineWidenedRolloutMonitoringResultReviewExecution,
       downloads.launchMainlineWidenedRolloutNextDecisionExecution,

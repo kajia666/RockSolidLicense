@@ -23156,6 +23156,152 @@ function appendFirstWaveCloseoutStableOperationsShortcutLines(lines = [], shortc
   return true;
 }
 
+function normalizeStableOperationsPacketReviewBridge(bridge = null) {
+  const source = bridge && typeof bridge === "object" ? bridge : null;
+  if (!source) {
+    return null;
+  }
+  const packetReviewQueue = Array.isArray(source.packetReviewQueue)
+    ? source.packetReviewQueue
+        .filter((item) => item && typeof item === "object")
+        .map((item) => ({
+          order: Number.isFinite(Number(item.order)) ? Number(item.order) : null,
+          key: item.key || null,
+          packetPath: item.packetPath || null
+        }))
+    : [];
+  return {
+    version: source.version || "developer-launch-mainline-stable-operations-packet-review-bridge/v1",
+    status: source.status || null,
+    ready: source.ready === true,
+    currentPacketKey: source.currentPacketKey || null,
+    currentPacketOrder: Number.isFinite(Number(source.currentPacketOrder)) ? Number(source.currentPacketOrder) : null,
+    currentPacketPath: source.currentPacketPath || null,
+    packetReviewProgress: source.packetReviewProgress || null,
+    reviewedCount: Number.isFinite(Number(source.reviewedCount)) ? Number(source.reviewedCount) : 0,
+    pendingCount: Number.isFinite(Number(source.pendingCount)) ? Number(source.pendingCount) : 0,
+    totalCount: Number.isFinite(Number(source.totalCount)) ? Number(source.totalCount) : 0,
+    nextPacketKey: source.nextPacketKey || null,
+    archiveIndexPath: source.archiveIndexPath || null,
+    launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    operatorActionKey: source.operatorActionKey || null,
+    reviewRequired: source.reviewRequired === true,
+    nextDownloadKey: source.nextDownloadKey || null,
+    nextDownloadFormat: source.nextDownloadFormat || null,
+    nextDownloadHref: source.nextDownloadHref || null,
+    nextAction: source.nextAction || null,
+    packetReviewQueue,
+    packetReviewReceiptSelection: source.packetReviewReceiptSelection && typeof source.packetReviewReceiptSelection === "object"
+      ? {
+          status: source.packetReviewReceiptSelection.status || null,
+          selectedAuditLogId: source.packetReviewReceiptSelection.selectedAuditLogId || null,
+          selectedProgress: source.packetReviewReceiptSelection.selectedProgress || null,
+          selectedNextPacketKey: source.packetReviewReceiptSelection.selectedNextPacketKey || null,
+          latestAuditLogId: source.packetReviewReceiptSelection.latestAuditLogId || null,
+          latestProgress: source.packetReviewReceiptSelection.latestProgress || null,
+          selectedComplete: source.packetReviewReceiptSelection.selectedComplete === true,
+          latestComplete: source.packetReviewReceiptSelection.latestComplete === true
+        }
+      : null
+  };
+}
+
+function buildDeveloperOpsStableOperationsPacketReviewBridge({
+  productCode = null,
+  channel = null,
+  stagingLaunchDutyArchive = null,
+  launchDutyPacketReviewReceiptSelection = null,
+  launchDutyRecordIndexPath = null,
+  launchDutyStableOperationsHandoffTail = null
+} = {}) {
+  const archive = stagingLaunchDutyArchive && typeof stagingLaunchDutyArchive === "object"
+    ? stagingLaunchDutyArchive
+    : null;
+  const tail = launchDutyStableOperationsHandoffTail && typeof launchDutyStableOperationsHandoffTail === "object"
+    ? launchDutyStableOperationsHandoffTail
+    : null;
+  const packetReviewSelection = launchDutyPacketReviewReceiptSelection && typeof launchDutyPacketReviewReceiptSelection === "object"
+    ? launchDutyPacketReviewReceiptSelection
+    : null;
+  const packetFiles = Array.isArray(archive?.packetFiles)
+    ? archive.packetFiles.filter((item) => item && typeof item === "object")
+    : [];
+  if (!tail?.readyForHandoff || !packetFiles.length || packetReviewSelection?.selectedComplete === true) {
+    return null;
+  }
+  const packetReviewQueue = packetFiles
+    .map((packet, index) => ({
+      order: index + 1,
+      key: packet.key || null,
+      packetPath: packet.path || null
+    }))
+    .filter((item) => item.key);
+  const reviewedKeys = Array.isArray(packetReviewSelection?.selectedReviewedKeys)
+    ? packetReviewSelection.selectedReviewedKeys.filter(Boolean)
+    : [];
+  const pendingKeys = Array.isArray(packetReviewSelection?.selectedPendingKeys) && packetReviewSelection.selectedPendingKeys.length
+    ? packetReviewSelection.selectedPendingKeys.filter(Boolean)
+    : packetReviewQueue.map((item) => item.key).filter((key) => !reviewedKeys.includes(key));
+  const currentPacketKey = packetReviewSelection?.selectedNextPacketKey
+    || pendingKeys[0]
+    || packetReviewQueue[0]?.key
+    || null;
+  const currentPacket = packetReviewQueue.find((item) => item.key === currentPacketKey)
+    || packetReviewQueue[0]
+    || null;
+  const currentPacketOrder = currentPacket?.order || null;
+  const nextPacket = currentPacketOrder
+    ? packetReviewQueue[currentPacketOrder] || null
+    : null;
+  const actionProductCode = packetReviewSelection?.productCode || productCode || archive?.projectCode || "";
+  const actionChannel = packetReviewSelection?.channel || channel || archive?.channel || "stable";
+  const operatorAction = packetReviewSelection?.operatorAction && typeof packetReviewSelection.operatorAction === "object"
+    ? packetReviewSelection.operatorAction
+    : {
+        key: "continue_packet_result_review",
+        reviewRequired: false,
+        nextDownloadFormat: "launch-operations-operator-entry",
+        nextDownloadKey: "ops_launch_operations_operator_entry",
+        nextDownloadHref: buildLaunchWorkflowDownloadHref(
+          "developer-ops",
+          "launch-operations-operator-entry",
+          {
+            productCode: actionProductCode,
+            channel: actionChannel,
+            limit: 80
+          }
+        ),
+        nextAction: "Continue packet result review from Developer Ops."
+      };
+  const archiveIndexPath = archive?.files?.launchDutyArchiveIndex
+    || archive?.indexFile
+    || archive?.launchDutyArchiveIndexPath
+    || null;
+  return normalizeStableOperationsPacketReviewBridge({
+    version: "developer-launch-mainline-stable-operations-packet-review-bridge/v1",
+    status: packetReviewSelection?.status || "ready_for_packet_result_review",
+    ready: true,
+    currentPacketKey,
+    currentPacketOrder,
+    currentPacketPath: currentPacket?.packetPath || null,
+    packetReviewProgress: packetReviewSelection?.selectedProgress || `${reviewedKeys.length}/${packetReviewQueue.length}`,
+    reviewedCount: reviewedKeys.length,
+    pendingCount: pendingKeys.length,
+    totalCount: packetReviewQueue.length,
+    nextPacketKey: nextPacket?.key || null,
+    archiveIndexPath,
+    launchDutyRecordIndexPath,
+    operatorActionKey: operatorAction.key || null,
+    reviewRequired: operatorAction.reviewRequired === true,
+    nextDownloadKey: operatorAction.nextDownloadKey || null,
+    nextDownloadFormat: operatorAction.nextDownloadFormat || null,
+    nextDownloadHref: operatorAction.nextDownloadHref || null,
+    nextAction: operatorAction.nextAction || "Continue packet result review from Developer Ops.",
+    packetReviewQueue,
+    packetReviewReceiptSelection: packetReviewSelection
+  });
+}
+
 function normalizeStableOperationsTransitionShortcut(shortcut = null) {
   const source = shortcut && typeof shortcut === "object" ? shortcut : null;
   if (!source) {
@@ -23178,6 +23324,7 @@ function normalizeStableOperationsTransitionShortcut(shortcut = null) {
   const operatorOrder = Array.isArray(source.operatorOrder)
     ? source.operatorOrder.filter((item) => String(item || "").trim() !== "")
     : [];
+  const packetReviewBridge = normalizeStableOperationsPacketReviewBridge(source.packetReviewBridge);
   return {
     version: source.version || "developer-launch-mainline-stable-operations-transition-shortcut/v1",
     status: source.status || null,
@@ -23205,6 +23352,7 @@ function normalizeStableOperationsTransitionShortcut(shortcut = null) {
     requiredChecks,
     operatorOrder,
     launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    ...(packetReviewBridge ? { packetReviewBridge } : {}),
     nextAction: source.nextAction || operatorAction?.nextAction || null
   };
 }
@@ -23254,6 +23402,7 @@ function getStableOperationsTransitionShortcutFromOperatorEntry(launchOperations
     requiredChecks: Array.isArray(transitionAction.requiredChecks) ? transitionAction.requiredChecks.slice() : [],
     operatorOrder: Array.isArray(transitionAction.operatorOrder) ? transitionAction.operatorOrder.slice() : [],
     launchDutyRecordIndexPath: transitionAction.launchDutyRecordIndexPath || entry?.launchDutyRecordIndexPath || null,
+    packetReviewBridge: transitionAction.packetReviewBridge || null,
     nextAction: transitionAction.nextAction || operatorAction?.nextAction || null
   });
 }
@@ -23270,6 +23419,22 @@ function appendStableOperationsTransitionShortcutLines(lines = [], shortcut = nu
   }
   const blockedBy = Array.isArray(item.blockedBy) ? item.blockedBy.join(",") : "";
   const requiredChecks = Array.isArray(item.requiredChecks) ? item.requiredChecks.join(",") : "";
+  const packetReviewBridgeTitle = String(title || "").replace(
+    "Stable Operations Transition Shortcut:",
+    "Stable Operations Packet Review Bridge:"
+  );
+  const packetReviewBridgeActionTitle = String(title || "").replace(
+    "Stable Operations Transition Shortcut:",
+    "Stable Operations Packet Review Bridge Action:"
+  );
+  const packetReviewBridgePathsTitle = String(title || "").replace(
+    "Stable Operations Transition Shortcut:",
+    "Stable Operations Packet Review Bridge Paths:"
+  );
+  const packetReviewBridgeQueueTitle = String(title || "").replace(
+    "Stable Operations Transition Shortcut:",
+    "Stable Operations Packet Review Bridge Queue:"
+  );
   lines.push(title);
   lines.push(
     `- status=${item.status || "-"}`
@@ -23317,6 +23482,32 @@ function appendStableOperationsTransitionShortcutLines(lines = [], shortcut = nu
     + ` | landingHref=${item.landingHref || "-"}`
     + ` | landingBridge=${item.landingBridgeStatus || "-"}`
   );
+  if (item.packetReviewBridge && typeof item.packetReviewBridge === "object") {
+    const packetQueue = Array.isArray(item.packetReviewBridge.packetReviewQueue) && item.packetReviewBridge.packetReviewQueue.length
+      ? item.packetReviewBridge.packetReviewQueue.map((step) => `${step.order || "-"}.${step.key || "-"}=${step.packetPath || "-"}`).join(" -> ")
+      : "-";
+    lines.push(
+      `${packetReviewBridgeTitle}`
+      + ` status=${item.packetReviewBridge.status || "-"}`
+      + ` | ready=${item.packetReviewBridge.ready === true ? "yes" : "no"}`
+      + ` | current=${item.packetReviewBridge.currentPacketKey || "-"}`
+      + ` | next=${item.packetReviewBridge.nextPacketKey || "-"}`
+      + ` | progress=${item.packetReviewBridge.packetReviewProgress || "-"}`
+    );
+    lines.push(
+      `${packetReviewBridgeActionTitle}`
+      + ` action=${item.packetReviewBridge.operatorActionKey || "-"}`
+      + ` | reviewRequired=${item.packetReviewBridge.operatorActionKey ? item.packetReviewBridge.reviewRequired === true ? "yes" : "no" : "-"}`
+      + ` | nextDownload=${item.packetReviewBridge.nextDownloadFormat || "-"}`
+      + ` | href=${item.packetReviewBridge.nextDownloadHref || "-"}`
+    );
+    lines.push(
+      `${packetReviewBridgePathsTitle}`
+      + ` archiveIndex=${item.packetReviewBridge.archiveIndexPath || "-"}`
+      + ` | launchDutyRecordIndex=${item.packetReviewBridge.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`${packetReviewBridgeQueueTitle} ${packetQueue}`);
+  }
   lines.push(`- checks=${requiredChecks || "-"}`);
   lines.push(`Stable Operations Transition Shortcut Next: ${item.nextAction || "-"}`);
   if (Array.isArray(item.operatorOrder) && item.operatorOrder.length) {
@@ -23399,6 +23590,48 @@ function appendStableOperationsTransitionReviewLines(lines = [], review = null, 
     + ` | landingHref=${item.landingHref || "-"}`
     + ` | landingBridge=${item.landingBridgeStatus || "-"}`
   );
+  if (item.packetReviewBridge && typeof item.packetReviewBridge === "object") {
+    const packetQueue = Array.isArray(item.packetReviewBridge.packetReviewQueue) && item.packetReviewBridge.packetReviewQueue.length
+      ? item.packetReviewBridge.packetReviewQueue.map((step) => `${step.order || "-"}.${step.key || "-"}=${step.packetPath || "-"}`).join(" -> ")
+      : "-";
+    const packetReviewBridgeTitle = String(title || "").replace(
+      "Stable Operations Transition Review:",
+      "Stable Operations Packet Review Bridge:"
+    );
+    const packetReviewBridgeActionTitle = String(title || "").replace(
+      "Stable Operations Transition Review:",
+      "Stable Operations Packet Review Bridge Action:"
+    );
+    const packetReviewBridgePathsTitle = String(title || "").replace(
+      "Stable Operations Transition Review:",
+      "Stable Operations Packet Review Bridge Paths:"
+    );
+    const packetReviewBridgeQueueTitle = String(title || "").replace(
+      "Stable Operations Transition Review:",
+      "Stable Operations Packet Review Bridge Queue:"
+    );
+    lines.push(
+      `${packetReviewBridgeTitle}`
+      + ` status=${item.packetReviewBridge.status || "-"}`
+      + ` | ready=${item.packetReviewBridge.ready === true ? "yes" : "no"}`
+      + ` | current=${item.packetReviewBridge.currentPacketKey || "-"}`
+      + ` | next=${item.packetReviewBridge.nextPacketKey || "-"}`
+      + ` | progress=${item.packetReviewBridge.packetReviewProgress || "-"}`
+    );
+    lines.push(
+      `${packetReviewBridgeActionTitle}`
+      + ` action=${item.packetReviewBridge.operatorActionKey || "-"}`
+      + ` | reviewRequired=${item.packetReviewBridge.operatorActionKey ? item.packetReviewBridge.reviewRequired === true ? "yes" : "no" : "-"}`
+      + ` | nextDownload=${item.packetReviewBridge.nextDownloadFormat || "-"}`
+      + ` | href=${item.packetReviewBridge.nextDownloadHref || "-"}`
+    );
+    lines.push(
+      `${packetReviewBridgePathsTitle}`
+      + ` archiveIndex=${item.packetReviewBridge.archiveIndexPath || "-"}`
+      + ` | launchDutyRecordIndex=${item.packetReviewBridge.launchDutyRecordIndexPath || "-"}`
+    );
+    lines.push(`${packetReviewBridgeQueueTitle} ${packetQueue}`);
+  }
   lines.push(`Stable Operations Transition Review Checks: checks=${requiredChecks || "-"}`);
   lines.push(`Stable Operations Transition Review Next: ${item.nextAction || "-"}`);
   if (Array.isArray(item.operatorOrder) && item.operatorOrder.length) {
@@ -49882,6 +50115,14 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     ?.stableOperationsHandoffTail || null;
   const launchDutyStableOperationsReadbackPacket = launchDutyStableOperationsHandoffTail
     ?.readinessReloadReadbackPacket || null;
+  const launchDutyStableOperationsPacketReviewBridge = buildDeveloperOpsStableOperationsPacketReviewBridge({
+    productCode,
+    channel,
+    stagingLaunchDutyArchive,
+    launchDutyPacketReviewReceiptSelection,
+    launchDutyRecordIndexPath,
+    launchDutyStableOperationsHandoffTail
+  });
   const launchDutySteadyStateHandoffOperatorOrder = [
     "Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations."
   ];
@@ -50095,6 +50336,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     packetReviewProgress: launchDutyPacketReviewReceiptSelection?.selectedProgress || null,
     stableOperationsTailStatus: launchDutyStableOperationsHandoffTail?.status || null,
     stableOperationsReadbackStatus: launchDutyStableOperationsReadbackPacket?.status || null,
+    packetReviewBridge: launchDutyStableOperationsPacketReviewBridge,
     landingStatus: launchDutySteadyStateHandoffLanding?.status || null,
     landingHref: launchDutySteadyStateHandoffHref || null,
     requiredChecks: Array.isArray(launchDutyStableOperationsLandingBridge?.completionChecks)

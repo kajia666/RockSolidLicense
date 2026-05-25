@@ -30127,6 +30127,51 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchDutyCloseoutStableOpsTransition.handoffReady, false);
     assert.equal(launchDutyCloseoutStableOpsTransition.currentActionKey, "review_staging_packet_results");
     assert.equal(launchDutyCloseoutStableOpsTransition.nextDownloadFormat, "launch-operations-operator-entry");
+    assert.ok(launchDutyCloseoutStableOpsTransition.packetReviewBridge);
+    assert.deepEqual(
+      {
+        version: launchDutyCloseoutStableOpsTransition.packetReviewBridge.version,
+        status: launchDutyCloseoutStableOpsTransition.packetReviewBridge.status,
+        ready: launchDutyCloseoutStableOpsTransition.packetReviewBridge.ready,
+        currentPacketKey: launchDutyCloseoutStableOpsTransition.packetReviewBridge.currentPacketKey,
+        currentPacketOrder: launchDutyCloseoutStableOpsTransition.packetReviewBridge.currentPacketOrder,
+        currentPacketPath: launchDutyCloseoutStableOpsTransition.packetReviewBridge.currentPacketPath,
+        packetReviewProgress: launchDutyCloseoutStableOpsTransition.packetReviewBridge.packetReviewProgress,
+        reviewedCount: launchDutyCloseoutStableOpsTransition.packetReviewBridge.reviewedCount,
+        pendingCount: launchDutyCloseoutStableOpsTransition.packetReviewBridge.pendingCount,
+        totalCount: launchDutyCloseoutStableOpsTransition.packetReviewBridge.totalCount,
+        nextPacketKey: launchDutyCloseoutStableOpsTransition.packetReviewBridge.nextPacketKey,
+        archiveIndexPath: launchDutyCloseoutStableOpsTransition.packetReviewBridge.archiveIndexPath,
+        launchDutyRecordIndexPath: launchDutyCloseoutStableOpsTransition.packetReviewBridge.launchDutyRecordIndexPath,
+        operatorActionKey: launchDutyCloseoutStableOpsTransition.packetReviewBridge.operatorActionKey,
+        reviewRequired: launchDutyCloseoutStableOpsTransition.packetReviewBridge.reviewRequired,
+        nextDownloadKey: launchDutyCloseoutStableOpsTransition.packetReviewBridge.nextDownloadKey,
+        nextDownloadFormat: launchDutyCloseoutStableOpsTransition.packetReviewBridge.nextDownloadFormat,
+        nextDownloadHref: launchDutyCloseoutStableOpsTransition.packetReviewBridge.nextDownloadHref,
+        nextAction: launchDutyCloseoutStableOpsTransition.packetReviewBridge.nextAction
+      },
+      {
+        version: "developer-launch-mainline-stable-operations-packet-review-bridge/v1",
+        status: "ready_for_packet_result_review",
+        ready: true,
+        currentPacketKey: "run_record_index",
+        currentPacketOrder: 1,
+        currentPacketPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-run-record-index.json",
+        packetReviewProgress: "0/6",
+        reviewedCount: 0,
+        pendingCount: 6,
+        totalCount: 6,
+        nextPacketKey: "artifact_manifest",
+        archiveIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-launch-duty-archive-index.json",
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        operatorActionKey: "continue_packet_result_review",
+        reviewRequired: false,
+        nextDownloadKey: "ops_launch_operations_operator_entry",
+        nextDownloadFormat: "launch-operations-operator-entry",
+        nextDownloadHref: "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry",
+        nextAction: "Continue packet result review from Developer Ops."
+      }
+    );
     assert.equal(launchDutyCloseoutStableOpsTransition.recordIndexProgress, "6/6");
     assert.equal(launchDutyCloseoutStableOpsTransition.packetReviewProgress, null);
     assert.match(
@@ -30378,6 +30423,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ],
         operatorOrder: ["Review the launch-duty packet results, then refresh Developer Ops."],
         launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        packetReviewBridge: launchDutyCloseoutStableOpsTransition.packetReviewBridge,
         nextAction: "Complete packet result review before opening the steady-state handoff brief."
       }
     );
@@ -30415,7 +30461,52 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ],
         operatorOrder: ["Review the launch-duty packet results, then refresh Developer Ops."],
         launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        packetReviewBridge: launchDutyCloseoutStableOpsTransition.packetReviewBridge,
         nextAction: "Complete packet result review before opening the steady-state handoff brief."
+      }
+    );
+    assert.deepEqual(
+      {
+        version: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.version,
+        status: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.status,
+        ready: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.ready,
+        currentPacketKey: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.currentPacketKey,
+        currentPacketOrder: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.currentPacketOrder,
+        currentPacketPath: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.currentPacketPath,
+        packetReviewProgress: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.packetReviewProgress,
+        reviewedCount: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.reviewedCount,
+        pendingCount: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.pendingCount,
+        totalCount: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.totalCount,
+        nextPacketKey: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.nextPacketKey,
+        archiveIndexPath: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.archiveIndexPath,
+        launchDutyRecordIndexPath: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.launchDutyRecordIndexPath,
+        operatorActionKey: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.operatorActionKey,
+        reviewRequired: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.reviewRequired,
+        nextDownloadKey: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.nextDownloadKey,
+        nextDownloadFormat: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.nextDownloadFormat,
+        nextDownloadHref: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.nextDownloadHref,
+        nextAction: launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview.packetReviewBridge.nextAction
+      },
+      {
+        version: "developer-launch-mainline-stable-operations-packet-review-bridge/v1",
+        status: "ready_for_packet_result_review",
+        ready: true,
+        currentPacketKey: "run_record_index",
+        currentPacketOrder: 1,
+        currentPacketPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-run-record-index.json",
+        packetReviewProgress: "0/6",
+        reviewedCount: 0,
+        pendingCount: 6,
+        totalCount: 6,
+        nextPacketKey: "artifact_manifest",
+        archiveIndexPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-launch-duty-archive-index.json",
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        operatorActionKey: "continue_packet_result_review",
+        reviewRequired: false,
+        nextDownloadKey: "ops_launch_operations_operator_entry",
+        nextDownloadFormat: "launch-operations-operator-entry",
+        nextDownloadHref: "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry",
+        nextAction: "Continue packet result review from Developer Ops."
       }
     );
     assert.ok(launchMainlineCloseoutRecordedReadback.mainlineSummary.overviewCards.some((item) => (
@@ -30448,6 +30539,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*12\. first_wave_closeout \| status=recorded/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Packet Review Bridge:[\s\S]*status=ready_for_packet_result_review \| ready=yes \| current=run_record_index \| next=artifact_manifest \| progress=0\/6/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Packet Review Bridge:[\s\S]*operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,

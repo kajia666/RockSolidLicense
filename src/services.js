@@ -12488,6 +12488,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline widened rollout next decision receipt readback execution",
+    "widened-rollout-next-decision-receipt-readback-execution.txt",
+    "widened-rollout-next-decision-receipt-readback-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlinePostLaunchHandoffIndexDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline Post-Launch Index",
     "launch-mainline-post-launch-handoff-index.txt",
@@ -13118,6 +13128,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineSummaryDownload);
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineHandoffRoutesDownload);
+  pushRecommendedDownload(mainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload);
   pushRecommendedDownload(mainlinePostLaunchHandoffIndexDownload);
   pushRecommendedDownload(mainlineChecksumsDownload);
   pushRecommendedDownload(mainlineZipDownload);
@@ -13286,6 +13297,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchMainlineSummary: mainlineSummaryDownload,
       launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: mainlineHandoffRoutesDownload,
+      launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecution: mainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload,
       launchMainlinePostLaunchIndex: mainlinePostLaunchHandoffIndexDownload,
       launchMainlineChecksums: mainlineChecksumsDownload,
       launchMainlineZip: mainlineZipDownload
@@ -13434,7 +13446,102 @@ function buildLaunchSurfaceHandoffRoutesText({
   launchDutyActionOrder = null,
   operatorNotes = []
 } = {}) {
-  const launchDutyRecordIndexPath = launchReadinessNextGate?.launchDutyRecordIndexPath || "";
+  const actionOrderSteps = Array.isArray(launchDutyActionOrder?.steps) ? launchDutyActionOrder.steps : [];
+  const actionOrderStagingArchiveNextOperations = launchDutyActionOrder?.stagingArchiveNextOperations
+    || actionOrderSteps.find((item) => item?.key === "staging_archive")?.nextOperations
+    || null;
+  const actionOrderRawLaunchReadinessNextGate = actionOrderStagingArchiveNextOperations?.launchReadinessNextGate
+    && typeof actionOrderStagingArchiveNextOperations.launchReadinessNextGate === "object"
+    ? actionOrderStagingArchiveNextOperations.launchReadinessNextGate
+    : {};
+  const actionOrderLaunchRunway = actionOrderStagingArchiveNextOperations?.launchRunway
+    && typeof actionOrderStagingArchiveNextOperations.launchRunway === "object"
+    ? actionOrderStagingArchiveNextOperations.launchRunway
+    : null;
+  const actionOrderCanEnterInitialLaunch = actionOrderRawLaunchReadinessNextGate.canEnterInitialLaunch === true
+    || actionOrderStagingArchiveNextOperations?.launchReadinessNextGateCanEnterInitialLaunch === true;
+  const actionOrderLaunchReadinessNextGateFallback = actionOrderStagingArchiveNextOperations
+    && typeof actionOrderStagingArchiveNextOperations === "object"
+      ? {
+          key: actionOrderRawLaunchReadinessNextGate.key
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateKey
+            || "initial_launch_go_live_next_gate",
+          status: actionOrderRawLaunchReadinessNextGate.status
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateStatus
+            || (actionOrderCanEnterInitialLaunch ? "ready_for_initial_launch" : "awaiting_launch_readiness"),
+          decision: actionOrderRawLaunchReadinessNextGate.decision
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateDecision
+            || (actionOrderCanEnterInitialLaunch ? "go" : "no_go"),
+          canEnterInitialLaunch: actionOrderCanEnterInitialLaunch,
+          currentGate: actionOrderRawLaunchReadinessNextGate.currentGate
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateCurrentGate
+            || actionOrderStagingArchiveNextOperations.status
+            || actionOrderLaunchRunway?.currentGate
+            || null,
+          nextAction: actionOrderRawLaunchReadinessNextGate.nextAction
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateNextAction
+            || actionOrderStagingArchiveNextOperations.nextAction
+            || actionOrderLaunchRunway?.nextAction
+            || null,
+          closeoutReloadCommand: actionOrderRawLaunchReadinessNextGate.closeoutReloadCommand
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateCloseoutReloadCommand
+            || actionOrderStagingArchiveNextOperations.closeoutReload
+            || null,
+          fullTestWindowCommand: actionOrderRawLaunchReadinessNextGate.fullTestWindowCommand
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateFullTestWindowCommand
+            || actionOrderStagingArchiveNextOperations.fullTestWindow
+            || null,
+          productionSignoffPacket: actionOrderRawLaunchReadinessNextGate.productionSignoffPacket
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateProductionSignoffPacket
+            || actionOrderStagingArchiveNextOperations.productionSignoffPacket
+            || null,
+          launchDutyRecordIndexPath: actionOrderRawLaunchReadinessNextGate.launchDutyRecordIndexPath
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateLaunchDutyRecordIndexPath
+            || actionOrderStagingArchiveNextOperations.launchDutyRecordIndexPath
+            || actionOrderStagingArchiveNextOperations.launchDutyRecordIndexFile
+            || actionOrderLaunchRunway?.launchDutyRecordIndexPath
+            || actionOrderLaunchRunway?.launchDutyRecordIndexFile
+            || null,
+          launchDayWatchEntry: actionOrderRawLaunchReadinessNextGate.launchDayWatchEntry
+            || actionOrderStagingArchiveNextOperations.launchReadinessNextGateLaunchDayWatchEntry
+            || actionOrderLaunchRunway?.launchDayWatchEntry
+            || "enter_after_production_signoff"
+        }
+      : null;
+  const hasLaunchReadinessValue = (value) => {
+    const normalized = String(value || "").trim();
+    return Boolean(normalized && normalized !== "-");
+  };
+  const hasSubstantiveLaunchReadinessNextGate = (gate = null) => Boolean(
+    gate && typeof gate === "object" && (
+      hasLaunchReadinessValue(gate.status)
+      || hasLaunchReadinessValue(gate.decision)
+      || hasLaunchReadinessValue(gate.currentGate)
+      || hasLaunchReadinessValue(gate.nextAction)
+      || hasLaunchReadinessValue(gate.closeoutReloadCommand)
+      || hasLaunchReadinessValue(gate.fullTestWindowCommand)
+      || hasLaunchReadinessValue(gate.productionSignoffPacket)
+      || hasLaunchReadinessValue(gate.launchDayWatchEntry)
+    )
+  );
+  const normalizedActionOrderLaunchReadinessNextGate = normalizeLaunchReadinessNextGateForHandoff(actionOrderStagingArchiveNextOperations);
+  const actionOrderLaunchReadinessNextGate = hasSubstantiveLaunchReadinessNextGate(normalizedActionOrderLaunchReadinessNextGate)
+    ? normalizedActionOrderLaunchReadinessNextGate
+    : actionOrderLaunchReadinessNextGateFallback;
+  const resolvedLaunchReadinessNextGate = hasSubstantiveLaunchReadinessNextGate(launchReadinessNextGate)
+    ? launchReadinessNextGate
+    : actionOrderLaunchReadinessNextGate
+      ? {
+          ...actionOrderLaunchReadinessNextGate,
+          launchDutyRecordIndexPath: launchReadinessNextGate?.launchDutyRecordIndexPath
+            || actionOrderLaunchReadinessNextGate.launchDutyRecordIndexPath
+            || ""
+        }
+      : launchReadinessNextGate;
+  const launchDutyRecordIndexPath = resolvedLaunchReadinessNextGate?.launchDutyRecordIndexPath
+    || launchReadinessNextGate?.launchDutyRecordIndexPath
+    || actionOrderLaunchReadinessNextGate?.launchDutyRecordIndexPath
+    || "";
   const lines = [
     title,
     `Generated At: ${generatedAt || ""}`,
@@ -13452,8 +13559,10 @@ function buildLaunchSurfaceHandoffRoutesText({
     lines.push("");
   }
 
-  if (launchReadinessNextGate && typeof launchReadinessNextGate === "object") {
-    appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGate);
+  if (resolvedLaunchReadinessNextGate && typeof resolvedLaunchReadinessNextGate === "object") {
+    appendLaunchReadinessNextGateHandoffText(lines, {
+      launchReadinessNextGate: resolvedLaunchReadinessNextGate
+    });
     if (launchDutyRecordIndexPath) {
       lines.push(`- launchDutyRecordIndex=${launchDutyRecordIndexPath}`);
     }
@@ -13532,6 +13641,7 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecution,
       downloads.launchMainlinePostLaunchIndex,
       downloads.launchMainlineChecksums,
       downloads.launchMainlineZip
@@ -14113,6 +14223,17 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline widened rollout next decision receipt readback execution",
+    "widened-rollout-next-decision-receipt-readback-execution.txt",
+    "widened-rollout-next-decision-receipt-readback-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchMainlinePostLaunchHandoffIndexDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline Post-Launch Index",
     "launch-mainline-post-launch-handoff-index.txt",
@@ -14206,6 +14327,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
     launchMainlineHandoffRoutesDownload,
+    launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload,
     launchMainlinePostLaunchHandoffIndexDownload,
     launchMainlineChecksumsDownload,
     launchMainlineZipDownload
@@ -14843,6 +14965,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchMainlineSummary: launchMainlineSummaryDownload,
       launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
+      launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecution: launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload,
       launchMainlinePostLaunchIndex: launchMainlinePostLaunchHandoffIndexDownload,
       launchMainlineChecksums: launchMainlineChecksumsDownload,
       launchMainlineZip: launchMainlineZipDownload
@@ -15014,6 +15137,14 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     }
   }
 
+  if (Array.isArray(smokeSummary.recommendedDownloads) && smokeSummary.recommendedDownloads.length) {
+    lines.push("");
+    lines.push("Launch Smoke Recommended Downloads:");
+    for (const item of smokeSummary.recommendedDownloads) {
+      lines.push(`- ${formatLaunchHandoffDownloadText(item, { fileSeparator: " | " })}`);
+    }
+  }
+
   return lines.join("\n").trimEnd();
 }
 
@@ -15110,6 +15241,7 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecution,
       downloads.launchMainlinePostLaunchIndex,
       downloads.launchMainlineChecksums,
       downloads.launchMainlineZip

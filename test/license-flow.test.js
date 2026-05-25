@@ -11691,6 +11691,36 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(stabilizationGateLaunchSmokeSummary.contentType || "", /^text\/plain/);
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeSummary.body);
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline widened rollout next decision receipt readback execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline widened rollout next decision receipt readback execution/
+    );
+    const stabilizationGateLaunchReviewHandoffRoutes = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=handoff-routes",
+      ownerSession.token
+    );
+    assert.match(stabilizationGateLaunchReviewHandoffRoutes.contentType || "", /^text\/plain/);
+    assertGoLiveNextGateHandoffText(stabilizationGateLaunchReviewHandoffRoutes.body);
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /widened-rollout-next-decision-receipt-readback-execution\.txt[^\n]*format=widened-rollout-next-decision-receipt-readback-execution/
+    );
+    const stabilizationGateLaunchSmokeHandoffRoutes = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=handoff-routes",
+      ownerSession.token
+    );
+    assert.match(stabilizationGateLaunchSmokeHandoffRoutes.contentType || "", /^text\/plain/);
+    assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeHandoffRoutes.body);
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /widened-rollout-next-decision-receipt-readback-execution\.txt[^\n]*format=widened-rollout-next-decision-receipt-readback-execution/
+    );
 
     const runtimeEvidenceLaunchMainline = await getJson(
       baseUrl,

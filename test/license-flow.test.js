@@ -11693,6 +11693,34 @@ test("developer license quickstart first-batch setup can create recommended laun
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeSummary.body);
     assert.match(
       stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline launch readiness distance/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline launch switch readiness/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline launch candidate full verification gate/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline production signoff entry handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline signoff archive watch handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline launch-duty receipt execution handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline stabilization receipt execution handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
       /Launch Mainline stable operations handoff execution/
     );
     assert.match(
@@ -11746,6 +11774,34 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchReviewSummary.body,
       /Launch Mainline widened rollout next decision execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline launch readiness distance/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline launch switch readiness/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline launch candidate full verification gate/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline production signoff entry handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline signoff archive watch handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline launch-duty receipt execution handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline stabilization receipt execution handoff/
     );
     assert.match(
       stabilizationGateLaunchSmokeSummary.body,
@@ -11812,6 +11868,34 @@ test("developer license quickstart first-batch setup can create recommended laun
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchReviewHandoffRoutes.body);
     assert.match(
       stabilizationGateLaunchReviewHandoffRoutes.body,
+      /launch-readiness-distance\.txt[^\n]*format=launch-readiness-distance/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /launch-switch-readiness\.txt[^\n]*format=launch-switch-readiness/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /launch-candidate-full-verification-gate\.txt[^\n]*format=launch-candidate-full-verification-gate/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /production-signoff-entry-handoff\.txt[^\n]*format=production-signoff-entry-handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /signoff-archive-watch-handoff\.txt[^\n]*format=signoff-archive-watch-handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /launch-duty-receipt-execution-handoff\.txt[^\n]*format=launch-duty-receipt-execution-handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /stabilization-receipt-execution-handoff\.txt[^\n]*format=stabilization-receipt-execution-handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
       /stable-operations-handoff-execution\.txt[^\n]*format=stable-operations-handoff-execution/
     );
     assert.match(
@@ -11873,6 +11957,34 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(stabilizationGateLaunchSmokeHandoffRoutes.contentType || "", /^text\/plain/);
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeHandoffRoutes.body);
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /launch-readiness-distance\.txt[^\n]*format=launch-readiness-distance/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /launch-switch-readiness\.txt[^\n]*format=launch-switch-readiness/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /launch-candidate-full-verification-gate\.txt[^\n]*format=launch-candidate-full-verification-gate/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /production-signoff-entry-handoff\.txt[^\n]*format=production-signoff-entry-handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /signoff-archive-watch-handoff\.txt[^\n]*format=signoff-archive-watch-handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /launch-duty-receipt-execution-handoff\.txt[^\n]*format=launch-duty-receipt-execution-handoff/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /stabilization-receipt-execution-handoff\.txt[^\n]*format=stabilization-receipt-execution-handoff/
+    );
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,
       /stable-operations-handoff-execution\.txt[^\n]*format=stable-operations-handoff-execution/

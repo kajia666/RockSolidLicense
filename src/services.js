@@ -4090,6 +4090,10 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_handoff_download_routes"
         : normalizedFormat === "launch-readiness-distance"
           ? "launch_mainline_launch_readiness_distance"
+        : normalizedFormat === "launch-switch-readiness"
+          ? "launch_mainline_launch_switch_readiness"
+        : normalizedFormat === "launch-candidate-full-verification-gate"
+          ? "launch_mainline_launch_candidate_full_verification_gate"
         : normalizedFormat === "production-signoff-entry-handoff"
           ? "launch_mainline_production_signoff_entry_handoff"
         : normalizedFormat === "signoff-archive-watch-handoff"
@@ -12488,6 +12492,76 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineLaunchReadinessDistanceDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch readiness distance",
+    "launch-readiness-distance.txt",
+    "launch-readiness-distance",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineLaunchSwitchReadinessDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch switch readiness",
+    "launch-switch-readiness.txt",
+    "launch-switch-readiness",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineLaunchCandidateFullVerificationGateDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch candidate full verification gate",
+    "launch-candidate-full-verification-gate.txt",
+    "launch-candidate-full-verification-gate",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineProductionSignoffEntryHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline production signoff entry handoff",
+    "production-signoff-entry-handoff.txt",
+    "production-signoff-entry-handoff",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineSignoffArchiveWatchHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline signoff archive watch handoff",
+    "signoff-archive-watch-handoff.txt",
+    "signoff-archive-watch-handoff",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineLaunchDutyReceiptExecutionHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch-duty receipt execution handoff",
+    "launch-duty-receipt-execution-handoff.txt",
+    "launch-duty-receipt-execution-handoff",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineStabilizationReceiptExecutionHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stabilization receipt execution handoff",
+    "stabilization-receipt-execution-handoff.txt",
+    "stabilization-receipt-execution-handoff",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlineStableOperationsHandoffExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline stable operations handoff execution",
     "stable-operations-handoff-execution.txt",
@@ -13258,6 +13332,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineSummaryDownload);
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineHandoffRoutesDownload);
+  pushRecommendedDownload(mainlineLaunchReadinessDistanceDownload);
+  pushRecommendedDownload(mainlineLaunchSwitchReadinessDownload);
+  pushRecommendedDownload(mainlineLaunchCandidateFullVerificationGateDownload);
+  pushRecommendedDownload(mainlineProductionSignoffEntryHandoffDownload);
+  pushRecommendedDownload(mainlineSignoffArchiveWatchHandoffDownload);
+  pushRecommendedDownload(mainlineLaunchDutyReceiptExecutionHandoffDownload);
+  pushRecommendedDownload(mainlineStabilizationReceiptExecutionHandoffDownload);
   pushRecommendedDownload(mainlineStableOperationsHandoffExecutionDownload);
   pushRecommendedDownload(mainlineStableOperationsTransitionReviewDownload);
   pushRecommendedDownload(mainlineSteadyStateHandoffLandingExecutionDownload);
@@ -13440,6 +13521,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchMainlineSummary: mainlineSummaryDownload,
       launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: mainlineHandoffRoutesDownload,
+      launchMainlineLaunchReadinessDistance: mainlineLaunchReadinessDistanceDownload,
+      launchMainlineLaunchSwitchReadiness: mainlineLaunchSwitchReadinessDownload,
+      launchMainlineLaunchCandidateFullVerificationGate: mainlineLaunchCandidateFullVerificationGateDownload,
+      launchMainlineProductionSignoffEntryHandoff: mainlineProductionSignoffEntryHandoffDownload,
+      launchMainlineSignoffArchiveWatchHandoff: mainlineSignoffArchiveWatchHandoffDownload,
+      launchMainlineLaunchDutyReceiptExecutionHandoff: mainlineLaunchDutyReceiptExecutionHandoffDownload,
+      launchMainlineStabilizationReceiptExecutionHandoff: mainlineStabilizationReceiptExecutionHandoffDownload,
       launchMainlineStableOperationsHandoffExecution: mainlineStableOperationsHandoffExecutionDownload,
       launchMainlineStableOperationsTransitionReview: mainlineStableOperationsTransitionReviewDownload,
       launchMainlineSteadyStateHandoffLandingExecution: mainlineSteadyStateHandoffLandingExecutionDownload,
@@ -13797,6 +13885,13 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineLaunchReadinessDistance,
+      downloads.launchMainlineLaunchSwitchReadiness,
+      downloads.launchMainlineLaunchCandidateFullVerificationGate,
+      downloads.launchMainlineProductionSignoffEntryHandoff,
+      downloads.launchMainlineSignoffArchiveWatchHandoff,
+      downloads.launchMainlineLaunchDutyReceiptExecutionHandoff,
+      downloads.launchMainlineStabilizationReceiptExecutionHandoff,
       downloads.launchMainlineStableOperationsHandoffExecution,
       downloads.launchMainlineStableOperationsTransitionReview,
       downloads.launchMainlineSteadyStateHandoffLandingExecution,
@@ -14392,6 +14487,83 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineLaunchReadinessDistanceDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch readiness distance",
+    "launch-readiness-distance.txt",
+    "launch-readiness-distance",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineLaunchSwitchReadinessDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch switch readiness",
+    "launch-switch-readiness.txt",
+    "launch-switch-readiness",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineLaunchCandidateFullVerificationGateDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch candidate full verification gate",
+    "launch-candidate-full-verification-gate.txt",
+    "launch-candidate-full-verification-gate",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineProductionSignoffEntryHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline production signoff entry handoff",
+    "production-signoff-entry-handoff.txt",
+    "production-signoff-entry-handoff",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineSignoffArchiveWatchHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline signoff archive watch handoff",
+    "signoff-archive-watch-handoff.txt",
+    "signoff-archive-watch-handoff",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineLaunchDutyReceiptExecutionHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch-duty receipt execution handoff",
+    "launch-duty-receipt-execution-handoff.txt",
+    "launch-duty-receipt-execution-handoff",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineStabilizationReceiptExecutionHandoffDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stabilization receipt execution handoff",
+    "stabilization-receipt-execution-handoff.txt",
+    "stabilization-receipt-execution-handoff",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchMainlineStableOperationsHandoffExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline stable operations handoff execution",
     "stable-operations-handoff-execution.txt",
@@ -14639,6 +14811,13 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
     launchMainlineHandoffRoutesDownload,
+    launchMainlineLaunchReadinessDistanceDownload,
+    launchMainlineLaunchSwitchReadinessDownload,
+    launchMainlineLaunchCandidateFullVerificationGateDownload,
+    launchMainlineProductionSignoffEntryHandoffDownload,
+    launchMainlineSignoffArchiveWatchHandoffDownload,
+    launchMainlineLaunchDutyReceiptExecutionHandoffDownload,
+    launchMainlineStabilizationReceiptExecutionHandoffDownload,
     launchMainlineStableOperationsHandoffExecutionDownload,
     launchMainlineStableOperationsTransitionReviewDownload,
     launchMainlineSteadyStateHandoffLandingExecutionDownload,
@@ -15290,6 +15469,13 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchMainlineSummary: launchMainlineSummaryDownload,
       launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
+      launchMainlineLaunchReadinessDistance: launchMainlineLaunchReadinessDistanceDownload,
+      launchMainlineLaunchSwitchReadiness: launchMainlineLaunchSwitchReadinessDownload,
+      launchMainlineLaunchCandidateFullVerificationGate: launchMainlineLaunchCandidateFullVerificationGateDownload,
+      launchMainlineProductionSignoffEntryHandoff: launchMainlineProductionSignoffEntryHandoffDownload,
+      launchMainlineSignoffArchiveWatchHandoff: launchMainlineSignoffArchiveWatchHandoffDownload,
+      launchMainlineLaunchDutyReceiptExecutionHandoff: launchMainlineLaunchDutyReceiptExecutionHandoffDownload,
+      launchMainlineStabilizationReceiptExecutionHandoff: launchMainlineStabilizationReceiptExecutionHandoffDownload,
       launchMainlineStableOperationsHandoffExecution: launchMainlineStableOperationsHandoffExecutionDownload,
       launchMainlineStableOperationsTransitionReview: launchMainlineStableOperationsTransitionReviewDownload,
       launchMainlineSteadyStateHandoffLandingExecution: launchMainlineSteadyStateHandoffLandingExecutionDownload,
@@ -15579,6 +15765,13 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineLaunchReadinessDistance,
+      downloads.launchMainlineLaunchSwitchReadiness,
+      downloads.launchMainlineLaunchCandidateFullVerificationGate,
+      downloads.launchMainlineProductionSignoffEntryHandoff,
+      downloads.launchMainlineSignoffArchiveWatchHandoff,
+      downloads.launchMainlineLaunchDutyReceiptExecutionHandoff,
+      downloads.launchMainlineStabilizationReceiptExecutionHandoff,
       downloads.launchMainlineStableOperationsHandoffExecution,
       downloads.launchMainlineStableOperationsTransitionReview,
       downloads.launchMainlineSteadyStateHandoffLandingExecution,

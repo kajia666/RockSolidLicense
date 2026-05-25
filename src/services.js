@@ -49255,6 +49255,8 @@ function isDeveloperOpsLaunchEvidenceComplete(status = null) {
     "completed",
     "recorded",
     "visible",
+    "confirmed_by_stable_operations_handoff",
+    "ready_for_stabilization_handoff",
     "ready_for_steady_state_handoff"
   ].includes(String(status || "").toLowerCase());
 }
@@ -49265,7 +49267,8 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
   launchDutyRecordIndexPath = null,
   stagingReadinessBridge = null,
   launchCandidateFullVerificationGate = null,
-  postSignoffWatchBridge = null
+  postSignoffWatchBridge = null,
+  launchDutyHandoffAction = null
 } = {}) {
   const bridge = stagingReadinessBridge && typeof stagingReadinessBridge === "object"
     ? stagingReadinessBridge
@@ -49275,6 +49278,9 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
     : null;
   const watchBridge = postSignoffWatchBridge && typeof postSignoffWatchBridge === "object"
     ? postSignoffWatchBridge
+    : null;
+  const dutyHandoff = launchDutyHandoffAction && typeof launchDutyHandoffAction === "object"
+    ? launchDutyHandoffAction
     : null;
   const closeoutEvidenceHandoff = bridge?.preStagingReadinessSelfCheckPacket?.closeoutEvidenceHandoff
     && typeof bridge.preStagingReadinessSelfCheckPacket.closeoutEvidenceHandoff === "object"
@@ -49302,6 +49308,7 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
     order: index + 1,
     key: target?.key || null,
     status: target?.key === currentEvidenceKey ? "current" : "pending_real_evidence",
+    type: target?.type || target?.sourceStep || null,
     source: target?.sourceStep || null,
     artifactPath: target?.artifactPath || null,
     command: target?.command || null,
@@ -49320,6 +49327,7 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
       order: evidenceItems.length + 1,
       key: item.key,
       status: item.status || "pending_real_evidence",
+      type: item.type || item.source || null,
       source: item.source || null,
       artifactPath: item.artifactPath || null,
       command: item.command || null,
@@ -49378,6 +49386,7 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
   pushEvidenceItem({
     key: "first_wave_closeout",
     status: "blocked_until_stabilization_records",
+    type: "post_signoff_watch",
     source: "post_signoff_watch",
     artifactPath: watchBridge?.firstWaveCloseoutArtifact || null,
     command: watchBridge?.firstWaveCloseoutCommand || null,
@@ -49385,31 +49394,148 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
     sourceRecordKeys: Array.isArray(watchBridge?.sourceRecordKeys) ? watchBridge.sourceRecordKeys : [],
     nextAction: "Record first_wave_closeout after incident, rollback, and stabilization owner handoff records are present."
   });
+  const launchDutyRecordReadbacks = [
+    dutyHandoff?.launchDayWatchSummaryRecordReadback || null,
+    dutyHandoff?.receiptVisibilitySnapshotRecordReadback || null,
+    dutyHandoff?.firstWaveIncidentLogRecordReadback || null,
+    dutyHandoff?.rollbackSignalReviewRecordReadback || null,
+    dutyHandoff?.stabilizationOwnerHandoffRecordReadback || null,
+    dutyHandoff?.firstWaveCloseoutRecordReadback || null
+  ].filter((item) => item && typeof item === "object");
+  const recordedLaunchDutyRecordReadbacks = launchDutyRecordReadbacks.filter((item) => item.recorded === true);
+  const pendingLaunchDutyRecordReadbacks = launchDutyRecordReadbacks.filter((item) => item.recorded !== true);
+  const launchDutyRecordProgress = launchDutyRecordReadbacks.length
+    ? {
+        recorded: recordedLaunchDutyRecordReadbacks.length,
+        pending: pendingLaunchDutyRecordReadbacks.length,
+        total: launchDutyRecordReadbacks.length,
+        nextRecordKey: pendingLaunchDutyRecordReadbacks[0]?.recordKey || null
+      }
+    : null;
+  const stableOperationsHandoffTail = dutyHandoff?.stabilizationReceiptWriteQueue?.stableOperationsHandoffTail
+    && typeof dutyHandoff.stabilizationReceiptWriteQueue.stableOperationsHandoffTail === "object"
+      ? dutyHandoff.stabilizationReceiptWriteQueue.stableOperationsHandoffTail
+      : null;
+  const currentStableOperationsHandoffPacket = stableOperationsHandoffTail?.currentHandoffPacket
+    && typeof stableOperationsHandoffTail.currentHandoffPacket === "object"
+      ? stableOperationsHandoffTail.currentHandoffPacket
+      : null;
+  const stableOperationsReadbackPacket = stableOperationsHandoffTail?.readinessReloadReadbackPacket
+    && typeof stableOperationsHandoffTail.readinessReloadReadbackPacket === "object"
+      ? stableOperationsHandoffTail.readinessReloadReadbackPacket
+      : null;
+  const firstWaveCloseoutReadback = dutyHandoff?.firstWaveCloseoutRecordReadback
+    && typeof dutyHandoff.firstWaveCloseoutRecordReadback === "object"
+      ? dutyHandoff.firstWaveCloseoutRecordReadback
+      : null;
+  const stableOperationsHandoffArtifacts = Array.isArray(stableOperationsReadbackPacket?.handoffArtifacts)
+    && stableOperationsReadbackPacket.handoffArtifacts.length
+      ? stableOperationsReadbackPacket.handoffArtifacts.slice()
+      : Array.isArray(stableOperationsHandoffTail?.handoffArtifacts)
+        ? stableOperationsHandoffTail.handoffArtifacts.slice()
+        : Array.isArray(currentStableOperationsHandoffPacket?.handoffArtifacts)
+          ? currentStableOperationsHandoffPacket.handoffArtifacts.slice()
+          : [];
+  const stableOperationsHandoff = stableOperationsHandoffTail ? {
+    status: stableOperationsHandoffTail.status || firstWaveCloseoutReadback?.status || null,
+    ready: stableOperationsHandoffTail.readyForHandoff === true
+      || currentStableOperationsHandoffPacket?.readyForHandoff === true,
+    currentActionKey: currentStableOperationsHandoffPacket?.actionKey
+      || dutyHandoff?.currentActionKey
+      || null,
+    currentCommand: currentStableOperationsHandoffPacket?.command
+      || stableOperationsHandoffTail.readinessStatusCommand
+      || null,
+    nextActionKey: currentStableOperationsHandoffPacket?.nextActionKey || null,
+    nextCommand: currentStableOperationsHandoffPacket?.nextCommand
+      || stableOperationsHandoffTail.rehearsalReloadCommand
+      || null,
+    readbackPacketStatus: stableOperationsReadbackPacket?.status || null,
+    recordIndexFile: currentStableOperationsHandoffPacket?.recordIndexFile
+      || stableOperationsHandoffTail.recordIndexFile
+      || launchDutyRecordIndexPath
+      || null,
+    firstWaveCloseoutArtifactPath: currentStableOperationsHandoffPacket?.firstWaveCloseoutArtifactPath
+      || stableOperationsHandoffTail.firstWaveCloseoutArtifactPath
+      || firstWaveCloseoutReadback?.recordIndexArtifactPath
+      || watchBridge?.firstWaveCloseoutArtifact
+      || null,
+    handoffArtifacts: stableOperationsHandoffArtifacts,
+    nextAction: stableOperationsReadbackPacket?.nextAction
+      || stableOperationsHandoffTail.nextAction
+      || firstWaveCloseoutReadback?.nextAction
+      || null
+  } : null;
+  const launchDutyCloseoutReadyForStableHandoff = Boolean(
+    firstWaveCloseoutReadback?.recorded === true
+    && stableOperationsHandoff?.ready === true
+  );
+  if (launchDutyCloseoutReadyForStableHandoff) {
+    for (const item of evidenceItems) {
+      if (item.key === "first_wave_closeout") {
+        item.status = "recorded";
+        item.type = "launch_duty_record";
+        item.artifactPath = stableOperationsHandoff.firstWaveCloseoutArtifactPath || item.artifactPath;
+        item.nextAction = stableOperationsHandoff.nextAction || item.nextAction;
+      } else if (!isDeveloperOpsLaunchEvidenceComplete(item.status)) {
+        item.status = "confirmed_by_stable_operations_handoff";
+        item.nextAction = null;
+      }
+    }
+  }
   const closeoutEvidenceCount = closeoutTargets.length;
-  const pendingEvidenceCount = evidenceItems.filter((item) => !isDeveloperOpsLaunchEvidenceComplete(item.status)).length;
-  const currentEvidenceItem = evidenceItems.find((item) => item.key === currentEvidenceKey)
+  const completedEvidenceCount = evidenceItems.filter((item) => isDeveloperOpsLaunchEvidenceComplete(item.status)).length;
+  const pendingEvidenceCount = evidenceItems.length - completedEvidenceCount;
+  const currentEvidenceItem = launchDutyCloseoutReadyForStableHandoff
+    ? evidenceItems.find((item) => item.key === "first_wave_closeout")
+    : evidenceItems.find((item) => item.key === currentEvidenceKey)
     || evidenceItems.find((item) => !isDeveloperOpsLaunchEvidenceComplete(item.status))
     || evidenceItems[0]
     || null;
+  const currentEvidenceStatus = launchDutyCloseoutReadyForStableHandoff
+    ? "recorded"
+    : currentEvidenceItem?.status || null;
+  const currentEvidenceType = launchDutyCloseoutReadyForStableHandoff
+    ? "launch_duty_record"
+    : currentEvidenceItem?.type || currentEvidenceItem?.source || null;
+  const currentArtifactPath = launchDutyCloseoutReadyForStableHandoff
+    ? stableOperationsHandoff?.firstWaveCloseoutArtifactPath
+      || currentEvidenceItem?.artifactPath
+      || null
+    : closeoutCheckpoint?.currentArtifactPath
+      || currentEvidenceItem?.artifactPath
+      || null;
+  const currentCommand = launchDutyCloseoutReadyForStableHandoff
+    ? stableOperationsHandoff?.currentCommand
+      || currentStableOperationsHandoffPacket?.command
+      || null
+    : closeoutCheckpoint?.currentCommand
+      || currentEvidenceItem?.command
+      || null;
+  const blockerCount = launchDutyCloseoutReadyForStableHandoff
+    ? 0
+    : Number(fullGate?.blockerCount ?? closeoutEvidenceHandoff?.fullTestEntryGate?.blockerCount ?? 0);
   return {
     version: "developer-ops-launch-evidence-readiness-gate/v1",
     productCode,
     channel,
-    status: pendingEvidenceCount > 0
+    status: launchDutyCloseoutReadyForStableHandoff
+      ? stableOperationsReadbackPacket?.expectedReadinessResult?.launchStatus
+        || "ready_for_stabilization_handoff"
+      : pendingEvidenceCount > 0
       ? "blocked_until_real_launch_evidence_attached"
       : "ready_for_launch_switch",
     currentEvidenceKey: currentEvidenceItem?.key || currentEvidenceKey || null,
-    currentArtifactPath: closeoutCheckpoint?.currentArtifactPath
-      || currentEvidenceItem?.artifactPath
-      || null,
-    currentCommand: closeoutCheckpoint?.currentCommand
-      || currentEvidenceItem?.command
-      || null,
+    currentEvidenceType,
+    currentEvidenceStatus,
+    currentArtifactPath,
+    currentCommand,
     evidenceCount: evidenceItems.length,
     closeoutEvidenceCount,
     postFullTestEvidenceCount: Math.max(0, evidenceItems.length - closeoutEvidenceCount),
+    completedEvidenceCount,
     pendingEvidenceCount,
-    blockerCount: Number(fullGate?.blockerCount ?? closeoutEvidenceHandoff?.fullTestEntryGate?.blockerCount ?? 0),
+    blockerCount,
     readinessStatusCommand: closeoutEvidenceHandoff?.readinessStatusCommand
       || bridge?.readinessStatusCommand
       || null,
@@ -49430,8 +49556,13 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
       || watchBridge?.launchDutyRecordIndexPath
       || bridge?.launchDutyRecordIndexPath
       || null,
+    launchDutyRecordProgress,
+    stableOperationsHandoff,
     evidenceItems,
-    nextAction: closeoutCheckpoint?.nextAction
+    nextAction: launchDutyCloseoutReadyForStableHandoff
+      ? stableOperationsHandoff?.nextAction
+      || "Run readiness status, reload staging rehearsal, and continue stable-operations handoff."
+      : closeoutCheckpoint?.nextAction
       || fullGate?.nextAction
       || watchBridge?.nextAction
       || "Attach real staging, closeout, full-test, sign-off, and launch-day watch evidence before launch switch."
@@ -50073,7 +50204,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchDutyRecordIndexPath,
     stagingReadinessBridge,
     launchCandidateFullVerificationGate,
-    postSignoffWatchBridge
+    postSignoffWatchBridge,
+    launchDutyHandoffAction
   });
   const operatorQueueCheckpoint = buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     status: checklist?.status || launchOperationsOverviewStatus?.status || "review",
@@ -62001,10 +62133,39 @@ function appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines = [], gate = n
   lines.push(
     `- status=${gate.status || "-"}`
     + ` | currentEvidence=${gate.currentEvidenceKey || "-"}`
+    + ` | currentType=${gate.currentEvidenceType || "-"}`
+    + ` | currentStatus=${gate.currentEvidenceStatus || "-"}`
     + ` | pending=${gate.pendingEvidenceCount ?? 0}/${gate.evidenceCount ?? evidenceItems.length}`
     + ` | blockers=${gate.blockerCount ?? 0}`
     + ` | launchDutyRecordIndex=${gate.launchDutyRecordIndexPath || "-"}`
   );
+  if (gate.launchDutyRecordProgress && typeof gate.launchDutyRecordProgress === "object") {
+    lines.push(
+      `- launchDutyRecords=${gate.launchDutyRecordProgress.recorded ?? 0}/${gate.launchDutyRecordProgress.total ?? 0}`
+      + ` | pendingRecords=${gate.launchDutyRecordProgress.pending ?? 0}`
+      + ` | nextRecord=${gate.launchDutyRecordProgress.nextRecordKey || "-"}`
+    );
+  }
+  if (gate.stableOperationsHandoff && typeof gate.stableOperationsHandoff === "object") {
+    const handoff = gate.stableOperationsHandoff;
+    const handoffArtifacts = Array.isArray(handoff.handoffArtifacts) && handoff.handoffArtifacts.length
+      ? handoff.handoffArtifacts.join(",")
+      : "-";
+    lines.push(
+      `- stableOperationsHandoff=${handoff.status || "-"}`
+      + ` | ready=${handoff.ready === true ? "yes" : "no"}`
+      + ` | current=${handoff.currentActionKey || "-"}`
+      + ` | next=${handoff.nextActionKey || "-"}`
+      + ` | readback=${handoff.readbackPacketStatus || "-"}`
+    );
+    lines.push(
+      `- stableOperationsHandoffCommand=${handoff.currentCommand || "-"}`
+      + ` | nextCommand=${handoff.nextCommand || "-"}`
+    );
+    lines.push(
+      `- stableOperationsHandoffArtifacts=${handoffArtifacts}`
+    );
+  }
   lines.push(
     `- currentArtifact=${gate.currentArtifactPath || "-"}`
     + ` | currentCommand=${gate.currentCommand || "-"}`

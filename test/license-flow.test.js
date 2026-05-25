@@ -29806,10 +29806,74 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     const launchDutyCloseoutRecordedHandoffAction = launchDutyCloseoutRecordedSnapshot.summary.initialLaunchOpsReadiness
       .launchOperationsOperatorEntry?.launchDutyHandoffAction;
+    const launchDutyCloseoutRecordedOperatorEntry = launchDutyCloseoutRecordedSnapshot.summary.initialLaunchOpsReadiness
+      .launchOperationsOperatorEntry;
     const launchDutyCloseoutRecordedQueue = launchDutyCloseoutRecordedSnapshot.summary.initialLaunchOpsReadiness
       .launchOperationsOperatorEntry?.launchDutyHandoffAction?.stabilizationReceiptWriteQueue;
+    const launchDutyCloseoutRecordedGate = launchDutyCloseoutRecordedOperatorEntry?.launchEvidenceReadinessGate;
+    const expectedLaunchDutyGateStableHandoff = {
+      status: "ready_for_stable_operations_handoff",
+      ready: true,
+      currentActionKey: "refresh_staging_readiness_after_first_wave_closeout",
+      currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+      nextActionKey: "reload_staging_rehearsal_for_stable_operations",
+      nextCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+      readbackPacketStatus: "awaiting_readiness_and_rehearsal_readback",
+      recordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+      firstWaveCloseoutArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+      handoffArtifacts: [
+        expectedSteadyStateLaunchDutyRecordIndexPath,
+        "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md"
+      ],
+      nextAction: "Run readiness status, confirm stable_operations_handoff, reload rehearsal, then open the steady-state handoff brief once packet and record readbacks are complete."
+    };
     assert.ok(launchDutyCloseoutRecordedHandoffAction);
+    assert.ok(launchDutyCloseoutRecordedOperatorEntry);
+    assert.ok(launchDutyCloseoutRecordedGate);
     assert.ok(launchDutyCloseoutRecordedQueue);
+    assert.deepEqual(
+      {
+        status: launchDutyCloseoutRecordedGate.status,
+        currentEvidenceKey: launchDutyCloseoutRecordedGate.currentEvidenceKey,
+        currentEvidenceType: launchDutyCloseoutRecordedGate.currentEvidenceType,
+        currentEvidenceStatus: launchDutyCloseoutRecordedGate.currentEvidenceStatus,
+        currentArtifactPath: launchDutyCloseoutRecordedGate.currentArtifactPath,
+        currentCommand: launchDutyCloseoutRecordedGate.currentCommand,
+        evidenceCount: launchDutyCloseoutRecordedGate.evidenceCount,
+        closeoutEvidenceCount: launchDutyCloseoutRecordedGate.closeoutEvidenceCount,
+        postFullTestEvidenceCount: launchDutyCloseoutRecordedGate.postFullTestEvidenceCount,
+        completedEvidenceCount: launchDutyCloseoutRecordedGate.completedEvidenceCount,
+        pendingEvidenceCount: launchDutyCloseoutRecordedGate.pendingEvidenceCount,
+        blockerCount: launchDutyCloseoutRecordedGate.blockerCount,
+        launchDutyRecordProgress: launchDutyCloseoutRecordedGate.launchDutyRecordProgress,
+        stableOperationsHandoff: launchDutyCloseoutRecordedGate.stableOperationsHandoff
+      },
+      {
+        status: "ready_for_stabilization_handoff",
+        currentEvidenceKey: "first_wave_closeout",
+        currentEvidenceType: "launch_duty_record",
+        currentEvidenceStatus: "recorded",
+        currentArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+        currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        evidenceCount: 12,
+        closeoutEvidenceCount: 7,
+        postFullTestEvidenceCount: 5,
+        completedEvidenceCount: 12,
+        pendingEvidenceCount: 0,
+        blockerCount: 0,
+        launchDutyRecordProgress: {
+          recorded: 6,
+          pending: 0,
+          total: 6,
+          nextRecordKey: null
+        },
+        stableOperationsHandoff: expectedLaunchDutyGateStableHandoff
+      }
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedGate.evidenceItems.find((item) => item.key === "first_wave_closeout")?.status,
+      "recorded"
+    );
     assert.equal(launchDutyCloseoutRecordedQueue.status, "complete");
     assert.equal(launchDutyCloseoutRecordedQueue.currentRecordKey, null);
     assert.equal(launchDutyCloseoutRecordedQueue.handoffComplete, true);
@@ -30148,6 +30212,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*status=ready_for_stabilization_handoff \| currentEvidence=first_wave_closeout \| currentType=launch_duty_record \| currentStatus=recorded \| pending=0\/12 \| blockers=0/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*launchDutyRecords=6\/6 \| pendingRecords=0 \| nextRecord=-/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*stableOperationsHandoff=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| readback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*12\. first_wave_closeout \| status=recorded/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Stabilization Receipt Write Queue:[\s\S]*status=complete \| handoffReady=yes \| handoffComplete=yes \| current=- \| records=4 \| closeout=first_wave_closeout/
     );
     assert.match(
@@ -30210,6 +30290,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       baseUrl,
       "/api/developer/launch-mainline?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
       ownerSession.token
+    );
+    assert.deepEqual(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.launchEvidenceReadinessGate,
+      launchDutyCloseoutRecordedGate
     );
     assert.equal(
       launchMainlineCloseoutRecordedReadback.mainlineSummary.firstWaveCloseoutRecordReadback.status,
@@ -30352,6 +30436,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=summary",
       ownerSession.token
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*status=ready_for_stabilization_handoff \| currentEvidence=first_wave_closeout \| currentType=launch_duty_record \| currentStatus=recorded \| pending=0\/12 \| blockers=0/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*stableOperationsHandoff=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| readback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*12\. first_wave_closeout \| status=recorded/
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,

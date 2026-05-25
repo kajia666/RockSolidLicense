@@ -11693,6 +11693,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeSummary.body);
     assert.match(
       stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline rollout widening decision execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline first operating result review execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
       /Launch Mainline widened rollout next decision receipt readback execution/
     );
     assert.match(
@@ -11714,6 +11722,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchReviewSummary.body,
       /Launch Mainline widened rollout next decision execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline rollout widening decision execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline first operating result review execution/
     );
     assert.match(
       stabilizationGateLaunchSmokeSummary.body,
@@ -11748,6 +11764,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchReviewHandoffRoutes.body);
     assert.match(
       stabilizationGateLaunchReviewHandoffRoutes.body,
+      /rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /first-operating-result-review-execution\.txt[^\n]*format=first-operating-result-review-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
       /widened-rollout-next-decision-receipt-readback-execution\.txt[^\n]*format=widened-rollout-next-decision-receipt-readback-execution/
     );
     assert.match(
@@ -11777,6 +11801,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(stabilizationGateLaunchSmokeHandoffRoutes.contentType || "", /^text\/plain/);
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeHandoffRoutes.body);
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /first-operating-result-review-execution\.txt[^\n]*format=first-operating-result-review-execution/
+    );
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,
       /widened-rollout-next-decision-receipt-readback-execution\.txt[^\n]*format=widened-rollout-next-decision-receipt-readback-execution/

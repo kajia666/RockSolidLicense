@@ -202,6 +202,50 @@ function buildOperatorNextCommands({
   return commands;
 }
 
+function buildOperatorQueueCheckpoint({
+  outputFile,
+  actionsFile,
+  targetType,
+  key,
+  artifactPath,
+  productionDecision,
+  signoffProgress,
+  operatorNextCommands
+}) {
+  const currentCommand = operatorNextCommands.find((item) => item.status === "current") || null;
+  const nextBackfill = operatorNextCommands.find((item) => item.key === "next_signoff_backfill") || null;
+  const rehearsalReload = operatorNextCommands.find((item) => item.key === "rehearsal_reload") || null;
+  const hasNextBackfill = Boolean(nextBackfill?.command);
+
+  return {
+    mode: "staging-signoff-backfill-operator-queue-checkpoint",
+    status: hasNextBackfill ? "awaiting_signoff_readiness_refresh" : "ready_for_launch_day_watch",
+    currentActionKey: currentCommand?.key || "readiness_status",
+    currentCommand: currentCommand?.command || signoffProgress?.statusCommand || null,
+    actionQueueFile: actionsFile || null,
+    outputFile,
+    backfilledTargetType: targetType,
+    backfilledKey: key,
+    backfilledArtifactPath: artifactPath || null,
+    productionDecision: productionDecision || null,
+    filledConditionCount: signoffProgress?.filledConditionCount ?? 0,
+    requiredConditionCount: signoffProgress?.requiredConditionCount ?? 0,
+    pendingConditionCount: signoffProgress?.pendingConditionCount ?? 0,
+    visibleReceiptLaneCount: signoffProgress?.visibleReceiptLaneCount ?? 0,
+    requiredReceiptLaneCount: signoffProgress?.requiredReceiptLaneCount ?? RECEIPT_VISIBILITY_KEYS.length,
+    pendingReceiptLaneCount: signoffProgress?.pendingReceiptLaneCount ?? RECEIPT_VISIBILITY_KEYS.length,
+    nextBackfillType: signoffProgress?.currentTarget?.type || null,
+    nextBackfillKey: signoffProgress?.currentTarget?.key || null,
+    nextBackfillCommand: nextBackfill?.command || null,
+    nextBackfillArtifactPath: nextBackfill?.artifactPath || null,
+    rehearsalReloadCommand: rehearsalReload?.command || null,
+    operatorCommandCount: operatorNextCommands.length,
+    nextAction: hasNextBackfill
+      ? "Run the readiness status refresh, then continue the next production sign-off or receipt visibility backfill."
+      : "Run the readiness status refresh, then reload rehearsal and archive the production sign-off handoff."
+  };
+}
+
 function buildEvidenceValue(options) {
   const parsed = JSON.parse(options.valueJson);
   const value = parsed && typeof parsed === "object" && !Array.isArray(parsed)
@@ -421,6 +465,26 @@ function backfill(payload, options) {
     : backfillReceiptLane(payload, options, value);
 }
 
+function writeOperatorQueueCheckpointPlain(checkpoint) {
+  if (!checkpoint) {
+    return;
+  }
+  console.log(`Sign-off operator checkpoint: ${checkpoint.currentActionKey} (status=${checkpoint.status}, commands=${checkpoint.operatorCommandCount})`);
+  if (checkpoint.currentCommand) {
+    console.log(`Sign-off checkpoint current: ${checkpoint.currentCommand}`);
+  }
+  console.log(`Sign-off checkpoint progress: conditions=${checkpoint.filledConditionCount}/${checkpoint.requiredConditionCount}, receipts=${checkpoint.visibleReceiptLaneCount}/${checkpoint.requiredReceiptLaneCount}`);
+  if (checkpoint.nextBackfillCommand) {
+    console.log(`Sign-off checkpoint next backfill: ${checkpoint.nextBackfillType}/${checkpoint.nextBackfillKey} -> ${checkpoint.nextBackfillCommand}`);
+  } else {
+    console.log("Sign-off checkpoint next backfill: none");
+  }
+  if (checkpoint.rehearsalReloadCommand) {
+    console.log(`Sign-off checkpoint rehearsal reload: ${checkpoint.rehearsalReloadCommand}`);
+  }
+  console.log(`Sign-off checkpoint next action: ${checkpoint.nextAction}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -451,6 +515,7 @@ function writeResult(result, json) {
         console.log(`Next sign-off backfill command: ${progress.nextBackfillCommand}`);
       }
     }
+    writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     if (result.launchDutyReadyHandoff) {
       const handoff = result.launchDutyReadyHandoff;
       console.log(`Launch duty readiness: ${handoff.status}`);
@@ -527,6 +592,24 @@ function main() {
       rehearsalCommand: nextCommand,
       signoffProgress
     });
+    const operatorNextCommands = buildOperatorNextCommands({
+      outputFile,
+      actionsFile,
+      rehearsalCommand: nextCommand,
+      readinessStatusCommand: nextStatusCommand,
+      nextBackfillCommand: signoffProgress.nextBackfillCommand,
+      nextBackfillArtifactPath: signoffProgress.currentTarget?.artifactPath
+    });
+    const operatorQueueCheckpoint = buildOperatorQueueCheckpoint({
+      outputFile,
+      actionsFile,
+      targetType,
+      key,
+      artifactPath: options.artifactPath || null,
+      productionDecision: productionSignoff.decision || null,
+      signoffProgress,
+      operatorNextCommands
+    });
     writeResult({
       status: "written",
       mode: "staging-signoff-backfill",
@@ -546,14 +629,8 @@ function main() {
       ...(launchDutyReadyHandoff ? { launchDutyReadyHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,
-      operatorNextCommands: buildOperatorNextCommands({
-        outputFile,
-        actionsFile,
-        rehearsalCommand: nextCommand,
-        readinessStatusCommand: nextStatusCommand,
-        nextBackfillCommand: signoffProgress.nextBackfillCommand,
-        nextBackfillArtifactPath: signoffProgress.currentTarget?.artifactPath
-      }),
+      operatorNextCommands,
+      operatorQueueCheckpoint,
       nextAction: "Run statusCommand to pick the next sign-off, receipt visibility, or launch-day watch action."
     }, options.json);
   } catch (error) {

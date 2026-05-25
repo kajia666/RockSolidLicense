@@ -1058,6 +1058,112 @@ function buildReadinessOperatorNextCommands({ currentGate, actionQueue }) {
   return null;
 }
 
+function currentCheckpointActionKey(item = {}) {
+  if (item.actionKey) {
+    return item.actionKey;
+  }
+  if (item.key === "set_production_signoff_decision") {
+    return "set_production_signoff_decision";
+  }
+  return item.key || null;
+}
+
+function currentCheckpointTargetType(item = {}) {
+  if (item.key === "backfill_closeout_evidence" || item.key === "confirm_full_test_go_no_go") {
+    return "closeout_evidence";
+  }
+  if (item.key === "run_full_test_window") {
+    return "full_test_window";
+  }
+  if (item.key === "set_production_signoff_decision") {
+    return "production_signoff_decision";
+  }
+  if (item.key === "backfill_production_signoff") {
+    return "production_signoff_condition";
+  }
+  if (item.key === "backfill_receipt_visibility") {
+    return "receipt_visibility_lane";
+  }
+  if (item.phase === "launch_day_watch" || item.phase === "first_wave_closeout") {
+    return "launch_duty_record";
+  }
+  if (item.phase === "stable_operations_handoff") {
+    return "stable_operations_handoff";
+  }
+  return item.phase || null;
+}
+
+function currentCheckpointNextAction(item = {}, currentGate = "") {
+  if (item.operatorInstruction) {
+    return item.operatorInstruction;
+  }
+  if (currentGate === "full_test_window") {
+    return "Run fullTestCommand, save fullTestResultArtifactPath, run signoffBackfillCommand with the redacted full-test result, then statusCommand.";
+  }
+  if (item.key === "backfill_production_signoff" || item.key === "set_production_signoff_decision") {
+    return "Run command with real redacted evidence, then statusCommand to continue production sign-off.";
+  }
+  if (item.key === "backfill_receipt_visibility") {
+    return "Run command with the latest receipt visibility summary, then statusCommand to continue toward launch-day watch.";
+  }
+  if (item.targetKey) {
+    return `Backfill ${item.targetKey}, then rerun staging:readiness:status.`;
+  }
+  return "Complete the current readiness action, then rerun staging:readiness:status.";
+}
+
+function buildCurrentEvidenceCheckpoint({
+  inputFile,
+  actionsFile,
+  currentGate,
+  launchStatus,
+  actionQueue,
+  evidenceSummary,
+  missingCloseoutKeys,
+  missingSignoffKeys,
+  missingReceiptVisibilityKeys
+}) {
+  const currentItem = actionQueue.find((item) => item.status === "current") || actionQueue[0] || {};
+  return {
+    mode: "staging-readiness-current-evidence-checkpoint",
+    currentGate,
+    launchStatus,
+    currentActionKey: currentCheckpointActionKey(currentItem),
+    currentTargetType: currentCheckpointTargetType(currentItem),
+    currentTargetKey: currentItem.targetKey || null,
+    currentCommand: currentItem.command || currentItem.followUpCommand || null,
+    exampleCommand: currentItem.exampleCommand || currentItem.followUpExampleCommand || null,
+    artifactPathHint: currentItem.evidence?.artifactPathHint || currentItem.artifactPathHint || null,
+    statusCommand: currentItem.statusCommand || statusCommand(inputFile, actionsFile),
+    reloadCommand: reloadCommand(inputFile),
+    actionQueueFile: actionsFile || null,
+    progress: {
+      closeout: {
+        filledCount: evidenceSummary.closeout.filledCount,
+        requiredCount: evidenceSummary.closeout.requiredCount,
+        missingCount: evidenceSummary.closeout.missingCount,
+        nextMissingKey: missingCloseoutKeys[0] || null
+      },
+      productionSignoff: {
+        filledConditionCount: evidenceSummary.productionSignoff.filledConditionCount,
+        requiredConditionCount: evidenceSummary.productionSignoff.requiredConditionCount,
+        missingConditionCount: evidenceSummary.productionSignoff.missingConditionCount,
+        nextMissingConditionKey: missingSignoffKeys[0] || null
+      },
+      receiptVisibility: {
+        visibleLaneCount: evidenceSummary.receiptVisibility.visibleLaneCount,
+        requiredLaneCount: evidenceSummary.receiptVisibility.requiredLaneCount,
+        missingLaneCount: evidenceSummary.receiptVisibility.missingLaneCount,
+        nextMissingLaneKey: missingReceiptVisibilityKeys[0] || null
+      }
+    },
+    remainingEvidenceCount: evidenceSummary.closeout.missingCount
+      + evidenceSummary.productionSignoff.missingConditionCount
+      + evidenceSummary.receiptVisibility.missingLaneCount,
+    nextAction: currentCheckpointNextAction(currentItem, currentGate)
+  };
+}
+
 function valueObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -1177,6 +1283,28 @@ function renderEvidenceSummaryMarkdown(result) {
   return lines;
 }
 
+function renderCurrentEvidenceCheckpointMarkdown(result) {
+  const checkpoint = result.currentEvidenceCheckpoint;
+  if (!checkpoint) {
+    return [];
+  }
+  return [
+    "## Current Evidence Checkpoint",
+    "",
+    `Checkpoint gate: \`${checkpoint.currentGate || "-"}\` (status \`${checkpoint.launchStatus || "-"}\`, remaining \`${checkpoint.remainingEvidenceCount ?? "-"}\`)`,
+    `Checkpoint current action: \`${checkpoint.currentActionKey || "-"}\``,
+    `Checkpoint target: \`${checkpoint.currentTargetType || "-"}/${checkpoint.currentTargetKey || "-"}\``,
+    `Checkpoint command: \`${checkpoint.currentCommand || "-"}\``,
+    ...(checkpoint.exampleCommand ? [`Checkpoint example: \`${checkpoint.exampleCommand}\``] : []),
+    `Checkpoint artifact: \`${checkpoint.artifactPathHint || "-"}\``,
+    `Checkpoint progress: closeout \`${checkpoint.progress?.closeout?.filledCount ?? "-"}/${checkpoint.progress?.closeout?.requiredCount ?? "-"}\`, signoff \`${checkpoint.progress?.productionSignoff?.filledConditionCount ?? "-"}/${checkpoint.progress?.productionSignoff?.requiredConditionCount ?? "-"}\`, receipts \`${checkpoint.progress?.receiptVisibility?.visibleLaneCount ?? "-"}/${checkpoint.progress?.receiptVisibility?.requiredLaneCount ?? "-"}\``,
+    `Checkpoint status refresh: \`${checkpoint.statusCommand || "-"}\``,
+    `Checkpoint rehearsal reload: \`${checkpoint.reloadCommand || "-"}\``,
+    `Checkpoint next action: ${checkpoint.nextAction || "-"}`,
+    ""
+  ];
+}
+
 function renderActionQueueMarkdown(result) {
   const lines = [
     "# Staging Readiness Action Queue",
@@ -1185,6 +1313,7 @@ function renderActionQueueMarkdown(result) {
     `Current gate: \`${result.readiness.currentGate}\``,
     `Launch status: \`${result.readiness.launchStatus}\``,
     "",
+    ...renderCurrentEvidenceCheckpointMarkdown(result),
     ...renderEvidenceSummaryMarkdown(result),
     "",
     "Complete only `[current]` items first. Items marked `[blocked_after_prior_actions]` become safe after the earlier items are backfilled and the status command is rerun.",
@@ -1541,6 +1670,17 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     visibleReceiptVisibilityKeys,
     missingReceiptVisibilityKeys
   });
+  const currentEvidenceCheckpoint = buildCurrentEvidenceCheckpoint({
+    inputFile,
+    actionsFile,
+    currentGate,
+    launchStatus,
+    actionQueue,
+    evidenceSummary,
+    missingCloseoutKeys,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys
+  });
 
   return {
     status: "pass",
@@ -1573,6 +1713,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
       }
     },
     evidenceSummary,
+    currentEvidenceCheckpoint,
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
     ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
@@ -1611,6 +1752,28 @@ function writeEvidenceSummaryPlain(summary) {
   }
 }
 
+function writeCurrentEvidenceCheckpointPlain(checkpoint) {
+  if (!checkpoint) {
+    return;
+  }
+  console.log(`Evidence checkpoint: ${checkpoint.currentGate || "-"} (status=${checkpoint.launchStatus || "-"}, remaining=${checkpoint.remainingEvidenceCount ?? "-"})`);
+  console.log(`Evidence checkpoint current action: ${checkpoint.currentActionKey || "-"}`);
+  console.log(`Evidence checkpoint target: ${checkpoint.currentTargetType || "-"}/${checkpoint.currentTargetKey || "-"}`);
+  console.log(`Evidence checkpoint command: ${checkpoint.currentCommand || "-"}`);
+  if (checkpoint.exampleCommand) {
+    console.log(`Evidence checkpoint example: ${checkpoint.exampleCommand}`);
+  }
+  console.log(`Evidence checkpoint artifact: ${checkpoint.artifactPathHint || "-"}`);
+  console.log(
+    `Evidence checkpoint progress: closeout=${checkpoint.progress?.closeout?.filledCount ?? "-"}/${checkpoint.progress?.closeout?.requiredCount ?? "-"}`
+      + `, signoff=${checkpoint.progress?.productionSignoff?.filledConditionCount ?? "-"}/${checkpoint.progress?.productionSignoff?.requiredConditionCount ?? "-"}`
+      + `, receipts=${checkpoint.progress?.receiptVisibility?.visibleLaneCount ?? "-"}/${checkpoint.progress?.receiptVisibility?.requiredLaneCount ?? "-"}`
+  );
+  console.log(`Evidence checkpoint status refresh: ${checkpoint.statusCommand || "-"}`);
+  console.log(`Evidence checkpoint rehearsal reload: ${checkpoint.reloadCommand || "-"}`);
+  console.log(`Evidence checkpoint next action: ${checkpoint.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -1621,6 +1784,7 @@ function writeResult(result, json) {
     console.log(`Next step: ${result.nextStep.key}`);
     console.log(result.nextStep.command);
     writeEvidenceSummaryPlain(result.evidenceSummary);
+    writeCurrentEvidenceCheckpointPlain(result.currentEvidenceCheckpoint);
     if (result.fullTestWindowHandoff) {
       const handoff = result.fullTestWindowHandoff;
       console.log(`Full-test handoff: ${handoff.status}`);

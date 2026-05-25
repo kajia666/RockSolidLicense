@@ -230,6 +230,31 @@ test("staging closeout backfill writes one evidence field without clearing remai
           nextAction: "Reload rehearsal after status confirms the next gate or all closeout evidence is ready."
         }
       ],
+      operatorQueueCheckpoint: {
+        mode: "staging-closeout-backfill-operator-queue-checkpoint",
+        status: "awaiting_closeout_readiness_refresh",
+        currentActionKey: "readiness_status",
+        currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+        actionQueueFile: actionsFile,
+        outputFile: closeoutInputFile,
+        backfilledTargetType: "closeout_evidence",
+        backfilledKey: "route_map_gate_result",
+        backfilledArtifactPath: "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt",
+        filledFieldCount: 1,
+        requiredFieldCount: 7,
+        pendingFieldCount: 6,
+        nextBackfillType: "closeout_evidence",
+        nextBackfillKey: "backup_restore_drill_result",
+        nextBackfillCommand: `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/backup_restore_drill_result.txt --actions-file ${actionsFile}`,
+        nextBackfillArtifactPath: "artifacts/staging/PILOT_ALPHA/stable/backup_restore_drill_result.txt",
+        fullTestReadyStatus: null,
+        fullTestCommand: null,
+        fullTestResultArtifactPath: null,
+        productionSignoffPacketPath: null,
+        signoffBackfillCommand: null,
+        operatorCommandCount: 3,
+        nextAction: "Run the readiness status refresh, then continue the next closeout evidence backfill."
+      },
       nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     });
 
@@ -292,6 +317,11 @@ test("staging closeout backfill prints ordered next commands in plain output", (
     assert.match(result.stdout, /Next target artifact: artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt/);
     assert.match(result.stdout, /Next target source step: source_backup_restore_drill_result/);
     assert.match(result.stdout, /Next backfill command: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Closeout operator checkpoint: readiness_status \(status=awaiting_closeout_readiness_refresh, commands=3\)/);
+    assert.match(result.stdout, /Closeout checkpoint current: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Closeout checkpoint progress: 1\/7 filled, 6 pending/);
+    assert.match(result.stdout, /Closeout checkpoint next backfill: closeout_evidence\/backup_restore_drill_result -> npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Closeout checkpoint next action: Run the readiness status refresh, then continue the next closeout evidence backfill\./);
     assert.match(result.stdout, /Next closeout handoff: ready_for_next_closeout_backfill/);
     assert.match(result.stdout, /Next closeout status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Next closeout backfill: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt --actions-file .*readiness-action-queue\.md/);
@@ -376,6 +406,31 @@ test("staging closeout backfill prints full-test handoff after final go/no-go ev
     assert.equal(output.remainingPlaceholderCount, 0);
     assert.equal(output.evidenceProgress.status, "filled");
     assert.equal(output.evidenceProgress.nextBackfillCommand, null);
+    assert.deepEqual(output.operatorQueueCheckpoint, {
+      mode: "staging-closeout-backfill-operator-queue-checkpoint",
+      status: "ready_for_full_test_window",
+      currentActionKey: "readiness_status",
+      currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      actionQueueFile: actionsFile,
+      outputFile: closeoutInputFile,
+      backfilledTargetType: "closeout_evidence",
+      backfilledKey: "operator_go_no_go",
+      backfilledArtifactPath: "artifacts/staging/PILOT_ALPHA/stable/operator-go-no-go.md",
+      filledFieldCount: 7,
+      requiredFieldCount: 7,
+      pendingFieldCount: 0,
+      nextBackfillType: null,
+      nextBackfillKey: null,
+      nextBackfillCommand: null,
+      nextBackfillArtifactPath: null,
+      fullTestReadyStatus: "ready_for_full_test_window",
+      fullTestCommand: "npm.cmd test",
+      fullTestResultArtifactPath: "artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt",
+      productionSignoffPacketPath: "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json",
+      signoffBackfillCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt --decision ready-for-production-signoff --actions-file ${actionsFile}`,
+      operatorCommandCount: 2,
+      nextAction: "Run statusCommand to confirm full-test readiness, run fullTestCommand, then use signoffBackfillCommand with the redacted full-test result."
+    });
     assert.deepEqual(output.fullTestReadyHandoff, {
       status: "ready_for_full_test_window",
       currentActionKey: "run_full_test_window",
@@ -398,6 +453,13 @@ test("staging closeout backfill prints full-test handoff after final go/no-go ev
     assert.equal(plainResult.status, 0, plainResult.stderr || plainResult.stdout);
     assert.equal(plainResult.stderr, "");
     assert.match(plainResult.stdout, /Closeout evidence progress: 7\/7 filled, 0 pending/);
+    assert.match(plainResult.stdout, /Closeout operator checkpoint: readiness_status \(status=ready_for_full_test_window, commands=2\)/);
+    assert.match(plainResult.stdout, /Closeout checkpoint current: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input-plain\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(plainResult.stdout, /Closeout checkpoint progress: 7\/7 filled, 0 pending/);
+    assert.match(plainResult.stdout, /Closeout checkpoint full-test readiness: ready_for_full_test_window/);
+    assert.match(plainResult.stdout, /Closeout checkpoint full-test command: npm\.cmd test/);
+    assert.match(plainResult.stdout, /Closeout checkpoint signoff backfill: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input-plain\.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
+    assert.match(plainResult.stdout, /Closeout checkpoint next action: Run statusCommand to confirm full-test readiness, run fullTestCommand, then use signoffBackfillCommand with the redacted full-test result\./);
     assert.match(plainResult.stdout, /Full-test readiness: ready_for_full_test_window/);
     assert.match(plainResult.stdout, /Full-test status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input-plain\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(plainResult.stdout, /Full-test rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input-plain\.json/);

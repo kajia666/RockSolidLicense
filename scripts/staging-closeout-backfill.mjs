@@ -319,6 +319,49 @@ function buildFullTestReadyHandoff({
   };
 }
 
+function buildOperatorQueueCheckpoint({
+  outputFile,
+  actionsFile,
+  targetType,
+  key,
+  artifactPath,
+  evidenceProgress,
+  fullTestReadyHandoff,
+  operatorNextCommands
+}) {
+  const currentCommand = operatorNextCommands.find((item) => item.status === "current") || null;
+  const nextBackfill = operatorNextCommands.find((item) => item.key === "next_closeout_backfill") || null;
+  const rehearsalReload = operatorNextCommands.find((item) => item.key === "rehearsal_reload") || null;
+  const readyForFullTestWindow = Boolean(fullTestReadyHandoff);
+  return {
+    mode: "staging-closeout-backfill-operator-queue-checkpoint",
+    status: readyForFullTestWindow ? "ready_for_full_test_window" : "awaiting_closeout_readiness_refresh",
+    currentActionKey: currentCommand?.key || "readiness_status",
+    currentCommand: currentCommand?.command || evidenceProgress?.statusCommand || null,
+    actionQueueFile: actionsFile || null,
+    outputFile,
+    backfilledTargetType: targetType,
+    backfilledKey: key,
+    backfilledArtifactPath: artifactPath || null,
+    filledFieldCount: evidenceProgress?.filledCount ?? 0,
+    requiredFieldCount: evidenceProgress?.requiredCount ?? 0,
+    pendingFieldCount: evidenceProgress?.pendingCount ?? 0,
+    nextBackfillType: nextBackfill ? "closeout_evidence" : null,
+    nextBackfillKey: nextBackfill ? evidenceProgress?.currentTarget?.key || null : null,
+    nextBackfillCommand: nextBackfill?.command || null,
+    nextBackfillArtifactPath: nextBackfill?.artifactPath || null,
+    fullTestReadyStatus: fullTestReadyHandoff?.status || null,
+    fullTestCommand: fullTestReadyHandoff?.fullTestCommand || null,
+    fullTestResultArtifactPath: fullTestReadyHandoff?.fullTestResultArtifactPath || null,
+    productionSignoffPacketPath: fullTestReadyHandoff?.productionSignoffPacketPath || null,
+    signoffBackfillCommand: fullTestReadyHandoff?.signoffBackfillCommand || null,
+    operatorCommandCount: operatorNextCommands.length,
+    nextAction: fullTestReadyHandoff
+      ? fullTestReadyHandoff.nextAction
+      : "Run the readiness status refresh, then continue the next closeout evidence backfill."
+  };
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -348,6 +391,35 @@ function writeResult(result, json) {
       if (progress.nextBackfillCommand) {
         console.log(`Next backfill command: ${progress.nextBackfillCommand}`);
       }
+    }
+    if (result.operatorQueueCheckpoint) {
+      const checkpoint = result.operatorQueueCheckpoint;
+      console.log(`Closeout operator checkpoint: ${checkpoint.currentActionKey} (status=${checkpoint.status}, commands=${checkpoint.operatorCommandCount})`);
+      if (checkpoint.currentCommand) {
+        console.log(`Closeout checkpoint current: ${checkpoint.currentCommand}`);
+      }
+      console.log(`Closeout checkpoint progress: ${checkpoint.filledFieldCount}/${checkpoint.requiredFieldCount} filled, ${checkpoint.pendingFieldCount} pending`);
+      if (checkpoint.nextBackfillCommand) {
+        console.log(`Closeout checkpoint next backfill: ${checkpoint.nextBackfillType}/${checkpoint.nextBackfillKey} -> ${checkpoint.nextBackfillCommand}`);
+      } else {
+        console.log("Closeout checkpoint next backfill: none");
+      }
+      if (checkpoint.fullTestReadyStatus) {
+        console.log(`Closeout checkpoint full-test readiness: ${checkpoint.fullTestReadyStatus}`);
+      }
+      if (checkpoint.fullTestCommand) {
+        console.log(`Closeout checkpoint full-test command: ${checkpoint.fullTestCommand}`);
+      }
+      if (checkpoint.fullTestResultArtifactPath) {
+        console.log(`Closeout checkpoint full-test result artifact: ${checkpoint.fullTestResultArtifactPath}`);
+      }
+      if (checkpoint.productionSignoffPacketPath) {
+        console.log(`Closeout checkpoint production signoff packet: ${checkpoint.productionSignoffPacketPath}`);
+      }
+      if (checkpoint.signoffBackfillCommand) {
+        console.log(`Closeout checkpoint signoff backfill: ${checkpoint.signoffBackfillCommand}`);
+      }
+      console.log(`Closeout checkpoint next action: ${checkpoint.nextAction}`);
     }
     if (result.nextCloseoutEvidenceHandoff) {
       const handoff = result.nextCloseoutEvidenceHandoff;
@@ -421,6 +493,14 @@ function main() {
       actionsFile,
       readinessStatusCommand: nextStatusCommand
     });
+    const operatorNextCommands = buildOperatorNextCommands({
+      outputFile,
+      actionsFile,
+      rehearsalCommand: nextCommand,
+      readinessStatusCommand: nextStatusCommand,
+      nextBackfillCommand: evidenceProgress.nextBackfillCommand,
+      nextBackfillArtifactPath: evidenceProgress.currentTarget?.artifactPath
+    });
     const nextCloseoutEvidenceHandoff = buildNextCloseoutEvidenceHandoff({
       backfilledKey: options.key,
       evidenceProgress,
@@ -436,6 +516,16 @@ function main() {
       rehearsalCommand: nextCommand,
       evidenceProgress
     });
+    const operatorQueueCheckpoint = buildOperatorQueueCheckpoint({
+      outputFile,
+      actionsFile,
+      targetType: "closeout_evidence",
+      key: options.key,
+      artifactPath: options.artifactPath || null,
+      evidenceProgress,
+      fullTestReadyHandoff,
+      operatorNextCommands
+    });
     writeResult({
       status: "written",
       mode: "staging-closeout-backfill",
@@ -449,18 +539,12 @@ function main() {
       filledFieldCount,
       remainingPlaceholderCount: fields.length - filledFieldCount,
       evidenceProgress,
+      operatorQueueCheckpoint,
       ...(nextCloseoutEvidenceHandoff ? { nextCloseoutEvidenceHandoff } : {}),
       ...(fullTestReadyHandoff ? { fullTestReadyHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,
-      operatorNextCommands: buildOperatorNextCommands({
-        outputFile,
-        actionsFile,
-        rehearsalCommand: nextCommand,
-        readinessStatusCommand: nextStatusCommand,
-        nextBackfillCommand: evidenceProgress.nextBackfillCommand,
-        nextBackfillArtifactPath: evidenceProgress.currentTarget?.artifactPath
-      }),
+      operatorNextCommands,
       nextAction: "Run statusCommand to pick the next closeout, full-test, or sign-off action."
     }, options.json);
   } catch (error) {

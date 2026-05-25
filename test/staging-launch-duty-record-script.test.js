@@ -37,6 +37,10 @@ function launchDutyArtifactPath(artifactRoot, key) {
   return join(artifactRoot, fileNames[key]);
 }
 
+function evidenceItemByKey(gate, key) {
+  return (gate.evidenceItems || []).find((item) => item.key === key);
+}
+
 function recordLaunchDutySequence({ closeoutInputFile, actionsFile, recordIndexFile, artifactRoot, keys }) {
   for (const key of keys) {
     const result = runRecord([
@@ -176,6 +180,54 @@ test("staging launch duty record writes a watch summary artifact and next comman
       operatorCommandCount: 3,
       nextAction: "Run nextRecordCommand for receipt_visibility_snapshot, then refresh readiness status."
     });
+    assert.deepEqual(
+      {
+        version: output.launchEvidenceReadinessGate?.version,
+        status: output.launchEvidenceReadinessGate?.status,
+        currentGate: output.launchEvidenceReadinessGate?.currentGate,
+        currentEvidenceKey: output.launchEvidenceReadinessGate?.currentEvidenceKey,
+        currentEvidenceType: output.launchEvidenceReadinessGate?.currentEvidenceType,
+        currentEvidenceStatus: output.launchEvidenceReadinessGate?.currentEvidenceStatus,
+        currentLaunchDutyRecordKey: output.launchEvidenceReadinessGate?.currentLaunchDutyRecordKey,
+        currentCommand: output.launchEvidenceReadinessGate?.currentCommand,
+        currentArtifactPath: output.launchEvidenceReadinessGate?.currentArtifactPath,
+        completedEvidenceCount: output.launchEvidenceReadinessGate?.completedEvidenceCount,
+        pendingEvidenceCount: output.launchEvidenceReadinessGate?.pendingEvidenceCount,
+        progress: output.launchEvidenceReadinessGate?.progress,
+        launchDutyRecordProgress: output.launchEvidenceReadinessGate?.launchDutyRecordProgress,
+        launchDutyRecordIndexPath: output.launchEvidenceReadinessGate?.launchDutyRecordIndexPath
+      },
+      {
+        version: "staging-launch-duty-record-launch-evidence-gate/v1",
+        status: "blocked_until_real_launch_evidence_attached",
+        currentGate: "launch_duty_record",
+        currentEvidenceKey: "first_wave_closeout",
+        currentEvidenceType: "launch_duty_record",
+        currentEvidenceStatus: "blocked_until_source_records",
+        currentLaunchDutyRecordKey: "receipt_visibility_snapshot",
+        currentCommand: output.nextRecordCommand,
+        currentArtifactPath: launchDutyArtifactPath(artifactRoot, "receipt_visibility_snapshot"),
+        completedEvidenceCount: 20,
+        pendingEvidenceCount: 1,
+        progress: {
+          closeout: { completed: 7, total: 7 },
+          productionSignoff: { completed: 7, total: 7 },
+          receiptVisibility: { completed: 5, total: 5 },
+          launchDuty: { completed: 1, total: 2 }
+        },
+        launchDutyRecordProgress: {
+          recorded: 1,
+          pending: 5,
+          total: 6,
+          nextRecordKey: "receipt_visibility_snapshot"
+        },
+        launchDutyRecordIndexPath: recordIndexFile
+      }
+    );
+    assert.equal(output.launchEvidenceReadinessGate.evidenceCount, 21);
+    assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "launch_day_watch_summary").status, "recorded");
+    assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "launch_day_watch_summary").artifactPath, artifactPath);
+    assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "first_wave_closeout").status, "blocked_until_source_records");
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -457,6 +509,56 @@ test("staging launch duty record emits completion handoff after first-wave close
       nextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner."
     });
     assert.deepEqual(
+      {
+        version: output.launchEvidenceReadinessGate?.version,
+        status: output.launchEvidenceReadinessGate?.status,
+        currentGate: output.launchEvidenceReadinessGate?.currentGate,
+        currentEvidenceKey: output.launchEvidenceReadinessGate?.currentEvidenceKey,
+        currentEvidenceType: output.launchEvidenceReadinessGate?.currentEvidenceType,
+        currentEvidenceStatus: output.launchEvidenceReadinessGate?.currentEvidenceStatus,
+        currentLaunchDutyRecordKey: output.launchEvidenceReadinessGate?.currentLaunchDutyRecordKey,
+        currentCommand: output.launchEvidenceReadinessGate?.currentCommand,
+        currentArtifactPath: output.launchEvidenceReadinessGate?.currentArtifactPath,
+        completedEvidenceCount: output.launchEvidenceReadinessGate?.completedEvidenceCount,
+        pendingEvidenceCount: output.launchEvidenceReadinessGate?.pendingEvidenceCount,
+        progress: output.launchEvidenceReadinessGate?.progress,
+        launchDutyRecordProgress: output.launchEvidenceReadinessGate?.launchDutyRecordProgress,
+        stableOperationsHandoff: output.launchEvidenceReadinessGate?.stableOperationsHandoff
+      },
+      {
+        version: "staging-launch-duty-record-launch-evidence-gate/v1",
+        status: "ready_for_stabilization_handoff",
+        currentGate: "launch_duty_record",
+        currentEvidenceKey: "first_wave_closeout",
+        currentEvidenceType: "launch_duty_record",
+        currentEvidenceStatus: "recorded",
+        currentLaunchDutyRecordKey: null,
+        currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+        currentArtifactPath: closeoutArtifactPath,
+        completedEvidenceCount: 21,
+        pendingEvidenceCount: 0,
+        progress: {
+          closeout: { completed: 7, total: 7 },
+          productionSignoff: { completed: 7, total: 7 },
+          receiptVisibility: { completed: 5, total: 5 },
+          launchDuty: { completed: 2, total: 2 }
+        },
+        launchDutyRecordProgress: {
+          recorded: 6,
+          pending: 0,
+          total: 6,
+          nextRecordKey: null
+        },
+        stableOperationsHandoff: {
+          status: "ready_for_stabilization_handoff",
+          handoffArtifacts: [recordIndexFile, closeoutArtifactPath],
+          nextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner."
+        }
+      }
+    );
+    assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "first_wave_closeout").status, "recorded");
+    assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "first_wave_closeout").artifactPath, closeoutArtifactPath);
+    assert.deepEqual(
       output.operatorNextCommands.map((item) => [item.key, item.status]),
       [
         ["readiness_status", "current"],
@@ -524,6 +626,11 @@ test("staging launch duty record prints completion handoff after first-wave clos
     assert.match(result.stdout, /Launch duty checkpoint completion handoff: ready_for_stabilization_handoff/);
     assert.match(result.stdout, /Launch duty checkpoint handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch duty checkpoint handoff next action: Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner\./);
+    assert.match(result.stdout, /Launch evidence gate: ready_for_stabilization_handoff \(current=first_wave_closeout, pending=0\/21\)/);
+    assert.match(result.stdout, /Launch evidence current: launch_duty_record\/first_wave_closeout -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch evidence progress: closeout=7\/7, signoff=7\/7, receipts=5\/5, launchDuty=2\/2/);
+    assert.match(result.stdout, /Launch evidence launch-duty records: 6\/6 recorded, 0 pending, next=-/);
+    assert.match(result.stdout, /Launch evidence stable handoff: ready_for_stabilization_handoff -> .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
     assert.match(result.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch duty completion handoff next action: Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner\./);

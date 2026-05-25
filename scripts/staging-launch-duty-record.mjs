@@ -13,6 +13,63 @@ const RECORD_SEQUENCE = [
   "first_wave_closeout"
 ];
 
+const CLOSEOUT_EVIDENCE_KEYS = [
+  "route_map_gate_result",
+  "backup_restore_drill_result",
+  "live_write_smoke_result",
+  "launch_smoke_handoff",
+  "launch_mainline_evidence_receipts",
+  "receipt_visibility_review",
+  "operator_go_no_go"
+];
+
+const PRODUCTION_SIGNOFF_DEFINITIONS = [
+  {
+    key: "full_test_window_passed",
+    fileName: "full-test-output.txt",
+    receiptOperations: [],
+    decision: "ready-for-production-signoff"
+  },
+  {
+    key: "staging_artifacts_archived",
+    fileName: "staging-artifacts-archive.txt",
+    receiptOperations: []
+  },
+  {
+    key: "launch_mainline_receipts_visible",
+    fileName: "launch-mainline-receipts-visible.json",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  {
+    key: "launch_ops_overview_status_visible",
+    fileName: "launch-ops-overview-status-visible.json",
+    receiptOperations: ["record_post_launch_ops_sweep"]
+  },
+  {
+    key: "backup_restore_drill_passed",
+    fileName: "backup-restore-drill.txt",
+    receiptOperations: ["record_recovery_drill", "record_backup_verification"]
+  },
+  {
+    key: "rollback_path_confirmed",
+    fileName: "rollback-path-confirmed.md",
+    receiptOperations: ["record_rollback_walkthrough"]
+  },
+  {
+    key: "operator_signoff_recorded",
+    fileName: "operator-production-signoff.md",
+    receiptOperations: []
+  }
+];
+
+const RECEIPT_VISIBILITY_DEFINITIONS = [
+  ["launchMainline", "launch-mainline-receipt-visibility.json"],
+  ["launchReview", "launch-review-receipt-visibility.json"],
+  ["launchSmoke", "launch-smoke-receipt-visibility.json"],
+  ["developerOps", "developer-ops-receipt-visibility.json"],
+  ["launchOpsOverviewStatus", "launch-ops-overview-status-receipt-visibility.json"]
+];
+
 const LAUNCH_DUTY_RECORDS = {
   launch_day_watch_summary: {
     actionKey: "record_launch_day_watch_summary",
@@ -179,6 +236,21 @@ function defaultRecordIndexFile(artifactPath) {
   return path.join(path.dirname(artifactPath), RECORD_INDEX_FILE_NAME);
 }
 
+function archiveRootFromCloseoutInputFile(closeoutInputFile) {
+  const root = path.dirname(closeoutInputFile || "");
+  if (!root || root === ".") {
+    return "artifacts/staging/<productCode>/<channel>";
+  }
+  return root;
+}
+
+function joinArtifactPath(root, fileName) {
+  if (path.isAbsolute(root)) {
+    return path.join(root, fileName);
+  }
+  return path.posix.join(root.replaceAll("\\", "/"), fileName);
+}
+
 function buildRecordCommand({ closeoutInputFile, actionsFile, key, artifactPath, recordIndexFile, sourceRecordPaths }) {
   const target = LAUNCH_DUTY_RECORDS[key];
   if (!target) {
@@ -195,6 +267,46 @@ function buildRecordCommand({ closeoutInputFile, actionsFile, key, artifactPath,
     receiptIdArgs(target.receiptOperations).trimStart(),
     sourceRecordArgs(target.sourceRecordKeys, sourceRecordPaths).trimStart(),
     recordIndexArg.trimStart(),
+    actionsArg.trimStart()
+  ].filter(Boolean).join(" ");
+}
+
+function buildCloseoutEvidenceBackfillCommand({
+  closeoutInputFile,
+  actionsFile = null,
+  key,
+  artifactPath
+}) {
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
+  return [
+    "npm.cmd run staging:closeout:backfill --",
+    `--input-file ${commandValue(closeoutInputFile)}`,
+    `--key ${commandValue(key)}`,
+    "--value-json <redacted-json>",
+    `--artifact-path ${commandValue(artifactPath)}`,
+    actionsArg.trimStart()
+  ].filter(Boolean).join(" ");
+}
+
+function buildSignoffEvidenceBackfillCommand({
+  closeoutInputFile,
+  actionsFile = null,
+  keyFlag,
+  key,
+  artifactPath,
+  receiptOperations = [],
+  decision = null
+}) {
+  const actionsArg = actionsFile ? ` --actions-file ${commandValue(actionsFile)}` : "";
+  const decisionArg = decision ? ` --decision ${decision}` : "";
+  return [
+    "npm.cmd run staging:signoff:backfill --",
+    `--input-file ${commandValue(closeoutInputFile)}`,
+    `${keyFlag} ${commandValue(key)}`,
+    "--value-json <redacted-json>",
+    `--artifact-path ${commandValue(artifactPath)}`,
+    receiptIdArgs(receiptOperations).trimStart(),
+    decisionArg.trimStart(),
     actionsArg.trimStart()
   ].filter(Boolean).join(" ");
 }
@@ -489,6 +601,231 @@ function buildOperatorQueueCheckpoint({
   };
 }
 
+function buildLaunchEvidenceItem({
+  order,
+  key,
+  type,
+  status,
+  artifactPath,
+  command,
+  receiptIds = [],
+  sourceRecordKeys = []
+}) {
+  const item = {
+    order,
+    key,
+    type,
+    status,
+    artifactPath,
+    command,
+    receiptIds: Array.isArray(receiptIds) ? receiptIds.slice() : []
+  };
+  if (Array.isArray(sourceRecordKeys) && sourceRecordKeys.length) {
+    item.sourceRecordKeys = sourceRecordKeys.slice();
+  }
+  return item;
+}
+
+function recordReceiptIds(record, fallbackOperations = []) {
+  if (Array.isArray(record?.receiptIds) && record.receiptIds.length) {
+    return record.receiptIds;
+  }
+  return fallbackOperations.map((operation) => `<${operation}-receipt-id>`);
+}
+
+function buildLaunchDutyRecordLaunchEvidenceGate({
+  options,
+  recordIndex,
+  recordIndexFile,
+  nextRecord,
+  nextRecordCommand,
+  statusRefreshCommand,
+  rehearsalReloadCommand
+}) {
+  const archiveRoot = archiveRootFromCloseoutInputFile(options.closeoutInputFile);
+  const records = recordIndex?.records || {};
+  const closeoutEvidenceItems = CLOSEOUT_EVIDENCE_KEYS.map((key, index) => {
+    const artifactPath = joinArtifactPath(archiveRoot, `${key}.txt`);
+    return buildLaunchEvidenceItem({
+      order: index + 1,
+      key,
+      type: "closeout_evidence",
+      status: "filled",
+      artifactPath,
+      command: buildCloseoutEvidenceBackfillCommand({
+        closeoutInputFile: options.closeoutInputFile,
+        actionsFile: options.actionsFile,
+        key,
+        artifactPath
+      })
+    });
+  });
+  const productionSignoffEvidenceItems = PRODUCTION_SIGNOFF_DEFINITIONS.map((definition, index) => {
+    const artifactPath = joinArtifactPath(archiveRoot, definition.fileName);
+    return buildLaunchEvidenceItem({
+      order: index + 8,
+      key: definition.key,
+      type: "production_signoff_condition",
+      status: "filled",
+      artifactPath,
+      command: buildSignoffEvidenceBackfillCommand({
+        closeoutInputFile: options.closeoutInputFile,
+        actionsFile: options.actionsFile,
+        keyFlag: "--condition-key",
+        key: definition.key,
+        artifactPath,
+        receiptOperations: definition.receiptOperations,
+        decision: definition.decision
+      }),
+      receiptIds: definition.receiptOperations.map((operation) => `<${operation}-receipt-id>`)
+    });
+  });
+  const receiptVisibilityEvidenceItems = RECEIPT_VISIBILITY_DEFINITIONS.map(([key, fileName], index) => {
+    const artifactPath = joinArtifactPath(archiveRoot, fileName);
+    return buildLaunchEvidenceItem({
+      order: index + 15,
+      key,
+      type: "receipt_visibility_lane",
+      status: "visible",
+      artifactPath,
+      command: buildSignoffEvidenceBackfillCommand({
+        closeoutInputFile: options.closeoutInputFile,
+        actionsFile: options.actionsFile,
+        keyFlag: "--receipt-lane",
+        key,
+        artifactPath,
+        receiptOperations: ["record_post_launch_ops_sweep"]
+      }),
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    });
+  });
+  const launchDayWatchRecord = records.launch_day_watch_summary || null;
+  const firstWaveCloseoutRecord = records.first_wave_closeout || null;
+  const launchDayWatchArtifact = launchDayWatchRecord?.artifactPath || joinArtifactPath(archiveRoot, LAUNCH_DUTY_RECORDS.launch_day_watch_summary.fileName);
+  const firstWaveCloseoutArtifact = firstWaveCloseoutRecord?.artifactPath || joinArtifactPath(archiveRoot, LAUNCH_DUTY_RECORDS.first_wave_closeout.fileName);
+  const firstWaveSourceRecordPaths = sourceRecordPathsFromRecords(
+    LAUNCH_DUTY_RECORDS.first_wave_closeout.sourceRecordKeys,
+    records
+  );
+  const launchDutyEvidenceItems = [
+    buildLaunchEvidenceItem({
+      order: 20,
+      key: "launch_day_watch_summary",
+      type: "launch_duty_record",
+      status: launchDayWatchRecord?.status === "recorded" ? "recorded" : "blocked_after_production_signoff_readiness_status",
+      artifactPath: launchDayWatchArtifact,
+      command: buildRecordCommand({
+        closeoutInputFile: options.closeoutInputFile,
+        actionsFile: options.actionsFile,
+        key: "launch_day_watch_summary",
+        artifactPath: launchDayWatchArtifact,
+        recordIndexFile,
+        sourceRecordPaths: {}
+      }),
+      receiptIds: recordReceiptIds(launchDayWatchRecord, LAUNCH_DUTY_RECORDS.launch_day_watch_summary.receiptOperations)
+    }),
+    buildLaunchEvidenceItem({
+      order: 21,
+      key: "first_wave_closeout",
+      type: "launch_duty_record",
+      status: firstWaveCloseoutRecord?.status === "recorded" ? "recorded" : "blocked_until_source_records",
+      artifactPath: firstWaveCloseoutArtifact,
+      command: buildRecordCommand({
+        closeoutInputFile: options.closeoutInputFile,
+        actionsFile: options.actionsFile,
+        key: "first_wave_closeout",
+        artifactPath: firstWaveCloseoutArtifact,
+        recordIndexFile,
+        sourceRecordPaths: firstWaveSourceRecordPaths
+      }),
+      receiptIds: recordReceiptIds(firstWaveCloseoutRecord, LAUNCH_DUTY_RECORDS.first_wave_closeout.receiptOperations),
+      sourceRecordKeys: LAUNCH_DUTY_RECORDS.first_wave_closeout.sourceRecordKeys
+    })
+  ];
+  const evidenceItems = [
+    ...closeoutEvidenceItems,
+    ...productionSignoffEvidenceItems,
+    ...receiptVisibilityEvidenceItems,
+    ...launchDutyEvidenceItems
+  ];
+  const closeoutCompleted = closeoutEvidenceItems.length;
+  const productionSignoffCompleted = productionSignoffEvidenceItems.length;
+  const receiptVisibilityCompleted = receiptVisibilityEvidenceItems.length;
+  const launchDutyCompleted = launchDutyEvidenceItems.filter((item) => item.status === "recorded").length;
+  const completedEvidenceCount = closeoutCompleted + productionSignoffCompleted + receiptVisibilityCompleted + launchDutyCompleted;
+  const currentEvidence = launchDutyEvidenceItems.find((item) => item.status !== "recorded")
+    || launchDutyEvidenceItems[launchDutyEvidenceItems.length - 1]
+    || null;
+  const completionHandoff = recordIndex?.completionHandoff || null;
+  const currentCommand = nextRecordCommand || completionHandoff?.statusCommand || currentEvidence?.command || null;
+  const currentArtifactPath = nextRecord?.artifactPath || currentEvidence?.artifactPath || null;
+
+  return {
+    version: "staging-launch-duty-record-launch-evidence-gate/v1",
+    status: completedEvidenceCount < evidenceItems.length
+      ? "blocked_until_real_launch_evidence_attached"
+      : completionHandoff?.status || "ready_for_stabilization_handoff",
+    currentGate: "launch_duty_record",
+    currentEvidenceKey: currentEvidence?.key || null,
+    currentEvidenceType: currentEvidence?.type || null,
+    currentEvidenceStatus: currentEvidence?.status || null,
+    currentLaunchDutyRecordKey: recordIndex?.nextRecordKey || null,
+    currentCommand,
+    currentArtifactPath,
+    closeoutInputFile: options.closeoutInputFile,
+    readinessActionQueueFile: options.actionsFile || null,
+    archiveRoot,
+    evidenceCount: evidenceItems.length,
+    closeoutEvidenceCount: closeoutEvidenceItems.length,
+    productionSignoffEvidenceCount: productionSignoffEvidenceItems.length,
+    receiptVisibilityEvidenceCount: receiptVisibilityEvidenceItems.length,
+    launchDutyEvidenceCount: launchDutyEvidenceItems.length,
+    completedEvidenceCount,
+    pendingEvidenceCount: evidenceItems.length - completedEvidenceCount,
+    readinessStatusCommand: statusRefreshCommand,
+    rehearsalReloadCommand,
+    fullTestCommand: "npm.cmd test",
+    fullTestOutputArtifact: joinArtifactPath(archiveRoot, "full-test-output.txt"),
+    productionSignoffPacket: joinArtifactPath(archiveRoot, "staging-production-signoff-packet.json"),
+    launchDayWatchArtifact,
+    firstWaveCloseoutArtifact,
+    launchDutyRecordIndexPath: recordIndexFile,
+    launchDutyRecordProgress: {
+      recorded: recordIndex?.recordedCount ?? 0,
+      pending: recordIndex?.pendingCount ?? RECORD_SEQUENCE.length,
+      total: RECORD_SEQUENCE.length,
+      nextRecordKey: recordIndex?.nextRecordKey || null
+    },
+    stableOperationsHandoff: completionHandoff
+      ? {
+        status: completionHandoff.status,
+        handoffArtifacts: completionHandoff.handoffArtifacts,
+        nextAction: completionHandoff.nextAction
+      }
+      : null,
+    progress: {
+      closeout: {
+        completed: closeoutCompleted,
+        total: closeoutEvidenceItems.length
+      },
+      productionSignoff: {
+        completed: productionSignoffCompleted,
+        total: productionSignoffEvidenceItems.length
+      },
+      receiptVisibility: {
+        completed: receiptVisibilityCompleted,
+        total: receiptVisibilityEvidenceItems.length
+      },
+      launchDuty: {
+        completed: launchDutyCompleted,
+        total: launchDutyEvidenceItems.length
+      }
+    },
+    evidenceItems,
+    nextAction: completionHandoff?.nextAction || "Run currentCommand to continue launch-duty record capture, then refresh readiness status and reload rehearsal."
+  };
+}
+
 function buildResult(options) {
   const target = LAUNCH_DUTY_RECORDS[options.key];
   if (!target) {
@@ -582,6 +919,15 @@ function buildResult(options) {
     operatorNextCommands,
     nextAction: recordIndex.nextAction
   });
+  const launchEvidenceReadinessGate = buildLaunchDutyRecordLaunchEvidenceGate({
+    options,
+    recordIndex,
+    recordIndexFile,
+    nextRecord,
+    nextRecordCommand,
+    statusRefreshCommand,
+    rehearsalReloadCommand
+  });
   writeRecordIndex(recordIndexFile, recordIndex);
   return {
     status: "written",
@@ -612,6 +958,7 @@ function buildResult(options) {
     rehearsalReloadCommand,
     operatorNextCommands,
     operatorQueueCheckpoint,
+    launchEvidenceReadinessGate,
     nextAction: recordIndex.nextAction
   };
 }
@@ -657,6 +1004,33 @@ function writeResult(result, json) {
         }
       }
       console.log(`Launch duty checkpoint next action: ${checkpoint.nextAction}`);
+    }
+    if (result.launchEvidenceReadinessGate) {
+      const gate = result.launchEvidenceReadinessGate;
+      console.log(
+        `Launch evidence gate: ${gate.status || "-"}`
+          + ` (current=${gate.currentEvidenceKey || "-"}, pending=${gate.pendingEvidenceCount ?? "-"}/${gate.evidenceCount ?? "-"})`
+      );
+      console.log(`Launch evidence current: ${gate.currentEvidenceType || "-"}/${gate.currentEvidenceKey || "-"} -> ${gate.currentCommand || "-"}`);
+      console.log(`Launch evidence artifact: ${gate.currentArtifactPath || "-"}`);
+      console.log(
+        `Launch evidence progress: closeout=${gate.progress?.closeout?.completed ?? "-"}/${gate.progress?.closeout?.total ?? "-"}`
+          + `, signoff=${gate.progress?.productionSignoff?.completed ?? "-"}/${gate.progress?.productionSignoff?.total ?? "-"}`
+          + `, receipts=${gate.progress?.receiptVisibility?.completed ?? "-"}/${gate.progress?.receiptVisibility?.total ?? "-"}`
+          + `, launchDuty=${gate.progress?.launchDuty?.completed ?? "-"}/${gate.progress?.launchDuty?.total ?? "-"}`
+      );
+      console.log(
+        `Launch evidence launch-duty records: ${gate.launchDutyRecordProgress?.recorded ?? "-"}/${gate.launchDutyRecordProgress?.total ?? "-"} recorded`
+          + `, ${gate.launchDutyRecordProgress?.pending ?? "-"} pending`
+          + `, next=${gate.launchDutyRecordProgress?.nextRecordKey || "-"}`
+      );
+      console.log(`Launch evidence readiness status: ${gate.readinessStatusCommand || "-"}`);
+      console.log(`Launch evidence rehearsal reload: ${gate.rehearsalReloadCommand || "-"}`);
+      console.log(`Launch evidence record index: ${gate.launchDutyRecordIndexPath || "-"}`);
+      if (gate.stableOperationsHandoff) {
+        console.log(`Launch evidence stable handoff: ${gate.stableOperationsHandoff.status || "-"} -> ${gate.stableOperationsHandoff.handoffArtifacts?.join("; ") || "-"}`);
+      }
+      console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
     }
     console.log(`Launch duty record status refresh: ${result.statusCommand}`);
     console.log(`Launch duty record rehearsal reload: ${result.rehearsalReloadCommand}`);

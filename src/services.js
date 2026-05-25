@@ -16509,6 +16509,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     && typeof launchOperationsOperatorEntry.operatorQueueCheckpoint === "object"
       ? launchOperationsOperatorEntry.operatorQueueCheckpoint
       : null;
+  const launchEvidenceReadinessGate = launchOperationsOperatorEntry?.launchEvidenceReadinessGate
+    && typeof launchOperationsOperatorEntry.launchEvidenceReadinessGate === "object"
+      ? launchOperationsOperatorEntry.launchEvidenceReadinessGate
+      : null;
   const postArchiveLaunchDayWatchReadback = getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(
     launchOperationsOperatorEntry
   );
@@ -21035,6 +21039,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveRuntimeEvidence,
     initialLaunchOpsOverviewStatus,
     launchDutyActionOrder,
+    launchEvidenceReadinessGate,
     operatorQueueCheckpoint,
     preStagingReadinessSelfCheck,
     steadyStateHandoffLanding,
@@ -23767,6 +23772,9 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const operatorQueueCheckpoint = mainlineSummary.operatorQueueCheckpoint
     || launchOperationsOperatorEntry?.operatorQueueCheckpoint
     || null;
+  const launchEvidenceReadinessGate = mainlineSummary.launchEvidenceReadinessGate
+    || launchOperationsOperatorEntry?.launchEvidenceReadinessGate
+    || null;
   const launchReceiptAuditBackfill = Number(payload.opsSnapshot?.auditLogs?.filters?.launchReceiptBackfill || 0);
   const launchReceiptAuditBackfillStatus = payload.postLaunchHandoffTraceability?.launchReceiptAuditBackfillStatus
     || payload.opsSnapshot?.summary?.launchReceiptAuditBackfillStatus
@@ -23830,6 +23838,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     title: "Launch Mainline Operator Queue Checkpoint:"
   });
   if (operatorQueueCheckpoint) {
+    lines.push("");
+  }
+  appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines, launchEvidenceReadinessGate, {
+    title: "Launch Mainline Launch Evidence Readiness Gate:"
+  });
+  if (launchEvidenceReadinessGate) {
     lines.push("");
   }
   appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
@@ -49235,6 +49249,195 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   };
 }
 
+function isDeveloperOpsLaunchEvidenceComplete(status = null) {
+  return [
+    "complete",
+    "completed",
+    "recorded",
+    "visible",
+    "ready_for_steady_state_handoff"
+  ].includes(String(status || "").toLowerCase());
+}
+
+function buildDeveloperOpsLaunchEvidenceReadinessGate({
+  productCode = null,
+  channel = null,
+  launchDutyRecordIndexPath = null,
+  stagingReadinessBridge = null,
+  launchCandidateFullVerificationGate = null,
+  postSignoffWatchBridge = null
+} = {}) {
+  const bridge = stagingReadinessBridge && typeof stagingReadinessBridge === "object"
+    ? stagingReadinessBridge
+    : null;
+  const fullGate = launchCandidateFullVerificationGate && typeof launchCandidateFullVerificationGate === "object"
+    ? launchCandidateFullVerificationGate
+    : null;
+  const watchBridge = postSignoffWatchBridge && typeof postSignoffWatchBridge === "object"
+    ? postSignoffWatchBridge
+    : null;
+  const closeoutEvidenceHandoff = bridge?.preStagingReadinessSelfCheckPacket?.closeoutEvidenceHandoff
+    && typeof bridge.preStagingReadinessSelfCheckPacket.closeoutEvidenceHandoff === "object"
+      ? bridge.preStagingReadinessSelfCheckPacket.closeoutEvidenceHandoff
+      : null;
+  const closeoutTargets = Array.isArray(closeoutEvidenceHandoff?.evidenceTargets)
+    ? closeoutEvidenceHandoff.evidenceTargets
+    : [];
+  const closeoutCheckpoint = closeoutEvidenceHandoff?.operatorCheckpoint
+    && typeof closeoutEvidenceHandoff.operatorCheckpoint === "object"
+      ? closeoutEvidenceHandoff.operatorCheckpoint
+      : null;
+  const currentEvidenceKey = closeoutCheckpoint?.currentBackfillKey
+    || closeoutEvidenceHandoff?.firstBackfillTarget?.key
+    || fullGate?.currentActionKey
+    || "staging_profile_rehearsal";
+  const resultHandoff = fullGate?.resultHandoff && typeof fullGate.resultHandoff === "object"
+    ? fullGate.resultHandoff
+    : null;
+  const productionSignoffEntryHandoff = resultHandoff?.productionSignoffEntryHandoff
+    && typeof resultHandoff.productionSignoffEntryHandoff === "object"
+      ? resultHandoff.productionSignoffEntryHandoff
+      : null;
+  const evidenceItems = closeoutTargets.map((target, index) => ({
+    order: index + 1,
+    key: target?.key || null,
+    status: target?.key === currentEvidenceKey ? "current" : "pending_real_evidence",
+    source: target?.sourceStep || null,
+    artifactPath: target?.artifactPath || null,
+    command: target?.command || null,
+    receiptOperations: Array.isArray(target?.receiptOperations)
+      ? target.receiptOperations.slice()
+      : [],
+    nextAction: target?.key === currentEvidenceKey
+      ? closeoutCheckpoint?.nextAction || closeoutEvidenceHandoff?.operatorCheckpoint?.nextAction || null
+      : null
+  })).filter((item) => item.key);
+  const pushEvidenceItem = (item) => {
+    if (!item || !item.key) {
+      return;
+    }
+    evidenceItems.push({
+      order: evidenceItems.length + 1,
+      key: item.key,
+      status: item.status || "pending_real_evidence",
+      source: item.source || null,
+      artifactPath: item.artifactPath || null,
+      command: item.command || null,
+      receiptOperations: Array.isArray(item.receiptOperations)
+        ? item.receiptOperations.slice()
+        : [],
+      sourceRecordKeys: Array.isArray(item.sourceRecordKeys)
+        ? item.sourceRecordKeys.slice()
+        : [],
+      nextAction: item.nextAction || null
+    });
+  };
+  pushEvidenceItem({
+    key: "full_test_window_passed",
+    status: fullGate?.status || "blocked_until_closeout_evidence_readbacks_complete",
+    source: "launch_candidate_full_verification_gate",
+    artifactPath: fullGate?.outputArtifact || resultHandoff?.artifactPath || null,
+    command: fullGate?.fullTestCommand || null,
+    nextAction: fullGate?.nextAction || null
+  });
+  pushEvidenceItem({
+    key: "production_signoff_packet",
+    status: productionSignoffEntryHandoff?.status
+      || resultHandoff?.status
+      || "blocked_until_full_test_window_passed",
+    source: "production_signoff_entry",
+    artifactPath: productionSignoffEntryHandoff?.productionSignoffPacket
+      || resultHandoff?.productionSignoffPacket
+      || fullGate?.productionSignoffPacket
+      || watchBridge?.productionSignoffPacket
+      || null,
+    command: resultHandoff?.signoffBackfillCommand
+      || fullGate?.signoffBackfillCommand
+      || productionSignoffEntryHandoff?.readinessReadbackCommand
+      || null,
+    nextAction: productionSignoffEntryHandoff?.nextAction || resultHandoff?.nextAction || null
+  });
+  pushEvidenceItem({
+    key: "launch_day_watch_summary",
+    status: "blocked_until_production_signoff",
+    source: "post_signoff_watch",
+    artifactPath: watchBridge?.launchDayWatchSummaryArtifact || null,
+    command: watchBridge?.watchRecordCommand || null,
+    receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+    nextAction: watchBridge?.nextAction || null
+  });
+  pushEvidenceItem({
+    key: "stabilization_owner_handoff",
+    status: "blocked_until_launch_day_watch",
+    source: "post_signoff_watch",
+    artifactPath: watchBridge?.stabilizationOwnerHandoffArtifact || null,
+    command: watchBridge?.stabilizationOwnerHandoffCommand || null,
+    receiptOperations: ["record_launch_stabilization_review"],
+    nextAction: "Record stabilization_owner_handoff after launch-day watch and stabilization receipts are attached."
+  });
+  pushEvidenceItem({
+    key: "first_wave_closeout",
+    status: "blocked_until_stabilization_records",
+    source: "post_signoff_watch",
+    artifactPath: watchBridge?.firstWaveCloseoutArtifact || null,
+    command: watchBridge?.firstWaveCloseoutCommand || null,
+    receiptOperations: ["record_launch_closeout_review"],
+    sourceRecordKeys: Array.isArray(watchBridge?.sourceRecordKeys) ? watchBridge.sourceRecordKeys : [],
+    nextAction: "Record first_wave_closeout after incident, rollback, and stabilization owner handoff records are present."
+  });
+  const closeoutEvidenceCount = closeoutTargets.length;
+  const pendingEvidenceCount = evidenceItems.filter((item) => !isDeveloperOpsLaunchEvidenceComplete(item.status)).length;
+  const currentEvidenceItem = evidenceItems.find((item) => item.key === currentEvidenceKey)
+    || evidenceItems.find((item) => !isDeveloperOpsLaunchEvidenceComplete(item.status))
+    || evidenceItems[0]
+    || null;
+  return {
+    version: "developer-ops-launch-evidence-readiness-gate/v1",
+    productCode,
+    channel,
+    status: pendingEvidenceCount > 0
+      ? "blocked_until_real_launch_evidence_attached"
+      : "ready_for_launch_switch",
+    currentEvidenceKey: currentEvidenceItem?.key || currentEvidenceKey || null,
+    currentArtifactPath: closeoutCheckpoint?.currentArtifactPath
+      || currentEvidenceItem?.artifactPath
+      || null,
+    currentCommand: closeoutCheckpoint?.currentCommand
+      || currentEvidenceItem?.command
+      || null,
+    evidenceCount: evidenceItems.length,
+    closeoutEvidenceCount,
+    postFullTestEvidenceCount: Math.max(0, evidenceItems.length - closeoutEvidenceCount),
+    pendingEvidenceCount,
+    blockerCount: Number(fullGate?.blockerCount ?? closeoutEvidenceHandoff?.fullTestEntryGate?.blockerCount ?? 0),
+    readinessStatusCommand: closeoutEvidenceHandoff?.readinessStatusCommand
+      || bridge?.readinessStatusCommand
+      || null,
+    rehearsalReloadCommand: closeoutEvidenceHandoff?.rehearsalReloadCommand
+      || bridge?.rehearsalReloadCommand
+      || null,
+    fullTestCommand: fullGate?.fullTestCommand || closeoutCheckpoint?.fullTestCommand || null,
+    fullTestOutputArtifact: fullGate?.outputArtifact || resultHandoff?.artifactPath || null,
+    productionSignoffPacket: productionSignoffEntryHandoff?.productionSignoffPacket
+      || resultHandoff?.productionSignoffPacket
+      || fullGate?.productionSignoffPacket
+      || watchBridge?.productionSignoffPacket
+      || null,
+    launchDayWatchArtifact: watchBridge?.launchDayWatchSummaryArtifact || null,
+    firstWaveCloseoutArtifact: watchBridge?.firstWaveCloseoutArtifact || null,
+    launchDutyRecordIndexPath: launchDutyRecordIndexPath
+      || fullGate?.launchDutyRecordIndexPath
+      || watchBridge?.launchDutyRecordIndexPath
+      || bridge?.launchDutyRecordIndexPath
+      || null,
+    evidenceItems,
+    nextAction: closeoutCheckpoint?.nextAction
+      || fullGate?.nextAction
+      || watchBridge?.nextAction
+      || "Attach real staging, closeout, full-test, sign-off, and launch-day watch evidence before launch switch."
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
   status = null,
   launchDutyRecordIndexPath = null,
@@ -49864,6 +50067,14 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   const launchDutyStabilizationCloseoutExecutionState = launchDutyStabilizationReceiptQueue?.closeoutExecutionState || null;
   const launchDutySteadyStateLandingDutyReceiptReviewAction = launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction || null;
   const firstLaunchDoorwaySupportInspection = firstLaunchConfirmationDoorway?.supportInspectionConfirmation || null;
+  const launchEvidenceReadinessGate = buildDeveloperOpsLaunchEvidenceReadinessGate({
+    productCode,
+    channel,
+    launchDutyRecordIndexPath,
+    stagingReadinessBridge,
+    launchCandidateFullVerificationGate,
+    postSignoffWatchBridge
+  });
   const operatorQueueCheckpoint = buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     status: checklist?.status || launchOperationsOverviewStatus?.status || "review",
     launchDutyRecordIndexPath,
@@ -49878,6 +50089,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     status: checklist?.status || launchOperationsOverviewStatus?.status || "review",
     receiptVisibilityStatus: checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || null,
     launchDutyRecordIndexPath,
+    launchEvidenceReadinessGate,
     operatorQueueCheckpoint,
     checklistCurrentStepKey: checklist?.currentStepKey || null,
     checklistStepCount: Number(checklist?.stepCount ?? (Array.isArray(checklist?.steps) ? checklist.steps.length : 0)),
@@ -61778,6 +61990,59 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
   return true;
 }
 
+function appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines = [], gate = null, {
+  title = "Launch Evidence Readiness Gate:"
+} = {}) {
+  if (!Array.isArray(lines) || !gate || typeof gate !== "object") {
+    return false;
+  }
+  const evidenceItems = Array.isArray(gate.evidenceItems) ? gate.evidenceItems : [];
+  lines.push(title);
+  lines.push(
+    `- status=${gate.status || "-"}`
+    + ` | currentEvidence=${gate.currentEvidenceKey || "-"}`
+    + ` | pending=${gate.pendingEvidenceCount ?? 0}/${gate.evidenceCount ?? evidenceItems.length}`
+    + ` | blockers=${gate.blockerCount ?? 0}`
+    + ` | launchDutyRecordIndex=${gate.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(
+    `- currentArtifact=${gate.currentArtifactPath || "-"}`
+    + ` | currentCommand=${gate.currentCommand || "-"}`
+  );
+  lines.push(
+    `- readiness=${gate.readinessStatusCommand || "-"}`
+    + ` | rehearsalReload=${gate.rehearsalReloadCommand || "-"}`
+  );
+  lines.push(
+    `- fullTest=${gate.fullTestCommand || "-"}`
+    + ` | output=${gate.fullTestOutputArtifact || "-"}`
+    + ` | productionSignoffPacket=${gate.productionSignoffPacket || "-"}`
+  );
+  lines.push(
+    `- launchDayWatch=${gate.launchDayWatchArtifact || "-"}`
+    + ` | firstWaveCloseout=${gate.firstWaveCloseoutArtifact || "-"}`
+  );
+  for (const item of evidenceItems) {
+    const receipts = Array.isArray(item.receiptOperations) && item.receiptOperations.length
+      ? item.receiptOperations.join(",")
+      : "-";
+    const sourceRecords = Array.isArray(item.sourceRecordKeys) && item.sourceRecordKeys.length
+      ? item.sourceRecordKeys.join(",")
+      : "-";
+    lines.push(
+      `${item.order || "-"}. ${item.key || "-"}`
+      + ` | status=${item.status || "-"}`
+      + ` | source=${item.source || "-"}`
+      + ` | artifact=${item.artifactPath || "-"}`
+      + ` | receipts=${receipts}`
+      + (sourceRecords !== "-" ? ` | sourceRecords=${sourceRecords}` : "")
+      + ` | command=${item.command || "-"}`
+    );
+  }
+  lines.push(`- nextAction=${gate.nextAction || "-"}`);
+  return true;
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -61838,6 +62103,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     ""
   ];
   appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines, entry.operatorQueueCheckpoint);
+  lines.push("");
+  appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines, entry.launchEvidenceReadinessGate);
   lines.push("");
   appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
     launchReviewSummaryDownload,

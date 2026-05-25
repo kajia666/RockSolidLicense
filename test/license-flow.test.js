@@ -22824,6 +22824,84 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*steadyStateDutyReceiptReview=/
     );
+    const launchEvidenceReadinessGate = launchOperationsOperatorEntry.launchEvidenceReadinessGate;
+    assert.deepEqual(
+      {
+        version: launchEvidenceReadinessGate.version,
+        status: launchEvidenceReadinessGate.status,
+        currentEvidenceKey: launchEvidenceReadinessGate.currentEvidenceKey,
+        currentArtifactPath: launchEvidenceReadinessGate.currentArtifactPath,
+        currentCommand: launchEvidenceReadinessGate.currentCommand,
+        evidenceCount: launchEvidenceReadinessGate.evidenceCount,
+        closeoutEvidenceCount: launchEvidenceReadinessGate.closeoutEvidenceCount,
+        postFullTestEvidenceCount: launchEvidenceReadinessGate.postFullTestEvidenceCount,
+        pendingEvidenceCount: launchEvidenceReadinessGate.pendingEvidenceCount,
+        blockerCount: launchEvidenceReadinessGate.blockerCount,
+        readinessStatusCommand: launchEvidenceReadinessGate.readinessStatusCommand,
+        rehearsalReloadCommand: launchEvidenceReadinessGate.rehearsalReloadCommand,
+        fullTestCommand: launchEvidenceReadinessGate.fullTestCommand,
+        fullTestOutputArtifact: launchEvidenceReadinessGate.fullTestOutputArtifact,
+        productionSignoffPacket: launchEvidenceReadinessGate.productionSignoffPacket,
+        launchDayWatchArtifact: launchEvidenceReadinessGate.launchDayWatchArtifact,
+        firstWaveCloseoutArtifact: launchEvidenceReadinessGate.firstWaveCloseoutArtifact,
+        launchDutyRecordIndexPath: launchEvidenceReadinessGate.launchDutyRecordIndexPath
+      },
+      {
+        version: "developer-ops-launch-evidence-readiness-gate/v1",
+        status: "blocked_until_real_launch_evidence_attached",
+        currentEvidenceKey: "route_map_gate_result",
+        currentArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt",
+        currentCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        evidenceCount: 12,
+        closeoutEvidenceCount: 7,
+        postFullTestEvidenceCount: 5,
+        pendingEvidenceCount: 12,
+        blockerCount: 8,
+        readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+        fullTestCommand: "npm.cmd test",
+        fullTestOutputArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt",
+        productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+        launchDayWatchArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md",
+        firstWaveCloseoutArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath
+      }
+    );
+    assert.deepEqual(
+      launchEvidenceReadinessGate.evidenceItems.map((item) => [
+        item.order,
+        item.key,
+        item.status,
+        item.artifactPath,
+        item.source
+      ]),
+      [
+        [1, "route_map_gate_result", "current", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt", "run_route_map_gate"],
+        [2, "backup_restore_drill_result", "pending_real_evidence", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt", "run_backup_restore_drill"],
+        [3, "live_write_smoke_result", "pending_real_evidence", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json", "run_live_write_smoke"],
+        [4, "launch_smoke_handoff", "pending_real_evidence", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-smoke-handoff.json", "archive_launch_smoke_handoff"],
+        [5, "launch_mainline_evidence_receipts", "pending_real_evidence", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-mainline-evidence-receipts.json", "record_launch_mainline_evidence"],
+        [6, "receipt_visibility_review", "pending_real_evidence", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/receipt-visibility-review.txt", "verify_receipt_visibility"],
+        [7, "operator_go_no_go", "pending_real_evidence", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/operator-go-no-go.md", "backfill_filled_closeout_input"],
+        [8, "full_test_window_passed", "blocked_until_closeout_evidence_readbacks_complete", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt", "launch_candidate_full_verification_gate"],
+        [9, "production_signoff_packet", "blocked_until_post_backfill_readback_confirms_production_signoff", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json", "production_signoff_entry"],
+        [10, "launch_day_watch_summary", "blocked_until_production_signoff", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md", "post_signoff_watch"],
+        [11, "stabilization_owner_handoff", "blocked_until_launch_day_watch", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/stabilization-owner-handoff.md", "post_signoff_watch"],
+        [12, "first_wave_closeout", "blocked_until_stabilization_records", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md", "post_signoff_watch"]
+      ]
+    );
+    assert.deepEqual(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.launchEvidenceReadinessGate,
+      launchEvidenceReadinessGate
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*currentEvidence=route_map_gate_result/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*fullTest=npm\.cmd test/
+    );
     assert.equal(launchOperationsOperatorEntry.checklistStepCount, 9);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
     assert.equal(launchOperationsOperatorEntry.checklistStepKeys[0], "open_launch_operations_handoff_summary");
@@ -25631,6 +25709,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*currentPhase=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*steadyStateHandoff=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*steadyStateDutyReceiptReview=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*currentEvidence=route_map_gate_result/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*fullTest=npm\.cmd test/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*12\. first_wave_closeout \| status=blocked_until_stabilization_records/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);

@@ -1164,6 +1164,215 @@ function buildCurrentEvidenceCheckpoint({
   };
 }
 
+function findActionQueueItem(actionQueue = [], targetKey = null, key = null) {
+  return actionQueue.find((item) => item.targetKey === targetKey && (!key || item.key === key)) || null;
+}
+
+function completedLaunchDutyRecordKeys(launchDutyCompletionHandoff = null) {
+  return Array.isArray(launchDutyCompletionHandoff?.completedRecordKeys)
+    ? launchDutyCompletionHandoff.completedRecordKeys
+    : [];
+}
+
+function buildLaunchEvidenceItem({
+  order,
+  key,
+  type,
+  status,
+  artifactPath = null,
+  command = null,
+  receiptOperations = [],
+  sourceRecordKeys = []
+}) {
+  const item = {
+    order,
+    key,
+    type,
+    status,
+    artifactPath,
+    command,
+    receiptOperations: Array.isArray(receiptOperations) ? receiptOperations.slice() : []
+  };
+  if (Array.isArray(sourceRecordKeys) && sourceRecordKeys.length) {
+    item.sourceRecordKeys = sourceRecordKeys.slice();
+  }
+  return item;
+}
+
+function buildStagingLaunchEvidenceReadinessGate({
+  inputFile,
+  actionsFile,
+  artifactPathRoot,
+  currentGate,
+  launchStatus,
+  actionQueue,
+  evidenceSummary,
+  currentEvidenceCheckpoint,
+  launchDutyCompletionHandoff = null
+}) {
+  const archiveRoot = artifactPathRoot?.path || DEFAULT_ARTIFACT_PATH_ROOT;
+  const completedRecordKeys = completedLaunchDutyRecordKeys(launchDutyCompletionHandoff);
+  const isCurrent = (type, key) => currentEvidenceCheckpoint?.currentTargetType === type
+    && currentEvidenceCheckpoint?.currentTargetKey === key;
+  const closeoutFilled = new Map((evidenceSummary.closeout.filledItems || []).map((item) => [item.key, item]));
+  const signoffFilled = new Map((evidenceSummary.productionSignoff.filledConditions || []).map((item) => [item.key, item]));
+  const receiptsVisible = new Map((evidenceSummary.receiptVisibility.visibleLanes || []).map((item) => [item.key, item]));
+  const evidenceItems = [];
+  let order = 1;
+
+  for (const key of REQUIRED_CLOSEOUT_KEYS) {
+    const filled = closeoutFilled.get(key) || null;
+    const queueItem = findActionQueueItem(actionQueue, key, "backfill_closeout_evidence")
+      || findActionQueueItem(actionQueue, key, "confirm_full_test_go_no_go");
+    const evidence = evidenceForCloseoutKey(key, artifactPathRoot);
+    evidenceItems.push(buildLaunchEvidenceItem({
+      order: order++,
+      key,
+      type: "closeout_evidence",
+      status: isCurrent("closeout_evidence", key)
+        ? "current"
+        : filled ? "filled" : "pending_real_evidence",
+      artifactPath: filled?.artifactPath || (queueItem ? evidence?.artifactPathHint || null : null),
+      command: queueItem?.command || null,
+      receiptOperations: evidence?.receiptOperations || []
+    }));
+  }
+
+  for (const key of REQUIRED_SIGNOFF_KEYS) {
+    const filled = signoffFilled.get(key) || null;
+    const queueItem = findActionQueueItem(actionQueue, key, "backfill_production_signoff")
+      || findActionQueueItem(actionQueue, key, "set_production_signoff_decision")
+      || (key === "full_test_window_passed" ? findActionQueueItem(actionQueue, key, "run_full_test_window") : null);
+    const evidence = evidenceForSignoffKey(key, artifactPathRoot);
+    evidenceItems.push(buildLaunchEvidenceItem({
+      order: order++,
+      key,
+      type: "production_signoff_condition",
+      status: isCurrent("production_signoff_condition", key) || isCurrent("production_signoff_decision", key)
+        ? "current"
+        : filled ? "filled" : "pending_real_evidence",
+      artifactPath: filled?.artifactPath || (queueItem ? evidence?.artifactPathHint || null : null),
+      command: queueItem?.command || queueItem?.followUpCommand || null,
+      receiptOperations: evidence?.receiptOperations || []
+    }));
+  }
+
+  for (const key of RECEIPT_VISIBILITY_KEYS) {
+    const visible = receiptsVisible.get(key) || null;
+    const queueItem = findActionQueueItem(actionQueue, key, "backfill_receipt_visibility");
+    const evidence = evidenceForReceiptLane(key, artifactPathRoot);
+    evidenceItems.push(buildLaunchEvidenceItem({
+      order: order++,
+      key,
+      type: "receipt_visibility_lane",
+      status: isCurrent("receipt_visibility_lane", key)
+        ? "current"
+        : visible ? "visible" : "pending_real_evidence",
+      artifactPath: visible?.artifactPath || (queueItem ? evidence?.artifactPathHint || null : null),
+      command: queueItem?.command || null,
+      receiptOperations: evidence?.receiptOperations || []
+    }));
+  }
+
+  const launchDutyDefinitions = [
+    {
+      key: "launch_day_watch_summary",
+      artifactPath: path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
+      receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"],
+      sourceRecordKeys: []
+    },
+    {
+      key: "first_wave_closeout",
+      artifactPath: path.posix.join(archiveRoot, "first-wave-closeout.md"),
+      receiptOperations: ["record_launch_closeout_review"],
+      sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+    }
+  ];
+  for (const definition of launchDutyDefinitions) {
+    const queueItem = findActionQueueItem(actionQueue, definition.key);
+    evidenceItems.push(buildLaunchEvidenceItem({
+      order: order++,
+      key: definition.key,
+      type: "launch_duty_record",
+      status: completedRecordKeys.includes(definition.key)
+        ? "recorded"
+        : queueItem?.status === "current"
+          ? "current"
+          : definition.key === "launch_day_watch_summary"
+            ? "blocked_until_production_signoff"
+            : "blocked_until_launch_day_watch",
+      artifactPath: queueItem?.evidence?.artifactPathHint || definition.artifactPath,
+      command: queueItem?.command || null,
+      receiptOperations: definition.receiptOperations,
+      sourceRecordKeys: definition.sourceRecordKeys
+    }));
+  }
+
+  const completedEvidenceCount = evidenceItems.filter((item) => (
+    item.status === "filled"
+    || item.status === "visible"
+    || item.status === "recorded"
+  )).length;
+  const pendingEvidenceCount = evidenceItems.length - completedEvidenceCount;
+  const currentItem = evidenceItems.find((item) => item.key === currentEvidenceCheckpoint?.currentTargetKey)
+    || evidenceItems.find((item) => item.status === "current")
+    || evidenceItems.find((item) => !["filled", "visible", "recorded"].includes(item.status))
+    || evidenceItems[0]
+    || null;
+  const closeoutEvidenceCount = REQUIRED_CLOSEOUT_KEYS.length;
+  const productionSignoffEvidenceCount = REQUIRED_SIGNOFF_KEYS.length;
+  const receiptVisibilityEvidenceCount = RECEIPT_VISIBILITY_KEYS.length;
+  const launchDutyEvidenceCount = launchDutyDefinitions.length;
+  return {
+    version: "staging-readiness-launch-evidence-gate/v1",
+    status: pendingEvidenceCount > 0
+      ? "blocked_until_real_launch_evidence_attached"
+      : "ready_for_stabilization_handoff",
+    currentGate,
+    launchStatus,
+    currentEvidenceKey: currentItem?.key || null,
+    currentEvidenceType: currentItem?.type || null,
+    currentCommand: currentEvidenceCheckpoint?.currentCommand || currentItem?.command || null,
+    currentArtifactPath: currentEvidenceCheckpoint?.artifactPathHint || currentItem?.artifactPath || null,
+    evidenceCount: evidenceItems.length,
+    closeoutEvidenceCount,
+    productionSignoffEvidenceCount,
+    receiptVisibilityEvidenceCount,
+    launchDutyEvidenceCount,
+    completedEvidenceCount,
+    pendingEvidenceCount,
+    readinessStatusCommand: currentEvidenceCheckpoint?.statusCommand || statusCommand(inputFile, actionsFile),
+    rehearsalReloadCommand: currentEvidenceCheckpoint?.reloadCommand || reloadCommand(inputFile),
+    fullTestCommand: "npm.cmd test",
+    fullTestOutputArtifact: path.posix.join(archiveRoot, "full-test-output.txt"),
+    productionSignoffPacket: path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
+    launchDayWatchArtifact: path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
+    firstWaveCloseoutArtifact: path.posix.join(archiveRoot, "first-wave-closeout.md"),
+    launchDutyRecordIndexPath: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    progress: {
+      closeout: {
+        completed: evidenceSummary.closeout.filledCount,
+        total: closeoutEvidenceCount
+      },
+      productionSignoff: {
+        completed: evidenceSummary.productionSignoff.filledConditionCount,
+        total: productionSignoffEvidenceCount
+      },
+      receiptVisibility: {
+        completed: evidenceSummary.receiptVisibility.visibleLaneCount,
+        total: receiptVisibilityEvidenceCount
+      },
+      launchDuty: {
+        completed: launchDutyDefinitions.filter((item) => completedRecordKeys.includes(item.key)).length,
+        total: launchDutyEvidenceCount
+      }
+    },
+    evidenceItems,
+    nextAction: currentEvidenceCheckpoint?.nextAction
+      || "Complete the current real launch evidence item, then rerun staging:readiness:status."
+  };
+}
+
 function valueObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -1305,6 +1514,47 @@ function renderCurrentEvidenceCheckpointMarkdown(result) {
   ];
 }
 
+function renderLaunchEvidenceReadinessGateMarkdown(result) {
+  const gate = result.launchEvidenceReadinessGate;
+  if (!gate) {
+    return [];
+  }
+  const lines = [
+    "## Launch Evidence Readiness Gate",
+    "",
+    `Launch evidence gate: \`${gate.status || "-"}\` (current \`${gate.currentEvidenceKey || "-"}\`, pending \`${gate.pendingEvidenceCount ?? "-"}/${gate.evidenceCount ?? "-"}\`)`,
+    `Launch evidence current: \`${gate.currentEvidenceType || "-"}/${gate.currentEvidenceKey || "-"}\``,
+    `Launch evidence command: \`${gate.currentCommand || "-"}\``,
+    `Launch evidence artifact: \`${gate.currentArtifactPath || "-"}\``,
+    `Launch evidence progress: closeout \`${gate.progress?.closeout?.completed ?? "-"}/${gate.progress?.closeout?.total ?? "-"}\`, signoff \`${gate.progress?.productionSignoff?.completed ?? "-"}/${gate.progress?.productionSignoff?.total ?? "-"}\`, receipts \`${gate.progress?.receiptVisibility?.completed ?? "-"}/${gate.progress?.receiptVisibility?.total ?? "-"}\`, launchDuty \`${gate.progress?.launchDuty?.completed ?? "-"}/${gate.progress?.launchDuty?.total ?? "-"}\``,
+    `Launch evidence status refresh: \`${gate.readinessStatusCommand || "-"}\``,
+    `Launch evidence rehearsal reload: \`${gate.rehearsalReloadCommand || "-"}\``,
+    `Launch evidence full-test: \`${gate.fullTestCommand || "-"}\` -> \`${gate.fullTestOutputArtifact || "-"}\``,
+    `Launch evidence production signoff packet: \`${gate.productionSignoffPacket || "-"}\``,
+    `Launch evidence launch-day watch: \`${gate.launchDayWatchArtifact || "-"}\``,
+    `Launch evidence first-wave closeout: \`${gate.firstWaveCloseoutArtifact || "-"}\``,
+    ""
+  ];
+  const evidenceItems = Array.isArray(gate.evidenceItems) ? gate.evidenceItems : [];
+  for (const item of evidenceItems) {
+    const receipts = Array.isArray(item.receiptOperations) && item.receiptOperations.length
+      ? item.receiptOperations.join(", ")
+      : "-";
+    const sourceRecords = Array.isArray(item.sourceRecordKeys) && item.sourceRecordKeys.length
+      ? item.sourceRecordKeys.join(", ")
+      : "-";
+    lines.push(
+      `- ${item.order || "-"}. \`${item.type || "-"}/${item.key || "-"}\` [${item.status || "-"}]`
+      + ` artifact \`${item.artifactPath || "-"}\``
+      + ` receipts \`${receipts}\``
+      + (sourceRecords !== "-" ? ` sources \`${sourceRecords}\`` : "")
+    );
+  }
+  lines.push(`Launch evidence next action: ${gate.nextAction || "-"}`);
+  lines.push("");
+  return lines;
+}
+
 function renderActionQueueMarkdown(result) {
   const lines = [
     "# Staging Readiness Action Queue",
@@ -1314,6 +1564,7 @@ function renderActionQueueMarkdown(result) {
     `Launch status: \`${result.readiness.launchStatus}\``,
     "",
     ...renderCurrentEvidenceCheckpointMarkdown(result),
+    ...renderLaunchEvidenceReadinessGateMarkdown(result),
     ...renderEvidenceSummaryMarkdown(result),
     "",
     "Complete only `[current]` items first. Items marked `[blocked_after_prior_actions]` become safe after the earlier items are backfilled and the status command is rerun.",
@@ -1681,6 +1932,17 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     missingSignoffKeys,
     missingReceiptVisibilityKeys
   });
+  const launchEvidenceReadinessGate = buildStagingLaunchEvidenceReadinessGate({
+    inputFile,
+    actionsFile,
+    artifactPathRoot,
+    currentGate,
+    launchStatus,
+    actionQueue,
+    evidenceSummary,
+    currentEvidenceCheckpoint,
+    launchDutyCompletionHandoff
+  });
 
   return {
     status: "pass",
@@ -1714,6 +1976,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     },
     evidenceSummary,
     currentEvidenceCheckpoint,
+    launchEvidenceReadinessGate,
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
     ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
@@ -1774,6 +2037,28 @@ function writeCurrentEvidenceCheckpointPlain(checkpoint) {
   console.log(`Evidence checkpoint next action: ${checkpoint.nextAction || "-"}`);
 }
 
+function writeLaunchEvidenceReadinessGatePlain(gate) {
+  if (!gate) {
+    return;
+  }
+  console.log(`Launch evidence gate: ${gate.status || "-"} (current=${gate.currentEvidenceKey || "-"}, pending=${gate.pendingEvidenceCount ?? "-"}/${gate.evidenceCount ?? "-"})`);
+  console.log(`Launch evidence current: ${gate.currentEvidenceType || "-"}/${gate.currentEvidenceKey || "-"} -> ${gate.currentCommand || "-"}`);
+  console.log(`Launch evidence artifact: ${gate.currentArtifactPath || "-"}`);
+  console.log(
+    `Launch evidence progress: closeout=${gate.progress?.closeout?.completed ?? "-"}/${gate.progress?.closeout?.total ?? "-"}`
+      + `, signoff=${gate.progress?.productionSignoff?.completed ?? "-"}/${gate.progress?.productionSignoff?.total ?? "-"}`
+      + `, receipts=${gate.progress?.receiptVisibility?.completed ?? "-"}/${gate.progress?.receiptVisibility?.total ?? "-"}`
+      + `, launchDuty=${gate.progress?.launchDuty?.completed ?? "-"}/${gate.progress?.launchDuty?.total ?? "-"}`
+  );
+  console.log(`Launch evidence status refresh: ${gate.readinessStatusCommand || "-"}`);
+  console.log(`Launch evidence rehearsal reload: ${gate.rehearsalReloadCommand || "-"}`);
+  console.log(`Launch evidence full-test: ${gate.fullTestCommand || "-"} -> ${gate.fullTestOutputArtifact || "-"}`);
+  console.log(`Launch evidence production signoff packet: ${gate.productionSignoffPacket || "-"}`);
+  console.log(`Launch evidence launch-day watch: ${gate.launchDayWatchArtifact || "-"}`);
+  console.log(`Launch evidence first-wave closeout: ${gate.firstWaveCloseoutArtifact || "-"}`);
+  console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -1785,6 +2070,7 @@ function writeResult(result, json) {
     console.log(result.nextStep.command);
     writeEvidenceSummaryPlain(result.evidenceSummary);
     writeCurrentEvidenceCheckpointPlain(result.currentEvidenceCheckpoint);
+    writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     if (result.fullTestWindowHandoff) {
       const handoff = result.fullTestWindowHandoff;
       console.log(`Full-test handoff: ${handoff.status}`);

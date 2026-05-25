@@ -503,6 +503,158 @@ test("staging readiness status plain output prints production signoff artifact a
   }
 });
 
+test("staging readiness status exposes launch evidence readiness gate in json plain output and action file", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-launch-evidence-gate-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: closeoutKeys,
+      decision: "ready-for-full-test-window",
+      productionDecision: "ready-for-production-signoff",
+      filledSignoffKeys: ["full_test_window_passed"],
+      visibleReceiptLanes: ["launchMainline"]
+    });
+
+    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(
+      {
+        version: output.launchEvidenceReadinessGate.version,
+        status: output.launchEvidenceReadinessGate.status,
+        currentGate: output.launchEvidenceReadinessGate.currentGate,
+        currentEvidenceKey: output.launchEvidenceReadinessGate.currentEvidenceKey,
+        currentEvidenceType: output.launchEvidenceReadinessGate.currentEvidenceType,
+        currentCommand: output.launchEvidenceReadinessGate.currentCommand,
+        currentArtifactPath: output.launchEvidenceReadinessGate.currentArtifactPath,
+        evidenceCount: output.launchEvidenceReadinessGate.evidenceCount,
+        closeoutEvidenceCount: output.launchEvidenceReadinessGate.closeoutEvidenceCount,
+        productionSignoffEvidenceCount: output.launchEvidenceReadinessGate.productionSignoffEvidenceCount,
+        receiptVisibilityEvidenceCount: output.launchEvidenceReadinessGate.receiptVisibilityEvidenceCount,
+        launchDutyEvidenceCount: output.launchEvidenceReadinessGate.launchDutyEvidenceCount,
+        completedEvidenceCount: output.launchEvidenceReadinessGate.completedEvidenceCount,
+        pendingEvidenceCount: output.launchEvidenceReadinessGate.pendingEvidenceCount,
+        readinessStatusCommand: output.launchEvidenceReadinessGate.readinessStatusCommand,
+        rehearsalReloadCommand: output.launchEvidenceReadinessGate.rehearsalReloadCommand,
+        fullTestCommand: output.launchEvidenceReadinessGate.fullTestCommand,
+        fullTestOutputArtifact: output.launchEvidenceReadinessGate.fullTestOutputArtifact,
+        productionSignoffPacket: output.launchEvidenceReadinessGate.productionSignoffPacket,
+        launchDayWatchArtifact: output.launchEvidenceReadinessGate.launchDayWatchArtifact,
+        firstWaveCloseoutArtifact: output.launchEvidenceReadinessGate.firstWaveCloseoutArtifact
+      },
+      {
+        version: "staging-readiness-launch-evidence-gate/v1",
+        status: "blocked_until_real_launch_evidence_attached",
+        currentGate: "production_signoff",
+        currentEvidenceKey: "staging_artifacts_archived",
+        currentEvidenceType: "production_signoff_condition",
+        currentCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file ${actionsFile}`,
+        currentArtifactPath: "artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt",
+        evidenceCount: 21,
+        closeoutEvidenceCount: 7,
+        productionSignoffEvidenceCount: 7,
+        receiptVisibilityEvidenceCount: 5,
+        launchDutyEvidenceCount: 2,
+        completedEvidenceCount: 9,
+        pendingEvidenceCount: 12,
+        readinessStatusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile} --actions-file ${actionsFile}`,
+        rehearsalReloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`,
+        fullTestCommand: "npm.cmd test",
+        fullTestOutputArtifact: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
+        productionSignoffPacket: "artifacts/staging/<productCode>/<channel>/staging-production-signoff-packet.json",
+        launchDayWatchArtifact: "artifacts/staging/<productCode>/<channel>/launch-day-watch-summary.md",
+        firstWaveCloseoutArtifact: "artifacts/staging/<productCode>/<channel>/first-wave-closeout.md"
+      }
+    );
+    const itemsByKey = new Map(output.launchEvidenceReadinessGate.evidenceItems.map((item) => [item.key, item]));
+    assert.deepEqual(
+      {
+        routeMap: itemsByKey.get("route_map_gate_result"),
+        signoffArchive: itemsByKey.get("staging_artifacts_archived"),
+        launchReview: itemsByKey.get("launchReview"),
+        launchDayWatch: itemsByKey.get("launch_day_watch_summary"),
+        firstWaveCloseout: itemsByKey.get("first_wave_closeout")
+      },
+      {
+        routeMap: {
+          order: 1,
+          key: "route_map_gate_result",
+          type: "closeout_evidence",
+          status: "filled",
+          artifactPath: null,
+          command: null,
+          receiptOperations: []
+        },
+        signoffArchive: {
+          order: 9,
+          key: "staging_artifacts_archived",
+          type: "production_signoff_condition",
+          status: "current",
+          artifactPath: "artifacts/staging/<productCode>/<channel>/staging-artifacts-archive.txt",
+          command: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file ${actionsFile}`,
+          receiptOperations: []
+        },
+        launchReview: {
+          order: 16,
+          key: "launchReview",
+          type: "receipt_visibility_lane",
+          status: "pending_real_evidence",
+          artifactPath: "artifacts/staging/<productCode>/<channel>/launch-review-receipt-visibility.json",
+          command: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --receipt-lane launchReview --value-json <redacted-json> --actions-file ${actionsFile}`,
+          receiptOperations: ["record_post_launch_ops_sweep"]
+        },
+        launchDayWatch: {
+          order: 20,
+          key: "launch_day_watch_summary",
+          type: "launch_duty_record",
+          status: "blocked_until_production_signoff",
+          artifactPath: "artifacts/staging/<productCode>/<channel>/launch-day-watch-summary.md",
+          command: null,
+          receiptOperations: ["record_cutover_walkthrough", "record_launch_day_readiness_review"]
+        },
+        firstWaveCloseout: {
+          order: 21,
+          key: "first_wave_closeout",
+          type: "launch_duty_record",
+          status: "blocked_until_launch_day_watch",
+          artifactPath: "artifacts/staging/<productCode>/<channel>/first-wave-closeout.md",
+          command: null,
+          receiptOperations: ["record_launch_closeout_review"],
+          sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+        }
+      }
+    );
+
+    const plain = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
+
+    assert.equal(plain.status, 0, plain.stderr || plain.stdout);
+    assert.equal(plain.stderr, "");
+    assert.match(plain.stdout, /Launch evidence gate: blocked_until_real_launch_evidence_attached \(current=staging_artifacts_archived, pending=12\/21\)/);
+    assert.match(plain.stdout, /Launch evidence current: production_signoff_condition\/staging_artifacts_archived -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
+    assert.match(plain.stdout, /Launch evidence artifact: artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt/);
+    assert.match(plain.stdout, /Launch evidence progress: closeout=7\/7, signoff=1\/7, receipts=1\/5, launchDuty=0\/2/);
+    assert.match(plain.stdout, /Launch evidence full-test: npm\.cmd test -> artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt/);
+    assert.match(plain.stdout, /Launch evidence production signoff packet: artifacts\/staging\/<productCode>\/<channel>\/staging-production-signoff-packet\.json/);
+    assert.match(plain.stdout, /Launch evidence launch-day watch: artifacts\/staging\/<productCode>\/<channel>\/launch-day-watch-summary\.md/);
+    assert.match(plain.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/<productCode>\/<channel>\/first-wave-closeout\.md/);
+    assert.match(plain.stdout, /Launch evidence next action: Run command with real redacted evidence, then statusCommand to continue production sign-off\./);
+
+    const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /## Launch Evidence Readiness Gate/);
+    assert.match(markdown, /Launch evidence gate: `blocked_until_real_launch_evidence_attached` \(current `staging_artifacts_archived`, pending `12\/21`\)/);
+    assert.match(markdown, /Launch evidence current: `production_signoff_condition\/staging_artifacts_archived`/);
+    assert.match(markdown, /Launch evidence command: `npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md`/);
+    assert.match(markdown, /Launch evidence progress: closeout `7\/7`, signoff `1\/7`, receipts `1\/5`, launchDuty `0\/2`/);
+    assert.match(markdown, /- 9\. `production_signoff_condition\/staging_artifacts_archived` \[current\] artifact `artifacts\/staging\/<productCode>\/<channel>\/staging-artifacts-archive\.txt`/);
+    assert.match(markdown, /- 21\. `launch_duty_record\/first_wave_closeout` \[blocked_until_launch_day_watch\] artifact `artifacts\/staging\/<productCode>\/<channel>\/first-wave-closeout\.md` receipts `record_launch_closeout_review` sources `first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff`/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging readiness status prints receipt visibility handoff before launch watch", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-receipt-handoff-"));
   try {

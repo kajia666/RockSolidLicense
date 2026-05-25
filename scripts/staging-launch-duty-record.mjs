@@ -455,6 +455,40 @@ function buildOperatorNextCommands({ nextRecordCommand, nextRecord, statusRefres
   return commands;
 }
 
+function buildOperatorQueueCheckpoint({
+  closeoutInputFile,
+  actionsFile,
+  recordIndexFile,
+  recordIndex,
+  nextRecord,
+  nextRecordCommand,
+  completionHandoff,
+  operatorNextCommands,
+  nextAction
+}) {
+  const currentCommand = operatorNextCommands.find((item) => item.status === "current") || null;
+  return {
+    mode: "staging-launch-duty-record-operator-queue-checkpoint",
+    status: completionHandoff ? "ready_for_stabilization_handoff" : "awaiting_next_launch_duty_record",
+    currentActionKey: currentCommand?.key || "readiness_status",
+    currentCommand: currentCommand?.command || null,
+    recordIndexFile,
+    closeoutInputFile,
+    actionsFile: actionsFile || null,
+    currentArtifactPath: currentCommand?.artifactPath || null,
+    recordedCount: recordIndex?.recordedCount ?? 0,
+    pendingCount: recordIndex?.pendingCount ?? 0,
+    nextRecordKey: nextRecord?.key || null,
+    nextRecordCommand: nextRecordCommand || null,
+    nextRecordArtifactPath: nextRecord?.artifactPath || null,
+    completionHandoffStatus: completionHandoff?.status || null,
+    completionHandoffArtifacts: completionHandoff?.handoffArtifacts || null,
+    completionHandoffNextAction: completionHandoff?.nextAction || null,
+    operatorCommandCount: operatorNextCommands.length,
+    nextAction: nextAction || (completionHandoff?.nextAction || "Refresh readiness status, then reload rehearsal for the latest launch-duty archive.")
+  };
+}
+
 function buildResult(options) {
   const target = LAUNCH_DUTY_RECORDS[options.key];
   if (!target) {
@@ -527,6 +561,27 @@ function buildResult(options) {
     statusRefreshCommand,
     rehearsalReloadCommand
   });
+  const operatorNextCommands = buildOperatorNextCommands({
+    nextRecordCommand,
+    nextRecord,
+    statusRefreshCommand,
+    rehearsalReloadCommand,
+    actionsFile: options.actionsFile,
+    closeoutInputFile: options.closeoutInputFile,
+    recordIndexFile,
+    completionHandoff: recordIndex.completionHandoff
+  });
+  const operatorQueueCheckpoint = buildOperatorQueueCheckpoint({
+    closeoutInputFile: options.closeoutInputFile,
+    actionsFile: options.actionsFile,
+    recordIndexFile,
+    recordIndex,
+    nextRecord,
+    nextRecordCommand,
+    completionHandoff: recordIndex.completionHandoff,
+    operatorNextCommands,
+    nextAction: recordIndex.nextAction
+  });
   writeRecordIndex(recordIndexFile, recordIndex);
   return {
     status: "written",
@@ -555,21 +610,9 @@ function buildResult(options) {
     completionHandoff: recordIndex.completionHandoff || null,
     statusCommand: statusRefreshCommand,
     rehearsalReloadCommand,
-    operatorNextCommands: buildOperatorNextCommands({
-      nextRecordCommand,
-      nextRecord,
-      statusRefreshCommand,
-      rehearsalReloadCommand,
-      actionsFile: options.actionsFile,
-      closeoutInputFile: options.closeoutInputFile,
-      recordIndexFile,
-      completionHandoff: recordIndex.completionHandoff
-    }),
-    nextAction: nextRecord
-      ? `Run nextRecordCommand for ${nextRecord.key}, then refresh readiness status.`
-      : recordIndex.completionHandoff
-        ? recordIndex.completionHandoff.nextAction
-        : "Refresh readiness status, then reload rehearsal for the latest launch-duty archive."
+    operatorNextCommands,
+    operatorQueueCheckpoint,
+    nextAction: recordIndex.nextAction
   };
 }
 
@@ -589,6 +632,32 @@ function writeResult(result, json) {
     console.log(`Launch duty record index progress: ${result.recordIndex?.recordedCount || 0}/6 recorded, ${result.recordIndex?.pendingCount || 0} pending`);
     console.log(`Launch duty record index next key: ${result.recordIndex?.nextRecordKey || "-"}`);
     console.log(`Launch duty record next command: ${result.nextRecordCommand || "-"}`);
+    if (result.operatorQueueCheckpoint) {
+      const checkpoint = result.operatorQueueCheckpoint;
+      console.log(`Launch duty operator checkpoint: ${checkpoint.currentActionKey} (status=${checkpoint.status}, commands=${checkpoint.operatorCommandCount})`);
+      if (checkpoint.currentCommand) {
+        console.log(`Launch duty checkpoint current: ${checkpoint.currentCommand}`);
+      }
+      if (checkpoint.recordIndexFile) {
+        console.log(`Launch duty checkpoint record index: ${checkpoint.recordIndexFile}`);
+      }
+      console.log(`Launch duty checkpoint progress: ${checkpoint.recordedCount}/6 recorded, ${checkpoint.pendingCount} pending`);
+      if (checkpoint.nextRecordKey && checkpoint.nextRecordCommand) {
+        console.log(`Launch duty checkpoint next record: ${checkpoint.nextRecordKey} -> ${checkpoint.nextRecordCommand}`);
+      } else {
+        console.log("Launch duty checkpoint next record: none");
+      }
+      if (checkpoint.completionHandoffStatus) {
+        console.log(`Launch duty checkpoint completion handoff: ${checkpoint.completionHandoffStatus}`);
+        if (checkpoint.completionHandoffArtifacts?.length) {
+          console.log(`Launch duty checkpoint handoff artifacts: ${checkpoint.completionHandoffArtifacts.join("; ")}`);
+        }
+        if (checkpoint.completionHandoffNextAction) {
+          console.log(`Launch duty checkpoint handoff next action: ${checkpoint.completionHandoffNextAction}`);
+        }
+      }
+      console.log(`Launch duty checkpoint next action: ${checkpoint.nextAction}`);
+    }
     console.log(`Launch duty record status refresh: ${result.statusCommand}`);
     console.log(`Launch duty record rehearsal reload: ${result.rehearsalReloadCommand}`);
     if (result.completionHandoff) {

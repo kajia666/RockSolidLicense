@@ -63,6 +63,7 @@ test("staging launch duty record writes a watch summary artifact and next comman
 
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-launch-duty-record-watch-"));
   try {
+    const artifactRoot = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable");
     const closeoutInputFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "filled-closeout-input.json");
     const actionsFile = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "readiness-action-queue.md");
     const artifactPath = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable", "launch-day-watch-summary.md");
@@ -155,6 +156,26 @@ test("staging launch duty record writes a watch summary artifact and next comman
         ["rehearsal_reload", recordIndexFile]
       ]
     );
+    assert.deepEqual(output.operatorQueueCheckpoint, {
+      mode: "staging-launch-duty-record-operator-queue-checkpoint",
+      status: "awaiting_next_launch_duty_record",
+      currentActionKey: "next_launch_duty_record",
+      currentCommand: `npm.cmd run staging:launch-duty:record -- --closeout-input-file ${closeoutInputFile} --key receipt_visibility_snapshot --artifact-path ${launchDutyArtifactPath(artifactRoot, "receipt_visibility_snapshot")} --value-json <redacted-json> --receipt-id <record_post_launch_ops_sweep-receipt-id> --record-index-file ${recordIndexFile} --actions-file ${actionsFile}`,
+      recordIndexFile,
+      closeoutInputFile,
+      actionsFile,
+      currentArtifactPath: launchDutyArtifactPath(artifactRoot, "receipt_visibility_snapshot"),
+      recordedCount: 1,
+      pendingCount: 5,
+      nextRecordKey: "receipt_visibility_snapshot",
+      nextRecordCommand: `npm.cmd run staging:launch-duty:record -- --closeout-input-file ${closeoutInputFile} --key receipt_visibility_snapshot --artifact-path ${launchDutyArtifactPath(artifactRoot, "receipt_visibility_snapshot")} --value-json <redacted-json> --receipt-id <record_post_launch_ops_sweep-receipt-id> --record-index-file ${recordIndexFile} --actions-file ${actionsFile}`,
+      nextRecordArtifactPath: launchDutyArtifactPath(artifactRoot, "receipt_visibility_snapshot"),
+      completionHandoffStatus: null,
+      completionHandoffArtifacts: null,
+      completionHandoffNextAction: null,
+      operatorCommandCount: 3,
+      nextAction: "Run nextRecordCommand for receipt_visibility_snapshot, then refresh readiness status."
+    });
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -379,6 +400,26 @@ test("staging launch duty record emits completion handoff after first-wave close
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.operatorQueueCheckpoint, {
+      mode: "staging-launch-duty-record-operator-queue-checkpoint",
+      status: "ready_for_stabilization_handoff",
+      currentActionKey: "readiness_status",
+      currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      recordIndexFile,
+      closeoutInputFile,
+      actionsFile,
+      currentArtifactPath: actionsFile,
+      recordedCount: 6,
+      pendingCount: 0,
+      nextRecordKey: null,
+      nextRecordCommand: null,
+      nextRecordArtifactPath: null,
+      completionHandoffStatus: "ready_for_stabilization_handoff",
+      completionHandoffArtifacts: [recordIndexFile, closeoutArtifactPath],
+      completionHandoffNextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner.",
+      operatorCommandCount: 3,
+      nextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner."
+    });
     assert.deepEqual(output.recordIndex, {
       path: recordIndexFile,
       status: "complete",
@@ -475,6 +516,14 @@ test("staging launch duty record prints completion handoff after first-wave clos
     assert.equal(result.stderr, "");
     assert.match(result.stdout, /Launch duty record index status: complete/);
     assert.match(result.stdout, /Launch duty record index progress: 6\/6 recorded, 0 pending/);
+    assert.match(result.stdout, /Launch duty operator checkpoint: readiness_status \(status=ready_for_stabilization_handoff, commands=3\)/);
+    assert.match(result.stdout, /Launch duty checkpoint current: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch duty checkpoint record index: .*launch-duty-record-index\.json/);
+    assert.match(result.stdout, /Launch duty checkpoint progress: 6\/6 recorded, 0 pending/);
+    assert.match(result.stdout, /Launch duty checkpoint next record: none/);
+    assert.match(result.stdout, /Launch duty checkpoint completion handoff: ready_for_stabilization_handoff/);
+    assert.match(result.stdout, /Launch duty checkpoint handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(result.stdout, /Launch duty checkpoint handoff next action: Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner\./);
     assert.match(result.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
     assert.match(result.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch duty completion handoff next action: Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner\./);

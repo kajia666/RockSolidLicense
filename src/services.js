@@ -16505,6 +16505,10 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     && typeof initialLaunchOpsReadiness.launchOperationsOperatorEntry === "object"
       ? initialLaunchOpsReadiness.launchOperationsOperatorEntry
       : null;
+  const operatorQueueCheckpoint = launchOperationsOperatorEntry?.operatorQueueCheckpoint
+    && typeof launchOperationsOperatorEntry.operatorQueueCheckpoint === "object"
+      ? launchOperationsOperatorEntry.operatorQueueCheckpoint
+      : null;
   const postArchiveLaunchDayWatchReadback = getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(
     launchOperationsOperatorEntry
   );
@@ -21031,6 +21035,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     firstWaveRuntimeEvidence,
     initialLaunchOpsOverviewStatus,
     launchDutyActionOrder,
+    operatorQueueCheckpoint,
     preStagingReadinessSelfCheck,
     steadyStateHandoffLanding,
     steadyStateDutyReceiptReview,
@@ -23759,6 +23764,9 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     mainlineSummary.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchDutyStableOperationsTransitionAction
     || initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchDutyStableOperationsTransitionAction
     || null;
+  const operatorQueueCheckpoint = mainlineSummary.operatorQueueCheckpoint
+    || launchOperationsOperatorEntry?.operatorQueueCheckpoint
+    || null;
   const launchReceiptAuditBackfill = Number(payload.opsSnapshot?.auditLogs?.filters?.launchReceiptBackfill || 0);
   const launchReceiptAuditBackfillStatus = payload.postLaunchHandoffTraceability?.launchReceiptAuditBackfillStatus
     || payload.opsSnapshot?.summary?.launchReceiptAuditBackfillStatus
@@ -23818,6 +23826,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     `Launch Receipt Audit Backfill Operator Hint: ${launchReceiptAuditBackfillStatus.operatorHint || "-"}`,
     ""
   ];
+  appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines, operatorQueueCheckpoint, {
+    title: "Launch Mainline Operator Queue Checkpoint:"
+  });
+  if (operatorQueueCheckpoint) {
+    lines.push("");
+  }
   appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
   lines.push("");
   appendLaunchMainlineGateText(lines, mainlineSummary.overallGate, formatWorkspaceActionText);
@@ -49221,6 +49235,74 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
   };
 }
 
+function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
+  status = null,
+  launchDutyRecordIndexPath = null,
+  currentAction = null,
+  launchDutyStableOperationsTransitionAction = null,
+  launchDutySteadyStateHandoffLanding = null
+} = {}) {
+  const stableTransition = launchDutyStableOperationsTransitionAction
+    && typeof launchDutyStableOperationsTransitionAction === "object"
+      ? launchDutyStableOperationsTransitionAction
+      : null;
+  const steadyStateHandoff = launchDutySteadyStateHandoffLanding
+    && typeof launchDutySteadyStateHandoffLanding === "object"
+      ? launchDutySteadyStateHandoffLanding
+      : null;
+  const receiptReview = steadyStateHandoff?.steadyStateDutyReceiptReviewAction
+    && typeof steadyStateHandoff.steadyStateDutyReceiptReviewAction === "object"
+      ? steadyStateHandoff.steadyStateDutyReceiptReviewAction
+      : null;
+  const action = currentAction && typeof currentAction === "object" ? currentAction : null;
+  return {
+    mode: "developer-ops-launch-operations-operator-queue-checkpoint/v1",
+    status: stableTransition?.status
+      || steadyStateHandoff?.status
+      || status
+      || null,
+    currentPhase: stableTransition?.key
+      || steadyStateHandoff?.mode
+      || action?.key
+      || null,
+    currentActionKey: stableTransition?.currentActionKey
+      || steadyStateHandoff?.actionKey
+      || action?.key
+      || null,
+    currentActionStatus: stableTransition?.status
+      || steadyStateHandoff?.status
+      || action?.status
+      || null,
+    currentCommand: stableTransition?.currentCommand
+      || stableTransition?.operatorAction?.command
+      || stableTransition?.nextDownloadHref
+      || steadyStateHandoff?.currentCommand
+      || steadyStateHandoff?.href
+      || action?.command
+      || action?.executionPlan?.receiptPlan?.route
+      || action?.href
+      || null,
+    launchDutyRecordIndexPath: launchDutyRecordIndexPath
+      || stableTransition?.launchDutyRecordIndexPath
+      || steadyStateHandoff?.launchDutyRecordIndexPath
+      || action?.launchDutyRecordIndexPath
+      || null,
+    steadyStateHandoffStatus: steadyStateHandoff?.status || null,
+    steadyStateHandoffActionKey: steadyStateHandoff?.actionKey || null,
+    steadyStateHandoffFormat: steadyStateHandoff?.format || null,
+    steadyStateHandoffHref: steadyStateHandoff?.href || null,
+    steadyStateDutyReceiptReviewStatus: receiptReview?.status || null,
+    steadyStateDutyReceiptReviewAuditLogId: receiptReview?.auditLogId || null,
+    steadyStateDutyReceiptReviewAction: receiptReview?.action || null,
+    steadyStateDutyReceiptReviewFormat: receiptReview?.format || null,
+    steadyStateDutyReceiptReviewHref: receiptReview?.href || null,
+    nextAction: stableTransition?.nextAction
+      || steadyStateHandoff?.nextAction
+      || receiptReview?.nextAction
+      || null
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntry({
   scope = {},
   launchOperationsOverviewStatus = null,
@@ -49782,6 +49864,13 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   const launchDutyStabilizationCloseoutExecutionState = launchDutyStabilizationReceiptQueue?.closeoutExecutionState || null;
   const launchDutySteadyStateLandingDutyReceiptReviewAction = launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction || null;
   const firstLaunchDoorwaySupportInspection = firstLaunchConfirmationDoorway?.supportInspectionConfirmation || null;
+  const operatorQueueCheckpoint = buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
+    status: checklist?.status || launchOperationsOverviewStatus?.status || "review",
+    launchDutyRecordIndexPath,
+    currentAction,
+    launchDutyStableOperationsTransitionAction,
+    launchDutySteadyStateHandoffLanding
+  });
   return {
     version: "developer-ops-launch-operations-operator-entry/v1",
     productCode,
@@ -49789,6 +49878,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     status: checklist?.status || launchOperationsOverviewStatus?.status || "review",
     receiptVisibilityStatus: checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || null,
     launchDutyRecordIndexPath,
+    operatorQueueCheckpoint,
     checklistCurrentStepKey: checklist?.currentStepKey || null,
     checklistStepCount: Number(checklist?.stepCount ?? (Array.isArray(checklist?.steps) ? checklist.steps.length : 0)),
     checklistStepKeys: Array.isArray(checklist?.steps) ? checklist.steps.map((item) => item?.key).filter(Boolean) : [],
@@ -61656,6 +61746,38 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklistText(payload = {}) {
   return lines.join("\n");
 }
 
+function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = [], checkpoint = null, {
+  title = "Operator Queue Checkpoint:"
+} = {}) {
+  if (!Array.isArray(lines) || !checkpoint || typeof checkpoint !== "object") {
+    return false;
+  }
+  lines.push(title);
+  lines.push(
+    `- status=${checkpoint.status || "-"}`
+    + ` | currentPhase=${checkpoint.currentPhase || "-"}`
+    + ` | currentAction=${checkpoint.currentActionKey || "-"}`
+    + ` | currentStatus=${checkpoint.currentActionStatus || "-"}`
+  );
+  lines.push(`- currentCommand=${checkpoint.currentCommand || "-"}`);
+  lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
+  lines.push(
+    `- steadyStateHandoff=${checkpoint.steadyStateHandoffStatus || "-"}`
+    + ` | action=${checkpoint.steadyStateHandoffActionKey || "-"}`
+    + ` | format=${checkpoint.steadyStateHandoffFormat || "-"}`
+    + ` | href=${checkpoint.steadyStateHandoffHref || "-"}`
+  );
+  lines.push(
+    `- steadyStateDutyReceiptReview=${checkpoint.steadyStateDutyReceiptReviewStatus || "-"}`
+    + ` | audit=${checkpoint.steadyStateDutyReceiptReviewAuditLogId || "-"}`
+    + ` | action=${checkpoint.steadyStateDutyReceiptReviewAction || "-"}`
+    + ` | format=${checkpoint.steadyStateDutyReceiptReviewFormat || "-"}`
+    + ` | href=${checkpoint.steadyStateDutyReceiptReviewHref || "-"}`
+  );
+  lines.push(`- nextAction=${checkpoint.nextAction || "-"}`);
+  return true;
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -61715,6 +61837,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     `Primary Download: ${entry.primaryDownload?.fileName || "-"} | format=${entry.primaryDownload?.format || "-"} | href=${entry.primaryDownload?.href || "-"}`,
     ""
   ];
+  appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines, entry.operatorQueueCheckpoint);
+  lines.push("");
   appendDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloadLines(lines, {
     launchReviewSummaryDownload,
     launchSmokeSummaryDownload

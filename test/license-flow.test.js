@@ -22771,6 +22771,59 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOperatorEntry.status, launchOperationsOverviewStatus.status);
     assert.equal(launchOperationsOperatorEntry.receiptVisibilityStatus, launchOperationsOverviewStatus.receiptVisibilityStatus);
     assert.equal(launchOperationsOperatorEntry.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    assert.deepEqual(
+      launchOperationsOperatorEntry.operatorQueueCheckpoint,
+      {
+        mode: "developer-ops-launch-operations-operator-queue-checkpoint/v1",
+        status: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.status
+          || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.status
+          || launchOperationsOperatorEntry.receiptVisibilityConfirmationQueue?.manualCheckpointStatus
+          || launchOperationsOperatorEntry.status,
+        currentPhase: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.key
+          || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.mode
+          || launchOperationsOperatorEntry.currentAction?.key
+          || null,
+        currentActionKey: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey
+          || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey
+          || launchOperationsOperatorEntry.currentAction?.key
+          || null,
+        currentActionStatus: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.status
+          || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.status
+          || launchOperationsOperatorEntry.currentAction?.status
+          || null,
+        currentCommand: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
+          || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.href
+          || launchOperationsOperatorEntry.currentAction?.executionPlan?.receiptPlan?.route
+          || launchOperationsOperatorEntry.currentAction?.href
+          || null,
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        steadyStateHandoffStatus: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.status || null,
+        steadyStateHandoffActionKey: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey || null,
+        steadyStateHandoffFormat: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.format || null,
+        steadyStateHandoffHref: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.href || null,
+        steadyStateDutyReceiptReviewStatus: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.status || null,
+        steadyStateDutyReceiptReviewAuditLogId: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.auditLogId || null,
+        steadyStateDutyReceiptReviewAction: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.action || null,
+        steadyStateDutyReceiptReviewFormat: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.format || null,
+        steadyStateDutyReceiptReviewHref: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.href || null,
+        nextAction: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextAction
+          || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.nextAction
+          || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.nextAction
+          || null
+      }
+    );
+    assert.deepEqual(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.operatorQueueCheckpoint,
+      launchOperationsOperatorEntry.operatorQueueCheckpoint
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*currentPhase=/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*steadyStateDutyReceiptReview=/
+    );
     assert.equal(launchOperationsOperatorEntry.checklistStepCount, 9);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
     assert.equal(launchOperationsOperatorEntry.checklistStepKeys[0], "open_launch_operations_handoff_summary");
@@ -25574,6 +25627,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.contentDisposition || "", /developer-ops-launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /RockSolid Developer Ops Launch Operations Operator Entry/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Primary Download: developer-ops-launch-operations-operator-entry\.txt/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*currentPhase=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*steadyStateHandoff=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*steadyStateDutyReceiptReview=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Smoke Kit summary \| Launch Smoke receipt visibility summary \| launch-smoke-kit\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);

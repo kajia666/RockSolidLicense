@@ -4112,6 +4112,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_next_rollout_widening_decision_execution"
         : normalizedFormat === "next-rollout-widening-decision-receipt-readback-execution"
           ? "launch_mainline_next_rollout_widening_decision_receipt_readback_execution"
+        : normalizedFormat === "widened-rollout-monitoring-execution"
+          ? "launch_mainline_widened_rollout_monitoring_execution"
         : normalizedFormat === "first-operating-result-handoff-execution"
           ? "launch_mainline_first_operating_result_handoff_execution"
         : normalizedFormat === "first-operating-result-handoff-receipt-readback-execution"
@@ -23658,6 +23660,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     || getDeveloperLaunchMainlineNextRolloutWideningDecisionExecution(payload);
   const nextRolloutWideningDecisionReceiptReadbackExecution = mainlineSummary.nextRolloutWideningDecisionReceiptReadbackExecution
     || getDeveloperLaunchMainlineNextRolloutWideningDecisionReceiptReadbackExecution(payload);
+  const widenedRolloutMonitoringExecution = mainlineSummary.widenedRolloutMonitoringExecution
+    || getDeveloperLaunchMainlineWidenedRolloutMonitoringExecution(payload);
   if (rolloutWideningDecisionAction) {
     lines.push("");
     lines.push("Launch Mainline Rollout Widening Decision:");
@@ -23728,6 +23732,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendNextRolloutWideningDecisionReceiptReadbackExecutionLines(lines, nextRolloutWideningDecisionReceiptReadbackExecution, {
       title: "Launch Mainline Next Rollout Widening Decision Receipt Readback Execution:"
+    });
+  }
+  if (widenedRolloutMonitoringExecution) {
+    lines.push("");
+    appendWidenedRolloutMonitoringExecutionLines(lines, widenedRolloutMonitoringExecution, {
+      title: "Launch Mainline Widened Rollout Monitoring Execution:"
     });
   }
   lines.push(`Primary Mainline Action: ${mainlineSummary.primaryAction?.title || mainlineSummary.primaryAction?.label || mainlineSummary.primaryAction?.key || "-"}`);
@@ -25831,6 +25841,180 @@ function buildDeveloperLaunchMainlineNextRolloutWideningDecisionReceiptReadbackE
   lines.push("- Use this direct file after the next rollout widening decision receipt is recorded.");
   lines.push("- It carries the receipt audit id, decision-source bridge, overview-status download, queue context, and launch-duty record index.");
   lines.push("- Keep it beside next-rollout-widening-decision-execution.txt so widened-rollout monitoring starts from an auditable readback.");
+  return lines.join("\n").trimEnd();
+}
+
+function getDeveloperLaunchMainlineWidenedRolloutMonitoringAction(payload = {}) {
+  return [
+    payload.mainlineSummary?.widenedRolloutMonitoringAction,
+    payload.mainlineSummary?.initialLaunchOpsOverviewStatus?.widenedRolloutMonitoringAction,
+    payload.mainlineSummary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.widenedRolloutMonitoringAction,
+    payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus?.widenedRolloutMonitoringAction
+  ].find((item) => item && typeof item === "object") || null;
+}
+
+function getDeveloperLaunchMainlineWidenedRolloutMonitoringExecution(payload = {}) {
+  const action = getDeveloperLaunchMainlineWidenedRolloutMonitoringAction(payload);
+  if (!action) {
+    return null;
+  }
+  const download = resolveNextRolloutWideningDecisionOverviewDownload(payload, action);
+  const blockedBy = Array.isArray(action.blockedBy)
+    ? action.blockedBy.filter((item) => String(item || "").trim() !== "")
+    : (action.ready === true ? [] : ["next_rollout_widening_decision_receipt"]);
+  const requiredChecks = Array.isArray(action.requiredChecks) && action.requiredChecks.length
+    ? action.requiredChecks.filter((item) => String(item || "").trim() !== "")
+    : action.ready === true
+      ? [
+          "next_rollout_widening_decision_receipt_recorded",
+          "receipt_visible_in_developer_ops",
+          "widened_rollout_monitoring_window_active"
+        ]
+      : [
+          "next_rollout_widening_decision_receipt_recorded",
+          "widened_rollout_monitoring_ready"
+        ];
+  const operatorOrder = Array.isArray(action.operatorOrder) && action.operatorOrder.length
+    ? action.operatorOrder.filter((item) => String(item || "").trim() !== "")
+    : action.ready === true
+      ? [
+          "Monitor the widened rollout window from the launch operations overview.",
+          "Keep the widened-window queue and attention counts beside the launch-duty record index until the next stable result review."
+        ]
+      : ["Record the next rollout widening decision receipt before monitoring the widened rollout window."];
+  return {
+    version: "developer-launch-mainline-widened-rollout-monitoring-execution/v1",
+    mode: "developer-launch-mainline-widened-rollout-monitoring-execution",
+    status: action.status || null,
+    ready: action.ready === true,
+    actionKey: action.actionKey || "monitor_widened_rollout_window",
+    auditLogId: action.auditLogId || action.nextRolloutWideningDecisionReceiptAuditLogId || null,
+    nextRolloutWideningDecisionReceiptAuditLogId:
+      action.nextRolloutWideningDecisionReceiptAuditLogId || action.auditLogId || null,
+    recordedAt: action.recordedAt || null,
+    recordedBy: action.recordedBy || null,
+    receiptReadbackStatus: action.receiptReadbackStatus || null,
+    receiptRecorded: action.receiptRecorded === true,
+    receiptVisibilityStatus: action.receiptVisibilityStatus || null,
+    rolloutWideningFollowupReceiptAuditLogId: action.rolloutWideningFollowupReceiptAuditLogId || null,
+    firstOperatingResultReviewReceiptAuditLogId: action.firstOperatingResultReviewReceiptAuditLogId || null,
+    firstOperatingResultHandoffReceiptAuditLogId: action.firstOperatingResultHandoffReceiptAuditLogId || null,
+    decisionSourceStatus: action.decisionSourceStatus || null,
+    decisionReady: action.decisionReady === true,
+    queueStatus: action.queueStatus || null,
+    queueTotal: action.queueTotal ?? null,
+    attentionCount: action.attentionCount ?? null,
+    nextDownloadKey: download.key || null,
+    nextDownloadFileName: download.fileName || null,
+    nextDownloadFormat: download.format || null,
+    nextDownloadHref: download.href || null,
+    nextDownloadSource: download.source || null,
+    launchDutyRecordIndexPath: download.launchDutyRecordIndexPath || null,
+    blockedBy,
+    requiredChecks,
+    recommendedDownload: download || null,
+    operatorOrder,
+    nextAction: action.nextAction || null
+  };
+}
+
+function appendWidenedRolloutMonitoringExecutionLines(lines = [], execution = null, {
+  title = "Widened Rollout Monitoring Execution:"
+} = {}) {
+  if (!Array.isArray(lines) || !execution || typeof execution !== "object") {
+    return false;
+  }
+  const blockedBy = Array.isArray(execution.blockedBy) ? execution.blockedBy.join(",") : "";
+  const requiredChecks = Array.isArray(execution.requiredChecks) ? execution.requiredChecks.join(",") : "";
+  lines.push(title);
+  lines.push(
+    `- status=${execution.status || "-"}`
+    + ` | ready=${execution.ready === true ? "yes" : "no"}`
+    + ` | action=${execution.actionKey || "-"}`
+    + ` | decisionReceipt=${execution.nextRolloutWideningDecisionReceiptAuditLogId || execution.auditLogId || "-"}`
+    + ` | file=${execution.nextDownloadFileName || "-"}`
+    + ` | format=${execution.nextDownloadFormat || "-"}`
+  );
+  lines.push(
+    "Widened Rollout Monitoring Download:"
+    + ` key=${execution.nextDownloadKey || "-"}`
+    + ` | file=${execution.nextDownloadFileName || "-"}`
+    + ` | format=${execution.nextDownloadFormat || "-"}`
+    + ` | href=${execution.nextDownloadHref || "-"}`
+    + ` | source=${execution.nextDownloadSource || "-"}`
+  );
+  lines.push(
+    "Widened Rollout Monitoring Record:"
+    + ` readback=${execution.receiptReadbackStatus || "-"}`
+    + ` | followupReceipt=${execution.rolloutWideningFollowupReceiptAuditLogId || "-"}`
+    + ` | reviewReceipt=${execution.firstOperatingResultReviewReceiptAuditLogId || "-"}`
+    + ` | handoffReceipt=${execution.firstOperatingResultHandoffReceiptAuditLogId || "-"}`
+    + ` | decisionSource=${execution.decisionSourceStatus || "-"}`
+    + ` | visibility=${execution.receiptVisibilityStatus || "-"}`
+  );
+  lines.push(
+    "Widened Rollout Monitoring Queue:"
+    + ` queueStatus=${execution.queueStatus || "-"}`
+    + ` | queueTotal=${execution.queueTotal ?? "-"}`
+    + ` | attention=${execution.attentionCount ?? "-"}`
+  );
+  lines.push(
+    "Widened Rollout Monitoring Blockers:"
+    + ` blockedBy=${blockedBy || "-"}`
+    + ` | checks=${requiredChecks || "-"}`
+    + ` | launchDutyRecordIndex=${execution.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`Widened Rollout Monitoring Execution Next: ${execution.nextAction || "-"}`);
+  if (Array.isArray(execution.operatorOrder) && execution.operatorOrder.length) {
+    lines.push("Widened Rollout Monitoring Operator Order:");
+    for (const step of execution.operatorOrder) {
+      lines.push(`- ${step}`);
+    }
+  }
+  return true;
+}
+
+function getDeveloperLaunchMainlineWidenedRolloutMonitoringExecutionDownload(payload = {}) {
+  const execution = payload.mainlineSummary?.widenedRolloutMonitoringExecution
+    || getDeveloperLaunchMainlineWidenedRolloutMonitoringExecution(payload);
+  if (!execution) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline widened rollout monitoring execution",
+      "widened-rollout-monitoring-execution.txt",
+      "widened-rollout-monitoring-execution",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: execution.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineWidenedRolloutMonitoringExecutionDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const execution = payload.mainlineSummary?.widenedRolloutMonitoringExecution
+    || getDeveloperLaunchMainlineWidenedRolloutMonitoringExecution(payload);
+  if (!execution) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Widened Rollout Monitoring Execution Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendWidenedRolloutMonitoringExecutionLines(lines, execution);
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this direct file after the next rollout widening decision receipt readback is ready.");
+  lines.push("- It carries the widened-window monitoring action, decision receipt audit, overview-status download, queue state, required checks, and launch-duty record index.");
+  lines.push("- Keep it beside next-rollout-widening-decision-receipt-readback-execution.txt while the widened rollout window is being watched.");
   return lines.join("\n").trimEnd();
 }
 
@@ -28342,6 +28526,11 @@ function buildDeveloperLaunchMainlinePayload({
       getDeveloperLaunchMainlineNextRolloutWideningDecisionExecution(payload);
     payload.mainlineSummary.nextRolloutWideningDecisionReceiptReadbackExecution =
       getDeveloperLaunchMainlineNextRolloutWideningDecisionReceiptReadbackExecution(payload);
+    payload.mainlineSummary.widenedRolloutMonitoringAction =
+      payload.mainlineSummary.widenedRolloutMonitoringAction
+      || getDeveloperLaunchMainlineWidenedRolloutMonitoringAction(payload);
+    payload.mainlineSummary.widenedRolloutMonitoringExecution =
+      getDeveloperLaunchMainlineWidenedRolloutMonitoringExecution(payload);
   }
   payload.postLaunchHandoffTraceability = buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload);
   payload.postLaunchHandoffIndexText = buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload);
@@ -28477,6 +28666,10 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     || getDeveloperLaunchMainlineNextRolloutWideningDecisionReceiptReadbackExecution(payload);
   const nextRolloutWideningDecisionReceiptReadbackExecutionDownload =
     getDeveloperLaunchMainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownload(payload);
+  const widenedRolloutMonitoringExecution = mainlineSummary.widenedRolloutMonitoringExecution
+    || getDeveloperLaunchMainlineWidenedRolloutMonitoringExecution(payload);
+  const widenedRolloutMonitoringExecutionDownload =
+    getDeveloperLaunchMainlineWidenedRolloutMonitoringExecutionDownload(payload);
   const preStagingReadinessSelfCheck = mainlineSummary.preStagingReadinessSelfCheck
     && typeof mainlineSummary.preStagingReadinessSelfCheck === "object"
       ? mainlineSummary.preStagingReadinessSelfCheck
@@ -29835,6 +30028,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       nextRolloutWideningDecisionReceiptReadbackExecutionDownload || {}
     );
   }
+  if (widenedRolloutMonitoringExecution) {
+    lines.push("");
+    appendWidenedRolloutMonitoringExecutionLines(lines, widenedRolloutMonitoringExecution, {
+      title: "Widened Rollout Monitoring Execution Route:"
+    });
+    pushRoute(
+      "widened-rollout-monitoring-execution",
+      "Launch Mainline widened rollout monitoring execution",
+      opsFiles.widenedRolloutMonitoringExecution || "ops/widened-rollout-monitoring-execution.txt",
+      widenedRolloutMonitoringExecutionDownload || {}
+    );
+  }
 
   appendLaunchDutyRecordIndexSelectionChecklistStepObjectLines(lines, launchDutyRecordIndexSelectionChecklistStep);
   lines.push("");
@@ -30305,6 +30510,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/widened-rollout-monitoring-execution.txt",
+    buildDeveloperLaunchMainlineWidenedRolloutMonitoringExecutionDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/steady-state-duty-board-download.txt",
     getDeveloperLaunchMainlineSteadyStateDutyBoardDownload(payload)
       ? buildDeveloperLaunchMainlineSteadyStateDutyBoardDownloadText(payload)
@@ -30498,7 +30708,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "rollout-widening-decision-execution", "first-operating-result-handoff-execution", "first-operating-result-handoff-receipt-readback-execution", "first-operating-result-review-execution", "next-rollout-widening-decision-execution", "next-rollout-widening-decision-receipt-readback-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "rollout-widening-decision-execution", "first-operating-result-handoff-execution", "first-operating-result-handoff-receipt-readback-execution", "first-operating-result-review-execution", "next-rollout-widening-decision-execution", "next-rollout-widening-decision-receipt-readback-execution", "widened-rollout-monitoring-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -30775,6 +30985,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "next-rollout-widening-decision-receipt-readback-execution.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineNextRolloutWideningDecisionReceiptReadbackExecutionDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "widened-rollout-monitoring-execution") {
+    return {
+      fileName: "widened-rollout-monitoring-execution.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineWidenedRolloutMonitoringExecutionDownloadText(payload)
     };
   }
   if (normalizedFormat === "stable-operations-transition-shortcut-download") {
@@ -32045,6 +32262,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       firstOperatingResultReviewExecution: "ops/first-operating-result-review-execution.txt",
       nextRolloutWideningDecisionExecution: "ops/next-rollout-widening-decision-execution.txt",
       nextRolloutWideningDecisionReceiptReadbackExecution: "ops/next-rollout-widening-decision-receipt-readback-execution.txt",
+      widenedRolloutMonitoringExecution: "ops/widened-rollout-monitoring-execution.txt",
       steadyStateHandoffDownloadRoute: "ops/steady-state-handoff-download.txt",
       steadyStateDutyBoardDownloadRoute: "ops/steady-state-duty-board-download.txt",
       steadyStateDutyActionLinksDownloadRoute: "ops/steady-state-duty-action-links-download.txt",
@@ -32172,6 +32390,8 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     || getDeveloperLaunchMainlineNextRolloutWideningDecisionExecution(payload);
   const nextRolloutWideningDecisionReceiptReadbackExecution = mainlineSummary.nextRolloutWideningDecisionReceiptReadbackExecution
     || getDeveloperLaunchMainlineNextRolloutWideningDecisionReceiptReadbackExecution(payload);
+  const widenedRolloutMonitoringExecution = mainlineSummary.widenedRolloutMonitoringExecution
+    || getDeveloperLaunchMainlineWidenedRolloutMonitoringExecution(payload);
   const launchOperationsOverviewStatusDownload = getDeveloperLaunchMainlineLaunchOperationsOverviewStatusDownload(payload);
   const launchReceiptNextFollowUpDownload = getDeveloperLaunchMainlineLaunchReceiptNextFollowUpDownload(payload);
   const launchReceiptBackfillStatusDownload = getDeveloperLaunchMainlineLaunchReceiptBackfillStatusDownload(payload);
@@ -32418,6 +32638,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       "Next rollout widening decision receipt readback execution direct file",
       opsFiles.nextRolloutWideningDecisionReceiptReadbackExecution
         || "ops/next-rollout-widening-decision-receipt-readback-execution.txt"
+    ]);
+  }
+  if (widenedRolloutMonitoringExecution) {
+    handoffFiles.push([
+      "Widened rollout monitoring execution direct file",
+      opsFiles.widenedRolloutMonitoringExecution || "ops/widened-rollout-monitoring-execution.txt"
     ]);
   }
   if (launchReadinessDistance) {
@@ -33261,6 +33487,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push("");
     appendNextRolloutWideningDecisionReceiptReadbackExecutionLines(lines, nextRolloutWideningDecisionReceiptReadbackExecution, {
       title: "Launch Mainline Next Rollout Widening Decision Receipt Readback Execution:"
+    });
+  }
+  if (widenedRolloutMonitoringExecution) {
+    lines.push("");
+    appendWidenedRolloutMonitoringExecutionLines(lines, widenedRolloutMonitoringExecution, {
+      title: "Launch Mainline Widened Rollout Monitoring Execution:"
     });
   }
   if (launchReadinessDistance) {
@@ -42783,6 +43015,74 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
           : "Record the next rollout widening decision receipt after reviewing the decision."
       })
     : null;
+  const widenedRolloutMonitoringReady = nextRolloutWideningDecisionReceiptReadbackAction?.ready === true
+    && nextRolloutWideningDecisionReceiptReadbackAction?.receiptRecorded === true
+    && nextRolloutWideningDecisionReceiptReadbackAction?.currentActionKey === "monitor_widened_rollout_window";
+  const widenedRolloutMonitoringAction = nextRolloutWideningDecisionReceiptReadbackAction
+    ? withLaunchOpsOverviewContextRecordIndex({
+        version: "developer-ops-launch-operations-overview-widened-rollout-monitoring-action/v1",
+        key: "widened_rollout_monitoring",
+        status: widenedRolloutMonitoringReady
+          ? "ready_for_widened_rollout_monitoring"
+          : "awaiting_next_rollout_widening_decision_receipt",
+        ready: widenedRolloutMonitoringReady,
+        actionKey: "monitor_widened_rollout_window",
+        auditLogId: nextRolloutWideningDecisionReceiptReadbackAction.auditLogId || null,
+        nextRolloutWideningDecisionReceiptAuditLogId:
+          nextRolloutWideningDecisionReceiptReadbackAction.auditLogId || null,
+        recordedAt: nextRolloutWideningDecisionReceiptReadbackAction.recordedAt || null,
+        recordedBy: nextRolloutWideningDecisionReceiptReadbackAction.recordedBy || null,
+        receiptReadbackStatus: nextRolloutWideningDecisionReceiptReadbackAction.status || null,
+        receiptRecorded: nextRolloutWideningDecisionReceiptReadbackAction.receiptRecorded === true,
+        receiptVisibilityStatus: nextRolloutWideningDecisionReceiptReadbackAction.receiptVisibilityStatus || null,
+        rolloutWideningFollowupReceiptAuditLogId:
+          nextRolloutWideningDecisionReceiptReadbackAction.rolloutWideningFollowupReceiptAuditLogId || null,
+        firstOperatingResultReviewReceiptAuditLogId:
+          nextRolloutWideningDecisionReceiptReadbackAction.firstOperatingResultReviewReceiptAuditLogId || null,
+        firstOperatingResultHandoffReceiptAuditLogId:
+          nextRolloutWideningDecisionReceiptReadbackAction.firstOperatingResultHandoffReceiptAuditLogId || null,
+        decisionSourceStatus: nextRolloutWideningDecisionReceiptReadbackAction.decisionSourceStatus || null,
+        decisionReady: nextRolloutWideningDecisionReceiptReadbackAction.decisionReady === true,
+        queueStatus: nextRolloutWideningDecisionReceiptReadbackAction.queueStatus || null,
+        queueTotal: nextRolloutWideningDecisionReceiptReadbackAction.queueTotal ?? null,
+        attentionCount: nextRolloutWideningDecisionReceiptReadbackAction.attentionCount ?? null,
+        nextDownloadKey: nextRolloutWideningDecisionReceiptReadbackAction.nextDownloadKey
+          || overviewDownload?.key
+          || "ops_launch_operations_overview_status",
+        nextDownloadFileName: nextRolloutWideningDecisionReceiptReadbackAction.nextDownloadFileName
+          || overviewDownload?.fileName
+          || "developer-ops-launch-operations-overview-status.txt",
+        nextDownloadFormat: nextRolloutWideningDecisionReceiptReadbackAction.nextDownloadFormat
+          || overviewDownload?.format
+          || "launch-operations-overview-status",
+        nextDownloadHref: nextRolloutWideningDecisionReceiptReadbackAction.nextDownloadHref
+          || overviewDownload?.href
+          || null,
+        nextDownloadSource: nextRolloutWideningDecisionReceiptReadbackAction.nextDownloadSource
+          || overviewDownload?.source
+          || "developer-ops",
+        requiredChecks: widenedRolloutMonitoringReady
+          ? [
+              "next_rollout_widening_decision_receipt_recorded",
+              "receipt_visible_in_developer_ops",
+              "widened_rollout_monitoring_window_active"
+            ]
+          : [
+              "next_rollout_widening_decision_receipt_recorded",
+              "widened_rollout_monitoring_ready"
+            ],
+        blockedBy: widenedRolloutMonitoringReady ? [] : ["next_rollout_widening_decision_receipt"],
+        operatorOrder: widenedRolloutMonitoringReady
+          ? [
+              "Monitor the widened rollout window from the launch operations overview.",
+              "Keep the widened-window queue and attention counts beside the launch-duty record index until the next stable result review."
+            ]
+          : ["Record the next rollout widening decision receipt before monitoring the widened rollout window."],
+        nextAction: widenedRolloutMonitoringReady
+          ? "Monitor the widened rollout window and keep the overview-status download beside the launch-duty record index."
+          : "Record the next rollout widening decision receipt before monitoring the widened rollout window."
+      })
+    : null;
   const panels = [
     withLaunchOpsOverviewContextRecordIndex({
       key: "launch_operations_evidence_chain",
@@ -42898,6 +43198,14 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
       ready: nextRolloutWideningDecisionReceiptReadbackAction?.ready === true,
       href: nextRolloutWideningDecisionReceiptReadbackAction?.nextDownloadHref || overviewDownload?.href || null,
       fileName: nextRolloutWideningDecisionReceiptReadbackAction?.nextDownloadFileName || overviewDownload?.fileName || null
+    }),
+    withLaunchOpsOverviewContextRecordIndex({
+      key: "widened_rollout_monitoring",
+      label: "Widened Rollout Monitoring",
+      status: widenedRolloutMonitoringAction?.status || "awaiting_next_rollout_widening_decision_receipt",
+      ready: widenedRolloutMonitoringAction?.ready === true,
+      href: widenedRolloutMonitoringAction?.nextDownloadHref || overviewDownload?.href || null,
+      fileName: widenedRolloutMonitoringAction?.nextDownloadFileName || overviewDownload?.fileName || null
     })
   ];
   const receiptVisible = receiptVisibilitySummary?.status === "visible";
@@ -42954,6 +43262,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     rolloutWideningFollowupReceiptReadbackAction,
     nextRolloutWideningDecisionAction,
     nextRolloutWideningDecisionReceiptReadbackAction,
+    widenedRolloutMonitoringAction,
     firstOperatingResultHandoffReceiptReadbackAction,
     firstOperatingResultReviewAction,
     firstOperatingResultReviewReceiptReadbackAction,
@@ -42967,7 +43276,7 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     panels,
     readyPanelCount,
     panelCount: panels.length,
-    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, signoff=${productionSignoffPacket || "-"}, watchEntry=${launchDayWatchEntry || "-"}, rollout=${rolloutWideningDecisionAction?.status || "-"}, rolloutReady=${rolloutWideningDecisionAction?.ready === true}, rolloutQueue=${rolloutWideningDecisionAction?.queueTotal ?? "-"}, rolloutAttention=${rolloutWideningDecisionAction?.attentionCount ?? "-"}, firstResultReview=${firstOperatingResultReviewAction?.status || "-"}, firstResultReviewReceipt=${firstOperatingResultReviewReceiptReadbackAction?.status || "-"}, rolloutFollowup=${rolloutWideningFollowupAction?.status || "-"}, rolloutFollowupReceipt=${rolloutWideningFollowupReceiptReadbackAction?.status || "-"}, nextRolloutDecision=${nextRolloutWideningDecisionAction?.status || "-"}, nextRolloutDecisionReceipt=${nextRolloutWideningDecisionReceiptReadbackAction?.status || "-"}, next=${nextAction?.key || "-"}.`
+    operatorSummary: `Launch operations overview: status=${status}, receipt=${receiptVisibilitySummary?.status || "pending"}, panels=${readyPanelCount}/${panels.length}, watchRecordDraft=${watchRecordDraftStatus || "-"}, records=${watchRecordDraftRecordCount ?? "-"}, signoff=${productionSignoffPacket || "-"}, watchEntry=${launchDayWatchEntry || "-"}, rollout=${rolloutWideningDecisionAction?.status || "-"}, rolloutReady=${rolloutWideningDecisionAction?.ready === true}, rolloutQueue=${rolloutWideningDecisionAction?.queueTotal ?? "-"}, rolloutAttention=${rolloutWideningDecisionAction?.attentionCount ?? "-"}, firstResultReview=${firstOperatingResultReviewAction?.status || "-"}, firstResultReviewReceipt=${firstOperatingResultReviewReceiptReadbackAction?.status || "-"}, rolloutFollowup=${rolloutWideningFollowupAction?.status || "-"}, rolloutFollowupReceipt=${rolloutWideningFollowupReceiptReadbackAction?.status || "-"}, nextRolloutDecision=${nextRolloutWideningDecisionAction?.status || "-"}, nextRolloutDecisionReceipt=${nextRolloutWideningDecisionReceiptReadbackAction?.status || "-"}, widenedRolloutMonitoring=${widenedRolloutMonitoringAction?.status || "-"}, next=${nextAction?.key || "-"}.`
   };
 }
 
@@ -57820,6 +58129,10 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
     && typeof overview.nextRolloutWideningDecisionReceiptReadbackAction === "object"
       ? overview.nextRolloutWideningDecisionReceiptReadbackAction
       : null;
+  const widenedRolloutMonitoringAction = overview?.widenedRolloutMonitoringAction
+    && typeof overview.widenedRolloutMonitoringAction === "object"
+      ? overview.widenedRolloutMonitoringAction
+      : null;
   const launchOpsOverviewContext = normalizeLaunchOpsOverviewContext(overview?.launchOpsOverviewContext);
   const {
     launchReviewSummaryDownload,
@@ -58017,6 +58330,28 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusText(payload = {}) {
       `- nextRolloutWideningDecisionReceiptNext=${nextRolloutWideningDecisionReceiptReadbackAction.currentActionKey || "-"}`
       + ` | nextDownload=${nextRolloutWideningDecisionReceiptReadbackAction.nextDownloadFormat || "-"}`
       + ` | launchDutyRecordIndex=${nextRolloutWideningDecisionReceiptReadbackAction.launchDutyRecordIndexPath || "-"}`
+      + ` | blockedBy=${blockedBy || "-"}`
+      + ` | checks=${requiredChecks || "-"}`
+    );
+  }
+  if (widenedRolloutMonitoringAction) {
+    const blockedBy = Array.isArray(widenedRolloutMonitoringAction.blockedBy)
+      ? widenedRolloutMonitoringAction.blockedBy.join(",")
+      : "";
+    const requiredChecks = Array.isArray(widenedRolloutMonitoringAction.requiredChecks)
+      ? widenedRolloutMonitoringAction.requiredChecks.join(",")
+      : "";
+    lines.push(
+      `- widenedRolloutMonitoring=${widenedRolloutMonitoringAction.status || "-"}`
+      + ` | action=${widenedRolloutMonitoringAction.actionKey || "-"}`
+      + ` | decisionReceipt=${widenedRolloutMonitoringAction.nextRolloutWideningDecisionReceiptAuditLogId || widenedRolloutMonitoringAction.auditLogId || "-"}`
+      + ` | followupReceipt=${widenedRolloutMonitoringAction.rolloutWideningFollowupReceiptAuditLogId || "-"}`
+      + ` | ready=${widenedRolloutMonitoringAction.ready === true}`
+    );
+    lines.push(
+      `- widenedRolloutMonitoringNext=${widenedRolloutMonitoringAction.actionKey || "-"}`
+      + ` | nextDownload=${widenedRolloutMonitoringAction.nextDownloadFormat || "-"}`
+      + ` | launchDutyRecordIndex=${widenedRolloutMonitoringAction.launchDutyRecordIndexPath || "-"}`
       + ` | blockedBy=${blockedBy || "-"}`
       + ` | checks=${requiredChecks || "-"}`
     );

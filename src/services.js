@@ -12488,6 +12488,36 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineWidenedRolloutMonitoringExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline widened rollout monitoring execution",
+    "widened-rollout-monitoring-execution.txt",
+    "widened-rollout-monitoring-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineWidenedRolloutMonitoringResultReviewExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline widened rollout monitoring result review execution",
+    "widened-rollout-monitoring-result-review-execution.txt",
+    "widened-rollout-monitoring-result-review-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineWidenedRolloutNextDecisionExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline widened rollout next decision execution",
+    "widened-rollout-next-decision-execution.txt",
+    "widened-rollout-next-decision-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline widened rollout next decision receipt readback execution",
     "widened-rollout-next-decision-receipt-readback-execution.txt",
@@ -13128,6 +13158,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineSummaryDownload);
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineHandoffRoutesDownload);
+  pushRecommendedDownload(mainlineWidenedRolloutMonitoringExecutionDownload);
+  pushRecommendedDownload(mainlineWidenedRolloutMonitoringResultReviewExecutionDownload);
+  pushRecommendedDownload(mainlineWidenedRolloutNextDecisionExecutionDownload);
   pushRecommendedDownload(mainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload);
   pushRecommendedDownload(mainlinePostLaunchHandoffIndexDownload);
   pushRecommendedDownload(mainlineChecksumsDownload);
@@ -13297,6 +13330,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchMainlineSummary: mainlineSummaryDownload,
       launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: mainlineHandoffRoutesDownload,
+      launchMainlineWidenedRolloutMonitoringExecution: mainlineWidenedRolloutMonitoringExecutionDownload,
+      launchMainlineWidenedRolloutMonitoringResultReviewExecution: mainlineWidenedRolloutMonitoringResultReviewExecutionDownload,
+      launchMainlineWidenedRolloutNextDecisionExecution: mainlineWidenedRolloutNextDecisionExecutionDownload,
       launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecution: mainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload,
       launchMainlinePostLaunchIndex: mainlinePostLaunchHandoffIndexDownload,
       launchMainlineChecksums: mainlineChecksumsDownload,
@@ -13641,6 +13677,9 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineWidenedRolloutMonitoringExecution,
+      downloads.launchMainlineWidenedRolloutMonitoringResultReviewExecution,
+      downloads.launchMainlineWidenedRolloutNextDecisionExecution,
       downloads.launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecution,
       downloads.launchMainlinePostLaunchIndex,
       downloads.launchMainlineChecksums,
@@ -14223,6 +14262,39 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineWidenedRolloutMonitoringExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline widened rollout monitoring execution",
+    "widened-rollout-monitoring-execution.txt",
+    "widened-rollout-monitoring-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineWidenedRolloutMonitoringResultReviewExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline widened rollout monitoring result review execution",
+    "widened-rollout-monitoring-result-review-execution.txt",
+    "widened-rollout-monitoring-result-review-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineWidenedRolloutNextDecisionExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline widened rollout next decision execution",
+    "widened-rollout-next-decision-execution.txt",
+    "widened-rollout-next-decision-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline widened rollout next decision receipt readback execution",
     "widened-rollout-next-decision-receipt-readback-execution.txt",
@@ -14327,6 +14399,9 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
     launchMainlineHandoffRoutesDownload,
+    launchMainlineWidenedRolloutMonitoringExecutionDownload,
+    launchMainlineWidenedRolloutMonitoringResultReviewExecutionDownload,
+    launchMainlineWidenedRolloutNextDecisionExecutionDownload,
     launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload,
     launchMainlinePostLaunchHandoffIndexDownload,
     launchMainlineChecksumsDownload,
@@ -14965,6 +15040,9 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchMainlineSummary: launchMainlineSummaryDownload,
       launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
+      launchMainlineWidenedRolloutMonitoringExecution: launchMainlineWidenedRolloutMonitoringExecutionDownload,
+      launchMainlineWidenedRolloutMonitoringResultReviewExecution: launchMainlineWidenedRolloutMonitoringResultReviewExecutionDownload,
+      launchMainlineWidenedRolloutNextDecisionExecution: launchMainlineWidenedRolloutNextDecisionExecutionDownload,
       launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecution: launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecutionDownload,
       launchMainlinePostLaunchIndex: launchMainlinePostLaunchHandoffIndexDownload,
       launchMainlineChecksums: launchMainlineChecksumsDownload,
@@ -15241,6 +15319,9 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineWidenedRolloutMonitoringExecution,
+      downloads.launchMainlineWidenedRolloutMonitoringResultReviewExecution,
+      downloads.launchMainlineWidenedRolloutNextDecisionExecution,
       downloads.launchMainlineWidenedRolloutNextDecisionReceiptReadbackExecution,
       downloads.launchMainlinePostLaunchIndex,
       downloads.launchMainlineChecksums,

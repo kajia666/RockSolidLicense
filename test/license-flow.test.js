@@ -11696,8 +11696,32 @@ test("developer license quickstart first-batch setup can create recommended laun
       /Launch Mainline widened rollout next decision receipt readback execution/
     );
     assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline widened rollout monitoring execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline widened rollout monitoring result review execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline widened rollout next decision execution/
+    );
+    assert.match(
       stabilizationGateLaunchSmokeSummary.body,
       /Launch Mainline widened rollout next decision receipt readback execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline widened rollout monitoring execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline widened rollout monitoring result review execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline widened rollout next decision execution/
     );
     const stabilizationGateLaunchReviewHandoffRoutes = await getText(
       baseUrl,
@@ -11710,6 +11734,18 @@ test("developer license quickstart first-batch setup can create recommended laun
       stabilizationGateLaunchReviewHandoffRoutes.body,
       /widened-rollout-next-decision-receipt-readback-execution\.txt[^\n]*format=widened-rollout-next-decision-receipt-readback-execution/
     );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /widened-rollout-monitoring-execution\.txt[^\n]*format=widened-rollout-monitoring-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /widened-rollout-monitoring-result-review-execution\.txt[^\n]*format=widened-rollout-monitoring-result-review-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /widened-rollout-next-decision-execution\.txt[^\n]*format=widened-rollout-next-decision-execution/
+    );
     const stabilizationGateLaunchSmokeHandoffRoutes = await getText(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=handoff-routes",
@@ -11720,6 +11756,18 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,
       /widened-rollout-next-decision-receipt-readback-execution\.txt[^\n]*format=widened-rollout-next-decision-receipt-readback-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /widened-rollout-monitoring-execution\.txt[^\n]*format=widened-rollout-monitoring-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /widened-rollout-monitoring-result-review-execution\.txt[^\n]*format=widened-rollout-monitoring-result-review-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /widened-rollout-next-decision-execution\.txt[^\n]*format=widened-rollout-next-decision-execution/
     );
 
     const runtimeEvidenceLaunchMainline = await getJson(

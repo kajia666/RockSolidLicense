@@ -762,6 +762,58 @@ function buildOperatorNextCommands({
   ];
 }
 
+function buildOperatorQueueCheckpoint({
+  operatorNextCommands,
+  outputFile,
+  closeoutInputFile,
+  readinessActionQueueFile,
+  archiveRoot,
+  closeoutInitCommand,
+  postCloseoutInitStatusCommand,
+  postFirstWaveCloseoutRehearsalReloadCommand,
+  postSmokeBackfillCommands,
+  productionSignoffBackfillCommands,
+  receiptVisibilityBackfillCommands,
+  stabilizationRecordCommands
+}) {
+  const currentCommand = operatorNextCommands.find((item) => item.status === "current") || operatorNextCommands[0] || {};
+  const nextMilestone = operatorNextCommands.find((item) => item.key === "closeout_init")
+    || operatorNextCommands.find((item) => item.status !== "current")
+    || {};
+  const currentCommandCount = operatorNextCommands.filter((item) => item.status === "current").length;
+  const stableOperationsCommandCount = operatorNextCommands.filter((item) =>
+    item.key === "post_first_wave_closeout_readiness_status"
+      || item.key === "post_first_wave_closeout_rehearsal_reload"
+      || item.key === "handoff_stable_operations"
+  ).length;
+
+  return {
+    mode: "staging-profile-operator-queue-checkpoint",
+    status: currentCommand.key === "profile_rehearsal" ? "awaiting_profile_rehearsal" : "awaiting_operator_queue",
+    currentActionKey: currentCommand.key || null,
+    currentCommand: currentCommand.command || null,
+    currentArtifactPath: currentCommand.artifactPath || outputFile,
+    actionQueueFile: readinessActionQueueFile,
+    closeoutInputFile,
+    readinessStatusCommand: postCloseoutInitStatusCommand,
+    rehearsalReloadCommand: postFirstWaveCloseoutRehearsalReloadCommand,
+    archiveRoot,
+    totalCommandCount: operatorNextCommands.length,
+    currentCommandCount,
+    blockedCommandCount: Math.max(operatorNextCommands.length - currentCommandCount, 0),
+    queueCounts: {
+      postSmokeBackfillCount: postSmokeBackfillCommands.length,
+      productionSignoffBackfillCount: productionSignoffBackfillCommands.length,
+      receiptVisibilityBackfillCount: receiptVisibilityBackfillCommands.length,
+      launchDutyRecordCount: 1 + stabilizationRecordCommands.length,
+      stableOperationsCommandCount
+    },
+    nextMilestoneKey: nextMilestone.key || null,
+    nextMilestoneCommand: nextMilestone.command || closeoutInitCommand,
+    nextAction: "Run the current profile rehearsal command, then follow closeout_init and readiness_status before recovery preflight."
+  };
+}
+
 function buildLaunchLaneFiles({
   archiveRoot,
   outputFile,
@@ -812,6 +864,26 @@ function buildLaunchLaneFiles({
   };
 }
 
+function writeOperatorQueueCheckpointPlain(checkpoint) {
+  if (!checkpoint) {
+    return;
+  }
+  console.log(
+    `Operator queue checkpoint: ${checkpoint.currentActionKey || "-"}`
+      + ` (status=${checkpoint.status || "-"}, total=${checkpoint.totalCommandCount ?? "-"}, blocked=${checkpoint.blockedCommandCount ?? "-"})`
+  );
+  console.log(`Operator queue current: ${checkpoint.currentCommand || "-"}`);
+  console.log(`Operator queue readiness status: ${checkpoint.readinessStatusCommand || "-"}`);
+  console.log(
+    `Operator queue counts: postSmoke=${checkpoint.queueCounts?.postSmokeBackfillCount ?? "-"}`
+      + `, signoff=${checkpoint.queueCounts?.productionSignoffBackfillCount ?? "-"}`
+      + `, receipts=${checkpoint.queueCounts?.receiptVisibilityBackfillCount ?? "-"}`
+      + `, launchDutyRecords=${checkpoint.queueCounts?.launchDutyRecordCount ?? "-"}`
+      + `, stableOps=${checkpoint.queueCounts?.stableOperationsCommandCount ?? "-"}`
+  );
+  console.log(`Operator queue next milestone: ${checkpoint.nextMilestoneKey || "-"} -> ${checkpoint.nextMilestoneCommand || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -831,6 +903,7 @@ function writeResult(result, json) {
       console.log(`Launch lane route-map output: ${files.routeMapGateOutputFile}`);
       console.log(`Launch lane record index: ${files.launchDutyRecordIndexFile}`);
     }
+    writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const closeoutInit = result.operatorNextCommands?.find((item) => item.key === "closeout_init");
     const readinessStatus = result.operatorNextCommands?.find((item) => item.key === "readiness_status");
@@ -1100,6 +1173,54 @@ function main() {
       firstWaveCloseoutFile,
       launchDutyRecordIndexFile
     });
+    const operatorNextCommands = buildOperatorNextCommands({
+      outputFile,
+      closeoutInputFile,
+      readinessActionQueueFile,
+      backupRestoreArtifactFile,
+      nextCommand,
+      closeoutInitCommand,
+      postCloseoutInitStatusCommand,
+      recoveryPreflightCommand,
+      routeMapGateDryRunCommand,
+      routeMapGateCommand,
+      routeMapGateBackfillCommand,
+      postRouteMapReadinessStatusCommand,
+      smokePreflightCommand,
+      launchSmokeStagingCommand,
+      postSmokeBackfillCommands,
+      postSmokeReadinessStatusCommand,
+      fullTestCommand,
+      fullTestOutputFile,
+      fullTestSignoffBackfillCommand,
+      postFullTestReadinessStatusCommand,
+      productionSignoffBackfillCommands,
+      receiptVisibilityBackfillCommands,
+      postProductionSignoffReadinessStatusCommand,
+      postFirstWaveCloseoutReadinessStatusCommand,
+      postFirstWaveCloseoutRehearsalReloadCommand,
+      stableOperationsHandoff,
+      launchDutyRecordIndexFile,
+      launchDayWatchRecordCommand,
+      launchDayWatchSummaryFile,
+      stabilizationRecordCommands,
+      routeMapGateDryRunFile,
+      routeMapGateOutputFile
+    });
+    const operatorQueueCheckpoint = buildOperatorQueueCheckpoint({
+      operatorNextCommands,
+      outputFile,
+      closeoutInputFile,
+      readinessActionQueueFile,
+      archiveRoot,
+      closeoutInitCommand,
+      postCloseoutInitStatusCommand,
+      postFirstWaveCloseoutRehearsalReloadCommand,
+      postSmokeBackfillCommands,
+      productionSignoffBackfillCommands,
+      receiptVisibilityBackfillCommands,
+      stabilizationRecordCommands
+    });
     writeResult({
       status: "written",
       mode: "staging-profile-init",
@@ -1135,42 +1256,10 @@ function main() {
       postFirstWaveCloseoutReadinessStatusCommand,
       postFirstWaveCloseoutRehearsalReloadCommand,
       stableOperationsHandoff: toPublicStableOperationsHandoff(stableOperationsHandoff),
+      operatorQueueCheckpoint,
       launchDayWatchRecordCommand,
       stabilizationRecordCommands,
-      operatorNextCommands: buildOperatorNextCommands({
-        outputFile,
-        closeoutInputFile,
-        readinessActionQueueFile,
-        backupRestoreArtifactFile,
-        nextCommand,
-        closeoutInitCommand,
-        postCloseoutInitStatusCommand,
-        recoveryPreflightCommand,
-        routeMapGateDryRunCommand,
-        routeMapGateCommand,
-        routeMapGateBackfillCommand,
-        postRouteMapReadinessStatusCommand,
-        smokePreflightCommand,
-        launchSmokeStagingCommand,
-        postSmokeBackfillCommands,
-        postSmokeReadinessStatusCommand,
-        fullTestCommand,
-        fullTestOutputFile,
-        fullTestSignoffBackfillCommand,
-        postFullTestReadinessStatusCommand,
-        productionSignoffBackfillCommands,
-        receiptVisibilityBackfillCommands,
-        postProductionSignoffReadinessStatusCommand,
-        postFirstWaveCloseoutReadinessStatusCommand,
-        postFirstWaveCloseoutRehearsalReloadCommand,
-        stableOperationsHandoff,
-        launchDutyRecordIndexFile,
-        launchDayWatchRecordCommand,
-        launchDayWatchSummaryFile,
-        stabilizationRecordCommands,
-        routeMapGateDryRunFile,
-        routeMapGateOutputFile
-      }),
+      operatorNextCommands,
       nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff."
     }, options.json);
   } catch (error) {

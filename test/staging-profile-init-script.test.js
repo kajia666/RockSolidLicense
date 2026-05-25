@@ -283,6 +283,31 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         .map((item) => [item.targetKey, item.status, item.command]),
       receiptVisibilityBackfillCommands.map((item) => [item.key, item.status, item.command])
     );
+    assert.deepEqual(output.operatorQueueCheckpoint, {
+      mode: "staging-profile-operator-queue-checkpoint",
+      status: "awaiting_profile_rehearsal",
+      currentActionKey: "profile_rehearsal",
+      currentCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+      currentArtifactPath: outputFile,
+      actionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
+      totalCommandCount: 39,
+      currentCommandCount: 1,
+      blockedCommandCount: 38,
+      queueCounts: {
+        postSmokeBackfillCount: 4,
+        productionSignoffBackfillCount: 6,
+        receiptVisibilityBackfillCount: 5,
+        launchDutyRecordCount: 6,
+        stableOperationsCommandCount: 3
+      },
+      nextMilestoneKey: "closeout_init",
+      nextMilestoneCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      nextAction: "Run the current profile rehearsal command, then follow closeout_init and readiness_status before recovery preflight."
+    });
     assert.deepEqual(output, {
       status: "written",
       mode: "staging-profile-init",
@@ -350,6 +375,31 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         rehearsalReloadCommand: postFirstWaveCloseoutRehearsalReloadCommand,
         handoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
         nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, then hand off the completed record index and first-wave closeout artifact to stable operations."
+      },
+      operatorQueueCheckpoint: {
+        mode: "staging-profile-operator-queue-checkpoint",
+        status: "awaiting_profile_rehearsal",
+        currentActionKey: "profile_rehearsal",
+        currentCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+        currentArtifactPath: outputFile,
+        actionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+        closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+        readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+        rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+        archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
+        totalCommandCount: 39,
+        currentCommandCount: 1,
+        blockedCommandCount: 38,
+        queueCounts: {
+          postSmokeBackfillCount: 4,
+          productionSignoffBackfillCount: 6,
+          receiptVisibilityBackfillCount: 5,
+          launchDutyRecordCount: 6,
+          stableOperationsCommandCount: 3
+        },
+        nextMilestoneKey: "closeout_init",
+        nextMilestoneCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+        nextAction: "Run the current profile rehearsal command, then follow closeout_init and readiness_status before recovery preflight."
       },
       launchDayWatchRecordCommand,
       stabilizationRecordCommands,
@@ -710,6 +760,11 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Launch lane action queue: artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Launch lane backup\/restore artifact: artifacts\/staging\/PILOT_ALPHA\/beta\/backup-restore-drill\.txt/);
     assert.match(result.stdout, /Launch lane record index: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json/);
+    assert.match(result.stdout, /Operator queue checkpoint: profile_rehearsal \(status=awaiting_profile_rehearsal, total=39, blocked=38\)/);
+    assert.match(result.stdout, /Operator queue current: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
+    assert.match(result.stdout, /Operator queue readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Operator queue counts: postSmoke=4, signoff=6, receipts=5, launchDutyRecords=6, stableOps=3/);
+    assert.match(result.stdout, /Operator queue next milestone: closeout_init -> npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
     assert.match(result.stdout, /Closeout init: npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);

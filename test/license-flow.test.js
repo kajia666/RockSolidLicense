@@ -11693,6 +11693,22 @@ test("developer license quickstart first-batch setup can create recommended laun
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeSummary.body);
     assert.match(
       stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline stable operations handoff execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline stable operations transition review/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline steady-state handoff landing execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
+      /Launch Mainline steady-state duty receipt review execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewSummary.body,
       /Launch Mainline rollout widening decision execution/
     );
     assert.match(
@@ -11730,6 +11746,22 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchReviewSummary.body,
       /Launch Mainline widened rollout next decision execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline stable operations handoff execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline stable operations transition review/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline steady-state handoff landing execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeSummary.body,
+      /Launch Mainline steady-state duty receipt review execution/
     );
     assert.match(
       stabilizationGateLaunchSmokeSummary.body,
@@ -11780,6 +11812,22 @@ test("developer license quickstart first-batch setup can create recommended laun
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchReviewHandoffRoutes.body);
     assert.match(
       stabilizationGateLaunchReviewHandoffRoutes.body,
+      /stable-operations-handoff-execution\.txt[^\n]*format=stable-operations-handoff-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /stable-operations-transition-review\.txt[^\n]*format=stable-operations-transition-review/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /steady-state-handoff-landing-execution\.txt[^\n]*format=steady-state-handoff-landing-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
+      /steady-state-duty-receipt-review-execution\.txt[^\n]*format=steady-state-duty-receipt-review-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
       /rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution/
     );
     assert.match(
@@ -11825,6 +11873,22 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(stabilizationGateLaunchSmokeHandoffRoutes.contentType || "", /^text\/plain/);
     assertGoLiveNextGateHandoffText(stabilizationGateLaunchSmokeHandoffRoutes.body);
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /stable-operations-handoff-execution\.txt[^\n]*format=stable-operations-handoff-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /stable-operations-transition-review\.txt[^\n]*format=stable-operations-transition-review/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /steady-state-handoff-landing-execution\.txt[^\n]*format=steady-state-handoff-landing-execution/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /steady-state-duty-receipt-review-execution\.txt[^\n]*format=steady-state-duty-receipt-review-execution/
+    );
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,
       /rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution/

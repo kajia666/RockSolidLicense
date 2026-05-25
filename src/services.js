@@ -12488,6 +12488,46 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineStableOperationsHandoffExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stable operations handoff execution",
+    "stable-operations-handoff-execution.txt",
+    "stable-operations-handoff-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineStableOperationsTransitionReviewDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stable operations transition review",
+    "stable-operations-transition-review.txt",
+    "stable-operations-transition-review",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineSteadyStateHandoffLandingExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline steady-state handoff landing execution",
+    "steady-state-handoff-landing-execution.txt",
+    "steady-state-handoff-landing-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineSteadyStateDutyReceiptReviewExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline steady-state duty receipt review execution",
+    "steady-state-duty-receipt-review-execution.txt",
+    "steady-state-duty-receipt-review-execution",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlineRolloutWideningDecisionExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline rollout widening decision execution",
     "rollout-widening-decision-execution.txt",
@@ -13218,6 +13258,10 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineSummaryDownload);
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineHandoffRoutesDownload);
+  pushRecommendedDownload(mainlineStableOperationsHandoffExecutionDownload);
+  pushRecommendedDownload(mainlineStableOperationsTransitionReviewDownload);
+  pushRecommendedDownload(mainlineSteadyStateHandoffLandingExecutionDownload);
+  pushRecommendedDownload(mainlineSteadyStateDutyReceiptReviewExecutionDownload);
   pushRecommendedDownload(mainlineRolloutWideningDecisionExecutionDownload);
   pushRecommendedDownload(mainlineFirstOperatingResultHandoffExecutionDownload);
   pushRecommendedDownload(mainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload);
@@ -13396,6 +13440,10 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchMainlineSummary: mainlineSummaryDownload,
       launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: mainlineHandoffRoutesDownload,
+      launchMainlineStableOperationsHandoffExecution: mainlineStableOperationsHandoffExecutionDownload,
+      launchMainlineStableOperationsTransitionReview: mainlineStableOperationsTransitionReviewDownload,
+      launchMainlineSteadyStateHandoffLandingExecution: mainlineSteadyStateHandoffLandingExecutionDownload,
+      launchMainlineSteadyStateDutyReceiptReviewExecution: mainlineSteadyStateDutyReceiptReviewExecutionDownload,
       launchMainlineRolloutWideningDecisionExecution: mainlineRolloutWideningDecisionExecutionDownload,
       launchMainlineFirstOperatingResultHandoffExecution: mainlineFirstOperatingResultHandoffExecutionDownload,
       launchMainlineFirstOperatingResultHandoffReceiptReadbackExecution: mainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload,
@@ -13749,6 +13797,10 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineStableOperationsHandoffExecution,
+      downloads.launchMainlineStableOperationsTransitionReview,
+      downloads.launchMainlineSteadyStateHandoffLandingExecution,
+      downloads.launchMainlineSteadyStateDutyReceiptReviewExecution,
       downloads.launchMainlineRolloutWideningDecisionExecution,
       downloads.launchMainlineFirstOperatingResultHandoffExecution,
       downloads.launchMainlineFirstOperatingResultHandoffReceiptReadbackExecution,
@@ -14340,6 +14392,50 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineStableOperationsHandoffExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stable operations handoff execution",
+    "stable-operations-handoff-execution.txt",
+    "stable-operations-handoff-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineStableOperationsTransitionReviewDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline stable operations transition review",
+    "stable-operations-transition-review.txt",
+    "stable-operations-transition-review",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineSteadyStateHandoffLandingExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline steady-state handoff landing execution",
+    "steady-state-handoff-landing-execution.txt",
+    "steady-state-handoff-landing-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineSteadyStateDutyReceiptReviewExecutionDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline steady-state duty receipt review execution",
+    "steady-state-duty-receipt-review-execution.txt",
+    "steady-state-duty-receipt-review-execution",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchMainlineRolloutWideningDecisionExecutionDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline rollout widening decision execution",
     "rollout-widening-decision-execution.txt",
@@ -14543,6 +14639,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineSummaryDownload,
     launchMainlineRehearsalGuideDownload,
     launchMainlineHandoffRoutesDownload,
+    launchMainlineStableOperationsHandoffExecutionDownload,
+    launchMainlineStableOperationsTransitionReviewDownload,
+    launchMainlineSteadyStateHandoffLandingExecutionDownload,
+    launchMainlineSteadyStateDutyReceiptReviewExecutionDownload,
     launchMainlineRolloutWideningDecisionExecutionDownload,
     launchMainlineFirstOperatingResultHandoffExecutionDownload,
     launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload,
@@ -15190,6 +15290,10 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchMainlineSummary: launchMainlineSummaryDownload,
       launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
+      launchMainlineStableOperationsHandoffExecution: launchMainlineStableOperationsHandoffExecutionDownload,
+      launchMainlineStableOperationsTransitionReview: launchMainlineStableOperationsTransitionReviewDownload,
+      launchMainlineSteadyStateHandoffLandingExecution: launchMainlineSteadyStateHandoffLandingExecutionDownload,
+      launchMainlineSteadyStateDutyReceiptReviewExecution: launchMainlineSteadyStateDutyReceiptReviewExecutionDownload,
       launchMainlineRolloutWideningDecisionExecution: launchMainlineRolloutWideningDecisionExecutionDownload,
       launchMainlineFirstOperatingResultHandoffExecution: launchMainlineFirstOperatingResultHandoffExecutionDownload,
       launchMainlineFirstOperatingResultHandoffReceiptReadbackExecution: launchMainlineFirstOperatingResultHandoffReceiptReadbackExecutionDownload,
@@ -15475,6 +15579,10 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
+      downloads.launchMainlineStableOperationsHandoffExecution,
+      downloads.launchMainlineStableOperationsTransitionReview,
+      downloads.launchMainlineSteadyStateHandoffLandingExecution,
+      downloads.launchMainlineSteadyStateDutyReceiptReviewExecution,
       downloads.launchMainlineRolloutWideningDecisionExecution,
       downloads.launchMainlineFirstOperatingResultHandoffExecution,
       downloads.launchMainlineFirstOperatingResultHandoffReceiptReadbackExecution,

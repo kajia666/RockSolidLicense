@@ -169,6 +169,29 @@ function buildRouteMapGateBackfillCommand({ closeoutInputFile, readinessActionQu
   ].join(" ");
 }
 
+function buildCloseoutEvidenceBackfillCommand({
+  closeoutInputFile,
+  readinessActionQueueFile,
+  key,
+  artifactPath,
+  receiptIds = []
+}) {
+  return [
+    "npm.cmd run staging:closeout:backfill --",
+    "--input-file",
+    commandValue(closeoutInputFile),
+    "--key",
+    key,
+    "--value-json",
+    "<redacted-json>",
+    "--artifact-path",
+    commandValue(artifactPath),
+    ...receiptIds.flatMap((receiptId) => ["--receipt-id", receiptId]),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
 function buildStagingSmokePreflightCommand(options) {
   return [
     "npm.cmd run staging:preflight --",
@@ -814,6 +837,209 @@ function buildOperatorQueueCheckpoint({
   };
 }
 
+function buildLaunchEvidenceItem({
+  order,
+  key,
+  type,
+  status,
+  artifactPath,
+  command,
+  receiptIds = [],
+  sourceRecordKeys = []
+}) {
+  const item = {
+    order,
+    key,
+    type,
+    status,
+    artifactPath,
+    command,
+    receiptIds: Array.isArray(receiptIds) ? receiptIds.slice() : []
+  };
+  if (Array.isArray(sourceRecordKeys) && sourceRecordKeys.length) {
+    item.sourceRecordKeys = sourceRecordKeys.slice();
+  }
+  return item;
+}
+
+function buildProfileLaunchEvidenceReadinessGate({
+  nextCommand,
+  closeoutInputFile,
+  readinessActionQueueFile,
+  archiveRoot,
+  routeMapGateBackfillCommand,
+  routeMapGateOutputFile,
+  backupRestoreDrillBackfillCommand,
+  backupRestoreArtifactFile,
+  postSmokeBackfillCommands,
+  operatorGoNoGoBackfillCommand,
+  operatorGoNoGoFile,
+  fullTestCommand,
+  fullTestOutputFile,
+  fullTestSignoffBackfillCommand,
+  productionSignoffBackfillCommands,
+  receiptVisibilityBackfillCommands,
+  postCloseoutInitStatusCommand,
+  postFirstWaveCloseoutRehearsalReloadCommand,
+  launchDutyRecordIndexFile,
+  launchDayWatchRecordCommand,
+  launchDayWatchSummaryFile,
+  stabilizationRecordCommands,
+  firstWaveCloseoutFile
+}) {
+  const postSmokeEvidenceStatuses = [
+    "blocked_after_launch_smoke_staging",
+    "blocked_after_live_write_smoke_result",
+    "blocked_after_launch_smoke_handoff",
+    "blocked_after_launch_mainline_evidence_receipts"
+  ];
+  const closeoutEvidenceItems = [
+    buildLaunchEvidenceItem({
+      order: 1,
+      key: "route_map_gate_result",
+      type: "closeout_evidence",
+      status: "blocked_after_route_map_gate",
+      artifactPath: routeMapGateOutputFile,
+      command: routeMapGateBackfillCommand,
+      receiptIds: ["<route-map-gate-receipt-id>"]
+    }),
+    buildLaunchEvidenceItem({
+      order: 2,
+      key: "backup_restore_drill_result",
+      type: "closeout_evidence",
+      status: "blocked_after_recovery_preflight",
+      artifactPath: backupRestoreArtifactFile,
+      command: backupRestoreDrillBackfillCommand,
+      receiptIds: ["<record_recovery_drill-receipt-id>", "<record_backup_verification-receipt-id>"]
+    }),
+    ...postSmokeBackfillCommands.map((item, index) => buildLaunchEvidenceItem({
+      order: index + 3,
+      key: item.key,
+      type: "closeout_evidence",
+      status: item.status || postSmokeEvidenceStatuses[index] || "blocked_after_post_smoke_evidence",
+      artifactPath: item.artifactPath,
+      command: item.command,
+      receiptIds: item.receiptIds
+    })),
+    buildLaunchEvidenceItem({
+      order: 7,
+      key: "operator_go_no_go",
+      type: "closeout_evidence",
+      status: "blocked_after_receipt_visibility_review",
+      artifactPath: operatorGoNoGoFile,
+      command: operatorGoNoGoBackfillCommand,
+      receiptIds: []
+    })
+  ];
+  const productionSignoffEvidenceItems = [
+    buildLaunchEvidenceItem({
+      order: 8,
+      key: "full_test_window_passed",
+      type: "production_signoff_condition",
+      status: "blocked_after_full_test_window",
+      artifactPath: fullTestOutputFile,
+      command: fullTestSignoffBackfillCommand,
+      receiptIds: []
+    }),
+    ...productionSignoffBackfillCommands.map((item, index) => buildLaunchEvidenceItem({
+      order: index + 9,
+      key: item.key,
+      type: "production_signoff_condition",
+      status: item.status,
+      artifactPath: item.artifactPath,
+      command: item.command,
+      receiptIds: item.receiptIds
+    }))
+  ];
+  const receiptVisibilityEvidenceItems = receiptVisibilityBackfillCommands.map((item, index) => buildLaunchEvidenceItem({
+    order: index + 15,
+    key: item.key,
+    type: "receipt_visibility_lane",
+    status: item.status,
+    artifactPath: item.artifactPath,
+    command: item.command,
+    receiptIds: item.receiptIds
+  }));
+  const firstWaveCloseout = stabilizationRecordCommands.find((item) => item.key === "first_wave_closeout") || {};
+  const launchDutyEvidenceItems = [
+    buildLaunchEvidenceItem({
+      order: 20,
+      key: "launch_day_watch_summary",
+      type: "launch_duty_record",
+      status: "blocked_after_production_signoff_readiness_status",
+      artifactPath: launchDayWatchSummaryFile,
+      command: launchDayWatchRecordCommand,
+      receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
+    }),
+    buildLaunchEvidenceItem({
+      order: 21,
+      key: "first_wave_closeout",
+      type: "launch_duty_record",
+      status: firstWaveCloseout.status || "blocked_until_source_records",
+      artifactPath: firstWaveCloseout.artifactPath || firstWaveCloseoutFile,
+      command: firstWaveCloseout.command || null,
+      receiptIds: firstWaveCloseout.receiptIds || ["<record_launch_closeout_review-receipt-id>"],
+      sourceRecordKeys: (firstWaveCloseout.sourceRecords || []).map((record) => record.key)
+    })
+  ];
+  const evidenceItems = [
+    ...closeoutEvidenceItems,
+    ...productionSignoffEvidenceItems,
+    ...receiptVisibilityEvidenceItems,
+    ...launchDutyEvidenceItems
+  ];
+  const currentEvidence = evidenceItems[0] || null;
+  const completedEvidenceCount = evidenceItems.filter((item) =>
+    item.status === "filled" || item.status === "visible" || item.status === "recorded"
+  ).length;
+  const pendingEvidenceCount = evidenceItems.length - completedEvidenceCount;
+  const closeoutEvidenceCount = closeoutEvidenceItems.length;
+  const productionSignoffEvidenceCount = productionSignoffEvidenceItems.length;
+  const receiptVisibilityEvidenceCount = receiptVisibilityEvidenceItems.length;
+  const launchDutyEvidenceCount = launchDutyEvidenceItems.length;
+
+  return {
+    version: "staging-profile-init-launch-evidence-gate/v1",
+    status: pendingEvidenceCount > 0
+      ? "blocked_until_real_launch_evidence_attached"
+      : "ready_for_stabilization_handoff",
+    currentGate: "profile_rehearsal",
+    currentSetupActionKey: "profile_rehearsal",
+    currentSetupCommand: nextCommand,
+    currentEvidenceKey: currentEvidence?.key || null,
+    currentEvidenceType: currentEvidence?.type || null,
+    currentEvidenceStatus: currentEvidence?.status || null,
+    currentCommand: currentEvidence?.command || null,
+    currentArtifactPath: currentEvidence?.artifactPath || null,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    archiveRoot,
+    evidenceCount: evidenceItems.length,
+    closeoutEvidenceCount,
+    productionSignoffEvidenceCount,
+    receiptVisibilityEvidenceCount,
+    launchDutyEvidenceCount,
+    completedEvidenceCount,
+    pendingEvidenceCount,
+    readinessStatusCommand: postCloseoutInitStatusCommand,
+    rehearsalReloadCommand: postFirstWaveCloseoutRehearsalReloadCommand,
+    fullTestCommand,
+    fullTestOutputArtifact: fullTestOutputFile,
+    productionSignoffPacket: path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
+    launchDayWatchArtifact: launchDayWatchSummaryFile,
+    firstWaveCloseoutArtifact: firstWaveCloseoutFile,
+    launchDutyRecordIndexPath: launchDutyRecordIndexFile,
+    progress: {
+      closeout: { completed: 0, total: closeoutEvidenceCount },
+      productionSignoff: { completed: 0, total: productionSignoffEvidenceCount },
+      receiptVisibility: { completed: 0, total: receiptVisibilityEvidenceCount },
+      launchDuty: { completed: 0, total: launchDutyEvidenceCount }
+    },
+    evidenceItems,
+    nextAction: "Run the current setup command and closeout init, then attach route_map_gate_result as the first real launch evidence item before continuing through readiness refresh, smoke, full-test, signoff, receipt visibility, launch-day watch, and first-wave closeout."
+  };
+}
+
 function buildLaunchLaneFiles({
   archiveRoot,
   outputFile,
@@ -827,6 +1053,7 @@ function buildLaunchLaneFiles({
   launchSmokeHandoffFile,
   launchMainlineEvidenceReceiptsFile,
   receiptVisibilityReviewFile,
+  operatorGoNoGoFile,
   fullTestOutputFile,
   launchDayWatchSummaryFile,
   receiptVisibilitySnapshotFile,
@@ -849,6 +1076,7 @@ function buildLaunchLaneFiles({
     launchSmokeHandoffFile,
     launchMainlineEvidenceReceiptsFile,
     receiptVisibilityReviewFile,
+    operatorGoNoGoFile,
     fullTestOutputFile,
     launchDayWatchSummaryFile,
     receiptVisibilitySnapshotFile,
@@ -884,6 +1112,30 @@ function writeOperatorQueueCheckpointPlain(checkpoint) {
   console.log(`Operator queue next milestone: ${checkpoint.nextMilestoneKey || "-"} -> ${checkpoint.nextMilestoneCommand || "-"}`);
 }
 
+function writeLaunchEvidenceReadinessGatePlain(gate) {
+  if (!gate) {
+    return;
+  }
+  console.log(
+    `Launch evidence gate: ${gate.status || "-"}`
+      + ` (current=${gate.currentEvidenceKey || "-"}, pending=${gate.pendingEvidenceCount ?? "-"}/${gate.evidenceCount ?? "-"})`
+  );
+  console.log(`Launch evidence setup: ${gate.currentSetupActionKey || "-"} -> ${gate.currentSetupCommand || "-"}`);
+  console.log(`Launch evidence current: ${gate.currentEvidenceType || "-"}/${gate.currentEvidenceKey || "-"} -> ${gate.currentCommand || "-"}`);
+  console.log(`Launch evidence artifact: ${gate.currentArtifactPath || "-"}`);
+  console.log(
+    `Launch evidence progress: closeout=${gate.progress?.closeout?.completed ?? "-"}/${gate.progress?.closeout?.total ?? "-"}`
+      + `, signoff=${gate.progress?.productionSignoff?.completed ?? "-"}/${gate.progress?.productionSignoff?.total ?? "-"}`
+      + `, receipts=${gate.progress?.receiptVisibility?.completed ?? "-"}/${gate.progress?.receiptVisibility?.total ?? "-"}`
+      + `, launchDuty=${gate.progress?.launchDuty?.completed ?? "-"}/${gate.progress?.launchDuty?.total ?? "-"}`
+  );
+  console.log(`Launch evidence full-test: ${gate.fullTestCommand || "-"} -> ${gate.fullTestOutputArtifact || "-"}`);
+  console.log(`Launch evidence production signoff packet: ${gate.productionSignoffPacket || "-"}`);
+  console.log(`Launch evidence launch-day watch: ${gate.launchDayWatchArtifact || "-"}`);
+  console.log(`Launch evidence first-wave closeout: ${gate.firstWaveCloseoutArtifact || "-"}`);
+  console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -901,9 +1153,11 @@ function writeResult(result, json) {
       console.log(`Launch lane backup/restore artifact: ${files.backupRestoreArtifactFile}`);
       console.log(`Launch lane route-map dry run: ${files.routeMapGateDryRunFile}`);
       console.log(`Launch lane route-map output: ${files.routeMapGateOutputFile}`);
+      console.log(`Launch lane operator go/no-go: ${files.operatorGoNoGoFile}`);
       console.log(`Launch lane record index: ${files.launchDutyRecordIndexFile}`);
     }
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
+    writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const closeoutInit = result.operatorNextCommands?.find((item) => item.key === "closeout_init");
     const readinessStatus = result.operatorNextCommands?.find((item) => item.key === "readiness_status");
@@ -1034,6 +1288,7 @@ function main() {
     const launchSmokeHandoffFile = path.posix.join(archiveRoot, "launch-smoke-handoff.json");
     const launchMainlineEvidenceReceiptsFile = path.posix.join(archiveRoot, "launch-mainline-evidence-receipts.json");
     const receiptVisibilityReviewFile = path.posix.join(archiveRoot, "receipt-visibility-review.txt");
+    const operatorGoNoGoFile = path.posix.join(archiveRoot, "operator-go-no-go.md");
     const fullTestOutputFile = path.posix.join(archiveRoot, "full-test-output.txt");
     const stagingArtifactsArchiveFile = path.posix.join(archiveRoot, "staging-artifacts-archive.txt");
     const launchMainlineReceiptsVisibleFile = path.posix.join(archiveRoot, "launch-mainline-receipts-visible.json");
@@ -1075,6 +1330,19 @@ function main() {
       closeoutInputFile,
       readinessActionQueueFile,
       routeMapGateOutputFile
+    });
+    const backupRestoreDrillBackfillCommand = buildCloseoutEvidenceBackfillCommand({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      key: "backup_restore_drill_result",
+      artifactPath: backupRestoreArtifactFile,
+      receiptIds: ["<record_recovery_drill-receipt-id>", "<record_backup_verification-receipt-id>"]
+    });
+    const operatorGoNoGoBackfillCommand = buildCloseoutEvidenceBackfillCommand({
+      closeoutInputFile,
+      readinessActionQueueFile,
+      key: "operator_go_no_go",
+      artifactPath: operatorGoNoGoFile
     });
     const postRouteMapReadinessStatusCommand = postCloseoutInitStatusCommand;
     const smokePreflightCommand = buildStagingSmokePreflightCommand(options);
@@ -1164,6 +1432,7 @@ function main() {
       launchSmokeHandoffFile,
       launchMainlineEvidenceReceiptsFile,
       receiptVisibilityReviewFile,
+      operatorGoNoGoFile,
       fullTestOutputFile,
       launchDayWatchSummaryFile,
       receiptVisibilitySnapshotFile,
@@ -1221,6 +1490,31 @@ function main() {
       receiptVisibilityBackfillCommands,
       stabilizationRecordCommands
     });
+    const launchEvidenceReadinessGate = buildProfileLaunchEvidenceReadinessGate({
+      nextCommand,
+      closeoutInputFile,
+      readinessActionQueueFile,
+      archiveRoot,
+      routeMapGateBackfillCommand,
+      routeMapGateOutputFile,
+      backupRestoreDrillBackfillCommand,
+      backupRestoreArtifactFile,
+      postSmokeBackfillCommands,
+      operatorGoNoGoBackfillCommand,
+      operatorGoNoGoFile,
+      fullTestCommand,
+      fullTestOutputFile,
+      fullTestSignoffBackfillCommand,
+      productionSignoffBackfillCommands,
+      receiptVisibilityBackfillCommands,
+      postCloseoutInitStatusCommand,
+      postFirstWaveCloseoutRehearsalReloadCommand,
+      launchDutyRecordIndexFile,
+      launchDayWatchRecordCommand,
+      launchDayWatchSummaryFile,
+      stabilizationRecordCommands,
+      firstWaveCloseoutFile
+    });
     writeResult({
       status: "written",
       mode: "staging-profile-init",
@@ -1257,6 +1551,7 @@ function main() {
       postFirstWaveCloseoutRehearsalReloadCommand,
       stableOperationsHandoff: toPublicStableOperationsHandoff(stableOperationsHandoff),
       operatorQueueCheckpoint,
+      launchEvidenceReadinessGate,
       launchDayWatchRecordCommand,
       stabilizationRecordCommands,
       operatorNextCommands,

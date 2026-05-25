@@ -80,6 +80,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     const routeMapGateDryRunCommand = "npm.cmd run launch:route-map-gate -- --dry-run --json --product-code PILOT_ALPHA --channel beta --staging-base-url https://staging.example.com --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const routeMapGateCommand = "npm.cmd run launch:route-map-gate -- --product-code PILOT_ALPHA --channel beta --staging-base-url https://staging.example.com --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const routeMapGateBackfillCommand = "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
+    const postCloseoutInitStatusCommand = "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const postRouteMapReadinessStatusCommand = "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const smokePreflightCommand = "npm.cmd run staging:preflight -- --base-url https://staging.example.com --product-code PILOT_ALPHA --channel beta";
     const launchSmokeStagingCommand = "npm.cmd run launch:smoke:staging -- --base-url https://staging.example.com --allow-live-writes --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
@@ -180,12 +181,15 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     const postFirstWaveCloseoutRehearsalReloadCommand = "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json";
     const launchDutyRecordIndexFile = "artifacts/staging/PILOT_ALPHA/beta/launch-duty-record-index.json";
     const launchDayWatchSummaryFile = "artifacts/staging/PILOT_ALPHA/beta/launch-day-watch-summary.md";
+    const operatorGoNoGoFile = "artifacts/staging/PILOT_ALPHA/beta/operator-go-no-go.md";
     const receiptVisibilitySnapshotFile = "artifacts/staging/PILOT_ALPHA/beta/receipt-visibility-snapshot.txt";
     const firstWaveIncidentLogFile = "artifacts/staging/PILOT_ALPHA/beta/first-wave-incident-log.md";
     const rollbackSignalReviewFile = "artifacts/staging/PILOT_ALPHA/beta/rollback-signal-review.md";
     const stabilizationOwnerHandoffFile = "artifacts/staging/PILOT_ALPHA/beta/stabilization-owner-handoff.md";
     const firstWaveCloseoutFile = "artifacts/staging/PILOT_ALPHA/beta/first-wave-closeout.md";
     const launchDayWatchRecordCommand = "npm.cmd run staging:launch-duty:record -- --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key launch_day_watch_summary --artifact-path artifacts/staging/PILOT_ALPHA/beta/launch-day-watch-summary.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts/staging/PILOT_ALPHA/beta/launch-duty-record-index.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
+    const backupRestoreDrillBackfillCommand = "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
+    const operatorGoNoGoBackfillCommand = "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key operator_go_no_go --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/operator-go-no-go.md --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const postSmokeBackfillCommands = [
       {
         key: "live_write_smoke_result",
@@ -263,6 +267,154 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         nextAction: "Record first-wave closeout after the incident, rollback, and stabilization handoff source records exist."
       }
     ];
+    const launchEvidenceReadinessGate = {
+      version: "staging-profile-init-launch-evidence-gate/v1",
+      status: "blocked_until_real_launch_evidence_attached",
+      currentGate: "profile_rehearsal",
+      currentSetupActionKey: "profile_rehearsal",
+      currentSetupCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+      currentEvidenceKey: "route_map_gate_result",
+      currentEvidenceType: "closeout_evidence",
+      currentEvidenceStatus: "blocked_after_route_map_gate",
+      currentCommand: routeMapGateBackfillCommand,
+      currentArtifactPath: "artifacts/staging/PILOT_ALPHA/beta/route-map-gate-output.txt",
+      closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
+      evidenceCount: 21,
+      closeoutEvidenceCount: 7,
+      productionSignoffEvidenceCount: 7,
+      receiptVisibilityEvidenceCount: 5,
+      launchDutyEvidenceCount: 2,
+      completedEvidenceCount: 0,
+      pendingEvidenceCount: 21,
+      readinessStatusCommand: postCloseoutInitStatusCommand,
+      rehearsalReloadCommand: postFirstWaveCloseoutRehearsalReloadCommand,
+      fullTestCommand,
+      fullTestOutputArtifact: fullTestOutputFile,
+      productionSignoffPacket: "artifacts/staging/PILOT_ALPHA/beta/staging-production-signoff-packet.json",
+      launchDayWatchArtifact: launchDayWatchSummaryFile,
+      firstWaveCloseoutArtifact: firstWaveCloseoutFile,
+      launchDutyRecordIndexPath: launchDutyRecordIndexFile,
+      progress: {
+        closeout: { completed: 0, total: 7 },
+        productionSignoff: { completed: 0, total: 7 },
+        receiptVisibility: { completed: 0, total: 5 },
+        launchDuty: { completed: 0, total: 2 }
+      },
+      evidenceItems: [
+        {
+          order: 1,
+          key: "route_map_gate_result",
+          type: "closeout_evidence",
+          status: "blocked_after_route_map_gate",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/route-map-gate-output.txt",
+          command: routeMapGateBackfillCommand,
+          receiptIds: ["<route-map-gate-receipt-id>"]
+        },
+        {
+          order: 2,
+          key: "backup_restore_drill_result",
+          type: "closeout_evidence",
+          status: "blocked_after_recovery_preflight",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt",
+          command: backupRestoreDrillBackfillCommand,
+          receiptIds: ["<record_recovery_drill-receipt-id>", "<record_backup_verification-receipt-id>"]
+        },
+        {
+          order: 3,
+          key: "live_write_smoke_result",
+          type: "closeout_evidence",
+          status: "blocked_after_launch_smoke_staging",
+          artifactPath: postSmokeBackfillCommands[0].artifactPath,
+          command: postSmokeBackfillCommands[0].command,
+          receiptIds: postSmokeBackfillCommands[0].receiptIds
+        },
+        {
+          order: 4,
+          key: "launch_smoke_handoff",
+          type: "closeout_evidence",
+          status: "blocked_after_live_write_smoke_result",
+          artifactPath: postSmokeBackfillCommands[1].artifactPath,
+          command: postSmokeBackfillCommands[1].command,
+          receiptIds: postSmokeBackfillCommands[1].receiptIds
+        },
+        {
+          order: 5,
+          key: "launch_mainline_evidence_receipts",
+          type: "closeout_evidence",
+          status: "blocked_after_launch_smoke_handoff",
+          artifactPath: postSmokeBackfillCommands[2].artifactPath,
+          command: postSmokeBackfillCommands[2].command,
+          receiptIds: postSmokeBackfillCommands[2].receiptIds
+        },
+        {
+          order: 6,
+          key: "receipt_visibility_review",
+          type: "closeout_evidence",
+          status: "blocked_after_launch_mainline_evidence_receipts",
+          artifactPath: postSmokeBackfillCommands[3].artifactPath,
+          command: postSmokeBackfillCommands[3].command,
+          receiptIds: postSmokeBackfillCommands[3].receiptIds
+        },
+        {
+          order: 7,
+          key: "operator_go_no_go",
+          type: "closeout_evidence",
+          status: "blocked_after_receipt_visibility_review",
+          artifactPath: operatorGoNoGoFile,
+          command: operatorGoNoGoBackfillCommand,
+          receiptIds: []
+        },
+        {
+          order: 8,
+          key: "full_test_window_passed",
+          type: "production_signoff_condition",
+          status: "blocked_after_full_test_window",
+          artifactPath: fullTestOutputFile,
+          command: fullTestSignoffBackfillCommand,
+          receiptIds: []
+        },
+        ...productionSignoffBackfillCommands.map((item, index) => ({
+          order: index + 9,
+          key: item.key,
+          type: "production_signoff_condition",
+          status: item.status,
+          artifactPath: item.artifactPath,
+          command: item.command,
+          receiptIds: item.receiptIds
+        })),
+        ...receiptVisibilityBackfillCommands.map((item, index) => ({
+          order: index + 15,
+          key: item.key,
+          type: "receipt_visibility_lane",
+          status: item.status,
+          artifactPath: item.artifactPath,
+          command: item.command,
+          receiptIds: item.receiptIds
+        })),
+        {
+          order: 20,
+          key: "launch_day_watch_summary",
+          type: "launch_duty_record",
+          status: "blocked_after_production_signoff_readiness_status",
+          artifactPath: launchDayWatchSummaryFile,
+          command: launchDayWatchRecordCommand,
+          receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
+        },
+        {
+          order: 21,
+          key: "first_wave_closeout",
+          type: "launch_duty_record",
+          status: "blocked_until_source_records",
+          artifactPath: firstWaveCloseoutFile,
+          command: stabilizationRecordCommands[4].command,
+          receiptIds: ["<record_launch_closeout_review-receipt-id>"],
+          sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+        }
+      ],
+      nextAction: "Run the current setup command and closeout init, then attach route_map_gate_result as the first real launch evidence item before continuing through readiness refresh, smoke, full-test, signoff, receipt visibility, launch-day watch, and first-wave closeout."
+    };
     assert.deepEqual(
       output.productionSignoffBackfillCommands.map((item) => [item.key, item.status, item.artifactPath, item.command]),
       productionSignoffBackfillCommands.map((item) => [item.key, item.status, item.artifactPath, item.command])
@@ -334,6 +486,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         launchSmokeHandoffFile: "artifacts/staging/PILOT_ALPHA/beta/launch-smoke-handoff.json",
         launchMainlineEvidenceReceiptsFile: "artifacts/staging/PILOT_ALPHA/beta/launch-mainline-evidence-receipts.json",
         receiptVisibilityReviewFile: "artifacts/staging/PILOT_ALPHA/beta/receipt-visibility-review.txt",
+        operatorGoNoGoFile,
         fullTestOutputFile,
         launchDayWatchSummaryFile,
         receiptVisibilitySnapshotFile,
@@ -401,6 +554,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         nextMilestoneCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
         nextAction: "Run the current profile rehearsal command, then follow closeout_init and readiness_status before recovery preflight."
       },
+      launchEvidenceReadinessGate,
       launchDayWatchRecordCommand,
       stabilizationRecordCommands,
       operatorNextCommands: [
@@ -759,12 +913,23 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Launch lane closeout input: artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json/);
     assert.match(result.stdout, /Launch lane action queue: artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Launch lane backup\/restore artifact: artifacts\/staging\/PILOT_ALPHA\/beta\/backup-restore-drill\.txt/);
+    assert.match(result.stdout, /Launch lane operator go\/no-go: artifacts\/staging\/PILOT_ALPHA\/beta\/operator-go-no-go\.md/);
     assert.match(result.stdout, /Launch lane record index: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json/);
     assert.match(result.stdout, /Operator queue checkpoint: profile_rehearsal \(status=awaiting_profile_rehearsal, total=39, blocked=38\)/);
     assert.match(result.stdout, /Operator queue current: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
     assert.match(result.stdout, /Operator queue readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Operator queue counts: postSmoke=4, signoff=6, receipts=5, launchDutyRecords=6, stableOps=3/);
     assert.match(result.stdout, /Operator queue next milestone: closeout_init -> npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch evidence gate: blocked_until_real_launch_evidence_attached \(current=route_map_gate_result, pending=21\/21\)/);
+    assert.match(result.stdout, /Launch evidence setup: profile_rehearsal -> npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
+    assert.match(result.stdout, /Launch evidence current: closeout_evidence\/route_map_gate_result -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch evidence artifact: artifacts\/staging\/PILOT_ALPHA\/beta\/route-map-gate-output\.txt/);
+    assert.match(result.stdout, /Launch evidence progress: closeout=0\/7, signoff=0\/7, receipts=0\/5, launchDuty=0\/2/);
+    assert.match(result.stdout, /Launch evidence full-test: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/beta\/full-test-output\.txt/);
+    assert.match(result.stdout, /Launch evidence production signoff packet: artifacts\/staging\/PILOT_ALPHA\/beta\/staging-production-signoff-packet\.json/);
+    assert.match(result.stdout, /Launch evidence launch-day watch: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-day-watch-summary\.md/);
+    assert.match(result.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md/);
+    assert.match(result.stdout, /Launch evidence next action: Run the current setup command and closeout init, then attach route_map_gate_result as the first real launch evidence item before continuing through readiness refresh, smoke, full-test, signoff, receipt visibility, launch-day watch, and first-wave closeout\./);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
     assert.match(result.stdout, /Closeout init: npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);

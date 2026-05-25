@@ -123,6 +123,165 @@ test("staging closeout init promotes a draft without clearing closeout readiness
     assert.equal(result.stderr, "");
     assert.equal(existsSync(outputFile), true);
     const output = JSON.parse(result.stdout);
+    const archiveRoot = "artifacts/staging/PILOT_ALPHA/stable";
+    const statusCommand = `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`;
+    const reloadCommand = `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`;
+    const closeoutEvidenceItems = [
+      "route_map_gate_result",
+      "backup_restore_drill_result",
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review",
+      "operator_go_no_go"
+    ].map((key, index) => ({
+      order: index + 1,
+      key,
+      type: "closeout_evidence",
+      status: "pending_operator_entry",
+      artifactPath: `${archiveRoot}/${key}.txt`,
+      command: `npm.cmd run staging:closeout:backfill -- --input-file ${outputFile} --key ${key} --value-json <redacted-json> --artifact-path ${archiveRoot}/${key}.txt --actions-file ${actionsFile}`,
+      receiptIds: []
+    }));
+    const productionSignoffEvidenceItems = [
+      {
+        order: 8,
+        key: "full_test_window_passed",
+        type: "production_signoff_condition",
+        status: "blocked_after_full_test_window",
+        artifactPath: `${archiveRoot}/full-test-output.txt`,
+        command: `npm.cmd run staging:signoff:backfill -- --input-file ${outputFile} --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path ${archiveRoot}/full-test-output.txt --decision ready-for-production-signoff --actions-file ${actionsFile}`,
+        receiptIds: []
+      },
+      {
+        order: 9,
+        key: "staging_artifacts_archived",
+        type: "production_signoff_condition",
+        status: "blocked_after_post_full_test_readiness_status",
+        artifactPath: `${archiveRoot}/staging-artifacts-archive.txt`,
+        command: `npm.cmd run staging:signoff:backfill -- --input-file ${outputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path ${archiveRoot}/staging-artifacts-archive.txt --actions-file ${actionsFile}`,
+        receiptIds: []
+      },
+      {
+        order: 10,
+        key: "launch_mainline_receipts_visible",
+        type: "production_signoff_condition",
+        status: "blocked_after_staging_artifacts_archived",
+        artifactPath: `${archiveRoot}/launch-mainline-receipts-visible.json`,
+        command: `npm.cmd run staging:signoff:backfill -- --input-file ${outputFile} --condition-key launch_mainline_receipts_visible --value-json <redacted-json> --artifact-path ${archiveRoot}/launch-mainline-receipts-visible.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file ${actionsFile}`,
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+      },
+      {
+        order: 11,
+        key: "launch_ops_overview_status_visible",
+        type: "production_signoff_condition",
+        status: "blocked_after_launch_mainline_receipts_visible",
+        artifactPath: `${archiveRoot}/launch-ops-overview-status-visible.json`,
+        command: `npm.cmd run staging:signoff:backfill -- --input-file ${outputFile} --condition-key launch_ops_overview_status_visible --value-json <redacted-json> --artifact-path ${archiveRoot}/launch-ops-overview-status-visible.json --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file ${actionsFile}`,
+        receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+      },
+      {
+        order: 12,
+        key: "backup_restore_drill_passed",
+        type: "production_signoff_condition",
+        status: "blocked_after_launch_ops_overview_status_visible",
+        artifactPath: `${archiveRoot}/backup-restore-drill.txt`,
+        command: `npm.cmd run staging:signoff:backfill -- --input-file ${outputFile} --condition-key backup_restore_drill_passed --value-json <redacted-json> --artifact-path ${archiveRoot}/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id> --actions-file ${actionsFile}`,
+        receiptIds: ["<record_recovery_drill-receipt-id>", "<record_backup_verification-receipt-id>"]
+      },
+      {
+        order: 13,
+        key: "rollback_path_confirmed",
+        type: "production_signoff_condition",
+        status: "blocked_after_backup_restore_drill_passed",
+        artifactPath: `${archiveRoot}/rollback-path-confirmed.md`,
+        command: `npm.cmd run staging:signoff:backfill -- --input-file ${outputFile} --condition-key rollback_path_confirmed --value-json <redacted-json> --artifact-path ${archiveRoot}/rollback-path-confirmed.md --receipt-id <record_rollback_walkthrough-receipt-id> --actions-file ${actionsFile}`,
+        receiptIds: ["<record_rollback_walkthrough-receipt-id>"]
+      },
+      {
+        order: 14,
+        key: "operator_signoff_recorded",
+        type: "production_signoff_condition",
+        status: "blocked_after_rollback_path_confirmed",
+        artifactPath: `${archiveRoot}/operator-production-signoff.md`,
+        command: `npm.cmd run staging:signoff:backfill -- --input-file ${outputFile} --condition-key operator_signoff_recorded --value-json <redacted-json> --artifact-path ${archiveRoot}/operator-production-signoff.md --actions-file ${actionsFile}`,
+        receiptIds: []
+      }
+    ];
+    const receiptVisibilityEvidenceItems = [
+      ["launchMainline", "blocked_after_operator_signoff_recorded", "launch-mainline-receipt-visibility.json"],
+      ["launchReview", "blocked_after_launchMainline_receipt_visibility", "launch-review-receipt-visibility.json"],
+      ["launchSmoke", "blocked_after_launchReview_receipt_visibility", "launch-smoke-receipt-visibility.json"],
+      ["developerOps", "blocked_after_launchSmoke_receipt_visibility", "developer-ops-receipt-visibility.json"],
+      ["launchOpsOverviewStatus", "blocked_after_developerOps_receipt_visibility", "launch-ops-overview-status-receipt-visibility.json"]
+    ].map(([key, status, fileName], index) => ({
+      order: index + 15,
+      key,
+      type: "receipt_visibility_lane",
+      status,
+      artifactPath: `${archiveRoot}/${fileName}`,
+      command: `npm.cmd run staging:signoff:backfill -- --input-file ${outputFile} --receipt-lane ${key} --value-json <redacted-json> --artifact-path ${archiveRoot}/${fileName} --receipt-id <record_post_launch_ops_sweep-receipt-id> --actions-file ${actionsFile}`,
+      receiptIds: ["<record_post_launch_ops_sweep-receipt-id>"]
+    }));
+    const launchEvidenceReadinessGate = {
+      version: "staging-closeout-init-launch-evidence-gate/v1",
+      status: "blocked_until_real_launch_evidence_attached",
+      currentGate: "closeout_init",
+      currentEvidenceKey: "route_map_gate_result",
+      currentEvidenceType: "closeout_evidence",
+      currentEvidenceStatus: "pending_operator_entry",
+      currentCommand: `npm.cmd run staging:closeout:backfill -- --input-file ${outputFile} --key route_map_gate_result --value-json <redacted-json> --artifact-path ${archiveRoot}/route_map_gate_result.txt --actions-file ${actionsFile}`,
+      currentArtifactPath: `${archiveRoot}/route_map_gate_result.txt`,
+      closeoutInputFile: outputFile,
+      readinessActionQueueFile: actionsFile,
+      archiveRoot,
+      evidenceCount: 21,
+      closeoutEvidenceCount: 7,
+      productionSignoffEvidenceCount: 7,
+      receiptVisibilityEvidenceCount: 5,
+      launchDutyEvidenceCount: 2,
+      completedEvidenceCount: 0,
+      pendingEvidenceCount: 21,
+      readinessStatusCommand: statusCommand,
+      rehearsalReloadCommand: reloadCommand,
+      fullTestCommand: "npm.cmd test",
+      fullTestOutputArtifact: `${archiveRoot}/full-test-output.txt`,
+      productionSignoffPacket: `${archiveRoot}/staging-production-signoff-packet.json`,
+      launchDayWatchArtifact: `${archiveRoot}/launch-day-watch-summary.md`,
+      firstWaveCloseoutArtifact: `${archiveRoot}/first-wave-closeout.md`,
+      launchDutyRecordIndexPath: `${archiveRoot}/launch-duty-record-index.json`,
+      progress: {
+        closeout: { completed: 0, total: 7 },
+        productionSignoff: { completed: 0, total: 7 },
+        receiptVisibility: { completed: 0, total: 5 },
+        launchDuty: { completed: 0, total: 2 }
+      },
+      evidenceItems: [
+        ...closeoutEvidenceItems,
+        ...productionSignoffEvidenceItems,
+        ...receiptVisibilityEvidenceItems,
+        {
+          order: 20,
+          key: "launch_day_watch_summary",
+          type: "launch_duty_record",
+          status: "blocked_after_production_signoff_readiness_status",
+          artifactPath: `${archiveRoot}/launch-day-watch-summary.md`,
+          command: `npm.cmd run staging:launch-duty:record -- --closeout-input-file ${outputFile} --key launch_day_watch_summary --artifact-path ${archiveRoot}/launch-day-watch-summary.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file ${archiveRoot}/launch-duty-record-index.json --actions-file ${actionsFile}`,
+          receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
+        },
+        {
+          order: 21,
+          key: "first_wave_closeout",
+          type: "launch_duty_record",
+          status: "blocked_until_source_records",
+          artifactPath: `${archiveRoot}/first-wave-closeout.md`,
+          command: `npm.cmd run staging:launch-duty:record -- --closeout-input-file ${outputFile} --key first_wave_closeout --artifact-path ${archiveRoot}/first-wave-closeout.md --value-json <redacted-json> --receipt-id <record_launch_closeout_review-receipt-id> --source-record first_wave_incident_log=${archiveRoot}/first-wave-incident-log.md --source-record rollback_signal_review=${archiveRoot}/rollback-signal-review.md --source-record stabilization_owner_handoff=${archiveRoot}/stabilization-owner-handoff.md --record-index-file ${archiveRoot}/launch-duty-record-index.json --actions-file ${actionsFile}`,
+          receiptIds: ["<record_launch_closeout_review-receipt-id>"],
+          sourceRecordKeys: ["first_wave_incident_log", "rollback_signal_review", "stabilization_owner_handoff"]
+        }
+      ],
+      nextAction: "Run readinessStatusCommand, attach the current closeout evidence item, then rerun readiness status before continuing to smoke, full-test, production signoff, receipt visibility, launch-day watch, and first-wave closeout."
+    };
     assert.deepEqual(output, {
       status: "written",
       mode: "staging-closeout-init",
@@ -173,6 +332,7 @@ test("staging closeout init promotes a draft without clearing closeout readiness
       },
       nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${outputFile}`,
       statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${outputFile} --actions-file ${actionsFile}`,
+      launchEvidenceReadinessGate,
       operatorNextCommands: [
         {
           key: "readiness_status",
@@ -255,6 +415,12 @@ test("staging closeout init prints ordered next commands in plain output", () =>
     assert.match(result.stdout, /First evidence source step: source_route_map_gate_result/);
     assert.match(result.stdout, /First evidence rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(result.stdout, /First evidence next action: Run statusCommand, then firstBackfillCommand with real redacted evidence before the rehearsal reload\./);
+    assert.match(result.stdout, /Launch evidence gate: blocked_until_real_launch_evidence_attached \(current=route_map_gate_result, pending=21\/21\)/);
+    assert.match(result.stdout, /Launch evidence current: closeout_evidence\/route_map_gate_result -> npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route_map_gate_result\.txt --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch evidence progress: closeout=0\/7, signoff=0\/7, receipts=0\/5, launchDuty=0\/2/);
+    assert.match(result.stdout, /Launch evidence readiness status: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch evidence full-test: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt/);
+    assert.match(result.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
     assert.match(result.stdout, /First backfill after status: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route_map_gate_result\.txt --actions-file .*readiness-action-queue\.md/);

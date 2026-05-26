@@ -65045,7 +65045,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
   if (entry.receiptConfirmation || entry.receiptRecoveryAction || readiness.latestSteadyStateDutyPlanReceipt) {
     lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
   }
-  lines.push("- Start from this file during launch operations handoff; it links the checklist, overview status, Launch Review, Launch Smoke, and Launch Mainline route map.");
+  lines.push("- Start from this file during launch operations handoff; keep launch-mainline-handoff-routes.txt, surface-review-closeout-shortcut-download.txt, and developer-ops-pre-staging-readiness-self-check.txt at the front of the path before production signoff.");
   lines.push("- Use the Launch Mainline readiness gate quick-access downloads in order before production signoff: launch-readiness-distance.txt -> initial-production-launch-readiness.txt -> launch-switch-readiness.txt -> launch-candidate-full-verification-gate.txt -> production-signoff-entry-handoff.txt.");
   lines.push("- Keep the launch-duty record index attached to every review handoff so reviewers confirm the same evidence chain.");
   return lines.join("\n");

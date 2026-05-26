@@ -26231,7 +26231,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /production-signoff-entry-handoff\.txt[^\n]*format=production-signoff-entry-handoff[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=production-signoff-entry-handoff/);
     assert.match(
       launchOperationsOperatorEntryDownload.body,
-      /Operator Order:[\s\S]*Use the Launch Mainline readiness gate quick-access downloads in order before production signoff: launch-readiness-distance\.txt -> initial-production-launch-readiness\.txt -> launch-switch-readiness\.txt -> launch-candidate-full-verification-gate\.txt -> production-signoff-entry-handoff\.txt\./
+      /Operator Order:[\s\S]*Start from this file during launch operations handoff; keep launch-mainline-handoff-routes\.txt, surface-review-closeout-shortcut-download\.txt, and developer-ops-pre-staging-readiness-self-check\.txt at the front of the path before production signoff\./
     );
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);

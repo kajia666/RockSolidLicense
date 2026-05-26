@@ -30788,60 +30788,81 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     mainlineRouteParams
   );
   const postArchiveLaunchDayWatchReadbackDownload = postArchiveLaunchDayWatchReadback
-    ? createLaunchMainlineDownloadShortcut(
-        "Launch Mainline post-archive launch-day watch readback",
-        "post-archive-launch-day-watch-readback.txt",
-        "post-archive-launch-day-watch-readback",
-        mainlineRouteParams
-      )
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline post-archive launch-day watch readback",
+          "post-archive-launch-day-watch-readback.txt",
+          "post-archive-launch-day-watch-readback",
+          mainlineRouteParams
+        ),
+        launchDutyRecordIndexPath: postArchiveLaunchDayWatchReadback.launchDutyRecordIndexPath || null
+      }
     : null;
   const launchDayWatchSummaryRecordReadbackDownload = launchDayWatchSummaryRecordReadback
-    ? createLaunchMainlineDownloadShortcut(
-        "Launch Mainline launch-day watch summary record readback",
-        "launch-day-watch-summary-record-readback.txt",
-        "launch-day-watch-summary-record-readback",
-        mainlineRouteParams
-      )
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline launch-day watch summary record readback",
+          "launch-day-watch-summary-record-readback.txt",
+          "launch-day-watch-summary-record-readback",
+          mainlineRouteParams
+        ),
+        launchDutyRecordIndexPath: launchDayWatchSummaryRecordReadback.launchDutyRecordIndexPath || null
+      }
     : null;
   const receiptVisibilitySnapshotRecordReadbackDownload = receiptVisibilitySnapshotRecordReadback
-    ? createLaunchMainlineDownloadShortcut(
-        "Launch Mainline receipt visibility snapshot record readback",
-        "receipt-visibility-snapshot-record-readback.txt",
-        "receipt-visibility-snapshot-record-readback",
-        mainlineRouteParams
-      )
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline receipt visibility snapshot record readback",
+          "receipt-visibility-snapshot-record-readback.txt",
+          "receipt-visibility-snapshot-record-readback",
+          mainlineRouteParams
+        ),
+        launchDutyRecordIndexPath: receiptVisibilitySnapshotRecordReadback.launchDutyRecordIndexPath || null
+      }
     : null;
   const firstWaveIncidentLogRecordReadbackDownload = firstWaveIncidentLogRecordReadback
-    ? createLaunchMainlineDownloadShortcut(
-        "Launch Mainline first-wave incident log record readback",
-        "first-wave-incident-log-record-readback.txt",
-        "first-wave-incident-log-record-readback",
-        mainlineRouteParams
-      )
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline first-wave incident log record readback",
+          "first-wave-incident-log-record-readback.txt",
+          "first-wave-incident-log-record-readback",
+          mainlineRouteParams
+        ),
+        launchDutyRecordIndexPath: firstWaveIncidentLogRecordReadback.launchDutyRecordIndexPath || null
+      }
     : null;
   const rollbackSignalReviewRecordReadbackDownload = rollbackSignalReviewRecordReadback
-    ? createLaunchMainlineDownloadShortcut(
-        "Launch Mainline rollback signal review record readback",
-        "rollback-signal-review-record-readback.txt",
-        "rollback-signal-review-record-readback",
-        mainlineRouteParams
-      )
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline rollback signal review record readback",
+          "rollback-signal-review-record-readback.txt",
+          "rollback-signal-review-record-readback",
+          mainlineRouteParams
+        ),
+        launchDutyRecordIndexPath: rollbackSignalReviewRecordReadback.launchDutyRecordIndexPath || null
+      }
     : null;
   const stabilizationOwnerHandoffRecordReadbackDownload = stabilizationOwnerHandoffRecordReadback
-    ? createLaunchMainlineDownloadShortcut(
-        "Launch Mainline stabilization owner handoff record readback",
-        "stabilization-owner-handoff-record-readback.txt",
-        "stabilization-owner-handoff-record-readback",
-        mainlineRouteParams
-      )
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline stabilization owner handoff record readback",
+          "stabilization-owner-handoff-record-readback.txt",
+          "stabilization-owner-handoff-record-readback",
+          mainlineRouteParams
+        ),
+        launchDutyRecordIndexPath: stabilizationOwnerHandoffRecordReadback.launchDutyRecordIndexPath || null
+      }
     : null;
   const firstWaveCloseoutRecordReadbackDownload = firstWaveCloseoutRecordReadback
-    ? createLaunchMainlineDownloadShortcut(
-        "Launch Mainline first-wave closeout record readback",
-        "first-wave-closeout-record-readback.txt",
-        "first-wave-closeout-record-readback",
-        mainlineRouteParams
-      )
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline first-wave closeout record readback",
+          "first-wave-closeout-record-readback.txt",
+          "first-wave-closeout-record-readback",
+          mainlineRouteParams
+        ),
+        launchDutyRecordIndexPath: firstWaveCloseoutRecordReadback.launchDutyRecordIndexPath || null
+      }
     : null;
   const launchReadinessDistanceDownload = getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload);
   const productionSignoffEntryHandoffDownload = getDeveloperLaunchMainlineProductionSignoffEntryHandoffDownload(payload);
@@ -31537,18 +31558,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | action=${postArchiveLaunchDayWatchReadback.actionKey || "-"}`
       + ` | record=${postArchiveLaunchDayWatchReadback.recordKey || "-"}`
     );
-    lines.push(
-      `- post-archive-launch-day-watch: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${postArchiveLaunchDayWatchReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
-    );
     pushRoute(
-      "post-archive-launch-day-watch-direct",
+      "post-archive-launch-day-watch",
       "Launch Mainline post-archive launch-day watch readback",
       opsFiles.postArchiveLaunchDayWatchReadback || "ops/post-archive-launch-day-watch-readback.txt",
       postArchiveLaunchDayWatchReadbackDownload || {}
@@ -31564,18 +31575,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | nextAction=${launchDayWatchSummaryRecordReadback.nextActionKey || "-"}`
       + ` | nextRecord=${launchDayWatchSummaryRecordReadback.nextRecordKey || "-"}`
     );
-    lines.push(
-      `- launch-day-watch-summary-readback: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${launchDayWatchSummaryRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
-    );
     pushRoute(
-      "launch-day-watch-summary-readback-direct",
+      "launch-day-watch-summary-readback",
       "Launch Mainline launch-day watch summary record readback",
       opsFiles.launchDayWatchSummaryRecordReadback || "ops/launch-day-watch-summary-record-readback.txt",
       launchDayWatchSummaryRecordReadbackDownload || {}
@@ -31591,18 +31592,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | nextAction=${receiptVisibilitySnapshotRecordReadback.nextActionKey || "-"}`
       + ` | nextRecord=${receiptVisibilitySnapshotRecordReadback.nextRecordKey || "-"}`
     );
-    lines.push(
-      `- receipt-visibility-snapshot-readback: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${receiptVisibilitySnapshotRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
-    );
     pushRoute(
-      "receipt-visibility-snapshot-readback-direct",
+      "receipt-visibility-snapshot-readback",
       "Launch Mainline receipt visibility snapshot record readback",
       opsFiles.receiptVisibilitySnapshotRecordReadback || "ops/receipt-visibility-snapshot-record-readback.txt",
       receiptVisibilitySnapshotRecordReadbackDownload || {}
@@ -31618,18 +31609,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | nextAction=${firstWaveIncidentLogRecordReadback.nextActionKey || "-"}`
       + ` | nextRecord=${firstWaveIncidentLogRecordReadback.nextRecordKey || "-"}`
     );
-    lines.push(
-      `- first-wave-incident-log-readback: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${firstWaveIncidentLogRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
-    );
     pushRoute(
-      "first-wave-incident-log-readback-direct",
+      "first-wave-incident-log-readback",
       "Launch Mainline first-wave incident log record readback",
       opsFiles.firstWaveIncidentLogRecordReadback || "ops/first-wave-incident-log-record-readback.txt",
       firstWaveIncidentLogRecordReadbackDownload || {}
@@ -31645,18 +31626,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | nextAction=${rollbackSignalReviewRecordReadback.nextActionKey || "-"}`
       + ` | nextRecord=${rollbackSignalReviewRecordReadback.nextRecordKey || "-"}`
     );
-    lines.push(
-      `- rollback-signal-review-readback: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${rollbackSignalReviewRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
-    );
     pushRoute(
-      "rollback-signal-review-readback-direct",
+      "rollback-signal-review-readback",
       "Launch Mainline rollback signal review record readback",
       opsFiles.rollbackSignalReviewRecordReadback || "ops/rollback-signal-review-record-readback.txt",
       rollbackSignalReviewRecordReadbackDownload || {}
@@ -31672,18 +31643,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | nextAction=${stabilizationOwnerHandoffRecordReadback.nextActionKey || "-"}`
       + ` | nextRecord=${stabilizationOwnerHandoffRecordReadback.nextRecordKey || "-"}`
     );
-    lines.push(
-      `- stabilization-owner-handoff-readback: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${stabilizationOwnerHandoffRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
-    );
     pushRoute(
-      "stabilization-owner-handoff-readback-direct",
+      "stabilization-owner-handoff-readback",
       "Launch Mainline stabilization owner handoff record readback",
       opsFiles.stabilizationOwnerHandoffRecordReadback || "ops/stabilization-owner-handoff-record-readback.txt",
       stabilizationOwnerHandoffRecordReadbackDownload || {}
@@ -31699,18 +31660,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | nextAction=${firstWaveCloseoutRecordReadback.nextActionKey || "-"}`
       + ` | stableTail=${firstWaveCloseoutRecordReadback.stableOperationsHandoffTailStatus || "-"}`
     );
-    lines.push(
-      `- first-wave-closeout-readback: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${firstWaveCloseoutRecordReadback.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
-    );
     pushRoute(
-      "first-wave-closeout-readback-direct",
+      "first-wave-closeout-readback",
       "Launch Mainline first-wave closeout record readback",
       opsFiles.firstWaveCloseoutRecordReadback || "ops/first-wave-closeout-record-readback.txt",
       firstWaveCloseoutRecordReadbackDownload || {}
@@ -34788,70 +34739,42 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (postArchiveLaunchDayWatchReadback) {
     handoffFiles.push([
       "Post-archive launch-day watch readback",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "Post-archive launch-day watch readback direct file",
       opsFiles.postArchiveLaunchDayWatchReadback || "ops/post-archive-launch-day-watch-readback.txt"
     ]);
   }
   if (launchDayWatchSummaryRecordReadback) {
     handoffFiles.push([
       "Launch-day watch summary record readback",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "Launch-day watch summary record readback direct file",
       opsFiles.launchDayWatchSummaryRecordReadback || "ops/launch-day-watch-summary-record-readback.txt"
     ]);
   }
   if (receiptVisibilitySnapshotRecordReadback) {
     handoffFiles.push([
       "Receipt visibility snapshot record readback",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "Receipt visibility snapshot record readback direct file",
       opsFiles.receiptVisibilitySnapshotRecordReadback || "ops/receipt-visibility-snapshot-record-readback.txt"
     ]);
   }
   if (firstWaveIncidentLogRecordReadback) {
     handoffFiles.push([
       "First-wave incident log record readback",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "First-wave incident log record readback direct file",
       opsFiles.firstWaveIncidentLogRecordReadback || "ops/first-wave-incident-log-record-readback.txt"
     ]);
   }
   if (rollbackSignalReviewRecordReadback) {
     handoffFiles.push([
       "Rollback signal review record readback",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "Rollback signal review record readback direct file",
       opsFiles.rollbackSignalReviewRecordReadback || "ops/rollback-signal-review-record-readback.txt"
     ]);
   }
   if (stabilizationOwnerHandoffRecordReadback) {
     handoffFiles.push([
       "Stabilization owner handoff record readback",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "Stabilization owner handoff record readback direct file",
       opsFiles.stabilizationOwnerHandoffRecordReadback || "ops/stabilization-owner-handoff-record-readback.txt"
     ]);
   }
   if (firstWaveCloseoutRecordReadback) {
     handoffFiles.push([
       "First-wave closeout record readback",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "First-wave closeout record readback direct file",
       opsFiles.firstWaveCloseoutRecordReadback || "ops/first-wave-closeout-record-readback.txt"
     ]);
   }

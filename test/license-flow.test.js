@@ -28159,11 +28159,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       postArchiveLaunchMainlineRoutesDownload.body,
-      /post-archive-launch-day-watch: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /post-archive-launch-day-watch: [^\n]*file=post-archive-launch-day-watch-readback\.txt[^\n]*format=post-archive-launch-day-watch-readback[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    assert.match(
+    assert.doesNotMatch(
       postArchiveLaunchMainlineRoutesDownload.body,
-      /post-archive-launch-day-watch-direct: [^\n]*file=post-archive-launch-day-watch-readback\.txt[^\n]*format=post-archive-launch-day-watch-readback[^\n]*source=developer-launch-mainline/
+      /post-archive-launch-day-watch-direct:/
     );
     assert.match(
       postArchiveLaunchMainlineRoutesDownload.body,
@@ -28184,11 +28184,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       postArchiveLaunchMainlineIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Post-archive launch-day watch readback: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*Post-archive launch-day watch readback: ops\/post-archive-launch-day-watch-readback\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       postArchiveLaunchMainlineIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Post-archive launch-day watch readback direct file: ops\/post-archive-launch-day-watch-readback\.txt/
+      /Post-archive launch-day watch readback direct file:/
     );
     assert.match(
       postArchiveLaunchMainlineIndexDownload.body,
@@ -28473,11 +28473,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineWatchSummaryRoutesDownload.body,
-      /launch-day-watch-summary-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /launch-day-watch-summary-readback: [^\n]*file=launch-day-watch-summary-record-readback\.txt[^\n]*format=launch-day-watch-summary-record-readback[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineWatchSummaryRoutesDownload.body,
-      /launch-day-watch-summary-readback-direct: [^\n]*file=launch-day-watch-summary-record-readback\.txt[^\n]*format=launch-day-watch-summary-record-readback[^\n]*source=developer-launch-mainline/
+      /launch-day-watch-summary-readback-direct:/
     );
     const launchMainlineWatchSummaryIndexDownload = await getText(
       baseUrl,
@@ -28490,11 +28490,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineWatchSummaryIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Launch-day watch summary record readback: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*Launch-day watch summary record readback: ops\/launch-day-watch-summary-record-readback\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineWatchSummaryIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Launch-day watch summary record readback direct file: ops\/launch-day-watch-summary-record-readback\.txt/
+      /Launch-day watch summary record readback direct file:/
     );
     const launchMainlineWatchSummaryChecksumsDownload = await getText(
       baseUrl,
@@ -28790,11 +28790,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineReceiptVisibilityRoutesDownload.body,
-      /receipt-visibility-snapshot-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /receipt-visibility-snapshot-readback: [^\n]*file=receipt-visibility-snapshot-record-readback\.txt[^\n]*format=receipt-visibility-snapshot-record-readback[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineReceiptVisibilityRoutesDownload.body,
-      /receipt-visibility-snapshot-readback-direct: [^\n]*file=receipt-visibility-snapshot-record-readback\.txt[^\n]*format=receipt-visibility-snapshot-record-readback[^\n]*source=developer-launch-mainline/
+      /receipt-visibility-snapshot-readback-direct:/
     );
     assert.match(
       launchMainlineReceiptVisibilityRoutesDownload.body,
@@ -28815,11 +28815,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineReceiptVisibilityIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Receipt visibility snapshot record readback: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*Receipt visibility snapshot record readback: ops\/receipt-visibility-snapshot-record-readback\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineReceiptVisibilityIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Receipt visibility snapshot record readback direct file: ops\/receipt-visibility-snapshot-record-readback\.txt/
+      /Receipt visibility snapshot record readback direct file:/
     );
     assert.match(
       launchMainlineReceiptVisibilityIndexDownload.body,
@@ -29071,11 +29071,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineFirstWaveIncidentRoutesDownload.body,
-      /first-wave-incident-log-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /first-wave-incident-log-readback: [^\n]*file=first-wave-incident-log-record-readback\.txt[^\n]*format=first-wave-incident-log-record-readback[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineFirstWaveIncidentRoutesDownload.body,
-      /first-wave-incident-log-readback-direct: [^\n]*file=first-wave-incident-log-record-readback\.txt[^\n]*format=first-wave-incident-log-record-readback[^\n]*source=developer-launch-mainline/
+      /first-wave-incident-log-readback-direct:/
     );
     const launchMainlineFirstWaveIncidentIndexDownload = await getText(
       baseUrl,
@@ -29088,11 +29088,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineFirstWaveIncidentIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First-wave incident log record readback: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*First-wave incident log record readback: ops\/first-wave-incident-log-record-readback\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineFirstWaveIncidentIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First-wave incident log record readback direct file: ops\/first-wave-incident-log-record-readback\.txt/
+      /First-wave incident log record readback direct file:/
     );
     const firstWaveIncidentLogReadbackDirectDownload = await getText(
       baseUrl,
@@ -29334,11 +29334,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineRollbackSignalRoutesDownload.body,
-      /rollback-signal-review-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /rollback-signal-review-readback: [^\n]*file=rollback-signal-review-record-readback\.txt[^\n]*format=rollback-signal-review-record-readback[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineRollbackSignalRoutesDownload.body,
-      /rollback-signal-review-readback-direct: [^\n]*file=rollback-signal-review-record-readback\.txt[^\n]*format=rollback-signal-review-record-readback[^\n]*source=developer-launch-mainline/
+      /rollback-signal-review-readback-direct:/
     );
     const launchMainlineRollbackSignalIndexDownload = await getText(
       baseUrl,
@@ -29351,11 +29351,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineRollbackSignalIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Rollback signal review record readback: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*Rollback signal review record readback: ops\/rollback-signal-review-record-readback\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineRollbackSignalIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Rollback signal review record readback direct file: ops\/rollback-signal-review-record-readback\.txt/
+      /Rollback signal review record readback direct file:/
     );
     const rollbackSignalReviewReadbackDirectDownload = await getText(
       baseUrl,
@@ -29733,11 +29733,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineStabilizationOwnerRoutesDownload.body,
-      /stabilization-owner-handoff-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /stabilization-owner-handoff-readback: [^\n]*file=stabilization-owner-handoff-record-readback\.txt[^\n]*format=stabilization-owner-handoff-record-readback[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineStabilizationOwnerRoutesDownload.body,
-      /stabilization-owner-handoff-readback-direct: [^\n]*file=stabilization-owner-handoff-record-readback\.txt[^\n]*format=stabilization-owner-handoff-record-readback[^\n]*source=developer-launch-mainline/
+      /stabilization-owner-handoff-readback-direct:/
     );
     assert.match(
       launchMainlineStabilizationOwnerRoutesDownload.body,
@@ -29745,11 +29745,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineStabilizationOwnerRoutesDownload.body,
-      /first-wave-closeout-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /first-wave-closeout-readback: [^\n]*file=first-wave-closeout-record-readback\.txt[^\n]*format=first-wave-closeout-record-readback[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineStabilizationOwnerRoutesDownload.body,
-      /first-wave-closeout-readback-direct: [^\n]*file=first-wave-closeout-record-readback\.txt[^\n]*format=first-wave-closeout-record-readback[^\n]*source=developer-launch-mainline/
+      /first-wave-closeout-readback-direct:/
     );
     const launchMainlineStabilizationOwnerIndexDownload = await getText(
       baseUrl,
@@ -29766,19 +29766,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineStabilizationOwnerIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Stabilization owner handoff record readback: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*Stabilization owner handoff record readback: ops\/stabilization-owner-handoff-record-readback\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineStabilizationOwnerIndexDownload.body,
+      /Stabilization owner handoff record readback direct file:/
     );
     assert.match(
       launchMainlineStabilizationOwnerIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Stabilization owner handoff record readback direct file: ops\/stabilization-owner-handoff-record-readback\.txt/
+      /Included Handoff Files:[\s\S]*First-wave closeout record readback: ops\/first-wave-closeout-record-readback\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineStabilizationOwnerIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First-wave closeout record readback: ops\/launch-operations-operator-entry\.txt/
-    );
-    assert.match(
-      launchMainlineStabilizationOwnerIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First-wave closeout record readback direct file: ops\/first-wave-closeout-record-readback\.txt/
+      /First-wave closeout record readback direct file:/
     );
     const stabilizationOwnerHandoffReadbackDirectDownload = await getText(
       baseUrl,
@@ -30695,11 +30695,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
-      /first-wave-closeout-readback: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /first-wave-closeout-readback: [^\n]*file=first-wave-closeout-record-readback\.txt[^\n]*format=first-wave-closeout-record-readback[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineCloseoutRecordedRoutesDownload.body,
-      /first-wave-closeout-readback-direct: [^\n]*file=first-wave-closeout-record-readback\.txt[^\n]*format=first-wave-closeout-record-readback[^\n]*source=developer-launch-mainline/
+      /first-wave-closeout-readback-direct:/
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
@@ -30789,11 +30789,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First-wave closeout record readback: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*First-wave closeout record readback: ops\/first-wave-closeout-record-readback\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First-wave closeout record readback direct file: ops\/first-wave-closeout-record-readback\.txt/
+      /First-wave closeout record readback direct file:/
     );
     const launchDutyReadbackDirectFilesChecksumsDownload = await getText(
       baseUrl,

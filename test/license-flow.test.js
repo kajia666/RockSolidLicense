@@ -25206,6 +25206,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut Route:[\s\S]*Pre-Staging Readiness Self-Check Route:/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Launch Mainline Surface Review Closeout Shortcut Route:[\s\S]*confirmStatus=ready_to_submit \| confirmReady=true \| confirm=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
     );
     assert.match(

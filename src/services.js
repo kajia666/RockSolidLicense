@@ -31773,6 +31773,19 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       }
     }
   }
+  if (surfaceReviewCloseoutShortcut) {
+    lines.push("");
+    appendSurfaceReviewCloseoutShortcutLines(lines, surfaceReviewCloseoutShortcut, {
+      title: "Launch Mainline Surface Review Closeout Shortcut Route:",
+      readyStyle: "boolean"
+    });
+    pushRoute(
+      "surface-review-closeout-shortcut",
+      "Launch Mainline surface review closeout shortcut download",
+      opsFiles.surfaceReviewCloseoutShortcutDownloadRoute || "ops/surface-review-closeout-shortcut-download.txt",
+      surfaceReviewCloseoutShortcutRouteDownload || {}
+    );
+  }
   if (preStagingReadinessSelfCheck) {
     const commandGroups = Array.isArray(preStagingReadinessSelfCheck.commandGroups)
       ? preStagingReadinessSelfCheck.commandGroups
@@ -32088,19 +32101,6 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       "Launch Mainline stable operations transition shortcut download",
       opsFiles.stableOperationsTransitionShortcutDownloadRoute || "ops/stable-operations-transition-shortcut-download.txt",
       stableOperationsTransitionShortcutRouteDownload || {}
-    );
-  }
-  if (surfaceReviewCloseoutShortcut) {
-    lines.push("");
-    appendSurfaceReviewCloseoutShortcutLines(lines, surfaceReviewCloseoutShortcut, {
-      title: "Launch Mainline Surface Review Closeout Shortcut Route:",
-      readyStyle: "boolean"
-    });
-    pushRoute(
-      "surface-review-closeout-shortcut",
-      "Launch Mainline surface review closeout shortcut download",
-      opsFiles.surfaceReviewCloseoutShortcutDownloadRoute || "ops/surface-review-closeout-shortcut-download.txt",
-      surfaceReviewCloseoutShortcutRouteDownload || {}
     );
   }
   if (launchDutyStableOperationsTransitionAction) {

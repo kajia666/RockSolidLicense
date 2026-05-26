@@ -51014,6 +51014,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     channel,
     reviewMode: "matched"
   });
+  const launchMainlineReadinessGateDownloads = buildDeveloperOpsLaunchMainlineReadinessGateDownloads({
+    ...scope,
+    productCode,
+    channel
+  });
   const surfaceReviewCloseoutShortcutDownloadRoute = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction
     ? {
         ...createLaunchMainlineDownloadShortcut(
@@ -51067,6 +51072,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchReviewSummaryDownload,
     launchSmokeSummaryDownload,
     launchMainlineHandoffRoutesDownload,
+    ...launchMainlineReadinessGateDownloads,
     firstLaunchConfirmationDoorway?.primaryDownload || null
   ]) {
     if (!download || typeof download !== "object") {

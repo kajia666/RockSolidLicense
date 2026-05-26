@@ -24610,6 +24610,31 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_overview_status"));
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_mainline_handoff_routes"));
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "launch_mainline_launch_readiness_distance"
+      && item.fileName === "launch-readiness-distance.txt"
+      && item.format === "launch-readiness-distance"
+    )));
+    assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "launch_mainline_initial_production_launch_readiness"
+      && item.fileName === "initial-production-launch-readiness.txt"
+      && item.format === "initial-production-launch-readiness"
+    )));
+    assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "launch_mainline_launch_switch_readiness"
+      && item.fileName === "launch-switch-readiness.txt"
+      && item.format === "launch-switch-readiness"
+    )));
+    assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "launch_mainline_launch_candidate_full_verification_gate"
+      && item.fileName === "launch-candidate-full-verification-gate.txt"
+      && item.format === "launch-candidate-full-verification-gate"
+    )));
+    assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "launch_mainline_production_signoff_entry_handoff"
+      && item.fileName === "production-signoff-entry-handoff.txt"
+      && item.format === "production-signoff-entry-handoff"
+    )));
+    assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
       item.key === "launch_mainline_surface_review_closeout_shortcut_download"
       && item.fileName === "surface-review-closeout-shortcut-download.txt"
       && item.format === "surface-review-closeout-shortcut-download"
@@ -26075,6 +26100,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Quick Access Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /developer-ops-pre-staging-readiness-self-check\.txt[^\n]*format=pre-staging-readiness-self-check/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /launch-readiness-distance\.txt[^\n]*format=launch-readiness-distance[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-readiness-distance/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /initial-production-launch-readiness\.txt[^\n]*format=initial-production-launch-readiness[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=initial-production-launch-readiness/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /launch-switch-readiness\.txt[^\n]*format=launch-switch-readiness[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-switch-readiness/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /launch-candidate-full-verification-gate\.txt[^\n]*format=launch-candidate-full-verification-gate[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-candidate-full-verification-gate/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /production-signoff-entry-handoff\.txt[^\n]*format=production-signoff-entry-handoff[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=production-signoff-entry-handoff/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, steadyStateDutyReceiptOperatorOrderPattern);

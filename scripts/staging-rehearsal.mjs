@@ -1040,6 +1040,101 @@ function buildOperatorQueueCheckpoint(result) {
   };
 }
 
+function buildInitialProductionLaunchReadiness(result) {
+  const executionSummary = result.stagingRehearsalExecutionSummary || {};
+  const focus = executionSummary.operatorFocus || {};
+  const goLiveProgress = focus.goLiveProgress || {};
+  const launchReadinessDistance = result.operatorExecutionPlan?.launchReadinessDistance
+    || result.finalRehearsalPacket?.launchReadinessDistance
+    || goLiveProgress.launchReadinessDistance
+    || {};
+  const realStagingInputClosure = focus.realStagingInputClosure || {};
+  const stableHandoffReady = result.operatorQueueCheckpoint?.status === "ready_for_stable_operations_handoff"
+    || result.finalRehearsalPacket?.status === "ready_for_stable_operations_handoff"
+    || result.launchEvidenceReadinessGate?.stableOperationsHandoff?.status === "ready_for_stabilization_handoff";
+  const gateStatus = (ready, fallback = "blocked") => (stableHandoffReady || ready ? "ready" : fallback);
+  const gates = [
+    {
+      key: "preflight_gates",
+      label: "No-write preflight gates",
+      status: gateStatus(
+        result.status === "pass"
+          && result.preflights?.staging?.status === "pass"
+          && result.preflights?.recovery?.status === "pass"
+      ),
+      nextAction: "Keep staging and recovery preflight gates green before any live-write operation."
+    },
+    {
+      key: "environment_execution",
+      label: "Environment execution",
+      status: stableHandoffReady
+        ? "ready"
+        : result.environmentReadiness?.status === "needs_operator_execution"
+          ? "operator_required"
+          : gateStatus(result.environmentReadiness?.status === "ready"),
+      nextAction: result.environmentReadiness?.nextAction
+        || "Complete HTTPS, storage, backup/restore, route-map, and live-write approval checks."
+    },
+    {
+      key: "real_staging_inputs",
+      label: "Real staging inputs",
+      status: gateStatus(realStagingInputClosure.status === "ready_for_real_staging_inputs"),
+      nextAction: realStagingInputClosure.nextAction || "Clear real staging input closure."
+    },
+    {
+      key: "full_test_window",
+      label: "Full test window",
+      status: gateStatus(result.fullTestWindowReadiness?.canRun === true),
+      nextAction: result.fullTestWindowReadiness?.nextAction || "Run the reserved full repository test window."
+    },
+    {
+      key: "production_signoff",
+      label: "Production sign-off",
+      status: gateStatus(result.productionSignoffReadiness?.canSignoff === true),
+      nextAction: result.productionSignoffReadiness?.nextAction || "Backfill production sign-off evidence and receipt visibility."
+    },
+    {
+      key: "launch_day_watch",
+      label: "Launch-day watch",
+      status: gateStatus(result.launchDayWatchPlan?.canStartCutoverWatch === true),
+      nextAction: result.launchDayWatchPlan?.nextAction || "Start launch-day watch after production sign-off is ready."
+    },
+    {
+      key: "stabilization_handoff",
+      label: "Stabilization handoff",
+      status: gateStatus(result.stabilizationHandoffPlan?.canStartStabilizationHandoff === true),
+      nextAction: result.stabilizationHandoffPlan?.nextAction || "Prepare stabilization owner handoff after cutover watch starts."
+    },
+    {
+      key: "stable_operations_handoff",
+      label: "Stable operations handoff",
+      status: gateStatus(stableHandoffReady),
+      nextAction: result.operatorQueueCheckpoint?.nextAction
+        || "Complete launch-duty record index, first-wave closeout, readiness reload, and stable-operations handoff."
+    }
+  ];
+  const remainingGates = gates.filter((item) => item.status !== "ready");
+  const status = stableHandoffReady
+    ? "ready_for_stable_operations_handoff"
+    : launchReadinessDistance.status || goLiveProgress.status || executionSummary.status || "unknown";
+  return {
+    mode: "initial-production-launch-readiness",
+    status,
+    launchBlockedBy: stableHandoffReady ? "none" : launchReadinessDistance.launchBlockedBy || "real_environment_evidence",
+    readinessPercent: stableHandoffReady
+      ? 100
+      : Number(launchReadinessDistance.readinessPercent ?? goLiveProgress.scriptReadinessPercent ?? 0),
+    remainingGateCount: remainingGates.length,
+    currentBlocker: stableHandoffReady
+      ? null
+      : launchReadinessDistance.currentBlocker || goLiveProgress.currentBlocker || remainingGates[0] || null,
+    gates,
+    nextAction: stableHandoffReady
+      ? result.operatorQueueCheckpoint?.nextAction || "Hand off the completed launch-duty record index and first-wave closeout artifact to stable operations."
+      : launchReadinessDistance.nextAction || goLiveProgress.nextAction || remainingGates[0]?.nextAction || "Continue the staging rehearsal operator plan."
+  };
+}
+
 function buildRehearsalLaunchEvidenceItem({
   order,
   key,
@@ -8647,9 +8742,18 @@ function buildResult(options) {
     ...resultWithOperatorExecutionPlan,
     ...(launchEvidenceReadinessGate ? { launchEvidenceReadinessGate } : {})
   };
+  const operatorQueueCheckpoint = gatesPassed
+    ? buildOperatorQueueCheckpoint(resultWithLaunchEvidenceReadinessGate)
+    : null;
   return {
     ...resultWithLaunchEvidenceReadinessGate,
-    operatorQueueCheckpoint: gatesPassed ? buildOperatorQueueCheckpoint(resultWithLaunchEvidenceReadinessGate) : null
+    operatorQueueCheckpoint,
+    initialProductionLaunchReadiness: gatesPassed
+      ? buildInitialProductionLaunchReadiness({
+        ...resultWithLaunchEvidenceReadinessGate,
+        operatorQueueCheckpoint
+      })
+      : null
   };
 }
 
@@ -8879,6 +8983,25 @@ function renderStagingRehearsalExecutionSummary(summary) {
         lines.push(`    - placeholders: ${reason.placeholderKeys.join(", ")}`);
       }
       lines.push(`    - nextAction: ${reason.nextAction || "-"}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function renderInitialProductionLaunchReadiness(readiness) {
+  if (!readiness) {
+    return "- Not available";
+  }
+  const lines = [
+    `- Initial production readiness: \`${readiness.status || "-"}\` (percent \`${readiness.readinessPercent ?? "-"}%\`, remaining \`${readiness.remainingGateCount ?? "-"}\`)`,
+    `- Launch blocked by: ${readiness.launchBlockedBy || "-"}`,
+    `- Current blocker: ${readiness.currentBlocker?.key || "-"}`,
+    `- Next action: ${readiness.nextAction || "-"}`
+  ];
+  if (Array.isArray(readiness.gates) && readiness.gates.length) {
+    lines.push("- Gates:");
+    for (const gate of readiness.gates) {
+      lines.push(`  - ${gate.key || "-"}: ${gate.status || "-"} | ${gate.nextAction || "-"}`);
     }
   }
   return lines.join("\n");
@@ -9384,6 +9507,18 @@ function writeLaunchEvidenceReadinessGatePlain(gate = null) {
   console.log(`Launch evidence status refresh: ${gate.readinessStatusCommand || "-"}`);
   console.log(`Launch evidence rehearsal reload: ${gate.rehearsalReloadCommand || "-"}`);
   console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
+}
+
+function writeInitialProductionLaunchReadinessPlain(readiness = null) {
+  if (!readiness) {
+    return;
+  }
+  console.log(
+    `Initial production readiness: ${readiness.status || "-"}`
+      + ` (percent=${readiness.readinessPercent ?? "-"}%, remaining=${readiness.remainingGateCount ?? "-"})`
+  );
+  console.log(`Initial production current blocker: ${readiness.currentBlocker?.key || "-"}`);
+  console.log(`Initial production next action: ${readiness.nextAction || "-"}`);
 }
 
 function writeOperatorQueueCheckpointPlain(checkpoint = null) {
@@ -11233,6 +11368,10 @@ function renderHandoffFile(result) {
     "",
     renderStagingRehearsalExecutionSummary(result.stagingRehearsalExecutionSummary),
     "",
+    "## Initial Production Launch Readiness",
+    "",
+    renderInitialProductionLaunchReadiness(result.initialProductionLaunchReadiness),
+    "",
     "## Gate Status",
     "",
     result.phases.map((phase) => `- ${phase.key}: ${phase.status}`).join("\n"),
@@ -11770,6 +11909,7 @@ function writeResult(result, json) {
       console.log(`Output archive entrypoint: ${outputWriteSummary.archiveEntrypoint?.key || "-"} (${outputWriteSummary.archiveEntrypoint?.status || "-"}) -> ${outputWriteSummary.archiveEntrypoint?.path || "-"}`);
       console.log(`Output write next action: ${outputWriteSummary.nextAction || "-"}`);
     }
+    writeInitialProductionLaunchReadinessPlain(result.initialProductionLaunchReadiness);
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     writeRealStagingRunFocusPlain(realStagingRunFocus);

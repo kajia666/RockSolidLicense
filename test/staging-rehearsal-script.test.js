@@ -406,6 +406,28 @@ test("staging rehearsal runner is exposed as an npm script and combines no-write
     output.stagingRehearsalExecutionSummary.operatorFocus.goLiveProgress.launchReadinessDistance,
     output.operatorExecutionPlan.launchReadinessDistance
   );
+  assert.equal(output.initialProductionLaunchReadiness.mode, "initial-production-launch-readiness");
+  assert.equal(output.initialProductionLaunchReadiness.status, "blocked_until_real_staging_inputs");
+  assert.equal(output.initialProductionLaunchReadiness.readinessPercent, 11);
+  assert.equal(output.initialProductionLaunchReadiness.remainingGateCount, 7);
+  assert.equal(output.initialProductionLaunchReadiness.currentBlocker.key, "staging_profile");
+  assert.deepEqual(
+    output.initialProductionLaunchReadiness.gates.map((item) => [item.key, item.status]),
+    [
+      ["preflight_gates", "ready"],
+      ["environment_execution", "operator_required"],
+      ["real_staging_inputs", "blocked"],
+      ["full_test_window", "blocked"],
+      ["production_signoff", "blocked"],
+      ["launch_day_watch", "blocked"],
+      ["stabilization_handoff", "blocked"],
+      ["stable_operations_handoff", "blocked"]
+    ]
+  );
+  assert.match(
+    output.initialProductionLaunchReadiness.nextAction,
+    /Clear the real staging input closure/
+  );
   assert.deepEqual(
     output.operatorExecutionPlan.goLiveOperatorActionPlan.phaseSummary.map((item) => [item.phase, item.readyCount, item.blockedCount]),
     [
@@ -6356,6 +6378,23 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.deepEqual(output.launchDutyCompletionHandoff, completionHandoff);
     assert.equal(output.finalRehearsalPacket.status, "ready_for_stable_operations_handoff");
     assert.equal(output.stagingRehearsalExecutionSummary.status, "ready_for_stable_operations_handoff");
+    assert.equal(output.initialProductionLaunchReadiness.status, "ready_for_stable_operations_handoff");
+    assert.equal(output.initialProductionLaunchReadiness.readinessPercent, 100);
+    assert.equal(output.initialProductionLaunchReadiness.remainingGateCount, 0);
+    assert.equal(output.initialProductionLaunchReadiness.currentBlocker, null);
+    assert.deepEqual(
+      output.initialProductionLaunchReadiness.gates.map((item) => [item.key, item.status]),
+      [
+        ["preflight_gates", "ready"],
+        ["environment_execution", "ready"],
+        ["real_staging_inputs", "ready"],
+        ["full_test_window", "ready"],
+        ["production_signoff", "ready"],
+        ["launch_day_watch", "ready"],
+        ["stabilization_handoff", "ready"],
+        ["stable_operations_handoff", "ready"]
+      ]
+    );
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.key, "stable_operations_handoff");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.stage, "stable_operations_handoff");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.sourceFocus, "launchDutyCompletionHandoff");
@@ -6451,6 +6490,8 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
       completionHandoff.nextAction
     );
     const handoff = readFileSync(handoffFile, "utf8");
+    assert.match(handoff, /## Initial Production Launch Readiness/);
+    assert.match(handoff, /Initial production readiness: `ready_for_stable_operations_handoff` \(percent `100%`, remaining `0`\)/);
     assert.match(handoff, /## Launch Evidence Readiness Gate/);
     assert.match(handoff, /Launch evidence gate: `ready_for_stabilization_handoff` \(current `first_wave_closeout`, pending `0\/21`\)/);
     assert.match(handoff, /Launch evidence progress: closeout `7\/7`, signoff `7\/7`, receipts `5\/5`, launchDuty `2\/2`/);
@@ -6468,6 +6509,7 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     ]);
     assert.equal(plain.status, 0, plain.stderr || plain.stdout);
     assert.equal(plain.stderr, "");
+    assert.match(plain.stdout, /Initial production readiness: ready_for_stable_operations_handoff \(percent=100%, remaining=0\)/);
     assert.match(plain.stdout, /Operator queue checkpoint: stable_operations_handoff \(status=ready_for_stable_operations_handoff, currentPhase=stable_operations_handoff\)/);
     assert.match(plain.stdout, /Operator checkpoint current: none/);
     assert.match(plain.stdout, /Operator checkpoint record index: .*launch-duty-record-index\.json/);

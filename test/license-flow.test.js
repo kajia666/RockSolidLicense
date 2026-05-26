@@ -6240,6 +6240,7 @@ test("developer release package export bundles integration, versions, and notice
       launchReview.reviewSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
       < launchReview.reviewSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
     );
+    assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_initial_production_launch_readiness" && item.source === "developer-launch-mainline"));
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(launchReview.reviewSummary.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
       const launchReviewDutyOrder = launchReview.reviewSummary.launchDutyActionOrder;
@@ -6436,6 +6437,7 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchReviewSummaryDownload.body, /context=launch_ops_overview_status .*downloadFormat=launch-operations-overview-status/);
       assert.match(launchReviewSummaryDownload.body, /context=launch_ops_overview_status .*productionSignoffPacket=artifacts\/staging\/RELPKG_ALPHA\/stable\/staging-production-signoff-packet\.json/);
       assert.match(launchReviewSummaryDownload.body, /context=launch_ops_overview_status .*launchDayWatchEntry=enter_after_production_signoff/);
+      assert.match(launchReviewSummaryDownload.body, /Launch Mainline initial production launch readiness \| initial-production-launch-readiness\.txt \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=initial-production-launch-readiness/);
       assert.match(launchReviewSummaryDownload.body, /source=launch-smoke/);
       assert.match(launchReviewSummaryDownload.body, /handoff=first-wave/);
 
@@ -10184,6 +10186,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
       smokeKit.smokeSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
       < smokeKit.smokeSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
     );
+    assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_initial_production_launch_readiness" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
@@ -10245,6 +10248,7 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.match(smokeKitSummaryDownload.body, /download=launch_smoke_summary/);
     assert.match(smokeKitSummaryDownload.body, /download=launch_smoke_summary \| href=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/);
     assert.match(smokeKitSummaryDownload.body, /control: Download Smoke Summary \| download=.*href=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/);
+    assert.match(smokeKitSummaryDownload.body, /Launch Mainline initial production launch readiness \| initial-production-launch-readiness\.txt \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=initial-production-launch-readiness/);
   } finally {
     await app.close();
     fs.rmSync(tempDir, { recursive: true, force: true });

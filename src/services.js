@@ -12512,6 +12512,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
       ...scopedOpsParams
     }
   );
+  const mainlineInitialProductionLaunchReadinessDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline initial production launch readiness",
+    "initial-production-launch-readiness.txt",
+    "initial-production-launch-readiness",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
   const mainlineLaunchSwitchReadinessDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline launch switch readiness",
     "launch-switch-readiness.txt",
@@ -13413,6 +13423,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineHandoffRoutesDownload);
   pushRecommendedDownload(mainlineLaunchReadinessDistanceDownload);
+  pushRecommendedDownload(mainlineInitialProductionLaunchReadinessDownload);
   pushRecommendedDownload(mainlineLaunchSwitchReadinessDownload);
   pushRecommendedDownload(mainlineLaunchCandidateFullVerificationGateDownload);
   pushRecommendedDownload(mainlineProductionSignoffEntryHandoffDownload);
@@ -14599,6 +14610,17 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineInitialProductionLaunchReadinessDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline initial production launch readiness",
+    "initial-production-launch-readiness.txt",
+    "initial-production-launch-readiness",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
   const launchMainlineLaunchSwitchReadinessDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline launch switch readiness",
     "launch-switch-readiness.txt",
@@ -14990,6 +15012,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineRehearsalGuideDownload,
     launchMainlineHandoffRoutesDownload,
     launchMainlineLaunchReadinessDistanceDownload,
+    launchMainlineInitialProductionLaunchReadinessDownload,
     launchMainlineLaunchSwitchReadinessDownload,
     launchMainlineLaunchCandidateFullVerificationGateDownload,
     launchMainlineProductionSignoffEntryHandoffDownload,

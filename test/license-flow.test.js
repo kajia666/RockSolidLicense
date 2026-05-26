@@ -24876,15 +24876,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
-      /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /steady-state-duty-receipt-review: ops\/steady-state-duty-receipt-review-execution\.txt[^\n]*file=steady-state-duty-receipt-review-execution\.txt[^\n]*format=steady-state-duty-receipt-review-execution[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
       new RegExp(`Steady-State Duty Receipt Review Execution Route:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
     );
-    assert.match(
+    assert.doesNotMatch(
       launchOperationsMainlineHandoffRoutesDownload.body,
-      /steady-state-duty-receipt-review-execution: [^\n]*file=steady-state-duty-receipt-review-execution\.txt[^\n]*format=steady-state-duty-receipt-review-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /(^|\n)- steady-state-duty-receipt-review-execution:/
     );
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(
@@ -24893,15 +24893,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
-      /rollout-widening-decision: [^\n]*key=ops_steady_state_duty_board[^\n]*source=developer-ops[^\n]*queueTotal=0[^\n]*attention=0/
+      /rollout-widening-decision: ops\/rollout-widening-decision-execution\.txt[^\n]*file=rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
       new RegExp(`Rollout Widening Decision Execution Route:[\\s\\S]*status=${rolloutWideningDecisionStatus} \\| ready=${rolloutWideningDecisionReady ? "yes" : "no"} \\| action=review_rollout_widening_decision \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
     );
-    assert.match(
+    assert.doesNotMatch(
       launchOperationsMainlineHandoffRoutesDownload.body,
-      /rollout-widening-decision-execution: [^\n]*file=rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /(^|\n)- rollout-widening-decision-execution:/
     );
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, rolloutWideningDecisionOperatorOrderPattern);
     assert.match(
@@ -24910,15 +24910,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
-      /first-operating-result-handoff: [^\n]*key=ops_launch_operations_overview_status[^\n]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /first-operating-result-handoff: ops\/first-operating-result-handoff-execution\.txt[^\n]*file=first-operating-result-handoff-execution\.txt[^\n]*format=first-operating-result-handoff-execution[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
       /First Operating Result Handoff Execution Route:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision \| receiptAudit=- \| file=developer-ops-launch-operations-overview-status\.txt \| format=launch-operations-overview-status/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchOperationsMainlineHandoffRoutesDownload.body,
-      /first-operating-result-handoff-execution: [^\n]*file=first-operating-result-handoff-execution\.txt[^\n]*format=first-operating-result-handoff-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /(^|\n)- first-operating-result-handoff-execution:/
     );
 
     const launchMainlineHandoffDownloadRoutesSelectionDownload = await getText(
@@ -24934,15 +24934,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
-      /steady-state-duty-receipt-review: [^\n]*key=ops_latest_steady_state_duty_receipt_asset[^\n]*source=developer-ops-steady-state-duty-plan-receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /steady-state-duty-receipt-review: ops\/steady-state-duty-receipt-review-execution\.txt[^\n]*file=steady-state-duty-receipt-review-execution\.txt[^\n]*format=steady-state-duty-receipt-review-execution[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       new RegExp(`Steady-State Duty Receipt Review Execution Route:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
-      /steady-state-duty-receipt-review-execution: [^\n]*file=steady-state-duty-receipt-review-execution\.txt[^\n]*format=steady-state-duty-receipt-review-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /(^|\n)- steady-state-duty-receipt-review-execution:/
     );
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, steadyStateDutyReceiptOperatorOrderPattern);
     assert.match(
@@ -24951,15 +24951,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
-      /rollout-widening-decision: [^\n]*key=ops_steady_state_duty_board[^\n]*source=developer-ops[^\n]*queueTotal=0[^\n]*attention=0/
+      /rollout-widening-decision: ops\/rollout-widening-decision-execution\.txt[^\n]*file=rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       new RegExp(`Rollout Widening Decision Execution Route:[\\s\\S]*status=${rolloutWideningDecisionStatus} \\| ready=${rolloutWideningDecisionReady ? "yes" : "no"} \\| action=review_rollout_widening_decision \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
-      /rollout-widening-decision-execution: [^\n]*file=rollout-widening-decision-execution\.txt[^\n]*format=rollout-widening-decision-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /(^|\n)- rollout-widening-decision-execution:/
     );
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, rolloutWideningDecisionOperatorOrderPattern);
     assert.match(
@@ -24968,15 +24968,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
-      /first-operating-result-handoff: [^\n]*key=ops_launch_operations_overview_status[^\n]*format=launch-operations-overview-status[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /first-operating-result-handoff: ops\/first-operating-result-handoff-execution\.txt[^\n]*file=first-operating-result-handoff-execution\.txt[^\n]*format=first-operating-result-handoff-execution[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /First Operating Result Handoff Execution Route:[\s\S]*status=awaiting_rollout_widening_receipt \| ready=no \| current=record_rollout_widening_decision \| receiptAudit=- \| file=developer-ops-launch-operations-overview-status\.txt \| format=launch-operations-overview-status/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
-      /first-operating-result-handoff-execution: [^\n]*file=first-operating-result-handoff-execution\.txt[^\n]*format=first-operating-result-handoff-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /(^|\n)- first-operating-result-handoff-execution:/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
@@ -25493,11 +25493,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Steady-state duty receipt review: ops\/steady-state-duty-board\.txt/
+      /Included Handoff Files:[\s\S]*Steady-state duty receipt review: ops\/steady-state-duty-receipt-review-execution\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Steady-state duty receipt review execution direct file: ops\/steady-state-duty-receipt-review-execution\.txt/
+      /Steady-state duty receipt review execution direct file:/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
@@ -25550,11 +25550,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Rollout widening decision: ops\/steady-state-duty-board\.txt/
+      /Included Handoff Files:[\s\S]*Rollout widening decision: ops\/rollout-widening-decision-execution\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Rollout widening decision execution direct file: ops\/rollout-widening-decision-execution\.txt/
+      /Rollout widening decision execution direct file:/
     );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, rolloutWideningDecisionOperatorOrderPattern);
     assert.match(
@@ -25567,11 +25567,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*First operating result handoff: ops\/launch-operations-overview-status\.txt/
+      /Included Handoff Files:[\s\S]*First operating result handoff: ops\/first-operating-result-handoff-execution\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*First operating result handoff execution direct file: ops\/first-operating-result-handoff-execution\.txt/
+      /First operating result handoff execution direct file:/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
@@ -32682,7 +32682,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
-      /steady-state-handoff-landing-execution: [^\n]*file=steady-state-handoff-landing-execution\.txt[^\n]*format=steady-state-handoff-landing-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /steady-state-handoff-landing: ops\/steady-state-handoff-landing-execution\.txt[^\n]*file=steady-state-handoff-landing-execution\.txt[^\n]*format=steady-state-handoff-landing-execution[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
@@ -32756,9 +32756,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateRoutesDownload.body,
       /Surface Review Closeout Route:[\s\S]*stableTransitionReceiptReviewFile=[^\n]*\| stableTransitionReceiptReviewHref=[^\n]*\| stableTransitionReceiptReviewVisibility=[^\n]*\| stableTransitionReceiptReviewNext=[^\n]*/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineSteadyStateRoutesDownload.body,
-      /steady-state-handoff-landing: [^\n]*key=ops_steady_state_handoff_brief[^\n]*source=developer-ops-launch-duty-handoff-landing/
+      /(^|\n)- steady-state-handoff-landing-execution:/
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
@@ -32893,11 +32893,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Steady-state handoff landing: ops\/steady-state-handoff-brief\.txt/
+      /Included Handoff Files:[\s\S]*Steady-state handoff landing: ops\/steady-state-handoff-landing-execution\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Steady-state handoff landing execution direct file: ops\/steady-state-handoff-landing-execution\.txt/
+      /Steady-state handoff landing execution direct file:/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,

@@ -31827,12 +31827,15 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | format=${steadyStateHandoffLanding.format || steadyStateHandoffLandingDownload?.format || "-"}`
       + ` | href=${steadyStateHandoffLanding.href || steadyStateHandoffLandingDownload?.href || "-"}`
     );
-    lines.push(
-      `- steady-state-handoff-landing: ${steadyStateHandoffLandingDownload?.fileName || steadyStateHandoffLanding.fileName || "ops/steady-state-handoff-brief.txt"}`
-      + ` | key=${steadyStateHandoffLandingDownload?.key || "ops_steady_state_handoff_brief"}`
-      + ` | label=${steadyStateHandoffLandingDownload?.label || "Launch duty steady-state handoff"}`
-      + ` | source=${steadyStateHandoffLandingDownload?.source || steadyStateHandoffLanding.source || "-"}`
-      + ` | launchDutyRecordIndex=${steadyStateHandoffLanding.launchDutyRecordIndexPath || "-"}`
+    pushRoute(
+      "steady-state-handoff-landing",
+      steadyStateHandoffLandingExecution
+        ? "Launch Mainline steady-state handoff landing execution"
+        : "Launch duty steady-state handoff",
+      steadyStateHandoffLandingExecution
+        ? opsFiles.steadyStateHandoffLandingExecution || "ops/steady-state-handoff-landing-execution.txt"
+        : steadyStateHandoffLandingDownload?.fileName || steadyStateHandoffLanding.fileName || "ops/steady-state-handoff-brief.txt",
+      steadyStateHandoffLandingExecutionDownload || steadyStateHandoffLandingDownload || {}
     );
     lines.push(`- nextAction=${steadyStateHandoffLanding.nextAction || "-"}`);
   }
@@ -31841,12 +31844,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     appendSteadyStateHandoffLandingExecutionLines(lines, steadyStateHandoffLandingExecution, {
       title: "Steady-State Handoff Landing Execution Route:"
     });
-    pushRoute(
-      "steady-state-handoff-landing-execution",
-      "Launch Mainline steady-state handoff landing execution",
-      opsFiles.steadyStateHandoffLandingExecution || "ops/steady-state-handoff-landing-execution.txt",
-      steadyStateHandoffLandingExecutionDownload || {}
-    );
+    if (!steadyStateHandoffLanding) {
+      pushRoute(
+        "steady-state-handoff-landing",
+        "Launch Mainline steady-state handoff landing execution",
+        opsFiles.steadyStateHandoffLandingExecution || "ops/steady-state-handoff-landing-execution.txt",
+        steadyStateHandoffLandingExecutionDownload || {}
+      );
+    }
   }
   if (steadyStateDutyReceiptReview) {
     lines.push("");
@@ -31859,13 +31864,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | format=${steadyStateDutyReceiptReview.format || steadyStateDutyReceiptReviewDownload?.format || "steady-state-duty-board"}`
       + ` | href=${steadyStateDutyReceiptReview.href || steadyStateDutyReceiptReviewDownload?.href || "-"}`
     );
-    lines.push(
-      `- steady-state-duty-receipt-review: ${steadyStateDutyReceiptReviewDownload?.fileName || steadyStateDutyReceiptReview.fileName || "ops/steady-state-duty-board.txt"}`
-      + ` | key=${steadyStateDutyReceiptReviewDownload?.key || "ops_latest_steady_state_duty_receipt_asset"}`
-      + ` | label=${steadyStateDutyReceiptReviewDownload?.label || "Latest steady-state duty receipt asset"}`
-      + ` | source=${steadyStateDutyReceiptReviewDownload?.source || "developer-ops-steady-state-duty-plan-receipt"}`
-      + ` | visibility=${steadyStateDutyReceiptReview.receiptVisibilityStatus || "-"}`
-      + ` | launchDutyRecordIndex=${steadyStateDutyReceiptReview.launchDutyRecordIndexPath || "-"}`
+    pushRoute(
+      "steady-state-duty-receipt-review",
+      steadyStateDutyReceiptReviewExecution
+        ? "Launch Mainline steady-state duty receipt review execution"
+        : "Latest steady-state duty receipt asset",
+      steadyStateDutyReceiptReviewExecution
+        ? opsFiles.steadyStateDutyReceiptReviewExecution || "ops/steady-state-duty-receipt-review-execution.txt"
+        : steadyStateDutyReceiptReviewDownload?.fileName || steadyStateDutyReceiptReview.fileName || "ops/steady-state-duty-board.txt",
+      steadyStateDutyReceiptReviewExecutionDownload
+        || steadyStateDutyReceiptReviewExecutionDirectDownload
+        || steadyStateDutyReceiptReviewDownload
+        || {}
     );
     lines.push(`- nextAction=${steadyStateDutyReceiptReview.nextAction || "-"}`);
   }
@@ -31874,12 +31884,14 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     appendSteadyStateDutyReceiptReviewExecutionLines(lines, steadyStateDutyReceiptReviewExecution, {
       title: "Steady-State Duty Receipt Review Execution Route:"
     });
-    pushRoute(
-      "steady-state-duty-receipt-review-execution",
-      "Launch Mainline steady-state duty receipt review execution",
-      opsFiles.steadyStateDutyReceiptReviewExecution || "ops/steady-state-duty-receipt-review-execution.txt",
-      steadyStateDutyReceiptReviewExecutionDownload || steadyStateDutyReceiptReviewExecutionDirectDownload || {}
-    );
+    if (!steadyStateDutyReceiptReview) {
+      pushRoute(
+        "steady-state-duty-receipt-review",
+        "Launch Mainline steady-state duty receipt review execution",
+        opsFiles.steadyStateDutyReceiptReviewExecution || "ops/steady-state-duty-receipt-review-execution.txt",
+        steadyStateDutyReceiptReviewExecutionDownload || steadyStateDutyReceiptReviewExecutionDirectDownload || {}
+      );
+    }
   }
   if (rolloutWideningDecisionAction) {
     lines.push("");
@@ -31892,13 +31904,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       + ` | format=${rolloutWideningDecisionDownload?.format || rolloutWideningDecisionAction.boardDownloadFormat || "steady-state-duty-board"}`
       + ` | href=${rolloutWideningDecisionDownload?.href || rolloutWideningDecisionAction.boardDownloadHref || "-"}`
     );
-    lines.push(
-      `- rollout-widening-decision: ${rolloutWideningDecisionDownload?.fileName || "ops/steady-state-duty-board.txt"}`
-      + ` | key=${rolloutWideningDecisionDownload?.key || "ops_steady_state_duty_board"}`
-      + ` | label=${rolloutWideningDecisionDownload?.label || "Steady-state duty board"}`
-      + ` | source=${rolloutWideningDecisionDownload?.source || "developer-ops"}`
-      + ` | queueTotal=${rolloutWideningDecisionAction.queueTotal ?? "-"}`
-      + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
+    pushRoute(
+      "rollout-widening-decision",
+      rolloutWideningDecisionExecution
+        ? "Launch Mainline rollout widening decision execution"
+        : "Steady-state duty board",
+      rolloutWideningDecisionExecution
+        ? opsFiles.rolloutWideningDecisionExecution || "ops/rollout-widening-decision-execution.txt"
+        : rolloutWideningDecisionDownload?.fileName || "ops/steady-state-duty-board.txt",
+      rolloutWideningDecisionExecutionDownload
+        || rolloutWideningDecisionExecutionDirectDownload
+        || rolloutWideningDecisionDownload
+        || {}
     );
     lines.push(`- nextAction=${rolloutWideningDecisionAction.nextAction || "-"}`);
   }
@@ -31907,28 +31924,36 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     appendRolloutWideningDecisionExecutionLines(lines, rolloutWideningDecisionExecution, {
       title: "Rollout Widening Decision Execution Route:"
     });
-    pushRoute(
-      "rollout-widening-decision-execution",
-      "Launch Mainline rollout widening decision execution",
-      opsFiles.rolloutWideningDecisionExecution || "ops/rollout-widening-decision-execution.txt",
-      rolloutWideningDecisionExecutionDownload || rolloutWideningDecisionExecutionDirectDownload || {}
-    );
+    if (!rolloutWideningDecisionAction) {
+      pushRoute(
+        "rollout-widening-decision",
+        "Launch Mainline rollout widening decision execution",
+        opsFiles.rolloutWideningDecisionExecution || "ops/rollout-widening-decision-execution.txt",
+        rolloutWideningDecisionExecutionDownload || rolloutWideningDecisionExecutionDirectDownload || {}
+      );
+    }
   }
   appendFirstOperatingResultHandoffLines(lines, firstOperatingResultHandoffAction, {
     title: "First Operating Result Handoff Route",
-    readyStyle: "boolean"
+    readyStyle: "boolean",
+    entryPath: firstOperatingResultHandoffExecution
+      ? opsFiles.firstOperatingResultHandoffExecution || "ops/first-operating-result-handoff-execution.txt"
+      : null,
+    entryDownload: firstOperatingResultHandoffExecutionDownload || firstOperatingResultHandoffExecutionDirectDownload || null
   });
   if (firstOperatingResultHandoffExecution) {
     lines.push("");
     appendFirstOperatingResultHandoffExecutionLines(lines, firstOperatingResultHandoffExecution, {
       title: "First Operating Result Handoff Execution Route:"
     });
-    pushRoute(
-      "first-operating-result-handoff-execution",
-      "Launch Mainline first operating result handoff execution",
-      opsFiles.firstOperatingResultHandoffExecution || "ops/first-operating-result-handoff-execution.txt",
-      firstOperatingResultHandoffExecutionDownload || firstOperatingResultHandoffExecutionDirectDownload || {}
-    );
+    if (!firstOperatingResultHandoffAction) {
+      pushRoute(
+        "first-operating-result-handoff",
+        "Launch Mainline first operating result handoff execution",
+        opsFiles.firstOperatingResultHandoffExecution || "ops/first-operating-result-handoff-execution.txt",
+        firstOperatingResultHandoffExecutionDownload || firstOperatingResultHandoffExecutionDirectDownload || {}
+      );
+    }
   }
   if (firstOperatingResultHandoffReceiptReadbackExecution) {
     lines.push("");
@@ -34602,12 +34627,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (steadyStateHandoffLanding) {
     handoffFiles.push([
       "Steady-state handoff landing",
-      "ops/steady-state-handoff-brief.txt"
+      steadyStateHandoffLandingExecution
+        ? opsFiles.steadyStateHandoffLandingExecution || "ops/steady-state-handoff-landing-execution.txt"
+        : "ops/steady-state-handoff-brief.txt"
     ]);
   }
-  if (steadyStateHandoffLandingExecution) {
+  if (steadyStateHandoffLandingExecution && !steadyStateHandoffLanding) {
     handoffFiles.push([
-      "Steady-state handoff landing execution direct file",
+      "Steady-state handoff landing",
       opsFiles.steadyStateHandoffLandingExecution || "ops/steady-state-handoff-landing-execution.txt"
     ]);
   }
@@ -34626,12 +34653,14 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (steadyStateDutyReceiptReview) {
     handoffFiles.push([
       "Steady-state duty receipt review",
-      "ops/steady-state-duty-board.txt"
+      steadyStateDutyReceiptReviewExecution
+        ? opsFiles.steadyStateDutyReceiptReviewExecution || "ops/steady-state-duty-receipt-review-execution.txt"
+        : "ops/steady-state-duty-board.txt"
     ]);
   }
-  if (steadyStateDutyReceiptReviewExecution) {
+  if (steadyStateDutyReceiptReviewExecution && !steadyStateDutyReceiptReview) {
     handoffFiles.push([
-      "Steady-state duty receipt review execution direct file",
+      "Steady-state duty receipt review",
       opsFiles.steadyStateDutyReceiptReviewExecution || "ops/steady-state-duty-receipt-review-execution.txt"
     ]);
   }
@@ -34652,24 +34681,28 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (rolloutWideningDecisionAction) {
     handoffFiles.push([
       "Rollout widening decision",
-      "ops/steady-state-duty-board.txt"
+      rolloutWideningDecisionExecution
+        ? opsFiles.rolloutWideningDecisionExecution || "ops/rollout-widening-decision-execution.txt"
+        : "ops/steady-state-duty-board.txt"
     ]);
   }
-  if (rolloutWideningDecisionExecution) {
+  if (rolloutWideningDecisionExecution && !rolloutWideningDecisionAction) {
     handoffFiles.push([
-      "Rollout widening decision execution direct file",
+      "Rollout widening decision",
       opsFiles.rolloutWideningDecisionExecution || "ops/rollout-widening-decision-execution.txt"
     ]);
   }
   if (firstOperatingResultHandoffAction) {
     handoffFiles.push([
       "First operating result handoff",
-      "ops/launch-operations-overview-status.txt"
+      firstOperatingResultHandoffExecution
+        ? opsFiles.firstOperatingResultHandoffExecution || "ops/first-operating-result-handoff-execution.txt"
+        : "ops/launch-operations-overview-status.txt"
     ]);
   }
-  if (firstOperatingResultHandoffExecution) {
+  if (firstOperatingResultHandoffExecution && !firstOperatingResultHandoffAction) {
     handoffFiles.push([
-      "First operating result handoff execution direct file",
+      "First operating result handoff",
       opsFiles.firstOperatingResultHandoffExecution || "ops/first-operating-result-handoff-execution.txt"
     ]);
   }
@@ -43345,7 +43378,9 @@ function buildLaunchOperationsFirstOperatingResultHandoffActionPayload({
 function appendFirstOperatingResultHandoffLines(lines = [], action = null, {
   title = "First Operating Result Handoff",
   readyStyle = "yes-no",
-  entryLabel = "first-operating-result-handoff"
+  entryLabel = "first-operating-result-handoff",
+  entryPath = null,
+  entryDownload = null
 } = {}) {
   if (!action || typeof action !== "object") {
     return false;
@@ -43369,6 +43404,17 @@ function appendFirstOperatingResultHandoffLines(lines = [], action = null, {
   const format = action.nextDownloadFormat || download?.format || "-";
   const href = action.nextDownloadHref || download?.href || "-";
   const key = action.nextDownloadKey || download?.key || "-";
+  const directEntryDownload = entryDownload && typeof entryDownload === "object" ? entryDownload : null;
+  const entryFileName = directEntryDownload?.fileName || fileName;
+  const entryFormat = directEntryDownload?.format || format;
+  const entryHref = directEntryDownload?.href || href;
+  const entryKey = directEntryDownload?.key || key;
+  const entrySource = directEntryDownload?.source || download?.source || action.source || "developer-ops-launch-operations-first-operating-result-handoff";
+  const entryRecordIndex = directEntryDownload?.launchDutyRecordIndexPath
+    || action.launchDutyRecordIndexPath
+    || download?.launchDutyRecordIndexPath
+    || action.launchOpsOverviewContextLaunchDutyRecordIndexPath
+    || "-";
   lines.push("");
   lines.push(`${title}:`);
   lines.push(
@@ -43382,12 +43428,13 @@ function appendFirstOperatingResultHandoffLines(lines = [], action = null, {
     + ` | blockedBy=${blockedBy || "-"}`
   );
   lines.push(
-    `- ${entryLabel}: ${fileName}`
-    + ` | key=${key}`
-    + ` | format=${format}`
-    + ` | href=${href}`
-    + ` | source=${download?.source || action.source || "developer-ops-launch-operations-first-operating-result-handoff"}`
-    + ` | launchDutyRecordIndex=${action.launchDutyRecordIndexPath || download?.launchDutyRecordIndexPath || action.launchOpsOverviewContextLaunchDutyRecordIndexPath || "-"}`
+    `- ${entryLabel}: ${entryPath || entryFileName}`
+    + ` | key=${entryKey}`
+    + ` | file=${entryFileName}`
+    + ` | format=${entryFormat}`
+    + ` | href=${entryHref}`
+    + ` | source=${entrySource}`
+    + ` | launchDutyRecordIndex=${entryRecordIndex}`
   );
   lines.push(
     `- rolloutReceiptStatus=${action.rolloutWideningReceiptStatus || "-"}`
@@ -59844,7 +59891,7 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     : null;
   if (steadyStateDutyReceiptReviewExecutionDownload) {
     downloads.push([
-      "steady-state-duty-receipt-review-execution",
+      "steady-state-duty-receipt-review",
       steadyStateDutyReceiptReviewExecutionDownload
     ]);
   }
@@ -59924,7 +59971,7 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     : null;
   if (rolloutWideningDecisionExecutionDownload) {
     downloads.push([
-      "rollout-widening-decision-execution",
+      "rollout-widening-decision",
       rolloutWideningDecisionExecutionDownload
     ]);
   }
@@ -60041,7 +60088,7 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     : null;
   if (firstOperatingResultHandoffExecutionDownload) {
     downloads.push([
-      "first-operating-result-handoff-execution",
+      "first-operating-result-handoff",
       firstOperatingResultHandoffExecutionDownload
     ]);
   }
@@ -60190,12 +60237,16 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       + ` | href=${latestSteadyStateDutyPlanReceipt.href || steadyStateDutyReceiptReviewDownload?.href || "-"}`
     );
     lines.push(
-      `- steady-state-duty-receipt-review: ${steadyStateDutyReceiptReviewDownload?.fileName || latestSteadyStateDutyPlanReceipt.fileName || "developer-ops-steady-state-duty-board.txt"}`
-      + ` | key=${steadyStateDutyReceiptReviewDownload?.key || "ops_latest_steady_state_duty_receipt_asset"}`
-      + ` | label=${steadyStateDutyReceiptReviewDownload?.label || "Latest steady-state duty receipt asset"}`
-      + ` | source=${steadyStateDutyReceiptReviewDownload?.source || "developer-ops-steady-state-duty-plan-receipt"}`
+      `- steady-state-duty-receipt-review: ${steadyStateDutyReceiptReviewExecutionDownload ? "ops/steady-state-duty-receipt-review-execution.txt" : steadyStateDutyReceiptReviewDownload?.fileName || latestSteadyStateDutyPlanReceipt.fileName || "developer-ops-steady-state-duty-board.txt"}`
+      + ` | key=${steadyStateDutyReceiptReviewExecutionDownload?.key || steadyStateDutyReceiptReviewDownload?.key || "ops_latest_steady_state_duty_receipt_asset"}`
+      + ` | label=${steadyStateDutyReceiptReviewExecutionDownload?.label || steadyStateDutyReceiptReviewDownload?.label || "Latest steady-state duty receipt asset"}`
+      + ` | file=${steadyStateDutyReceiptReviewExecutionDownload?.fileName || steadyStateDutyReceiptReviewDownload?.fileName || latestSteadyStateDutyPlanReceipt.fileName || "developer-ops-steady-state-duty-board.txt"}`
+      + ` | format=${steadyStateDutyReceiptReviewExecutionDownload?.format || steadyStateDutyReceiptReviewDownload?.format || latestSteadyStateDutyPlanReceipt.format || "steady-state-duty-board"}`
+      + ` | source=${steadyStateDutyReceiptReviewExecutionDownload?.source || steadyStateDutyReceiptReviewDownload?.source || "developer-ops-steady-state-duty-plan-receipt"}`
+      + ` | href=${steadyStateDutyReceiptReviewExecutionDownload?.href || steadyStateDutyReceiptReviewDownload?.href || latestSteadyStateDutyPlanReceipt.href || "-"}`
       + ` | visibility=${latestSteadyStateDutyPlanReceipt.receiptVisibility?.status || "-"}`
-      + ` | launchDutyRecordIndex=${latestSteadyStateDutyPlanReceipt.receiptVisibility?.launchDutyRecordIndexPath
+      + ` | launchDutyRecordIndex=${steadyStateDutyReceiptReviewExecutionDownload?.launchDutyRecordIndexPath
+        || latestSteadyStateDutyPlanReceipt.receiptVisibility?.launchDutyRecordIndexPath
         || latestSteadyStateDutyPlanReceipt.launchReadinessNextGateLaunchDutyRecordIndexPath
         || latestSteadyStateDutyPlanReceipt.launchOpsOverviewContextLaunchDutyRecordIndexPath
         || "-"}`
@@ -60206,16 +60257,6 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     appendSteadyStateDutyReceiptReviewExecutionLines(lines, steadyStateDutyReceiptReviewExecution, {
       title: "Steady-State Duty Receipt Review Execution Route:"
     });
-    lines.push(
-      `- steady-state-duty-receipt-review-execution: ops/steady-state-duty-receipt-review-execution.txt`
-      + ` | key=${steadyStateDutyReceiptReviewExecutionDownload?.key || "launch_mainline_steady_state_duty_receipt_review_execution"}`
-      + ` | label=${steadyStateDutyReceiptReviewExecutionDownload?.label || "Launch Mainline steady-state duty receipt review execution"}`
-      + ` | file=${steadyStateDutyReceiptReviewExecutionDownload?.fileName || "steady-state-duty-receipt-review-execution.txt"}`
-      + ` | format=${steadyStateDutyReceiptReviewExecutionDownload?.format || "steady-state-duty-receipt-review-execution"}`
-      + ` | source=${steadyStateDutyReceiptReviewExecutionDownload?.source || "developer-launch-mainline"}`
-      + ` | href=${steadyStateDutyReceiptReviewExecutionDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${steadyStateDutyReceiptReviewExecution.launchDutyRecordIndexPath || "-"}`
-    );
   }
   if (rolloutWideningDecisionAction) {
     lines.push("");
@@ -60229,10 +60270,14 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       + ` | href=${rolloutWideningDecisionDownload?.href || "-"}`
     );
     lines.push(
-      `- rollout-widening-decision: ${rolloutWideningDecisionDownload?.fileName || "developer-ops-steady-state-duty-board.txt"}`
-      + ` | key=${rolloutWideningDecisionDownload?.key || "ops_steady_state_duty_board"}`
-      + ` | label=${rolloutWideningDecisionDownload?.label || "Steady-state duty board"}`
-      + ` | source=${rolloutWideningDecisionDownload?.source || "developer-ops"}`
+      `- rollout-widening-decision: ${rolloutWideningDecisionExecutionDownload ? "ops/rollout-widening-decision-execution.txt" : rolloutWideningDecisionDownload?.fileName || "developer-ops-steady-state-duty-board.txt"}`
+      + ` | key=${rolloutWideningDecisionExecutionDownload?.key || rolloutWideningDecisionDownload?.key || "ops_steady_state_duty_board"}`
+      + ` | label=${rolloutWideningDecisionExecutionDownload?.label || rolloutWideningDecisionDownload?.label || "Steady-state duty board"}`
+      + ` | file=${rolloutWideningDecisionExecutionDownload?.fileName || rolloutWideningDecisionDownload?.fileName || "developer-ops-steady-state-duty-board.txt"}`
+      + ` | format=${rolloutWideningDecisionExecutionDownload?.format || rolloutWideningDecisionDownload?.format || "steady-state-duty-board"}`
+      + ` | source=${rolloutWideningDecisionExecutionDownload?.source || rolloutWideningDecisionDownload?.source || "developer-ops"}`
+      + ` | href=${rolloutWideningDecisionExecutionDownload?.href || rolloutWideningDecisionDownload?.href || "-"}`
+      + `${rolloutWideningDecisionExecutionDownload?.launchDutyRecordIndexPath ? ` | launchDutyRecordIndex=${rolloutWideningDecisionExecutionDownload.launchDutyRecordIndexPath}` : ""}`
       + ` | queueTotal=${rolloutWideningDecisionAction.queueTotal ?? "-"}`
       + ` | attention=${rolloutWideningDecisionAction.attentionCount ?? "-"}`
     );
@@ -60242,36 +60287,20 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     appendRolloutWideningDecisionExecutionLines(lines, rolloutWideningDecisionExecution, {
       title: "Rollout Widening Decision Execution Route:"
     });
-    lines.push(
-      `- rollout-widening-decision-execution: ops/rollout-widening-decision-execution.txt`
-      + ` | key=${rolloutWideningDecisionExecutionDownload?.key || "launch_mainline_rollout_widening_decision_execution"}`
-      + ` | label=${rolloutWideningDecisionExecutionDownload?.label || "Launch Mainline rollout widening decision execution"}`
-      + ` | file=${rolloutWideningDecisionExecutionDownload?.fileName || "rollout-widening-decision-execution.txt"}`
-      + ` | format=${rolloutWideningDecisionExecutionDownload?.format || "rollout-widening-decision-execution"}`
-      + ` | source=${rolloutWideningDecisionExecutionDownload?.source || "developer-launch-mainline"}`
-      + ` | href=${rolloutWideningDecisionExecutionDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${rolloutWideningDecisionExecution.launchDutyRecordIndexPath || "-"}`
-    );
   }
   appendFirstOperatingResultHandoffLines(lines, firstOperatingResultHandoffAction, {
     title: "First Operating Result Handoff Route",
-    readyStyle: "boolean"
+    readyStyle: "boolean",
+    entryPath: firstOperatingResultHandoffExecution
+      ? "ops/first-operating-result-handoff-execution.txt"
+      : null,
+    entryDownload: firstOperatingResultHandoffExecutionDownload || null
   });
   if (firstOperatingResultHandoffExecution) {
     lines.push("");
     appendFirstOperatingResultHandoffExecutionLines(lines, firstOperatingResultHandoffExecution, {
       title: "First Operating Result Handoff Execution Route:"
     });
-    lines.push(
-      `- first-operating-result-handoff-execution: ops/first-operating-result-handoff-execution.txt`
-      + ` | key=${firstOperatingResultHandoffExecutionDownload?.key || "launch_mainline_first_operating_result_handoff_execution"}`
-      + ` | label=${firstOperatingResultHandoffExecutionDownload?.label || "Launch Mainline first operating result handoff execution"}`
-      + ` | file=${firstOperatingResultHandoffExecutionDownload?.fileName || "first-operating-result-handoff-execution.txt"}`
-      + ` | format=${firstOperatingResultHandoffExecutionDownload?.format || "first-operating-result-handoff-execution"}`
-      + ` | source=${firstOperatingResultHandoffExecutionDownload?.source || "developer-launch-mainline"}`
-      + ` | href=${firstOperatingResultHandoffExecutionDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${firstOperatingResultHandoffExecution.launchDutyRecordIndexPath || "-"}`
-    );
   }
   if (firstOperatingResultHandoffReceiptReadbackExecution) {
     lines.push("");

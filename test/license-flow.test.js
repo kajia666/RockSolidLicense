@@ -6302,6 +6302,17 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(Array.isArray(launchReview.reviewSummary.recommendedDownloads));
       assert.ok(launchReview.reviewSummary.recommendedDownloads.some((item) => item.key === "launch_review_summary"));
       assert.ok(launchReview.reviewSummary.actionPlan.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
+      const launchReviewMainlineOverviewAction = launchReview.reviewSummary.actionPlan.find((item) => item.key === "launch_mainline_overview");
+      assert.match(
+        launchReviewMainlineOverviewAction?.summary || "",
+        /launch-mainline-handoff-routes\.txt[\s\S]*surface-review-closeout-shortcut-download\.txt[\s\S]*developer-ops-pre-staging-readiness-self-check\.txt/
+      );
+      const launchReviewHandoffRoutesAction = launchReview.reviewSummary.actionPlan.find((item) => item.key === "launch_review_handoff_routes");
+      assert.equal(launchReviewHandoffRoutesAction?.title, "Attach Review to the front-loaded Launch Mainline path");
+      assert.match(
+        launchReviewHandoffRoutesAction?.summary || "",
+        /launch-mainline-handoff-routes\.txt[\s\S]*surface-review-closeout-shortcut-download\.txt[\s\S]*developer-ops-pre-staging-readiness-self-check\.txt/
+      );
       assert.ok(launchReview.reviewSummary.workspaceActions?.some((item) => /^Open (Account|Entitlement|Session|Device) Control in Ops$/.test(item.label || "")));
       assert.ok(launchReview.reviewSummary.recommendedWorkspace?.key);
       assert.equal(launchReview.reviewSummary.routeFocus?.title, "Continue launch review sweep");
@@ -10193,6 +10204,17 @@ test("developer license quickstart bootstrap can create starter launch assets in
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.recommendedDownloads?.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.ok(smokeKit.smokeSummary?.actionPlan?.some((item) => item.key === "launch_mainline_overview" && item.recommendedDownload?.key === "launch_mainline_rehearsal_guide"));
+    const smokeKitMainlineOverviewAction = smokeKit.smokeSummary.actionPlan.find((item) => item.key === "launch_mainline_overview");
+    assert.match(
+      smokeKitMainlineOverviewAction?.summary || "",
+      /launch-mainline-handoff-routes\.txt[\s\S]*surface-review-closeout-shortcut-download\.txt[\s\S]*developer-ops-pre-staging-readiness-self-check\.txt/
+    );
+    const smokeKitHandoffRoutesAction = smokeKit.smokeSummary.actionPlan.find((item) => item.key === "launch_smoke_handoff_routes");
+    assert.equal(smokeKitHandoffRoutesAction?.title, "Attach Smoke to the front-loaded Launch Mainline path");
+    assert.match(
+      smokeKitHandoffRoutesAction?.summary || "",
+      /launch-mainline-handoff-routes\.txt[\s\S]*surface-review-closeout-shortcut-download\.txt[\s\S]*developer-ops-pre-staging-readiness-self-check\.txt/
+    );
     assert.equal(smokeKit.smokeSummary?.routeFocus?.title, "Continue launch smoke sweep");
     assert.equal(smokeKit.smokeSummary?.routeFocus?.summary, "Continue smoke receipt follow-up");
     assert.equal(smokeKit.smokeSummary?.routeFocus?.operation, "record_post_launch_ops_sweep");

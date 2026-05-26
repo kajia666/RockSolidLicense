@@ -2969,7 +2969,7 @@ function buildReleaseMainlineFollowUpPayload({
     pushActionPlan({
       key: "launch_mainline_overview",
       title: "Review the unified launch mainline handoff",
-      summary: "Use the aggregated launch-mainline handoff to recheck release, workflow, review, and smoke together after the blocker pass.",
+      summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke on the front-loaded path: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt.",
       status: "review",
       priority: "secondary",
       workspaceAction: createRoutedWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
@@ -3046,7 +3046,7 @@ function buildReleaseMainlineFollowUpPayload({
     pushActionPlan({
       key: "launch_mainline_overview",
       title: "Review the unified launch mainline handoff",
-      summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned for this lane.",
+      summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke on the front-loaded path: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt.",
       status: normalizedStatus === "ready" ? "pass" : "review",
       priority: "secondary",
       workspaceAction: createRoutedWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
@@ -10719,7 +10719,7 @@ function buildLaunchWorkflowSummaryPayload({
   pushActionPlan(createLaunchWorkflowActionPlanStep({
     key: "launch_mainline_overview",
     title: "Review the unified launch mainline handoff",
-    summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned for this lane.",
+    summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke on the front-loaded path: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt.",
     status: workflowStatus === "hold" ? "block" : workflowStatus === "attention" ? "review" : "pass",
     priority: "secondary",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
@@ -13234,7 +13234,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushActionPlan(createLaunchWorkflowActionPlanStep({
     key: "launch_mainline_overview",
     title: "Review the unified launch mainline handoff",
-    summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke in one recheck loop.",
+    summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke on the front-loaded path: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt.",
     status: workflowBlocked ? "block" : workflowNeedsReview || queueHasUrgent ? "review" : "pass",
     priority: "secondary",
     workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
@@ -13242,8 +13242,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
   }));
   pushActionPlan(createLaunchWorkflowActionPlanStep({
     key: "launch_review_handoff_routes",
-    title: "Attach Review to Ops/Mainline handoff routes",
-    summary: "Keep the Review package connected to Developer Ops handoff index, Launch Mainline route map, and post-launch index before passing the lane forward.",
+    title: "Attach Review to the front-loaded Launch Mainline path",
+    summary: "Keep the Review package connected to the front-loaded path: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt before passing the lane forward.",
     status: workflowBlocked ? "block" : workflowNeedsReview || queueHasUrgent ? "review" : "pass",
     priority: "secondary",
     workspaceAction: stayAction,
@@ -15503,16 +15503,16 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       title: "Review the unified launch mainline handoff",
       priority: "secondary",
       status: startupBlocked || !readyPaths.length ? "block" : blockingPaths.length || reviewPaths.length ? "review" : "pass",
-      summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke aligned while smoke validation runs.",
+      summary: "Use the aggregated launch-mainline handoff to keep release, workflow, review, and smoke on the front-loaded path: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt.",
       workspaceAction: createLaunchWorkflowWorkspaceShortcut("launch-mainline", "summary", "Open Launch Mainline"),
       recommendedDownload: launchMainlineRehearsalGuideDownload
     },
     {
       key: "launch_smoke_handoff_routes",
-      title: "Attach Smoke to Review/Ops/Mainline handoff routes",
+      title: "Attach Smoke to the front-loaded Launch Mainline path",
       priority: "secondary",
       status: startupBlocked || !readyPaths.length ? "block" : blockingPaths.length || reviewPaths.length ? "review" : "pass",
-      summary: "Keep the smoke kit connected to Launch Review, Developer Ops handoff index, Launch Mainline route map, and post-launch index.",
+      summary: "Keep the smoke kit connected to the front-loaded path: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt before passing the lane forward.",
       workspaceAction: smokeWorkspaceAction,
       recommendedDownload: launchSmokeKitHandoffRoutesDownload
     },

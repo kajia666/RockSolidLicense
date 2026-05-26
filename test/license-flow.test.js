@@ -25024,7 +25024,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
-      /surface-review-closeout-shortcut: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /surface-review-closeout-shortcut: ops\/surface-review-closeout-shortcut-download\.txt[^\n]*file=surface-review-closeout-shortcut-download\.txt[^\n]*format=surface-review-closeout-shortcut-download[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
@@ -30711,7 +30711,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
-      /first-wave-closeout-stable-operations-shortcut: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /first-wave-closeout-stable-operations-shortcut: ops\/first-wave-closeout-stable-operations-shortcut-download\.txt[^\n]*file=first-wave-closeout-stable-operations-shortcut-download\.txt[^\n]*format=first-wave-closeout-stable-operations-shortcut-download[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
@@ -30743,7 +30743,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
-      /stable-operations-transition-shortcut: [^\n]*file=developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /stable-operations-transition-shortcut: ops\/stable-operations-transition-shortcut-download\.txt[^\n]*file=stable-operations-transition-shortcut-download\.txt[^\n]*format=stable-operations-transition-shortcut-download[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const launchMainlineCloseoutRecordedPacketReviewBridgeDownload = await getText(
       baseUrl,

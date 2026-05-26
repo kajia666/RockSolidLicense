@@ -30743,6 +30743,20 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     routeTitle: payload.filters?.routeTitle || "",
     routeReason: payload.filters?.routeReason || ""
   });
+  const surfaceReviewCloseoutShortcutRouteDownload = getDeveloperLaunchMainlineSurfaceReviewCloseoutShortcutDownload(payload);
+  const firstWaveCloseoutStableOperationsShortcutRouteDownload =
+    getDeveloperLaunchMainlineFirstWaveCloseoutStableOperationsShortcutDownload(payload);
+  const stableOperationsTransitionShortcutRouteDownload = stableOperationsTransitionShortcut
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline stable operations transition shortcut download",
+          "stable-operations-transition-shortcut-download.txt",
+          "stable-operations-transition-shortcut-download",
+          mainlineRouteParams
+        ),
+        launchDutyRecordIndexPath: stableOperationsTransitionShortcut.launchDutyRecordIndexPath || null
+      }
+    : null;
   const postLaunchHandoffIndexDownload = createLaunchMainlineDownloadShortcut(
     "Launch Mainline post-launch handoff index",
     payload.postLaunchHandoffIndexFileName || "developer-launch-mainline-post-launch-handoff-index.txt",
@@ -31707,15 +31721,11 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     appendFirstWaveCloseoutStableOperationsShortcutLines(lines, firstWaveCloseoutStableOperationsShortcut, {
       title: "Launch Mainline First-Wave Closeout Stable Operations Shortcut Route:"
     });
-    lines.push(
-      `- first-wave-closeout-stable-operations-shortcut: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${firstWaveCloseoutStableOperationsShortcut.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    pushRoute(
+      "first-wave-closeout-stable-operations-shortcut",
+      "Launch Mainline first-wave closeout stable operations shortcut download",
+      opsFiles.firstWaveCloseoutStableOperationsShortcutDownloadRoute || "ops/first-wave-closeout-stable-operations-shortcut-download.txt",
+      firstWaveCloseoutStableOperationsShortcutRouteDownload || {}
     );
   }
   if (stableOperationsHandoffExecution) {
@@ -31755,34 +31765,15 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     );
   }
   if (stableOperationsTransitionShortcut) {
-    const shortcutDownloadFormat = stableOperationsTransitionShortcut.nextDownloadFormat || "launch-operations-operator-entry";
-    const shortcutDownloadKey = stableOperationsTransitionShortcut.nextDownloadKey
-      || (shortcutDownloadFormat === "steady-state-handoff-brief"
-        ? "ops_steady_state_handoff_brief"
-        : "ops_launch_operations_operator_entry");
-    const shortcutDownloadFileName = shortcutDownloadFormat === "steady-state-handoff-brief"
-      ? "developer-ops-steady-state-handoff-brief.txt"
-      : shortcutDownloadFormat === "handoff-index"
-        ? "developer-ops-handoff-index.txt"
-        : "developer-ops-launch-operations-operator-entry.txt";
-    const shortcutDownloadLabel = shortcutDownloadFormat === "steady-state-handoff-brief"
-      ? "Steady-state handoff brief"
-      : shortcutDownloadFormat === "handoff-index"
-        ? "Launch operations handoff index"
-        : "Launch operations operator entry";
     lines.push("");
     appendStableOperationsTransitionShortcutLines(lines, stableOperationsTransitionShortcut, {
       title: "Launch Mainline Stable Operations Transition Shortcut Route:"
     });
-    lines.push(
-      `- stable-operations-transition-shortcut: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${shortcutDownloadKey}`
-      + ` | label=${shortcutDownloadLabel}`
-      + ` | file=${shortcutDownloadFileName}`
-      + ` | format=${shortcutDownloadFormat}`
-      + ` | source=developer-ops-launch-duty-stable-operations-transition`
-      + ` | href=${stableOperationsTransitionShortcut.nextDownloadHref || "-"}`
-      + ` | launchDutyRecordIndex=${stableOperationsTransitionShortcut.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    pushRoute(
+      "stable-operations-transition-shortcut",
+      "Launch Mainline stable operations transition shortcut download",
+      opsFiles.stableOperationsTransitionShortcutDownloadRoute || "ops/stable-operations-transition-shortcut-download.txt",
+      stableOperationsTransitionShortcutRouteDownload || {}
     );
   }
   if (surfaceReviewCloseoutShortcut) {
@@ -31791,15 +31782,11 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       title: "Launch Mainline Surface Review Closeout Shortcut Route:",
       readyStyle: "boolean"
     });
-    lines.push(
-      `- surface-review-closeout-shortcut: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${surfaceReviewCloseoutShortcut.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    pushRoute(
+      "surface-review-closeout-shortcut",
+      "Launch Mainline surface review closeout shortcut download",
+      opsFiles.surfaceReviewCloseoutShortcutDownloadRoute || "ops/surface-review-closeout-shortcut-download.txt",
+      surfaceReviewCloseoutShortcutRouteDownload || {}
     );
   }
   if (launchDutyStableOperationsTransitionAction) {

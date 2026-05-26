@@ -25000,7 +25000,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
-      /launch-switch-readiness: [^\n]*key=ops_launch_operations_operator_entry[^\n]*format=launch-operations-operator-entry[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+      /launch-switch-readiness: ops\/launch-switch-readiness\.txt[^\n]*file=launch-switch-readiness\.txt[^\n]*format=launch-switch-readiness[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
@@ -25013,6 +25013,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Launch Candidate Full Verification Result Handoff:[\s\S]*status=required_after_full_test_window_passed_backfill \| target=full_test_window_passed \| decision=ready-for-production-signoff \| expectedFilled=full_test_window_passed \| expectedGate=production_signoff/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-candidate-full-verification-gate: ops\/launch-candidate-full-verification-gate\.txt[^\n]*file=launch-candidate-full-verification-gate\.txt[^\n]*format=launch-candidate-full-verification-gate[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
@@ -25651,11 +25655,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Launch switch readiness direct file: ops\/launch-switch-readiness\.txt/
+      /Included Handoff Files:[\s\S]*Launch switch readiness: ops\/launch-switch-readiness\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Launch candidate full verification gate direct file: ops\/launch-candidate-full-verification-gate\.txt/
+      /Included Handoff Files:[\s\S]*Launch candidate full verification gate: ops\/launch-candidate-full-verification-gate\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
@@ -25705,9 +25709,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Surface review closeout shortcut download route:/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Launch switch operator entry: ops\/launch-operations-operator-entry\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch switch readiness direct file:/
+    );
+    assert.doesNotMatch(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch candidate full verification gate direct file:/
     );
 
     const launchMainlineSummarySelectionDownload = await getText(

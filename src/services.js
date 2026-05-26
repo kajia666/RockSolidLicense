@@ -28961,6 +28961,41 @@ function getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload = {})
   };
 }
 
+function getDeveloperLaunchMainlineLaunchSwitchReadinessDownload(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const launchSwitchReadinessSummary = entry?.launchSwitchReadinessSummary || null;
+  const launchSwitchOperatorRunbook = entry?.launchSwitchOperatorRunbook || null;
+  if (!launchSwitchReadinessSummary && !launchSwitchOperatorRunbook) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline launch switch readiness",
+      "launch-switch-readiness.txt",
+      "launch-switch-readiness",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: launchSwitchReadinessSummary?.launchDutyRecordIndexPath || null
+  };
+}
+
+function getDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownload(payload = {}) {
+  const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
+  const launchCandidateFullVerificationGate = entry?.launchCandidateFullVerificationGate || null;
+  if (!launchCandidateFullVerificationGate) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline launch candidate full verification gate",
+      "launch-candidate-full-verification-gate.txt",
+      "launch-candidate-full-verification-gate",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: launchCandidateFullVerificationGate.launchDutyRecordIndexPath || null
+  };
+}
+
 function buildDeveloperLaunchMainlineLaunchReadinessDistanceDownloadText(payload = {}) {
   const manifest = payload.manifest || {};
   const project = manifest.project || {};
@@ -30865,6 +30900,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       }
     : null;
   const launchReadinessDistanceDownload = getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload);
+  const launchSwitchReadinessDownload = getDeveloperLaunchMainlineLaunchSwitchReadinessDownload(payload);
+  const launchCandidateFullVerificationGateDownload = getDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownload(payload);
   const productionSignoffEntryHandoffDownload = getDeveloperLaunchMainlineProductionSignoffEntryHandoffDownload(payload);
   const signoffArchiveWatchHandoffDownload = getDeveloperLaunchMainlineSignoffArchiveWatchHandoffDownload(payload);
   const launchDutyReceiptExecutionHandoffDownload = getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoffDownload(payload);
@@ -31525,15 +31562,11 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     appendLaunchSwitchReadinessSummaryLines(lines, launchSwitchReadinessSummary, {
       title: "Launch Switch Readiness Route:"
     });
-    lines.push(
-      `- launch-switch-readiness: ${opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"}`
-      + ` | key=${launchOperationsOperatorEntryDownload?.key || "ops_launch_operations_operator_entry"}`
-      + ` | label=${launchOperationsOperatorEntryDownload?.label || "Launch operations operator entry"}`
-      + ` | file=${launchOperationsOperatorEntryDownload?.fileName || "developer-ops-launch-operations-operator-entry.txt"}`
-      + ` | format=${launchOperationsOperatorEntryDownload?.format || "launch-operations-operator-entry"}`
-      + ` | source=${launchOperationsOperatorEntryDownload?.source || "developer-ops"}`
-      + ` | href=${launchOperationsOperatorEntryDownload?.href || "-"}`
-      + ` | launchDutyRecordIndex=${launchSwitchReadinessSummary.launchDutyRecordIndexPath || launchOperationsOperatorEntryDownload?.launchDutyRecordIndexPath || "-"}`
+    pushRoute(
+      "launch-switch-readiness",
+      "Launch Mainline launch switch readiness",
+      opsFiles.launchSwitchReadiness || "ops/launch-switch-readiness.txt",
+      launchSwitchReadinessDownload || {}
     );
   }
   if (launchSwitchOperatorRunbook) {
@@ -31547,6 +31580,12 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     appendLaunchCandidateFullVerificationGateLines(lines, launchCandidateFullVerificationGate, {
       title: "Launch Candidate Full Verification Gate Route:"
     });
+    pushRoute(
+      "launch-candidate-full-verification-gate",
+      "Launch Mainline launch candidate full verification gate",
+      opsFiles.launchCandidateFullVerificationGate || "ops/launch-candidate-full-verification-gate.txt",
+      launchCandidateFullVerificationGateDownload || {}
+    );
   }
   if (postArchiveLaunchDayWatchReadback) {
     lines.push("");
@@ -34718,21 +34757,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   }
   if (launchSwitchReadinessSummary || launchSwitchOperatorRunbook) {
     handoffFiles.push([
-      "Launch switch operator entry",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "Launch switch readiness direct file",
+      "Launch switch readiness",
       opsFiles.launchSwitchReadiness || "ops/launch-switch-readiness.txt"
     ]);
   }
   if (launchCandidateFullVerificationGate) {
     handoffFiles.push([
       "Launch candidate full verification gate",
-      opsFiles.preStagingReadinessSelfCheck || "ops/pre-staging-readiness-self-check.txt"
-    ]);
-    handoffFiles.push([
-      "Launch candidate full verification gate direct file",
       opsFiles.launchCandidateFullVerificationGate || "ops/launch-candidate-full-verification-gate.txt"
     ]);
   }

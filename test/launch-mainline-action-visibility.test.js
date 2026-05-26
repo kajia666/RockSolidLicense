@@ -327,7 +327,9 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
         { kind: "workspace", workspace: "ops", download: null },
         { kind: "workspace", workspace: "launch-mainline", download: null },
         { kind: "download", workspace: null, download: "launch_review_summary" },
+        { kind: "download", workspace: null, download: "launch_review_handoff_routes" },
         { kind: "download", workspace: null, download: "launch_smoke_kit_summary" },
+        { kind: "download", workspace: null, download: "launch_smoke_handoff_routes" },
         { kind: "download", workspace: null, download: "ops_summary" },
         { kind: "download", workspace: null, download: "ops_launch_receipt_next_follow_up" },
         { kind: "download", workspace: null, download: "launch_mainline_post_launch_sweep_handoff" },
@@ -556,6 +558,18 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       ownerSession.token
     );
     assert.equal(launchReviewSummaryDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(
+      launchReviewSummaryDownload.body,
+      /Launch Surface Review Closeout:[\s\S]*status=ready_for_first_wave_confirmation \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff/
+    );
+    assert.match(
+      launchReviewSummaryDownload.body,
+      /Launch Surface Review Closeout:[\s\S]*reviewDownloads=launch_review_summary,launch_smoke_summary/
+    );
+    assert.match(
+      launchReviewSummaryDownload.body,
+      /Launch Surface Review Closeout:[\s\S]*Launch Review Receipt Visibility:/
+    );
     assert.match(launchReviewSummaryDownload.body, /Launch Review Receipt Visibility:/);
     assert.match(
       launchReviewSummaryDownload.body,
@@ -580,6 +594,18 @@ test("developer launch mainline action receipt exposes visibility checkpoints fo
       ownerSession.token
     );
     assert.equal(launchSmokeSummaryDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(
+      launchSmokeSummaryDownload.body,
+      /Launch Surface Review Closeout:[\s\S]*status=ready_for_first_wave_confirmation \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff/
+    );
+    assert.match(
+      launchSmokeSummaryDownload.body,
+      /Launch Surface Review Closeout:[\s\S]*reviewDownloads=launch_review_summary,launch_smoke_summary/
+    );
+    assert.match(
+      launchSmokeSummaryDownload.body,
+      /Launch Surface Review Closeout:[\s\S]*Launch Smoke Receipt Visibility:/
+    );
     assert.match(launchSmokeSummaryDownload.body, /Launch Smoke Receipt Visibility:/);
     assert.match(
       launchSmokeSummaryDownload.body,

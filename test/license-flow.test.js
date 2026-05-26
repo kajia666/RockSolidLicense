@@ -24720,6 +24720,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(launchOperationsOverviewStatus.overviewDownload.href, /format=launch-operations-overview-status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:/);
+    assert.match(
+      steadyStateDutyReceiptSnapshot.summaryText,
+      /Launch Surface Review Closeout:[\s\S]*status=ready_for_first_wave_confirmation \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff/
+    );
+    assert.match(
+      steadyStateDutyReceiptSnapshot.summaryText,
+      /Launch Surface Review Closeout:[\s\S]*reviewDownloads=launch_review_summary,launch_smoke_summary/
+    );
+    assert.match(
+      steadyStateDutyReceiptSnapshot.summaryText,
+      /Launch Surface Review Closeout:[\s\S]*Launch Operations Overview Status:/
+    );
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /overviewStatus=.*receipt=visible/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*context=launch_ops_overview_status/);
     assert.match(steadyStateDutyReceiptSnapshot.summaryText, /Launch Operations Overview Status:[\s\S]*downloadFormat=launch-operations-overview-status/);

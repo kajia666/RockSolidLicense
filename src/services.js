@@ -12000,6 +12000,9 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       || reviewSummary.routeFocus
       || null
   );
+  const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(
+    opsSnapshot.summary?.initialLaunchOpsReadiness || null
+  );
   const lines = [
     "RockSolid Developer Launch Review",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -12044,6 +12047,9 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
   };
 
   appendLaunchMainlineGateText(lines, reviewSummary.mainlineGate, formatWorkspaceActionText);
+  appendLaunchSurfaceReviewCloseoutActionText(lines, launchSurfaceReviewCloseoutAction, {
+    heading: "Launch Surface Review Closeout:"
+  });
   appendLaunchDutyReceiptVisibilityText(
     lines,
     opsOverview.latestLaunchReceipts,
@@ -15768,6 +15774,9 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
       || smokeSummary.routeFocus
       || null
   );
+  const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(
+    opsSnapshot.summary?.initialLaunchOpsReadiness || null
+  );
   const formatWorkspaceActionText = (action = null) => {
     if (!action || typeof action !== "object") {
       return "-";
@@ -15796,6 +15805,9 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
   ];
 
   appendLaunchMainlineGateText(lines, smokeSummary.mainlineGate, formatWorkspaceActionText);
+  appendLaunchSurfaceReviewCloseoutActionText(lines, launchSurfaceReviewCloseoutAction, {
+    heading: "Launch Surface Review Closeout:"
+  });
   appendLaunchDutyReceiptVisibilityText(
     lines,
     opsOverview.latestLaunchReceipts,
@@ -56725,6 +56737,49 @@ function appendDeveloperOpsLaunchReadinessNextGateHandoffText(lines = [], {
   return true;
 }
 
+function getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {
+  return initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
+}
+
+function appendLaunchSurfaceReviewCloseoutActionText(lines = [], action = null, {
+  leadingBlank = true,
+  heading = "Launch Surface Review Closeout:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  if (!action || typeof action !== "object") {
+    return false;
+  }
+  const reviewDownloads = Array.isArray(action.reviewDownloads) ? action.reviewDownloads : [];
+  if (leadingBlank) {
+    lines.push("");
+  }
+  lines.push(heading);
+  lines.push(
+    `- status=${action.status || "-"}`
+    + ` | current=${action.currentActionKey || "-"}`
+    + ` | decision=${action.decision || "-"}`
+    + ` | ready=${action.ready === true ? "yes" : "no"}`
+    + ` | manualProgress=${action.manualCheckpointProgress || "-"}`
+    + ` | manualRemaining=${action.remainingManualCheckpoints ?? "-"}`
+  );
+  lines.push(
+    `- surfaces=${action.readyReviewSurfaceCount ?? 0}/${action.reviewSurfaceCount ?? 0}`
+    + ` | launchDutyRecordIndex=${action.launchDutyRecordIndexPath || "-"}`
+  );
+  if (reviewDownloads.length) {
+    lines.push(`- reviewDownloads=${reviewDownloads.map((item) => item?.key || item?.fileName || "-").join(",")}`);
+  }
+  lines.push(
+    `- confirm=${action.confirmationSubmission?.method || "-"} ${action.confirmationSubmission?.route || "-"}`
+    + ` | refresh=${action.developerOpsOverviewRefresh?.method || "-"} ${action.developerOpsOverviewRefresh?.route || "-"}`
+    + ` | handoff=${action.postConfirmationSwitch?.decision || "-"}`
+  );
+  lines.push(`- nextAction=${action.nextAction || "-"}`);
+  return true;
+}
+
 function appendLaunchDutyReceiptVisibilityText(lines = [], latestLaunchReceipts = [], heading = "Launch Duty Receipt Visibility:") {
   if (!Array.isArray(lines)) {
     return;
@@ -57894,6 +57949,9 @@ function buildDeveloperOpsSummaryText(payload = {}) {
   const launchReceiptAuditBackfill = Number(payload.auditLogs?.filters?.launchReceiptBackfill || 0);
   const launchReceiptAuditBackfillStatus = summary.launchReceiptAuditBackfillStatus
     || buildLaunchReceiptAuditBackfillStatus(launchReceiptAuditBackfill);
+  const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(
+    initialLaunchOpsReadiness
+  );
   const lines = [
     "RockSolid Developer Ops Snapshot",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -57946,6 +58004,9 @@ function buildDeveloperOpsSummaryText(payload = {}) {
     );
   }
   appendFirstWaveAuditBackfillStatusText(lines, payload);
+  appendLaunchSurfaceReviewCloseoutActionText(lines, launchSurfaceReviewCloseoutAction, {
+    heading: "Launch Surface Review Closeout:"
+  });
 
   if (initialLaunchOpsReadiness) {
     const gate = initialLaunchOpsReadiness.gate || {};

@@ -34708,52 +34708,52 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   }
   if (firstOperatingResultHandoffReceiptReadbackExecution) {
     handoffFiles.push([
-      "First operating result handoff receipt readback execution direct file",
+      "First operating result handoff receipt readback",
       opsFiles.firstOperatingResultHandoffReceiptReadbackExecution
         || "ops/first-operating-result-handoff-receipt-readback-execution.txt"
     ]);
   }
   if (firstOperatingResultReviewExecution) {
     handoffFiles.push([
-      "First operating result review execution direct file",
+      "First operating result review",
       opsFiles.firstOperatingResultReviewExecution || "ops/first-operating-result-review-execution.txt"
     ]);
   }
   if (nextRolloutWideningDecisionExecution) {
     handoffFiles.push([
-      "Next rollout widening decision execution direct file",
+      "Next rollout widening decision",
       opsFiles.nextRolloutWideningDecisionExecution || "ops/next-rollout-widening-decision-execution.txt"
     ]);
   }
   if (nextRolloutWideningDecisionReceiptReadbackExecution) {
     handoffFiles.push([
-      "Next rollout widening decision receipt readback execution direct file",
+      "Next rollout widening decision receipt readback",
       opsFiles.nextRolloutWideningDecisionReceiptReadbackExecution
         || "ops/next-rollout-widening-decision-receipt-readback-execution.txt"
     ]);
   }
   if (widenedRolloutMonitoringExecution) {
     handoffFiles.push([
-      "Widened rollout monitoring execution direct file",
+      "Widened rollout monitoring",
       opsFiles.widenedRolloutMonitoringExecution || "ops/widened-rollout-monitoring-execution.txt"
     ]);
   }
   if (widenedRolloutMonitoringResultReviewExecution) {
     handoffFiles.push([
-      "Widened rollout monitoring result review execution direct file",
+      "Widened rollout monitoring result review",
       opsFiles.widenedRolloutMonitoringResultReviewExecution
         || "ops/widened-rollout-monitoring-result-review-execution.txt"
     ]);
   }
   if (widenedRolloutNextDecisionExecution) {
     handoffFiles.push([
-      "Widened rollout next decision execution direct file",
+      "Widened rollout next decision",
       opsFiles.widenedRolloutNextDecisionExecution || "ops/widened-rollout-next-decision-execution.txt"
     ]);
   }
   if (widenedRolloutNextDecisionReceiptReadbackExecution) {
     handoffFiles.push([
-      "Widened rollout next decision receipt readback execution direct file",
+      "Widened rollout next decision receipt readback",
       opsFiles.widenedRolloutNextDecisionReceiptReadbackExecution
         || "ops/widened-rollout-next-decision-receipt-readback-execution.txt"
     ]);

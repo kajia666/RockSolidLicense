@@ -26891,15 +26891,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineNextRolloutPostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Next rollout widening decision execution direct file: ops\/next-rollout-widening-decision-execution\.txt/
+      /Included Handoff Files:[\s\S]*Next rollout widening decision: ops\/next-rollout-widening-decision-execution\.txt/
     );
     assert.match(
       launchMainlineNextRolloutPostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Next rollout widening decision receipt readback execution direct file: ops\/next-rollout-widening-decision-receipt-readback-execution\.txt/
+      /Included Handoff Files:[\s\S]*Next rollout widening decision receipt readback: ops\/next-rollout-widening-decision-receipt-readback-execution\.txt/
     );
     assert.match(
       launchMainlineNextRolloutPostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Widened rollout monitoring execution direct file: ops\/widened-rollout-monitoring-execution\.txt/
+      /Included Handoff Files:[\s\S]*Widened rollout monitoring: ops\/widened-rollout-monitoring-execution\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineNextRolloutPostLaunchIndexDownload.body,
+      /Next rollout widening decision execution direct file:/
+    );
+    assert.doesNotMatch(
+      launchMainlineNextRolloutPostLaunchIndexDownload.body,
+      /Next rollout widening decision receipt readback execution direct file:/
+    );
+    assert.doesNotMatch(
+      launchMainlineNextRolloutPostLaunchIndexDownload.body,
+      /Widened rollout monitoring execution direct file:/
     );
     const launchMainlineNextRolloutChecksumsDownload = await getText(
       baseUrl,
@@ -27101,7 +27113,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineNextRolloutPostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Widened rollout monitoring result review execution direct file: ops\/widened-rollout-monitoring-result-review-execution\.txt/
+      /Included Handoff Files:[\s\S]*Widened rollout monitoring result review: ops\/widened-rollout-monitoring-result-review-execution\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineNextRolloutPostLaunchIndexDownload.body,
+      /Widened rollout monitoring result review execution direct file:/
     );
     assert.match(
       launchMainlineNextRolloutChecksumsDownload.body,
@@ -27222,7 +27238,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineNextRolloutPostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Widened rollout next decision execution direct file: ops\/widened-rollout-next-decision-execution\.txt/
+      /Included Handoff Files:[\s\S]*Widened rollout next decision: ops\/widened-rollout-next-decision-execution\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineNextRolloutPostLaunchIndexDownload.body,
+      /Widened rollout next decision execution direct file:/
     );
     assert.match(
       launchMainlineNextRolloutChecksumsDownload.body,
@@ -27445,7 +27465,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineWidenedNextDecisionReceiptPostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Widened rollout next decision receipt readback execution direct file: ops\/widened-rollout-next-decision-receipt-readback-execution\.txt/
+      /Included Handoff Files:[\s\S]*Widened rollout next decision receipt readback: ops\/widened-rollout-next-decision-receipt-readback-execution\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineWidenedNextDecisionReceiptPostLaunchIndexDownload.body,
+      /Widened rollout next decision receipt readback execution direct file:/
     );
     const launchMainlineWidenedNextDecisionReceiptChecksumsDownload = await getText(
       baseUrl,
@@ -32925,7 +32949,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First operating result handoff receipt readback execution direct file: ops\/first-operating-result-handoff-receipt-readback-execution\.txt/
+      /Included Handoff Files:[\s\S]*First operating result handoff receipt readback: ops\/first-operating-result-handoff-receipt-readback-execution\.txt/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
@@ -32935,7 +32959,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First operating result review execution direct file: ops\/first-operating-result-review-execution\.txt/
+      /Included Handoff Files:[\s\S]*First operating result review: ops\/first-operating-result-review-execution\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /First operating result handoff receipt readback execution direct file:/
+    );
+    assert.doesNotMatch(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /First operating result review execution direct file:/
     );
     const launchMainlineSteadyStateChecksumsDownload = await getText(
       baseUrl,

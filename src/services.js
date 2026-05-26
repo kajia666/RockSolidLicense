@@ -4108,6 +4108,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_stable_operations_transition_review"
         : normalizedFormat === "stable-operations-packet-review-bridge"
           ? "launch_mainline_stable_operations_packet_review_bridge"
+        : normalizedFormat === "stable-operations-transition-shortcut-download"
+          ? "launch_mainline_stable_operations_transition_shortcut_download"
         : normalizedFormat === "steady-state-handoff-landing-execution"
           ? "launch_mainline_steady_state_handoff_landing_execution"
         : normalizedFormat === "steady-state-duty-receipt-review-execution"
@@ -4146,6 +4148,10 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_stabilization_owner_handoff_record_readback"
         : normalizedFormat === "first-wave-closeout-record-readback"
           ? "launch_mainline_first_wave_closeout_record_readback"
+        : normalizedFormat === "surface-review-closeout-shortcut-download"
+          ? "launch_mainline_surface_review_closeout_shortcut_download"
+        : normalizedFormat === "first-wave-closeout-stable-operations-shortcut-download"
+          ? "launch_mainline_first_wave_closeout_stable_operations_shortcut_download"
         : normalizedFormat === "first-launch-handoff"
           ? "launch_mainline_first_launch_handoff"
         : normalizedFormat === "first-wave-runtime-evidence"
@@ -50502,6 +50508,46 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
         }
       })
     : null;
+  const launchMainlineShortcutRouteParams = compactRouteParams({
+    productCode,
+    channel,
+    reviewMode: "matched"
+  });
+  const surfaceReviewCloseoutShortcutDownloadRoute = receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline surface review closeout shortcut download",
+          "surface-review-closeout-shortcut-download.txt",
+          "surface-review-closeout-shortcut-download",
+          launchMainlineShortcutRouteParams
+        ),
+        launchDutyRecordIndexPath
+      }
+    : null;
+  const firstWaveCloseoutStableOperationsShortcutDownloadRoute =
+    launchDutyHandoffAction?.firstWaveCloseoutRecordReadback?.recorded === true
+    && launchDutyHandoffAction?.stabilizationReceiptWriteQueue?.stableOperationsHandoffTail?.readyForHandoff === true
+      ? {
+          ...createLaunchMainlineDownloadShortcut(
+            "Launch Mainline first-wave closeout stable operations shortcut download",
+            "first-wave-closeout-stable-operations-shortcut-download.txt",
+            "first-wave-closeout-stable-operations-shortcut-download",
+            launchMainlineShortcutRouteParams
+          ),
+          launchDutyRecordIndexPath
+        }
+      : null;
+  const stableOperationsTransitionShortcutDownloadRoute = launchDutyStableOperationsTransitionAction
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline stable operations transition shortcut download",
+          "stable-operations-transition-shortcut-download.txt",
+          "stable-operations-transition-shortcut-download",
+          launchMainlineShortcutRouteParams
+        ),
+        launchDutyRecordIndexPath
+      }
+    : null;
   const quickAccessDownloads = [];
   const seenDownloadKeys = new Set();
   for (const download of [
@@ -50510,6 +50556,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchDutySteadyStateHandoffDownload,
     launchDutyStableOperationsTransitionDownload,
     launchDutyStableOperationsPacketReviewBridgeDownload,
+    surfaceReviewCloseoutShortcutDownloadRoute,
+    firstWaveCloseoutStableOperationsShortcutDownloadRoute,
+    stableOperationsTransitionShortcutDownloadRoute,
     launchDutyRecordIndexNextDownload,
     launchDutyPacketReviewNextDownload,
     launchOperationsOperatorChecklistDownload,

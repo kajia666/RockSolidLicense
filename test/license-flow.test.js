@@ -24501,6 +24501,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_operations_overview_status"));
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => item.key === "ops_launch_mainline_handoff_routes"));
     assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+      item.key === "launch_mainline_surface_review_closeout_shortcut_download"
+      && item.fileName === "surface-review-closeout-shortcut-download.txt"
+      && item.format === "surface-review-closeout-shortcut-download"
+    )));
+    assert.ok(launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
       item.fileName === "launch-review.txt"
       && /readinessGateRecordIndex=/.test(item.href || "")
     )));
@@ -30757,6 +30762,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         item.key === "launch_mainline_stable_operations_packet_review_bridge"
         && item.fileName === "stable-operations-packet-review-bridge.txt"
         && item.format === "stable-operations-packet-review-bridge"
+      ))
+    );
+    assert.ok(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.initialLaunchOpsReadiness.launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+        item.key === "launch_mainline_first_wave_closeout_stable_operations_shortcut_download"
+        && item.fileName === "first-wave-closeout-stable-operations-shortcut-download.txt"
+        && item.format === "first-wave-closeout-stable-operations-shortcut-download"
+      ))
+    );
+    assert.ok(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.initialLaunchOpsReadiness.launchOperationsOperatorEntry.quickAccessDownloads.some((item) => (
+        item.key === "launch_mainline_stable_operations_transition_shortcut_download"
+        && item.fileName === "stable-operations-transition-shortcut-download.txt"
+        && item.format === "stable-operations-transition-shortcut-download"
       ))
     );
     assert.match(

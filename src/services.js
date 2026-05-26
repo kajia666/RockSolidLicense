@@ -7633,6 +7633,11 @@ function frontloadLaunchMainlineRehearsalDownload(items = []) {
 const DEFAULT_PRODUCTION_ADMIN_PASSWORD = "ChangeMe!123";
 const DEFAULT_PRODUCTION_SERVER_TOKEN_SECRET = "change-me-before-production-rocksolid";
 const LAUNCH_MAINLINE_RECOVERY_DRILL_WINDOW_DAYS = 14;
+const LAUNCH_MAINLINE_READINESS_GATE_CHAIN_TEXT = "launch-readiness-distance.txt -> initial-production-launch-readiness.txt -> launch-switch-readiness.txt -> launch-candidate-full-verification-gate.txt -> production-signoff-entry-handoff.txt";
+
+function appendLaunchMainlineReadinessGateChainOperatorNote(lines = []) {
+  lines.push(`- Launch Mainline readiness gate chain: ${LAUNCH_MAINLINE_READINESS_GATE_CHAIN_TEXT}.`);
+}
 
 function buildLaunchMainlineGatePayload({
   status = "unknown",
@@ -29218,7 +29223,8 @@ function buildDeveloperLaunchMainlineInitialProductionLaunchReadinessDownloadTex
   lines.push("Operator Notes:");
   lines.push("- Use this packet as the shortest answer to what still blocks initial production launch.");
   lines.push("- This is a launch-control readback, not a substitute for the live staging lane, guarded full-test output, or sign-off evidence.");
-  lines.push("- Keep it beside launch-readiness-distance.txt, launch-switch-readiness.txt, and launch-candidate-full-verification-gate.txt during cutover preparation.");
+  appendLaunchMainlineReadinessGateChainOperatorNote(lines);
+  lines.push("- Keep the full gate chain beside the live staging lane during cutover preparation.");
   return lines.join("\n").trimEnd();
 }
 
@@ -29297,7 +29303,8 @@ function buildDeveloperLaunchMainlineLaunchReadinessDistanceDownloadText(payload
   lines.push("Operator Notes:");
   lines.push("- Use this direct file as the shortest answer to what still blocks initial launch.");
   lines.push("- This is a launch-control readback, not a substitute for the real staging run, guarded full-test output, or production sign-off evidence.");
-  lines.push("- Keep it beside launch-switch-readiness.txt and launch-candidate-full-verification-gate.txt during cutover preparation.");
+  appendLaunchMainlineReadinessGateChainOperatorNote(lines);
+  lines.push("- Keep the full gate chain beside the live staging lane during cutover preparation.");
   return lines.join("\n").trimEnd();
 }
 
@@ -29434,6 +29441,8 @@ function buildDeveloperLaunchMainlineProductionSignoffEntryHandoffDownloadText(p
   lines.push("Operator Notes:");
   lines.push("- Use this direct file immediately after the guarded full-test result is attached and full_test_window_passed is backfilled.");
   lines.push("- It shows the production sign-off packet, readiness readback, rehearsal reload, and required archive checks without reopening the longer full-verification gate.");
+  appendLaunchMainlineReadinessGateChainOperatorNote(lines);
+  lines.push("- Treat this file as the final production signoff stop before archiving the production sign-off packet.");
   lines.push("- Do not archive the production sign-off packet until the readiness readback confirms the expected production_signoff gate.");
   return lines.join("\n").trimEnd();
 }
@@ -30127,6 +30136,7 @@ function buildDeveloperLaunchMainlineLaunchSwitchReadinessDownloadText(payload =
   lines.push("");
   lines.push("Operator Notes:");
   lines.push("- Use this direct download during launch switch watch to check whether full-test/signoff still blocks the switch.");
+  appendLaunchMainlineReadinessGateChainOperatorNote(lines);
   lines.push("- Keep this file beside post-launch-handoff-index.txt so the current command and guarded full-test handoff are visible without opening the longer summary.");
   return lines.join("\n").trimEnd();
 }
@@ -30152,6 +30162,7 @@ function buildDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownload
   lines.push("");
   lines.push("Operator Notes:");
   lines.push("- Use this direct download before reserving the guarded full-test window or backfilling full_test_window_passed.");
+  appendLaunchMainlineReadinessGateChainOperatorNote(lines);
   lines.push("- Keep the production sign-off entry section with the full-test output artifact so signoff handoff can be reviewed without reopening the full Operator Entry.");
   return lines.join("\n").trimEnd();
 }

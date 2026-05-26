@@ -25498,6 +25498,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineStableOperationsTransitionShortcutDirectDownload.body,
       /Action: confirm_first_wave_handoff/
     );
+    const launchMainlineReadinessGateChainPattern = /Operator Notes:[\s\S]*Launch Mainline readiness gate chain: launch-readiness-distance\.txt -> initial-production-launch-readiness\.txt -> launch-switch-readiness\.txt -> launch-candidate-full-verification-gate\.txt -> production-signoff-entry-handoff\.txt\./;
     const launchMainlineLaunchSwitchReadinessDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=launch-switch-readiness",
@@ -25515,6 +25516,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineLaunchSwitchReadinessDirectDownload.body,
       /Launch Switch Operator Runbook:[\s\S]*currentStep=refresh_staging_readiness_status[^\n]*currentCommand=npm\.cmd run staging:readiness:status/
     );
+    assert.match(
+      launchMainlineLaunchSwitchReadinessDirectDownload.body,
+      launchMainlineReadinessGateChainPattern
+    );
     const launchMainlineLaunchCandidateFullVerificationGateDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=launch-candidate-full-verification-gate",
@@ -25531,6 +25536,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineLaunchCandidateFullVerificationGateDirectDownload.body,
       /Launch Candidate Full Verification Production Signoff Entry:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet/
+    );
+    assert.match(
+      launchMainlineLaunchCandidateFullVerificationGateDirectDownload.body,
+      launchMainlineReadinessGateChainPattern
     );
     const launchMainlineLaunchReadinessDistanceDirectDownload = await getText(
       baseUrl,
@@ -25557,6 +25566,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineLaunchReadinessDistanceDirectDownload.body,
       /Launch Readiness Distance Signoff:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/
     );
+    assert.match(
+      launchMainlineLaunchReadinessDistanceDirectDownload.body,
+      launchMainlineReadinessGateChainPattern
+    );
     const launchMainlineProductionSignoffEntryHandoffDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=production-signoff-entry-handoff",
@@ -25581,6 +25594,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
       /Production Signoff Entry Required Checks:[\s\S]*4\. launch_day_watch_entry_preserved \| expected=enter_after_production_signoff remains the next launch-day watch entry after sign-off archive/
+    );
+    assert.match(
+      launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
+      launchMainlineReadinessGateChainPattern
+    );
+    assert.match(
+      launchMainlineProductionSignoffEntryHandoffDirectDownload.body,
+      /Operator Notes:[\s\S]*Treat this file as the final production signoff stop before archiving the production sign-off packet\./
     );
     const launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload = await getText(
       baseUrl,
@@ -25959,6 +25980,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(initialProductionLaunchReadinessDownload.body, /Launch Switch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff/);
     assert.match(initialProductionLaunchReadinessDownload.body, /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete/);
     assert.match(initialProductionLaunchReadinessDownload.body, /Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff/);
+    assert.match(
+      initialProductionLaunchReadinessDownload.body,
+      launchMainlineReadinessGateChainPattern
+    );
     assert.match(
       launchMainlineSummarySelectionDownload.body,
       /Launch Candidate Full Verification Result Handoff:[\s\S]*status=required_after_full_test_window_passed_backfill \| target=full_test_window_passed \| decision=ready-for-production-signoff \| expectedFilled=full_test_window_passed \| expectedGate=production_signoff/

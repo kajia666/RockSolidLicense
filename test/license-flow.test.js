@@ -25699,15 +25699,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Surface review closeout shortcut: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*Surface review closeout shortcut: ops\/surface-review-closeout-shortcut-download\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Surface review closeout shortcut download route: ops\/surface-review-closeout-shortcut-download\.txt/
-    );
-    assert.match(
-      launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Stable operations transition shortcut download route: ops\/stable-operations-transition-shortcut-download\.txt/
+      /Surface review closeout shortcut download route:/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
@@ -30867,11 +30863,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First-wave closeout stable-operations shortcut: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*First-wave closeout stable-operations shortcut: ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*First-wave closeout stable-operations shortcut download route: ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/
+      /First-wave closeout stable-operations shortcut download route:/
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
@@ -30887,11 +30883,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Stable operations transition shortcut: ops\/launch-operations-operator-entry\.txt/
+      /Included Handoff Files:[\s\S]*Stable operations transition shortcut: ops\/stable-operations-transition-shortcut-download\.txt/
     );
-    assert.match(
+    assert.doesNotMatch(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Stable operations transition shortcut download route: ops\/stable-operations-transition-shortcut-download\.txt/
+      /Stable operations transition shortcut download route:/
     );
     const launchMainlineCloseoutRecordedChecksumsDownload = await getText(
       baseUrl,

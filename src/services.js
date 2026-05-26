@@ -34858,10 +34858,6 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (firstWaveCloseoutStableOperationsShortcut) {
     handoffFiles.push([
       "First-wave closeout stable-operations shortcut",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "First-wave closeout stable-operations shortcut download route",
       opsFiles.firstWaveCloseoutStableOperationsShortcutDownloadRoute || "ops/first-wave-closeout-stable-operations-shortcut-download.txt"
     ]);
   }
@@ -34886,20 +34882,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (stableOperationsTransitionShortcut) {
     handoffFiles.push([
       "Stable operations transition shortcut",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "Stable operations transition shortcut download route",
       opsFiles.stableOperationsTransitionShortcutDownloadRoute || "ops/stable-operations-transition-shortcut-download.txt"
     ]);
   }
   if (surfaceReviewCloseoutShortcut) {
     handoffFiles.push([
       "Surface review closeout shortcut",
-      opsFiles.launchOperationsOperatorEntry || "ops/launch-operations-operator-entry.txt"
-    ]);
-    handoffFiles.push([
-      "Surface review closeout shortcut download route",
       opsFiles.surfaceReviewCloseoutShortcutDownloadRoute || "ops/surface-review-closeout-shortcut-download.txt"
     ]);
   }

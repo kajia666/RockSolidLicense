@@ -46285,6 +46285,11 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklist({
     productCode,
     channel
   });
+  const launchMainlineReadinessGateDownloads = buildDeveloperOpsLaunchMainlineReadinessGateDownloads({
+    ...scope,
+    productCode,
+    channel
+  });
   const checklistStagingReadinessBridge = buildDeveloperOpsLaunchOperationsOperatorStagingReadinessBridge({
     scope: { ...scope, productCode, channel },
     stagingLaunchDutyArchive,
@@ -46409,6 +46414,46 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklist({
       format: preStagingReadinessSelfCheckDownload?.format || null,
       href: preStagingReadinessSelfCheckDownload?.href || null,
       launchDutyRecordIndexPath: launchCandidateFullVerificationGate.launchDutyRecordIndexPath || launchDutyRecordIndexPath
+    });
+  }
+  const launchMainlineReadinessGateSteps = [
+    {
+      key: "review_launch_readiness_distance",
+      label: "Review Launch Mainline launch readiness distance",
+      download: launchMainlineReadinessGateDownloads.find((item) => item?.format === "launch-readiness-distance")
+    },
+    {
+      key: "review_initial_production_launch_readiness",
+      label: "Review Launch Mainline initial production launch readiness",
+      download: launchMainlineReadinessGateDownloads.find((item) => item?.format === "initial-production-launch-readiness")
+    },
+    {
+      key: "review_launch_switch_readiness",
+      label: "Review Launch Mainline launch switch readiness",
+      download: launchMainlineReadinessGateDownloads.find((item) => item?.format === "launch-switch-readiness")
+    },
+    {
+      key: "review_launch_candidate_full_verification_gate_download",
+      label: "Review Launch Mainline launch candidate full verification gate download",
+      download: launchMainlineReadinessGateDownloads.find((item) => item?.format === "launch-candidate-full-verification-gate")
+    },
+    {
+      key: "review_production_signoff_entry_handoff",
+      label: "Review Launch Mainline production signoff entry handoff",
+      download: launchMainlineReadinessGateDownloads.find((item) => item?.format === "production-signoff-entry-handoff")
+    }
+  ];
+  for (const item of launchMainlineReadinessGateSteps) {
+    pushStep({
+      key: item.key,
+      label: item.label,
+      source: item.download?.source || "developer-launch-mainline",
+      sourceKey: item.download?.key || null,
+      status: launchOperationsOverviewStatus?.status || null,
+      fileName: item.download?.fileName || null,
+      format: item.download?.format || null,
+      href: item.download?.href || null,
+      launchDutyRecordIndexPath
     });
   }
   return {

@@ -22795,7 +22795,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         "review_launch_smoke_receipt_visibility_summary",
         "open_launch_mainline_handoff_routes",
         "continue_launch_duty_record_index_selection_handoff",
-        "review_launch_candidate_full_verification_gate"
+        "review_launch_candidate_full_verification_gate",
+        "review_launch_readiness_distance",
+        "review_initial_production_launch_readiness",
+        "review_launch_switch_readiness",
+        "review_launch_candidate_full_verification_gate_download",
+        "review_production_signoff_entry_handoff"
       ]
     );
     assert.ok(launchOperationsOperatorChecklist.steps.every((item, index) => (
@@ -22831,6 +22836,51 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.format === "pre-staging-readiness-self-check"
       && /\/api\/developer\/ops\/export\/download\?/.test(item.href || "")
       && /format=pre-staging-readiness-self-check/.test(item.href || "")
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "review_launch_readiness_distance"
+      && item.sourceKey === "launch_mainline_launch_readiness_distance"
+      && item.fileName === "launch-readiness-distance.txt"
+      && item.format === "launch-readiness-distance"
+      && /\/api\/developer\/launch-mainline\/download\?/.test(item.href || "")
+      && /format=launch-readiness-distance/.test(item.href || "")
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "review_initial_production_launch_readiness"
+      && item.sourceKey === "launch_mainline_initial_production_launch_readiness"
+      && item.fileName === "initial-production-launch-readiness.txt"
+      && item.format === "initial-production-launch-readiness"
+      && /\/api\/developer\/launch-mainline\/download\?/.test(item.href || "")
+      && /format=initial-production-launch-readiness/.test(item.href || "")
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "review_launch_switch_readiness"
+      && item.sourceKey === "launch_mainline_launch_switch_readiness"
+      && item.fileName === "launch-switch-readiness.txt"
+      && item.format === "launch-switch-readiness"
+      && /\/api\/developer\/launch-mainline\/download\?/.test(item.href || "")
+      && /format=launch-switch-readiness/.test(item.href || "")
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "review_launch_candidate_full_verification_gate_download"
+      && item.sourceKey === "launch_mainline_launch_candidate_full_verification_gate"
+      && item.fileName === "launch-candidate-full-verification-gate.txt"
+      && item.format === "launch-candidate-full-verification-gate"
+      && /\/api\/developer\/launch-mainline\/download\?/.test(item.href || "")
+      && /format=launch-candidate-full-verification-gate/.test(item.href || "")
+      && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
+    )));
+    assert.ok(launchOperationsOperatorChecklist.steps.some((item) => (
+      item.key === "review_production_signoff_entry_handoff"
+      && item.sourceKey === "launch_mainline_production_signoff_entry_handoff"
+      && item.fileName === "production-signoff-entry-handoff.txt"
+      && item.format === "production-signoff-entry-handoff"
+      && /\/api\/developer\/launch-mainline\/download\?/.test(item.href || "")
+      && /format=production-signoff-entry-handoff/.test(item.href || "")
       && item.launchDutyRecordIndexPath === expectedSteadyStateLaunchDutyRecordIndexPath
     )));
     assert.deepEqual(
@@ -23010,7 +23060,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*fullTest=npm\.cmd test/
     );
-    assert.equal(launchOperationsOperatorEntry.checklistStepCount, 9);
+    assert.equal(launchOperationsOperatorEntry.checklistStepCount, 14);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
     assert.equal(launchOperationsOperatorEntry.checklistStepKeys[0], "open_launch_operations_handoff_summary");
     assert.ok(launchOperationsOperatorEntry.checklistStepKeys.includes("review_launch_candidate_full_verification_gate"));
@@ -24952,6 +25002,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorChecklistDownload.body, /7\. open_launch_mainline_handoff_routes[^\n]*developer-ops-launch-mainline-handoff-routes\.txt/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /8\. continue_launch_duty_record_index_selection_handoff[^\n]*developer-ops-launch-operations-operator-entry\.txt[^\n]*format=launch-operations-operator-entry/);
     assert.match(launchOperationsOperatorChecklistDownload.body, /9\. review_launch_candidate_full_verification_gate[^\n]*developer-ops-pre-staging-readiness-self-check\.txt[^\n]*format=pre-staging-readiness-self-check/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /10\. review_launch_readiness_distance[^\n]*launch-readiness-distance\.txt[^\n]*format=launch-readiness-distance[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-readiness-distance/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /11\. review_initial_production_launch_readiness[^\n]*initial-production-launch-readiness\.txt[^\n]*format=initial-production-launch-readiness[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=initial-production-launch-readiness/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /12\. review_launch_switch_readiness[^\n]*launch-switch-readiness\.txt[^\n]*format=launch-switch-readiness[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-switch-readiness/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /13\. review_launch_candidate_full_verification_gate_download[^\n]*launch-candidate-full-verification-gate\.txt[^\n]*format=launch-candidate-full-verification-gate[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-candidate-full-verification-gate/);
+    assert.match(launchOperationsOperatorChecklistDownload.body, /14\. review_production_signoff_entry_handoff[^\n]*production-signoff-entry-handoff\.txt[^\n]*format=production-signoff-entry-handoff[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=production-signoff-entry-handoff/);
     assert.match(
       launchOperationsOperatorChecklistDownload.body,
       /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test \| output=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt/
@@ -31376,7 +31431,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     )));
     const staleLaunchDutyReadbackChecklist = staleLaunchDutyReadbackSnapshot.summary.initialLaunchOpsReadiness
       .launchOperationsOperatorChecklist;
-    assert.equal(staleLaunchDutyReadbackChecklist.stepCount, 9);
+    assert.equal(staleLaunchDutyReadbackChecklist.stepCount, 14);
     assert.ok(staleLaunchDutyReadbackChecklist.steps.some((item) => (
       item.key === "continue_launch_duty_record_index_selection_handoff"
       && item.sourceKey === "ops_steady_state_handoff_brief"

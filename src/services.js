@@ -35209,16 +35209,16 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
       opsFiles.stableOperationsPacketReviewBridge || "ops/stable-operations-packet-review-bridge.txt"
     ]);
   }
-  if (stableOperationsTransitionShortcut) {
-    handoffFiles.push([
-      "Stable operations transition shortcut",
-      opsFiles.stableOperationsTransitionShortcutDownloadRoute || "ops/stable-operations-transition-shortcut-download.txt"
-    ]);
-  }
   if (surfaceReviewCloseoutShortcut) {
     handoffFiles.push([
       "Surface review closeout shortcut",
       opsFiles.surfaceReviewCloseoutShortcutDownloadRoute || "ops/surface-review-closeout-shortcut-download.txt"
+    ]);
+  }
+  if (stableOperationsTransitionShortcut) {
+    handoffFiles.push([
+      "Stable operations transition shortcut",
+      opsFiles.stableOperationsTransitionShortcutDownloadRoute || "ops/stable-operations-transition-shortcut-download.txt"
     ]);
   }
   if (launchOperationsOverviewStatusDownload) {

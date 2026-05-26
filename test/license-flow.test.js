@@ -25932,6 +25932,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Surface review closeout shortcut: ops\/surface-review-closeout-shortcut-download\.txt/
     );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Surface review closeout shortcut: ops\/surface-review-closeout-shortcut-download\.txt[\s\S]*Stable operations transition shortcut: ops\/stable-operations-transition-shortcut-download\.txt/
+    );
     assert.doesNotMatch(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       /Surface review closeout shortcut download route:/

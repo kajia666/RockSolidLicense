@@ -25142,7 +25142,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Operations Operator Entry Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-operator-entry/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Surface Review Closeout Shortcut Download/);
-    assert.match(launchMainlineOpsRouteMirrorZipText, /Action: confirm_first_wave_handoff/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Surface Review Closeout Brief Summary:[\s\S]*Manual checkpoint:[^\n]*1\/2/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Surface Review Closeout Brief Summary:[\s\S]*Launch Review summary[\s\S]*Launch Smoke summary/);
+    assert.match(
+      launchMainlineOpsRouteMirrorZipText,
+      /Download:[\s\S]*key=launch_mainline_surface_review_closeout_shortcut_download[\s\S]*format=surface-review-closeout-shortcut-download/
+    );
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Duty Record Index: artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-operator-entry/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Stable Operations Transition Shortcut Download/);
@@ -25247,7 +25252,30 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body,
       /RockSolid Launch Mainline Surface Review Closeout Shortcut Download/
     );
-    assert.match(launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body, /Action: confirm_first_wave_handoff/);
+    assert.match(
+      launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body,
+      /Download:[\s\S]*key=launch_mainline_surface_review_closeout_shortcut_download[\s\S]*format=surface-review-closeout-shortcut-download/
+    );
+    assert.match(
+      launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*Manual checkpoint:[^\n]*1\/2/
+    );
+    assert.match(
+      launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*Review surfaces:[^\n]*2\/3/
+    );
+    assert.match(
+      launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*Confirmation:[^\n]*POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*Launch Review summary[\s\S]*Launch Smoke summary/
+    );
+    assert.match(
+      launchMainlineSurfaceReviewCloseoutShortcutDirectDownload.body,
+      /Action Steps:[\s\S]*1\. review_launch_review_summary[\s\S]*2\. review_launch_smoke_summary[\s\S]*3\. confirm_first_wave_handoff[\s\S]*4\. refresh_developer_ops_overview/
+    );
     const launchMainlineStableOperationsTransitionShortcutDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stable-operations-transition-shortcut-download",
@@ -30843,7 +30871,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedZipText,
-      /Action: reload_staging_rehearsal_for_stable_operations/
+      /First-Wave Closeout Stable Operations Shortcut:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| readback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /Download:[\s\S]*key=launch_mainline_first_wave_closeout_stable_operations_shortcut_download[\s\S]*format=first-wave-closeout-stable-operations-shortcut-download/
     );
     assert.match(
       launchMainlineCloseoutRecordedZipText,
@@ -30892,7 +30924,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload.body,
-      /Action: reload_staging_rehearsal_for_stable_operations/
+      /Download:[\s\S]*key=launch_mainline_first_wave_closeout_stable_operations_shortcut_download[\s\S]*format=first-wave-closeout-stable-operations-shortcut-download/
+    );
+    assert.match(
+      launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload.body,
+      /First-Wave Closeout Stable Operations Shortcut:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| readback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload.body,
+      /First-Wave Closeout Stable Operations Shortcut:[\s\S]*currentCommand=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload.body,
+      /Stable Operations Transition:[\s\S]*status=blocked_until_packet_result_review \| current=review_staging_packet_results/
+    );
+    assert.match(
+      launchMainlineFirstWaveCloseoutStableOperationsShortcutDirectDownload.body,
+      /Stable Operations Transition:[\s\S]*nextDownload=launch-operations-operator-entry/
     );
     const launchMainlineStableOperationsHandoffExecutionDirectDownload = await getText(
       baseUrl,

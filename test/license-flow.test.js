@@ -24652,6 +24652,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(Array.isArray(launchOperationsOperatorEntry.quickAccessDownloads));
     assert.equal(launchOperationsOperatorEntry.quickAccessDownloads[0]?.key, "ops_launch_operations_operator_entry");
     assert.ok(
+      launchOperationsOperatorEntry.quickAccessDownloads.findIndex((item) => item.key === "ops_launch_mainline_handoff_routes")
+      < launchOperationsOperatorEntry.quickAccessDownloads.findIndex((item) => item.key === "launch_mainline_surface_review_closeout_shortcut_download")
+    );
+    assert.ok(
       launchOperationsOperatorEntry.quickAccessDownloads.findIndex((item) => item.key === "launch_mainline_surface_review_closeout_shortcut_download")
       < launchOperationsOperatorEntry.quickAccessDownloads.findIndex((item) => item.key === "ops_pre_staging_readiness_self_check")
     );

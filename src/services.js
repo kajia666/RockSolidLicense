@@ -51127,6 +51127,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   const seenDownloadKeys = new Set();
   for (const download of [
     primaryDownload,
+    launchMainlineHandoffRoutesDownload,
     surfaceReviewCloseoutShortcutDownloadRoute,
     preStagingReadinessSelfCheckDownload,
     launchDutySteadyStateHandoffDownload,
@@ -51140,7 +51141,6 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchOperationsOverviewStatus?.overviewDownload || null,
     launchReviewSummaryDownload,
     launchSmokeSummaryDownload,
-    launchMainlineHandoffRoutesDownload,
     ...launchMainlineReadinessGateDownloads,
     firstLaunchConfirmationDoorway?.primaryDownload || null
   ]) {

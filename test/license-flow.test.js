@@ -21520,6 +21520,25 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptReviewExecution.operatorOrder,
       expectedSteadyStateDutyReceiptOperatorOrder
     );
+    const initialProductionLaunchReadiness = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.initialProductionLaunchReadiness;
+    assert.ok(initialProductionLaunchReadiness);
+    assert.equal(initialProductionLaunchReadiness.status, launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.launchReadinessDistance.status);
+    assert.equal(initialProductionLaunchReadiness.launchBlockedBy, launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.launchReadinessDistance.blockedBy);
+    assert.equal(initialProductionLaunchReadiness.readinessPercent, launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.launchReadinessDistance.readinessPercent);
+    assert.equal(initialProductionLaunchReadiness.remainingGateCount, launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.launchReadinessDistance.remainingOperatorActionCount);
+    assert.deepEqual(
+      initialProductionLaunchReadiness.gates.map((item) => item.key),
+      [
+        "launch_readiness_distance",
+        "launch_switch_readiness",
+        "launch_candidate_full_verification_gate",
+        "production_signoff_entry_handoff"
+      ]
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Initial Production Launch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/
+    );
     const expectedRolloutWideningDecisionOperatorOrder = [
       "Review rollout widening decision from Launch Mainline after first stable operating window evidence is attached."
     ];
@@ -24984,6 +25003,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Initial Production Launch Readiness Route:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /launch-readiness-distance: [^\n]*file=launch-readiness-distance\.txt[^\n]*format=launch-readiness-distance[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
@@ -25083,6 +25106,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-readiness-distance\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/initial-production-launch-readiness\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/production-signoff-entry-handoff\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-switch-readiness\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-candidate-full-verification-gate\.txt/);
@@ -25158,6 +25182,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Launch Readiness Distance Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Readiness Distance:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Readiness Distance Commands:[\s\S]*current=npm\.cmd run staging:readiness:status/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/initial-production-launch-readiness\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Initial Production Launch Readiness Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Initial Production Launch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/production-signoff-entry-handoff\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Production Signoff Entry Handoff Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet/);
@@ -25703,6 +25730,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Initial production launch readiness: ops\/initial-production-launch-readiness\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
     );
     assert.match(
@@ -25749,6 +25780,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSummarySelectionDownload.body,
+      /Launch Mainline Initial Production Launch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
       /Launch Mainline Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
     );
     assert.match(
@@ -25763,6 +25798,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSummarySelectionDownload.body,
       /Launch Mainline Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test/
     );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Mainline Recommended Downloads:[\s\S]*initial-production-launch-readiness\.txt/
+    );
+    const initialProductionLaunchReadinessDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=initial-production-launch-readiness",
+      ownerSession.token
+    );
+    assert.equal(initialProductionLaunchReadinessDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(initialProductionLaunchReadinessDownload.body, /RockSolid Launch Mainline Initial Production Launch Readiness Download/);
+    assert.match(initialProductionLaunchReadinessDownload.body, /Initial Production Launch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/
+    );
+    assert.match(initialProductionLaunchReadinessDownload.body, /Initial Production Launch Readiness Gates:[\s\S]*launch_readiness_distance/);
+    assert.match(initialProductionLaunchReadinessDownload.body, /Launch Readiness Distance:[\s\S]*status=blocked_until_full_test_and_signoff/);
+    assert.match(initialProductionLaunchReadinessDownload.body, /Launch Switch Readiness:[\s\S]*status=blocked_until_full_test_and_signoff/);
+    assert.match(initialProductionLaunchReadinessDownload.body, /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete/);
+    assert.match(initialProductionLaunchReadinessDownload.body, /Production Signoff Entry Handoff:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff/);
     assert.match(
       launchMainlineSummarySelectionDownload.body,
       /Launch Candidate Full Verification Result Handoff:[\s\S]*status=required_after_full_test_window_passed_backfill \| target=full_test_window_passed \| decision=ready-for-production-signoff \| expectedFilled=full_test_window_passed \| expectedGate=production_signoff/

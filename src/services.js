@@ -4090,6 +4090,8 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
           ? "launch_mainline_handoff_download_routes"
         : normalizedFormat === "launch-readiness-distance"
           ? "launch_mainline_launch_readiness_distance"
+        : normalizedFormat === "initial-production-launch-readiness"
+          ? "launch_mainline_initial_production_launch_readiness"
         : normalizedFormat === "launch-switch-readiness"
           ? "launch_mainline_launch_switch_readiness"
         : normalizedFormat === "launch-candidate-full-verification-gate"
@@ -23960,6 +23962,8 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const launchReadinessDistance = mainlineSummary.launchReadinessDistance
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const initialProductionLaunchReadiness = mainlineSummary.initialProductionLaunchReadiness
+    || buildDeveloperLaunchMainlineInitialProductionLaunchReadiness(payload);
   const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
@@ -24143,6 +24147,13 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     lines.push("");
     appendLaunchReadinessDistanceLines(lines, launchReadinessDistance, {
       title: "Launch Mainline Launch Readiness Distance:"
+    });
+  }
+  if (initialProductionLaunchReadiness) {
+    lines.push("");
+    appendInitialProductionLaunchReadinessLines(lines, initialProductionLaunchReadiness, {
+      title: "Launch Mainline Initial Production Launch Readiness:",
+      includeDetailedSections: false
     });
   }
   if (productionSignoffEntryHandoff) {
@@ -28889,6 +28900,106 @@ function buildDeveloperLaunchMainlineLaunchReadinessDistance(payload = {}) {
   };
 }
 
+function buildDeveloperLaunchMainlineInitialProductionLaunchReadiness(payload = {}) {
+  const mainlineSummary = payload.mainlineSummary || {};
+  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const launchOperationsOperatorEntry = initialLaunchOpsReadiness?.launchOperationsOperatorEntry || null;
+  const operatorQueueCheckpoint = mainlineSummary.operatorQueueCheckpoint
+    || launchOperationsOperatorEntry?.operatorQueueCheckpoint
+    || null;
+  const stableHandoffReady = operatorQueueCheckpoint?.status === "ready_for_stable_operations_handoff";
+  const launchReadinessDistance = mainlineSummary.launchReadinessDistance
+    || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const launchSwitchReadinessSummary = mainlineSummary.launchSwitchReadinessSummary
+    || launchOperationsOperatorEntry?.launchSwitchReadinessSummary
+    || null;
+  const launchSwitchOperatorRunbook = mainlineSummary.launchSwitchOperatorRunbook
+    || launchOperationsOperatorEntry?.launchSwitchOperatorRunbook
+    || null;
+  const launchCandidateFullVerificationGate = mainlineSummary.launchCandidateFullVerificationGate
+    || launchOperationsOperatorEntry?.launchCandidateFullVerificationGate
+    || null;
+  const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
+    || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
+  const gates = [
+    {
+      key: "launch_readiness_distance",
+      label: "Launch readiness distance",
+      status: stableHandoffReady ? "ready" : launchReadinessDistance?.status || "blocked",
+      nextAction: launchReadinessDistance?.nextAction || "Review the launch readiness distance packet."
+    },
+    {
+      key: "launch_switch_readiness",
+      label: "Launch switch readiness",
+      status: stableHandoffReady ? "ready" : launchSwitchReadinessSummary?.status || launchSwitchOperatorRunbook?.status || "blocked",
+      nextAction: launchSwitchReadinessSummary?.nextAction
+        || launchSwitchOperatorRunbook?.nextAction
+        || "Review the launch switch readiness packet."
+    },
+    {
+      key: "launch_candidate_full_verification_gate",
+      label: "Launch candidate full verification gate",
+      status: stableHandoffReady ? "ready" : launchCandidateFullVerificationGate?.status || "blocked",
+      nextAction: launchCandidateFullVerificationGate?.nextAction
+        || "Review the guarded full verification gate."
+    },
+    {
+      key: "production_signoff_entry_handoff",
+      label: "Production signoff entry handoff",
+      status: stableHandoffReady ? "ready" : productionSignoffEntryHandoff?.status || "blocked",
+      nextAction: productionSignoffEntryHandoff?.nextAction
+        || "Review the production sign-off packet before archiving it."
+    }
+  ];
+  const remainingGateCount = stableHandoffReady
+    ? 0
+    : gates.filter((item) => item.status !== "ready").length;
+  const readinessPercent = stableHandoffReady
+    ? 100
+    : Number(launchReadinessDistance?.readinessPercent ?? 0);
+  return {
+    mode: "developer-launch-mainline-initial-production-launch-readiness",
+    status: stableHandoffReady
+      ? "ready_for_stable_operations_handoff"
+      : launchReadinessDistance?.status
+        || launchSwitchReadinessSummary?.status
+        || launchCandidateFullVerificationGate?.status
+        || productionSignoffEntryHandoff?.status
+        || "unknown",
+    launchBlockedBy: stableHandoffReady
+      ? "none"
+      : launchReadinessDistance?.blockedBy || "full_test_and_production_signoff",
+    readinessPercent,
+    remainingGateCount,
+    currentBlocker: stableHandoffReady ? null : launchReadinessDistance?.currentBlocker || null,
+    currentBlockerKey: stableHandoffReady
+      ? null
+      : launchReadinessDistance?.currentBlockerKey
+        || launchReadinessDistance?.currentBlocker?.key
+        || null,
+    currentCommand: stableHandoffReady ? null : launchReadinessDistance?.currentCommand || null,
+    launchDutyRecordIndexPath: launchReadinessDistance?.launchDutyRecordIndexPath
+      || productionSignoffEntryHandoff?.launchDutyRecordIndexPath
+      || operatorQueueCheckpoint?.launchDutyRecordIndexPath
+      || null,
+    launchReadinessDistance,
+    launchSwitchReadinessSummary,
+    launchSwitchOperatorRunbook,
+    launchCandidateFullVerificationGate,
+    productionSignoffEntryHandoff,
+    operatorQueueCheckpoint,
+    gates,
+    nextAction: stableHandoffReady
+      ? operatorQueueCheckpoint?.nextAction
+        || "Hand off the completed launch-duty record index and first-wave closeout artifact to stable operations."
+      : launchReadinessDistance?.nextAction
+        || launchSwitchReadinessSummary?.nextAction
+        || launchCandidateFullVerificationGate?.nextAction
+        || productionSignoffEntryHandoff?.nextAction
+        || "Continue the launch mainline readiness path."
+  };
+}
+
 function appendLaunchReadinessDistanceLines(lines = [], distance = null, {
   title = "Launch Readiness Distance:"
 } = {}) {
@@ -28942,6 +29053,118 @@ function appendLaunchReadinessDistanceLines(lines = [], distance = null, {
   }
   lines.push(`Launch Readiness Distance Next: ${distance.nextAction || "-"}`);
   return true;
+}
+
+function appendInitialProductionLaunchReadinessLines(lines = [], readiness = null, {
+  title = "Initial Production Launch Readiness:",
+  includeDetailedSections = true
+} = {}) {
+  if (!Array.isArray(lines) || !readiness || typeof readiness !== "object") {
+    return false;
+  }
+  const gates = Array.isArray(readiness.gates) ? readiness.gates : [];
+  lines.push(title);
+  lines.push(
+    `- status=${readiness.status || "-"}`
+    + ` | blockedBy=${readiness.launchBlockedBy || "-"}`
+    + ` | readiness=${readiness.readinessPercent ?? 0}%`
+    + ` | currentBlocker=${readiness.currentBlockerKey || readiness.currentBlocker?.key || "-"}`
+    + ` | remaining=${readiness.remainingGateCount ?? 0}`
+    + ` | launchDutyRecordIndex=${readiness.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push("Initial Production Launch Readiness Gates:");
+  if (gates.length) {
+    for (const item of gates) {
+      lines.push(
+        `- ${item.key || "-"}`
+        + ` | label=${item.label || "-"}`
+        + ` | status=${item.status || "-"}`
+        + (item.nextAction ? ` | nextAction=${item.nextAction}` : "")
+      );
+    }
+  } else {
+    lines.push("- none");
+  }
+  if (includeDetailedSections) {
+    if (readiness.launchReadinessDistance) {
+      lines.push("");
+      appendLaunchReadinessDistanceLines(lines, readiness.launchReadinessDistance, {
+        title: "Launch Readiness Distance:"
+      });
+    }
+    if (readiness.launchSwitchReadinessSummary || readiness.launchSwitchOperatorRunbook) {
+      lines.push("");
+      appendLaunchSwitchReadinessSummaryLines(lines, readiness.launchSwitchReadinessSummary || {}, {
+        title: "Launch Switch Readiness:"
+      });
+    }
+    if (readiness.launchSwitchOperatorRunbook) {
+      lines.push("");
+      appendLaunchSwitchOperatorRunbookLines(lines, readiness.launchSwitchOperatorRunbook, {
+        title: "Launch Switch Operator Runbook:"
+      });
+    }
+    if (readiness.launchCandidateFullVerificationGate) {
+      lines.push("");
+      appendLaunchCandidateFullVerificationGateLines(lines, readiness.launchCandidateFullVerificationGate, {
+        title: "Launch Candidate Full Verification Gate:"
+      });
+    }
+    if (readiness.productionSignoffEntryHandoff) {
+      lines.push("");
+      appendProductionSignoffEntryHandoffLines(lines, readiness.productionSignoffEntryHandoff, {
+        title: "Production Signoff Entry Handoff:"
+      });
+    }
+  }
+  lines.push(`Initial Production Launch Readiness Next: ${readiness.nextAction || "-"}`);
+  return true;
+}
+
+function getDeveloperLaunchMainlineInitialProductionLaunchReadinessDownload(payload = {}) {
+  const readiness = payload.mainlineSummary?.initialProductionLaunchReadiness
+    || buildDeveloperLaunchMainlineInitialProductionLaunchReadiness(payload);
+  if (!readiness) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline initial production launch readiness",
+      "initial-production-launch-readiness.txt",
+      "initial-production-launch-readiness",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: readiness.launchDutyRecordIndexPath || null
+  };
+}
+
+function buildDeveloperLaunchMainlineInitialProductionLaunchReadinessDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const readiness = payload.mainlineSummary?.initialProductionLaunchReadiness
+    || buildDeveloperLaunchMainlineInitialProductionLaunchReadiness(payload);
+  if (!readiness) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Initial Production Launch Readiness Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline",
+    ""
+  ];
+  appendInitialProductionLaunchReadinessLines(lines, readiness, {
+    includeDetailedSections: true
+  });
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this packet as the shortest answer to what still blocks initial production launch.");
+  lines.push("- This is a launch-control readback, not a substitute for the live staging lane, guarded full-test output, or sign-off evidence.");
+  lines.push("- Keep it beside launch-readiness-distance.txt, launch-switch-readiness.txt, and launch-candidate-full-verification-gate.txt during cutover preparation.");
+  return lines.join("\n").trimEnd();
 }
 
 function getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload = {}) {
@@ -30471,6 +30694,13 @@ function buildDeveloperLaunchMainlinePayload({
   });
   if (payload.mainlineSummary && typeof payload.mainlineSummary === "object") {
     payload.mainlineSummary.launchReadinessDistance = buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+    payload.mainlineSummary.initialProductionLaunchReadiness = buildDeveloperLaunchMainlineInitialProductionLaunchReadiness(payload);
+    payload.mainlineSummary.initialProductionLaunchReadinessDownload = getDeveloperLaunchMainlineInitialProductionLaunchReadinessDownload(payload);
+    if (Array.isArray(payload.mainlineSummary.recommendedDownloads)
+      && payload.mainlineSummary.initialProductionLaunchReadinessDownload
+      && !payload.mainlineSummary.recommendedDownloads.some((item) => item?.key === payload.mainlineSummary.initialProductionLaunchReadinessDownload.key)) {
+      payload.mainlineSummary.recommendedDownloads.unshift(payload.mainlineSummary.initialProductionLaunchReadinessDownload);
+    }
     payload.mainlineSummary.productionSignoffEntryHandoff = getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
     payload.mainlineSummary.signoffArchiveWatchHandoff = getDeveloperLaunchMainlineSignoffArchiveWatchHandoff(payload);
     payload.mainlineSummary.launchDutyReceiptExecutionHandoff = getDeveloperLaunchMainlineLaunchDutyReceiptExecutionHandoff(payload);
@@ -30684,6 +30914,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const launchReadinessDistance = mainlineSummary.launchReadinessDistance
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const initialProductionLaunchReadiness = mainlineSummary.initialProductionLaunchReadiness
+    || buildDeveloperLaunchMainlineInitialProductionLaunchReadiness(payload);
   const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
@@ -30900,6 +31132,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       }
     : null;
   const launchReadinessDistanceDownload = getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload);
+  const initialProductionLaunchReadinessDownload = getDeveloperLaunchMainlineInitialProductionLaunchReadinessDownload(payload);
   const launchSwitchReadinessDownload = getDeveloperLaunchMainlineLaunchSwitchReadinessDownload(payload);
   const launchCandidateFullVerificationGateDownload = getDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownload(payload);
   const productionSignoffEntryHandoffDownload = getDeveloperLaunchMainlineProductionSignoffEntryHandoffDownload(payload);
@@ -31507,6 +31740,19 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       "Launch Mainline launch readiness distance",
       opsFiles.launchReadinessDistance || "ops/launch-readiness-distance.txt",
       launchReadinessDistanceDownload || {}
+    );
+  }
+  if (initialProductionLaunchReadiness) {
+    lines.push("");
+    appendInitialProductionLaunchReadinessLines(lines, initialProductionLaunchReadiness, {
+      title: "Initial Production Launch Readiness Route:",
+      includeDetailedSections: false
+    });
+    pushRoute(
+      "initial-production-launch-readiness",
+      "Launch Mainline initial production launch readiness",
+      opsFiles.initialProductionLaunchReadiness || "ops/initial-production-launch-readiness.txt",
+      initialProductionLaunchReadinessDownload || {}
     );
   }
   if (productionSignoffEntryHandoff) {
@@ -32196,6 +32442,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/initial-production-launch-readiness.txt",
+    buildDeveloperLaunchMainlineInitialProductionLaunchReadinessDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/production-signoff-entry-handoff.txt",
     buildDeveloperLaunchMainlineProductionSignoffEntryHandoffDownloadText(payload)
   );
@@ -32749,7 +33000,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "stable-operations-packet-review-bridge", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "rollout-widening-decision-execution", "first-operating-result-handoff-execution", "first-operating-result-handoff-receipt-readback-execution", "first-operating-result-review-execution", "next-rollout-widening-decision-execution", "next-rollout-widening-decision-receipt-readback-execution", "widened-rollout-monitoring-execution", "widened-rollout-monitoring-result-review-execution", "widened-rollout-next-decision-execution", "widened-rollout-next-decision-receipt-readback-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "initial-production-launch-readiness", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "stable-operations-packet-review-bridge", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "rollout-widening-decision-execution", "first-operating-result-handoff-execution", "first-operating-result-handoff-receipt-readback-execution", "first-operating-result-review-execution", "next-rollout-widening-decision-execution", "next-rollout-widening-decision-receipt-readback-execution", "widened-rollout-monitoring-execution", "widened-rollout-monitoring-result-review-execution", "widened-rollout-next-decision-execution", "widened-rollout-next-decision-receipt-readback-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -32851,6 +33102,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "launch-readiness-distance.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineLaunchReadinessDistanceDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "initial-production-launch-readiness") {
+    return {
+      fileName: "initial-production-launch-readiness.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineInitialProductionLaunchReadinessDownloadText(payload)
     };
   }
   if (normalizedFormat === "production-signoff-entry-handoff") {
@@ -34279,6 +34537,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffTraceability(payload = {})
       launchOperationsOperatorEntry: "ops/launch-operations-operator-entry.txt",
       launchOperationsOperatorEntryDownloadRoute: "ops/launch-operations-operator-entry-download.txt",
       launchReadinessDistance: "ops/launch-readiness-distance.txt",
+      initialProductionLaunchReadiness: "ops/initial-production-launch-readiness.txt",
       productionSignoffEntryHandoff: "ops/production-signoff-entry-handoff.txt",
       signoffArchiveWatchHandoff: "ops/signoff-archive-watch-handoff.txt",
       launchDutyReceiptExecutionHandoff: "ops/launch-duty-receipt-execution-handoff.txt",
@@ -34762,6 +35021,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Launch readiness distance",
       opsFiles.launchReadinessDistance || "ops/launch-readiness-distance.txt"
+    ]);
+  }
+  if (mainlineSummary.initialProductionLaunchReadiness || launchReadinessDistance) {
+    handoffFiles.push([
+      "Initial production launch readiness",
+      opsFiles.initialProductionLaunchReadiness || "ops/initial-production-launch-readiness.txt"
     ]);
   }
   if (productionSignoffEntryHandoff) {

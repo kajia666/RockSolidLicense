@@ -11955,6 +11955,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       stabilizationGateLaunchReviewHandoffRoutes.body,
+      /initial-production-launch-readiness\.txt[^\n]*format=initial-production-launch-readiness/
+    );
+    assert.match(
+      stabilizationGateLaunchReviewHandoffRoutes.body,
       /launch-switch-readiness\.txt[^\n]*format=launch-switch-readiness/
     );
     assert.match(
@@ -12071,6 +12075,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,
       /launch-readiness-distance\.txt[^\n]*format=launch-readiness-distance/
+    );
+    assert.match(
+      stabilizationGateLaunchSmokeHandoffRoutes.body,
+      /initial-production-launch-readiness\.txt[^\n]*format=initial-production-launch-readiness/
     );
     assert.match(
       stabilizationGateLaunchSmokeHandoffRoutes.body,

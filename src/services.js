@@ -9875,8 +9875,18 @@ function buildLaunchQuickstartFollowUpPlan({
       ? "launch-mainline-restock-rehearsal-guide.txt"
       : normalizedOperation === "first_batch_setup"
         ? "launch-mainline-inventory-rehearsal-guide.txt"
-        : "launch-mainline-rehearsal-guide.txt",
+      : "launch-mainline-rehearsal-guide.txt",
     "rehearsal-guide",
+    preferredOpsAction?.workspaceAction?.params
+  );
+  const launchMainlineInitialProductionLaunchReadinessDownload = createLaunchMainlineDownloadShortcut(
+    normalizedOperation === "restock"
+      ? "Launch refill initial production launch readiness"
+      : normalizedOperation === "first_batch_setup"
+        ? "Launch inventory initial production launch readiness"
+        : "Launch Mainline initial production launch readiness",
+    "initial-production-launch-readiness.txt",
+    "initial-production-launch-readiness",
     preferredOpsAction?.workspaceAction?.params
   );
   const launchMainlineChecksumsDownload = createLaunchMainlineDownloadShortcut(
@@ -9941,7 +9951,14 @@ function buildLaunchQuickstartFollowUpPlan({
     seenDownloadKeys.add(download.key);
     recommendedDownloads.push({ ...download });
   }
-  for (const download of [launchReviewDownload, launchMainlineSummaryDownload, launchMainlineRehearsalGuideDownload, launchMainlineChecksumsDownload, launchMainlineZipDownload]) {
+  for (const download of [
+    launchReviewDownload,
+    launchMainlineSummaryDownload,
+    launchMainlineRehearsalGuideDownload,
+    launchMainlineInitialProductionLaunchReadinessDownload,
+    launchMainlineChecksumsDownload,
+    launchMainlineZipDownload
+  ]) {
     if (!download?.key || seenDownloadKeys.has(download.key)) {
       continue;
     }
@@ -10287,6 +10304,16 @@ function buildLaunchWorkflowSummaryPayload({
       ...routedParams
     }
   );
+  const launchMainlineInitialProductionLaunchReadinessDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline initial production launch readiness",
+    "initial-production-launch-readiness.txt",
+    "initial-production-launch-readiness",
+    {
+      productCode: releasePackage?.manifest?.project?.code || null,
+      channel,
+      ...routedParams
+    }
+  );
   const recommendedDownloads = [
     createLaunchWorkflowDownloadShortcut(
       "launch_handoff_zip",
@@ -10361,6 +10388,7 @@ function buildLaunchWorkflowSummaryPayload({
         ...routedParams
       }
     ),
+    launchMainlineInitialProductionLaunchReadinessDownload,
     createLaunchMainlineDownloadShortcut(
       "Launch mainline checksums",
       "launch-mainline-sha256.txt",

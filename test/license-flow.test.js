@@ -5926,6 +5926,7 @@ test("developer release package export bundles integration, versions, and notice
       launchWorkflow.workflowSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_rehearsal_guide")
       < launchWorkflow.workflowSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_summary")
     );
+    assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_initial_production_launch_readiness" && item.source === "developer-launch-mainline"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_zip" && item.source === "developer-launch-mainline"));
     assert.ok(launchWorkflow.workflowSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_checksums" && item.source === "developer-launch-mainline"));
     assert.equal(launchWorkflow.workflowSummary.launchBootstrapAction?.label, "Run Launch Bootstrap");
@@ -5998,6 +5999,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchWorkflow.summaryText, /Recommended handoff zip/);
     assert.match(launchWorkflow.summaryText, /Recommended handoff checksums.*href=.*format=handoff-checksums/);
     assert.match(launchWorkflow.summaryText, /Combined launch workflow zip.*href=.*format=zip/);
+    assert.match(launchWorkflow.summaryText, /Launch Mainline initial production launch readiness/);
     assert.match(launchWorkflow.summaryText, /Launch workflow summary.*href=.*format=summary/);
     assert.match(launchWorkflow.summaryText, /Launch workflow checklist.*href=.*format=checklist/);
     assert.match(launchWorkflow.summaryText, /workspace=Open License Workspace@quickstart/);
@@ -6035,6 +6037,7 @@ test("developer release package export bundles integration, versions, and notice
     assert.match(launchSummaryDownload.body, /Recommended handoff zip/);
     assert.match(launchSummaryDownload.body, /Recommended handoff checksums.*href=.*format=handoff-checksums/);
     assert.match(launchSummaryDownload.body, /Combined launch workflow zip/);
+    assert.match(launchSummaryDownload.body, /Launch Mainline initial production launch readiness/);
 
     const launchChecklistDownload = await getText(
       baseUrl,

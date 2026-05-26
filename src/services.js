@@ -34760,31 +34760,31 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   }
   if (launchReadinessDistance) {
     handoffFiles.push([
-      "Launch readiness distance direct file",
+      "Launch readiness distance",
       opsFiles.launchReadinessDistance || "ops/launch-readiness-distance.txt"
     ]);
   }
   if (productionSignoffEntryHandoff) {
     handoffFiles.push([
-      "Production signoff entry handoff direct file",
+      "Production signoff entry handoff",
       opsFiles.productionSignoffEntryHandoff || "ops/production-signoff-entry-handoff.txt"
     ]);
   }
   if (signoffArchiveWatchHandoff) {
     handoffFiles.push([
-      "Signoff archive watch handoff direct file",
+      "Signoff archive watch handoff",
       opsFiles.signoffArchiveWatchHandoff || "ops/signoff-archive-watch-handoff.txt"
     ]);
   }
   if (launchDutyReceiptExecutionHandoff) {
     handoffFiles.push([
-      "Launch-duty receipt execution handoff direct file",
+      "Launch-duty receipt execution handoff",
       opsFiles.launchDutyReceiptExecutionHandoff || "ops/launch-duty-receipt-execution-handoff.txt"
     ]);
   }
   if (stabilizationReceiptExecutionHandoff) {
     handoffFiles.push([
-      "Stabilization receipt execution handoff direct file",
+      "Stabilization receipt execution handoff",
       opsFiles.stabilizationReceiptExecutionHandoff || "ops/stabilization-receipt-execution-handoff.txt"
     ]);
   }
@@ -34850,19 +34850,19 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   }
   if (stableOperationsHandoffExecution) {
     handoffFiles.push([
-      "Stable operations handoff execution direct file",
+      "Stable operations handoff",
       opsFiles.stableOperationsHandoffExecution || "ops/stable-operations-handoff-execution.txt"
     ]);
   }
   if (stableOperationsTransitionReview) {
     handoffFiles.push([
-      "Stable operations transition review direct file",
+      "Stable operations transition review",
       opsFiles.stableOperationsTransitionReview || "ops/stable-operations-transition-review.txt"
     ]);
   }
   if (stableOperationsPacketReviewBridgeDownload) {
     handoffFiles.push([
-      "Stable operations packet review bridge direct file",
+      "Stable operations packet review bridge",
       opsFiles.stableOperationsPacketReviewBridge || "ops/stable-operations-packet-review-bridge.txt"
     ]);
   }

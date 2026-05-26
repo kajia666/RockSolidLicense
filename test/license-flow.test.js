@@ -25647,11 +25647,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Launch readiness distance direct file: ops\/launch-readiness-distance\.txt/
+      /Included Handoff Files:[\s\S]*Launch readiness distance: ops\/launch-readiness-distance\.txt/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
-      /Included Handoff Files:[\s\S]*Production signoff entry handoff direct file: ops\/production-signoff-entry-handoff\.txt/
+      /Included Handoff Files:[\s\S]*Production signoff entry handoff: ops\/production-signoff-entry-handoff\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch readiness distance direct file:/
+    );
+    assert.doesNotMatch(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Production signoff entry handoff direct file:/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
@@ -27916,7 +27924,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       confirmedSignoffArchiveWatchIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Signoff archive watch handoff direct file: ops\/signoff-archive-watch-handoff\.txt/
+      /Included Handoff Files:[\s\S]*Signoff archive watch handoff: ops\/signoff-archive-watch-handoff\.txt/
+    );
+    assert.doesNotMatch(
+      confirmedSignoffArchiveWatchIndexDownload.body,
+      /Signoff archive watch handoff direct file:/
     );
     const confirmedSignoffArchiveWatchChecksumsDownload = await getText(
       baseUrl,
@@ -28232,7 +28244,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       postArchiveLaunchMainlineIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Launch-duty receipt execution handoff direct file: ops\/launch-duty-receipt-execution-handoff\.txt/
+      /Included Handoff Files:[\s\S]*Launch-duty receipt execution handoff: ops\/launch-duty-receipt-execution-handoff\.txt/
+    );
+    assert.doesNotMatch(
+      postArchiveLaunchMainlineIndexDownload.body,
+      /Launch-duty receipt execution handoff direct file:/
     );
     const postArchiveLaunchMainlineChecksumsDownload = await getText(
       baseUrl,
@@ -28863,7 +28879,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineReceiptVisibilityIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Stabilization receipt execution handoff direct file: ops\/stabilization-receipt-execution-handoff\.txt/
+      /Included Handoff Files:[\s\S]*Stabilization receipt execution handoff: ops\/stabilization-receipt-execution-handoff\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineReceiptVisibilityIndexDownload.body,
+      /Stabilization receipt execution handoff direct file:/
     );
     const launchMainlineReceiptVisibilityChecksumsDownload = await getText(
       baseUrl,
@@ -30821,7 +30841,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Stable operations packet review bridge direct file: ops\/stable-operations-packet-review-bridge\.txt/
+      /Included Handoff Files:[\s\S]*Stable operations packet review bridge: ops\/stable-operations-packet-review-bridge\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineCloseoutRecordedIndexDownload.body,
+      /Stable operations packet review bridge direct file:/
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
@@ -30911,11 +30935,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Stable operations handoff execution direct file: ops\/stable-operations-handoff-execution\.txt/
+      /Included Handoff Files:[\s\S]*Stable operations handoff: ops\/stable-operations-handoff-execution\.txt/
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
-      /Included Handoff Files:[\s\S]*Stable operations transition review direct file: ops\/stable-operations-transition-review\.txt/
+      /Included Handoff Files:[\s\S]*Stable operations transition review: ops\/stable-operations-transition-review\.txt/
+    );
+    assert.doesNotMatch(
+      launchMainlineCloseoutRecordedIndexDownload.body,
+      /Stable operations handoff execution direct file:/
+    );
+    assert.doesNotMatch(
+      launchMainlineCloseoutRecordedIndexDownload.body,
+      /Stable operations transition review direct file:/
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,

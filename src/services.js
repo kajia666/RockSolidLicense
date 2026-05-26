@@ -51127,11 +51127,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   const seenDownloadKeys = new Set();
   for (const download of [
     primaryDownload,
+    surfaceReviewCloseoutShortcutDownloadRoute,
     preStagingReadinessSelfCheckDownload,
     launchDutySteadyStateHandoffDownload,
     launchDutyStableOperationsTransitionDownload,
     launchDutyStableOperationsPacketReviewBridgeDownload,
-    surfaceReviewCloseoutShortcutDownloadRoute,
     firstWaveCloseoutStableOperationsShortcutDownloadRoute,
     stableOperationsTransitionShortcutDownloadRoute,
     launchDutyRecordIndexNextDownload,

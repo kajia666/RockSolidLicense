@@ -6477,6 +6477,16 @@ test("developer release package export bundles integration, versions, and notice
           "workspace_path",
           "pre_staging_readiness_self_check",
           "rollout_widening_decision",
+          "first_operating_result_handoff",
+          "post_archive_launch_day_watch_readback",
+          "launch_day_watch_summary_record_readback",
+          "receipt_visibility_snapshot_record_readback",
+          "first_wave_incident_log_record_readback",
+          "rollback_signal_review_record_readback",
+          "stabilization_owner_handoff_record_readback",
+          "first_wave_closeout_record_readback",
+          "surface_review_closeout_shortcut",
+          "stable_operations_transition_shortcut",
           "recommended_downloads"
         ]
       );
@@ -6560,6 +6570,12 @@ test("developer release package export bundles integration, versions, and notice
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_closeout_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_stabilization_handoff"));
       assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => item.key === "launch_mainline_rehearsal_guide"));
+      assert.ok(launchMainline.mainlineSummary.recommendedDownloads.some((item) => (
+        item.key === "launch_mainline_surface_review_closeout_shortcut_download"
+        && item.fileName === "surface-review-closeout-shortcut-download.txt"
+        && item.format === "surface-review-closeout-shortcut-download"
+        && item.source === "developer-launch-mainline"
+      )));
       assert.equal(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.key, "launch_mainline_initial_launch_ops_readiness");
       assert.equal(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.source, "developer-launch-mainline");
       assert.equal(launchMainline.mainlineSummary.initialLaunchOpsReadinessDownload?.format, "initial-launch-ops-readiness");
@@ -7304,7 +7320,8 @@ test("developer release package export bundles integration, versions, and notice
       assert.match(launchMainline.summaryText, /Lifecycle Recommended Downloads:.*Launch mainline operations handoff/i);
       assert.match(launchMainline.summaryText, /Primary Lifecycle Download: .*href=.*\/api\/developer\/launch-mainline\/download\?.*format=operations-handoff/i);
       assert.match(launchMainline.summaryText, /Lifecycle Recommended Downloads:.*href=.*\/api\/developer\/launch-mainline\/download\?.*format=stabilization-handoff/i);
-      assert.match(launchMainline.summaryText, /Mainline Recommended Downloads:[\s\S]*Launch mainline post-launch sweep handoff.*href=.*format=post-launch-sweep-handoff/i);
+      assert.match(launchMainline.summaryText, /Mainline Recommended Downloads:/);
+      assert.match(launchMainline.summaryText, /Launch Mainline surface review closeout shortcut download/i);
       assert.match(launchMainline.summaryText, /Launch Mainline Rehearsal Guide:/);
       assert.match(launchMainline.summaryText, /Phase 1: Release And Workflow Precheck/);
       assert.match(launchMainline.summaryText, /Record Launch Rehearsal Run/);
@@ -30459,6 +30476,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         packetReviewBridge: launchDutyCloseoutStableOpsTransition.packetReviewBridge,
         nextAction: "Complete packet result review before opening the steady-state handoff brief."
       }
+    );
+    assert.ok(launchMainlineCloseoutRecordedReadback.mainlineSummary.recommendedDownloads.some((item) => (
+      item.key === "launch_mainline_surface_review_closeout_shortcut_download"
+      && item.fileName === "surface-review-closeout-shortcut-download.txt"
+      && item.format === "surface-review-closeout-shortcut-download"
+      && item.source === "developer-launch-mainline"
+    )));
+    assert.ok(launchMainlineCloseoutRecordedReadback.mainlineSummary.recommendedDownloads.some((item) => (
+      item.key === "launch_mainline_first_wave_closeout_stable_operations_shortcut_download"
+      && item.fileName === "first-wave-closeout-stable-operations-shortcut-download.txt"
+      && item.format === "first-wave-closeout-stable-operations-shortcut-download"
+      && item.source === "developer-launch-mainline"
+    )));
+    assert.ok(launchMainlineCloseoutRecordedReadback.mainlineSummary.recommendedDownloads.some((item) => (
+      item.key === "launch_mainline_stable_operations_transition_shortcut_download"
+      && item.fileName === "stable-operations-transition-shortcut-download.txt"
+      && item.format === "stable-operations-transition-shortcut-download"
+      && item.source === "developer-launch-mainline"
+    )));
+    assert.ok(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_surface_review_closeout_shortcut_download")
+      < launchMainlineCloseoutRecordedReadback.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_first_wave_closeout_stable_operations_shortcut_download")
+    );
+    assert.ok(
+      launchMainlineCloseoutRecordedReadback.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_first_wave_closeout_stable_operations_shortcut_download")
+      < launchMainlineCloseoutRecordedReadback.mainlineSummary.recommendedDownloads.findIndex((item) => item.key === "launch_mainline_stable_operations_transition_shortcut_download")
     );
     assert.deepEqual(
       launchMainlineCloseoutRecordedReadback.mainlineSummary.stableOperationsTransitionReview,

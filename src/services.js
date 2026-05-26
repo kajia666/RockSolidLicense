@@ -16551,6 +16551,39 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   const surfaceReviewCloseoutShortcut = getSurfaceReviewCloseoutShortcutFromOperatorEntry(
     launchOperationsOperatorEntry
   );
+  const surfaceReviewCloseoutShortcutDownload = surfaceReviewCloseoutShortcut
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline surface review closeout shortcut download",
+          "surface-review-closeout-shortcut-download.txt",
+          "surface-review-closeout-shortcut-download",
+          params
+        ),
+        launchDutyRecordIndexPath: surfaceReviewCloseoutShortcut.launchDutyRecordIndexPath || null
+      }
+    : null;
+  const firstWaveCloseoutStableOperationsShortcutDownload = firstWaveCloseoutStableOperationsShortcut
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline first-wave closeout stable operations shortcut download",
+          "first-wave-closeout-stable-operations-shortcut-download.txt",
+          "first-wave-closeout-stable-operations-shortcut-download",
+          params
+        ),
+        launchDutyRecordIndexPath: firstWaveCloseoutStableOperationsShortcut.launchDutyRecordIndexPath || null
+      }
+    : null;
+  const stableOperationsTransitionShortcutDownload = stableOperationsTransitionShortcut
+    ? {
+        ...createLaunchMainlineDownloadShortcut(
+          "Launch Mainline stable operations transition shortcut download",
+          "stable-operations-transition-shortcut-download.txt",
+          "stable-operations-transition-shortcut-download",
+          params
+        ),
+        launchDutyRecordIndexPath: stableOperationsTransitionShortcut.launchDutyRecordIndexPath || null
+      }
+    : null;
   const preStagingReadinessSelfCheckSource = launchOperationsOperatorEntry?.stagingReadinessBridge?.preStagingReadinessSelfCheckPacket
     && typeof launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket === "object"
       ? launchOperationsOperatorEntry.stagingReadinessBridge.preStagingReadinessSelfCheckPacket
@@ -18921,6 +18954,9 @@ function buildDeveloperLaunchMainlineSummaryPayload({
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstLaunchHandoffDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstWaveRuntimeEvidenceDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstWaveSupportInspectionConfirmation?.confirmationDownload || null, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(surfaceReviewCloseoutShortcutDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(firstWaveCloseoutStableOperationsShortcutDownload, params));
+  pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(stableOperationsTransitionShortcutDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(initialLaunchOpsOverviewStatusDownload, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(preStagingReadinessSelfCheck?.recommendedDownload || null, params));
   pushRecommendedDownload(ensureLaunchWorkflowDownloadHref(steadyStateHandoffLanding?.recommendedDownload || null, params));

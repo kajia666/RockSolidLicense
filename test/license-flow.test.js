@@ -19827,6 +19827,30 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(handoffIndexDownload.body, /launch-receipt-backfill-status\.txt.*format=launch-receipt-backfill-status/);
     assert.match(handoffIndexDownload.body, /launch-mainline-first-launch-handoff\.txt/);
     assert.match(handoffIndexDownload.body, /developer-ops-launch-mainline-handoff-routes\.txt.*format=launch-mainline-handoff-routes/);
+    assert.match(
+      handoffIndexDownload.body,
+      /Recommended Downloads:[\s\S]*Launch Mainline launch readiness distance \| file=launch-readiness-distance\.txt \| format=launch-readiness-distance \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-readiness-distance/
+    );
+    assert.match(
+      handoffIndexDownload.body,
+      /Recommended Downloads:[\s\S]*Launch Mainline initial production launch readiness \| file=initial-production-launch-readiness\.txt \| format=initial-production-launch-readiness \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=initial-production-launch-readiness/
+    );
+    assert.match(
+      handoffIndexDownload.body,
+      /Recommended Downloads:[\s\S]*Launch Mainline launch switch readiness \| file=launch-switch-readiness\.txt \| format=launch-switch-readiness \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-switch-readiness/
+    );
+    assert.match(
+      handoffIndexDownload.body,
+      /Recommended Downloads:[\s\S]*Launch Mainline launch candidate full verification gate \| file=launch-candidate-full-verification-gate\.txt \| format=launch-candidate-full-verification-gate \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-candidate-full-verification-gate/
+    );
+    assert.match(
+      handoffIndexDownload.body,
+      /Recommended Downloads:[\s\S]*Launch Mainline production signoff entry handoff \| file=production-signoff-entry-handoff\.txt \| format=production-signoff-entry-handoff \| href=.*\/api\/developer\/launch-mainline\/download\?.*format=production-signoff-entry-handoff/
+    );
+    assert.match(
+      handoffIndexDownload.body,
+      /Operator Order:[\s\S]*Use launch-readiness-distance\.txt, initial-production-launch-readiness\.txt, launch-switch-readiness\.txt, launch-candidate-full-verification-gate\.txt, and production-signoff-entry-handoff\.txt as the Launch Mainline readiness gate chain\./
+    );
     assert.match(handoffIndexDownload.body, /Launch-Day Watch Receipt:/);
     assert.match(handoffIndexDownload.body, /receiptRecorded=true/);
     assert.match(handoffIndexDownload.body, /latestReceipt=record_post_launch_ops_sweep/);

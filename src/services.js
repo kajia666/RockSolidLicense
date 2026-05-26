@@ -39512,6 +39512,45 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope = {}) {
   );
 }
 
+function buildDeveloperOpsLaunchMainlineReadinessGateDownloads(scope = {}) {
+  const params = {
+    ...buildDeveloperOpsRouteReviewBaseDownloadParams(scope),
+    reviewMode: "matched"
+  };
+  return [
+    createLaunchMainlineDownloadShortcut(
+      "Launch Mainline launch readiness distance",
+      "launch-readiness-distance.txt",
+      "launch-readiness-distance",
+      params
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch Mainline initial production launch readiness",
+      "initial-production-launch-readiness.txt",
+      "initial-production-launch-readiness",
+      params
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch Mainline launch switch readiness",
+      "launch-switch-readiness.txt",
+      "launch-switch-readiness",
+      params
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch Mainline launch candidate full verification gate",
+      "launch-candidate-full-verification-gate.txt",
+      "launch-candidate-full-verification-gate",
+      params
+    ),
+    createLaunchMainlineDownloadShortcut(
+      "Launch Mainline production signoff entry handoff",
+      "production-signoff-entry-handoff.txt",
+      "production-signoff-entry-handoff",
+      params
+    )
+  ];
+}
+
 function buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope = {}) {
   return createLaunchWorkflowDownloadShortcut(
     "ops_staging_launch_duty_archive",
@@ -51409,6 +51448,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
   const backfillStatusDownload = buildDeveloperOpsLaunchReceiptBackfillStatusDownload(scope);
   const firstWaveBackfillStatusDownload = buildDeveloperOpsFirstWaveAuditBackfillStatusDownload(scope);
   const launchMainlineHandoffRoutesDownload = buildDeveloperOpsLaunchMainlineHandoffRoutesDownload(scope);
+  const launchMainlineReadinessGateDownloads = buildDeveloperOpsLaunchMainlineReadinessGateDownloads(scope);
   const stagingLaunchDutyArchiveDownload = buildDeveloperOpsStagingLaunchDutyArchiveDownload(scope);
   const initialLaunchReadinessDownload = buildDeveloperOpsInitialLaunchReadinessDownload(scope);
   const firstLaunchHandoffDownload = mainlineHandoff?.downloads?.firstLaunchHandoff || null;
@@ -51506,6 +51546,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     firstWaveBackfillStatusDownload,
     firstLaunchHandoffDownload,
     launchMainlineHandoffRoutesDownload,
+    ...launchMainlineReadinessGateDownloads,
     stagingLaunchDutyArchiveDownload,
     initialLaunchReadinessDownload,
     firstWaveReadinessBridge?.downloads?.zip,
@@ -62479,6 +62520,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   lines.push("- Use launch-operations-shift-action-plan.txt as the ordered operator checklist for the active launch watch shift.");
   lines.push("- Use launch-operations-overview-status.txt as the one-screen launch operations status before and during cutover.");
   lines.push("- Use launch-mainline-handoff-routes.txt when the next reviewer needs direct Launch Mainline download hrefs without opening the zip.");
+  lines.push("- Use launch-readiness-distance.txt, initial-production-launch-readiness.txt, launch-switch-readiness.txt, launch-candidate-full-verification-gate.txt, and production-signoff-entry-handoff.txt as the Launch Mainline readiness gate chain.");
   lines.push("- Use csv/launch-receipt-follow-ups.csv when handing the full follow-up queue to another operator.");
   return lines.join("\n");
 }

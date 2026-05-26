@@ -62615,6 +62615,16 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
     appendFirstWaveConfirmationChainTextLines(lines, firstWaveConfirmationChain);
   }
 
+  const surfaceReviewCloseoutShortcut = getSurfaceReviewCloseoutShortcutFromOperatorEntry(
+    readiness.launchOperationsOperatorEntry || null
+  );
+  if (surfaceReviewCloseoutShortcut) {
+    lines.push("");
+    appendSurfaceReviewCloseoutShortcutLines(lines, surfaceReviewCloseoutShortcut, {
+      title: "Surface Review Closeout Shortcut:"
+    });
+  }
+
   lines.push("");
   lines.push("Included Files:");
   for (const filePath of includedFiles) {

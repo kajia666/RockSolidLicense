@@ -24889,6 +24889,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status: [^\n]*recoveryLaunchReadinessNextGateCurrentGate=/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations Overview Status:[\s\S]*launchDayWatchEntry=enter_after_production_signoff/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Surface Review Closeout Shortcut:/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Surface Review Closeout Shortcut:[\s\S]*status=ready_for_first_wave_confirmation \| ready=no \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Surface Review Closeout Shortcut Review Downloads:[\s\S]*launch_review_summary[\s\S]*launch_smoke_summary/);
+    assert.match(launchOperationsHandoffIndexDownload.body, /Surface Review Closeout Shortcut:[\s\S]*Included Files:/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-handoff-summary\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
     assert.match(launchOperationsHandoffIndexDownload.body, /Launch Operations File Index:[\s\S]*launch-operations-daily-brief\.txt[^\n]*launchOpsOverviewContextRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);

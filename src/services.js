@@ -63083,6 +63083,7 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklistText(payload = {}) {
   }
   lines.push("- Open the four Launch Operations files first, then verify Launch Review and Launch Smoke receipt visibility with the same launch-duty record index.");
   lines.push("- Keep the Launch Mainline handoff routes open as the cross-surface route map for recovery or reviewer handoff.");
+  lines.push("- Review the Launch Mainline readiness gate chain in order before production signoff: launch-readiness-distance.txt -> initial-production-launch-readiness.txt -> launch-switch-readiness.txt -> launch-candidate-full-verification-gate.txt -> production-signoff-entry-handoff.txt.");
   if (launchCandidateFullVerificationGate) {
     lines.push("- Review the Launch Candidate Full Verification Gate before reserving or running the guarded full-test window.");
   }
@@ -64939,6 +64940,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
   }
   lines.push("- Start from this file during launch operations handoff; it links the checklist, overview status, Launch Review, Launch Smoke, and Launch Mainline route map.");
+  lines.push("- Use the Launch Mainline readiness gate quick-access downloads in order before production signoff: launch-readiness-distance.txt -> initial-production-launch-readiness.txt -> launch-switch-readiness.txt -> launch-candidate-full-verification-gate.txt -> production-signoff-entry-handoff.txt.");
   lines.push("- Keep the launch-duty record index attached to every review handoff so reviewers confirm the same evidence chain.");
   return lines.join("\n");
 }

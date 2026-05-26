@@ -25009,6 +25009,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorChecklistDownload.body, /14\. review_production_signoff_entry_handoff[^\n]*production-signoff-entry-handoff\.txt[^\n]*format=production-signoff-entry-handoff[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=production-signoff-entry-handoff/);
     assert.match(
       launchOperationsOperatorChecklistDownload.body,
+      /Operator Order:[\s\S]*Review the Launch Mainline readiness gate chain in order before production signoff: launch-readiness-distance\.txt -> initial-production-launch-readiness\.txt -> launch-switch-readiness\.txt -> launch-candidate-full-verification-gate\.txt -> production-signoff-entry-handoff\.txt\./
+    );
+    assert.match(
+      launchOperationsOperatorChecklistDownload.body,
       /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test \| output=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt/
     );
     assert.match(
@@ -26160,6 +26164,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-switch-readiness\.txt[^\n]*format=launch-switch-readiness[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-switch-readiness/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-candidate-full-verification-gate\.txt[^\n]*format=launch-candidate-full-verification-gate[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=launch-candidate-full-verification-gate/);
     assert.match(launchOperationsOperatorEntryDownload.body, /production-signoff-entry-handoff\.txt[^\n]*format=production-signoff-entry-handoff[^\n]*href=.*\/api\/developer\/launch-mainline\/download\?.*format=production-signoff-entry-handoff/);
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Operator Order:[\s\S]*Use the Launch Mainline readiness gate quick-access downloads in order before production signoff: launch-readiness-distance\.txt -> initial-production-launch-readiness\.txt -> launch-switch-readiness\.txt -> launch-candidate-full-verification-gate\.txt -> production-signoff-entry-handoff\.txt\./
+    );
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-review\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /launch-smoke-kit\.txt[^\n]*readinessGateRecordIndex=/);
     assert.match(launchOperationsOperatorEntryDownload.body, steadyStateDutyReceiptOperatorOrderPattern);

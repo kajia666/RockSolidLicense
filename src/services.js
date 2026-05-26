@@ -63320,6 +63320,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     launchReviewSummaryDownload,
     launchSmokeSummaryDownload
   } = getDeveloperOpsLaunchOperationsReceiptVisibilitySummaryDownloads(fileIndex);
+  const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(readiness);
   const lines = [
     "RockSolid Developer Ops Launch Operations Operator Entry",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -63335,6 +63336,28 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     `Primary Download: ${entry.primaryDownload?.fileName || "-"} | format=${entry.primaryDownload?.format || "-"} | href=${entry.primaryDownload?.href || "-"}`,
     ""
   ];
+  if (launchSurfaceReviewCloseoutAction) {
+    const reviewDownloads = Array.isArray(launchSurfaceReviewCloseoutAction.reviewDownloads)
+      ? launchSurfaceReviewCloseoutAction.reviewDownloads
+      : [];
+    lines.push("Launch Surface Review Closeout:");
+    lines.push(
+      `- status=${launchSurfaceReviewCloseoutAction.status || "-"}`
+      + ` | current=${launchSurfaceReviewCloseoutAction.currentActionKey || "-"}`
+      + ` | decision=${launchSurfaceReviewCloseoutAction.decision || "-"}`
+      + ` | manualProgress=${launchSurfaceReviewCloseoutAction.manualCheckpointProgress || "-"}`
+      + ` | manualRemaining=${launchSurfaceReviewCloseoutAction.remainingManualCheckpoints ?? "-"}`
+      + ` | surfaces=${launchSurfaceReviewCloseoutAction.readyReviewSurfaceCount ?? 0}/${launchSurfaceReviewCloseoutAction.reviewSurfaceCount ?? 0}`
+      + ` | reviewDownloads=${reviewDownloads.map((item) => item?.key || item?.fileName || "-").join(",") || "-"}`
+    );
+    lines.push(
+      `- next=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.actionKey || "-"}`
+      + ` | method=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.method || "-"}`
+      + ` | route=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.route || "-"}`
+      + ` | href=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.href || "-"}`
+    );
+    lines.push("");
+  }
   appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines, entry.operatorQueueCheckpoint);
   lines.push("");
   appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines, entry.launchEvidenceReadinessGate);

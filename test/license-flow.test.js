@@ -26105,6 +26105,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /2\. first_card_delivery_export \| status=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /3\. first_wave_handoff_confirmation \| status=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /4\. first_user_runtime_validation \| status=[^\n]*supportInspection=confirmed \| supportReady=true/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout:[\s\S]*status=ready_for_first_wave_confirmation \| current=confirm_first_wave_handoff \| decision=hold_launch_duty_handoff/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout:[\s\S]*reviewDownloads=launch_review_summary,launch_smoke_summary/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout:[\s\S]*Receipt Visibility Parity Check:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Parity Check:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Parity Check:[\s\S]*status=aligned \| aligned=2\/2 \| mismatches=0/);
     assert.match(launchOperationsOperatorEntryDownload.body, /1\. launch_review_summary \| status=aligned \| file=launch-review\.txt \| format=summary \| recordIndexAligned=yes \| routeIndexAligned=yes/);

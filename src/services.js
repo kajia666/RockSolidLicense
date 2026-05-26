@@ -35354,6 +35354,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
   lines.push("");
 
+  if (surfaceReviewCloseoutShortcut) {
+    appendSurfaceReviewCloseoutShortcutLines(lines, surfaceReviewCloseoutShortcut, {
+      title: "Launch Mainline Surface Review Closeout Shortcut:"
+    });
+    lines.push("");
+  }
+
   if (launchDutyActionOrder) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Mainline Launch Duty Action Order:"
@@ -36049,12 +36056,6 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     lines.push("");
     appendStableOperationsTransitionShortcutLines(lines, stableOperationsTransitionShortcut, {
       title: "Launch Mainline Stable Operations Transition Shortcut:"
-    });
-  }
-  if (surfaceReviewCloseoutShortcut) {
-    lines.push("");
-    appendSurfaceReviewCloseoutShortcutLines(lines, surfaceReviewCloseoutShortcut, {
-      title: "Launch Mainline Surface Review Closeout Shortcut:"
     });
   }
 

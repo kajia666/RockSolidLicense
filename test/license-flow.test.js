@@ -25689,6 +25689,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, /RockSolid Developer Launch Mainline Post-Launch Handoff Index/);
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*Lifecycle Phase Statuses:/
+    );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,

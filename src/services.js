@@ -19905,6 +19905,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           `Launch duty record index: ${firstWaveCloseoutStableOperationsShortcut.launchDutyRecordIndexPath || "-"}`
         ],
         controls: [
+          firstWaveCloseoutStableOperationsShortcutDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open First-Wave Closeout Stable Operations Shortcut",
+            recommendedDownload: firstWaveCloseoutStableOperationsShortcutDownload
+          }, params) : null,
           launchOperationsOperatorEntry?.primaryDownload ? ensureLaunchMainlineControlHrefs({
             kind: "download",
             label: "Open Launch Operations Operator Entry",
@@ -19944,6 +19949,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           `Launch duty record index: ${stableOperationsTransitionShortcut.launchDutyRecordIndexPath || "-"}`
         ],
         controls: [
+          stableOperationsTransitionShortcutDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open Stable Operations Transition Shortcut",
+            recommendedDownload: stableOperationsTransitionShortcutDownload
+          }, params) : null,
           stableOperationsTransitionShortcut.nextDownloadKey ? ensureLaunchMainlineControlHrefs({
             kind: "download",
             label: "Open Stable Operations Transition Download",
@@ -19996,6 +20006,11 @@ function buildDeveloperLaunchMainlineSummaryPayload({
           `Launch duty record index: ${surfaceReviewCloseoutShortcut.launchDutyRecordIndexPath || "-"}`
         ],
         controls: [
+          surfaceReviewCloseoutShortcutDownload ? ensureLaunchMainlineControlHrefs({
+            kind: "download",
+            label: "Open Surface Review Closeout Shortcut",
+            recommendedDownload: surfaceReviewCloseoutShortcutDownload
+          }, params) : null,
           launchOperationsOperatorEntry?.primaryDownload ? ensureLaunchMainlineControlHrefs({
             kind: "download",
             label: "Open Launch Operations Operator Entry",

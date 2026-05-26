@@ -9577,7 +9577,10 @@ test("developer launch runway next evidence action advances after each evidence 
       pendingEvidenceOperationCount: 0,
       nextActionKey: null,
       nextActionOperation: null,
-      launchDayWatchEntry: "enter_after_production_signoff"
+      launchDayWatchEntry: "enter_after_production_signoff",
+      launchReadinessNextGateStatus: "awaiting_launch_readiness",
+      launchReadinessNextGateDecision: "no_go",
+      launchReadinessNextGateCurrentGate: "ready_for_closeout_reload"
     });
     assert.deepEqual({
       status: sweepResult.launchMainline?.mainlineSummary?.launchDayWatchPanel?.status,
@@ -12893,6 +12896,9 @@ test("developer launch mainline action can restock low inventory and return duty
         }
         pushUnique(workspaceKeys, actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key || null);
         pushUnique(downloadKeys, actionResult.receipt?.firstLaunchHandoffDownload?.key || null);
+        pushUnique(downloadKeys, "developer_cards_first_launch_csv");
+        pushUnique(downloadKeys, "developer_cards_first_launch_zip");
+        pushUnique(downloadKeys, "developer_cards_first_launch_checksums");
         pushUnique(downloadKeys, actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.recommendedDownload?.key || null);
         return {
           primaryWorkspaceKey:
@@ -12938,6 +12944,9 @@ test("developer launch mainline action can restock low inventory and return duty
         }
         pushUnique(workspaceKeys, actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.workspaceAction?.key || null);
         pushUnique(downloadKeys, actionResult.receipt?.firstLaunchHandoffDownload?.key || null);
+        pushUnique(downloadKeys, "developer_cards_first_launch_csv");
+        pushUnique(downloadKeys, "developer_cards_first_launch_zip");
+        pushUnique(downloadKeys, "developer_cards_first_launch_checksums");
         pushUnique(downloadKeys, actionResult.receipt?.mainlineEvidenceQueue?.nextAction?.recommendedDownload?.key || null);
         return {
           primaryWorkspaceKey:
@@ -13340,6 +13349,8 @@ test("developer launch mainline action can bootstrap starter launch assets and r
         { kind: "download", key: "ops_pre_staging_readiness_self_check" },
         { kind: "workspace", key: "ops" },
         { kind: "download", key: "ops_steady_state_duty_board" },
+        { kind: "workspace", key: "ops" },
+        { kind: "download", key: "ops_launch_operations_overview_status" },
         { kind: "workspace", key: "ops" },
         { kind: "setup", key: "launch_mainline_record_launch_rehearsal_run" },
         { kind: "download", key: "launch_mainline_rehearsal_guide" },
@@ -14741,6 +14752,8 @@ test("developer launch mainline action can create first launch batches and retur
         { kind: "download", key: "ops_pre_staging_readiness_self_check" },
         { kind: "workspace", key: "ops" },
         { kind: "download", key: "ops_steady_state_duty_board" },
+        { kind: "workspace", key: "ops" },
+        { kind: "download", key: "ops_launch_operations_overview_status" },
         { kind: "workspace", key: "ops" },
         { kind: "setup", key: "launch_mainline_record_launch_rehearsal_run" },
         { kind: "download", key: "launch_mainline_rehearsal_guide" },
@@ -24307,6 +24320,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       item.key === "surface_review_closeout_shortcut"
       && item.tags.some((tag) => tag.label === "current" && tag.value === "confirm_first_wave_handoff")
       && item.tags.some((tag) => tag.label === "next" && tag.value === "confirm_first_wave_handoff")
+      && item.controls?.some((control) => control?.recommendedDownload?.key === "launch_mainline_surface_review_closeout_shortcut_download")
     )));
     assert.equal(
       launchDutyHandoffAction.version,
@@ -30593,11 +30607,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       item.key === "first_wave_closeout_stable_operations_shortcut"
       && item.tags.some((tag) => tag.label === "current" && tag.value === "refresh_staging_readiness_after_first_wave_closeout")
       && item.tags.some((tag) => tag.label === "next" && tag.value === "reload_staging_rehearsal_for_stable_operations")
+      && item.controls?.some((control) => control?.recommendedDownload?.key === "launch_mainline_first_wave_closeout_stable_operations_shortcut_download")
     )));
     assert.ok(launchMainlineCloseoutRecordedReadback.mainlineSummary.overviewCards.some((item) => (
       item.key === "stable_operations_transition_shortcut"
       && item.tags.some((tag) => tag.label === "current" && tag.value === "review_staging_packet_results")
       && item.tags.some((tag) => tag.label === "next" && tag.value === "launch-operations-operator-entry")
+      && item.controls?.some((control) => control?.recommendedDownload?.key === "launch_mainline_stable_operations_transition_shortcut_download")
     )));
     const launchMainlineCloseoutRecordedSummaryDownload = await getText(
       baseUrl,
@@ -31656,6 +31672,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       item.key === "stable_operations_transition_shortcut"
       && item.tags.some((tag) => tag.label === "current" && tag.value === "open_steady_state_handoff_brief")
       && item.tags.some((tag) => tag.label === "next" && tag.value === "steady-state-handoff-brief")
+      && item.controls?.some((control) => control?.recommendedDownload?.key === "launch_mainline_stable_operations_transition_shortcut_download")
     )));
     const expectedPreStagingSelfCheckOperatorOrder = [
       "Confirm the pre-staging readiness self-check packet, run readiness refresh, then reload rehearsal before entering full-test/signoff."

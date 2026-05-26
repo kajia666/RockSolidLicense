@@ -60093,6 +60093,51 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
       )
     ],
     [
+      "launch-mainline-launch-readiness-distance",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline launch readiness distance",
+        launchMainlineFiles.launchReadinessDistance || "launch-readiness-distance.txt",
+        "launch-readiness-distance",
+        routeParams
+      )
+    ],
+    [
+      "launch-mainline-initial-production-launch-readiness",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline initial production launch readiness",
+        launchMainlineFiles.initialProductionLaunchReadiness || "initial-production-launch-readiness.txt",
+        "initial-production-launch-readiness",
+        routeParams
+      )
+    ],
+    [
+      "launch-mainline-launch-switch-readiness",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline launch switch readiness",
+        launchMainlineFiles.launchSwitchReadiness || "launch-switch-readiness.txt",
+        "launch-switch-readiness",
+        routeParams
+      )
+    ],
+    [
+      "launch-mainline-launch-candidate-full-verification-gate",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline launch candidate full verification gate",
+        launchMainlineFiles.launchCandidateFullVerificationGate || "launch-candidate-full-verification-gate.txt",
+        "launch-candidate-full-verification-gate",
+        routeParams
+      )
+    ],
+    [
+      "launch-mainline-production-signoff-entry-handoff",
+      createLaunchMainlineDownloadShortcut(
+        "Launch Mainline production signoff entry handoff",
+        launchMainlineFiles.productionSignoffEntryHandoff || "production-signoff-entry-handoff.txt",
+        "production-signoff-entry-handoff",
+        routeParams
+      )
+    ],
+    [
       "launch-mainline-summary",
       createLaunchMainlineDownloadShortcut(
         "Launch Mainline summary",

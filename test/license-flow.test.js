@@ -19887,6 +19887,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       opsLaunchMainlineRouteMapDownload.body,
+      /launch-mainline-launch-readiness-distance.*launch-readiness-distance\.txt.*\/api\/developer\/launch-mainline\/download\?.*format=launch-readiness-distance/
+    );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-mainline-initial-production-launch-readiness.*initial-production-launch-readiness\.txt.*\/api\/developer\/launch-mainline\/download\?.*format=initial-production-launch-readiness/
+    );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-mainline-launch-switch-readiness.*launch-switch-readiness\.txt.*\/api\/developer\/launch-mainline\/download\?.*format=launch-switch-readiness/
+    );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-mainline-launch-candidate-full-verification-gate.*launch-candidate-full-verification-gate\.txt.*\/api\/developer\/launch-mainline\/download\?.*format=launch-candidate-full-verification-gate/
+    );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
+      /launch-mainline-production-signoff-entry-handoff.*production-signoff-entry-handoff\.txt.*\/api\/developer\/launch-mainline\/download\?.*format=production-signoff-entry-handoff/
+    );
+    assert.match(
+      opsLaunchMainlineRouteMapDownload.body,
       /launch-ops-overview-status: .*developer-ops-launch-operations-overview-status\.txt.*href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-operations-overview-status.*format=launch-operations-overview-status/
     );
     assert.match(

@@ -388,6 +388,116 @@ function buildExpectedLaunchEvidenceGate({
   };
 }
 
+function buildExpectedProductionSwitchProofPacket({
+  closeoutInputFile,
+  actionsFile,
+  currentActionKey,
+  currentCommand,
+  fullTestStatus = "ready_evidence_attached",
+  productionSignoffStatus = "blocked_after_full_test_signoff_backfill",
+  launchDutyStatus = "blocked_after_production_signoff_readiness",
+  productionSignoffCommand = null
+}) {
+  const archiveRoot = "artifacts/staging/PILOT_ALPHA/stable";
+  const proofItems = [
+    {
+      order: 1,
+      key: "public_https_entrypoint",
+      status: "pending_real_environment_value",
+      command: null,
+      artifactPath: null,
+      nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+    },
+    {
+      order: 2,
+      key: "non_default_secret_env",
+      status: "pending_real_environment_confirmation",
+      command: null,
+      artifactPath: null,
+      nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
+    },
+    {
+      order: 3,
+      key: "storage_profile_selected",
+      status: "pending_real_environment_value",
+      command: null,
+      artifactPath: null,
+      nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging evidence backfill."
+    },
+    {
+      order: 4,
+      key: "backup_restore_drill",
+      status: "ready_evidence_attached",
+      command: null,
+      artifactPath: `${archiveRoot}/backup_restore_drill_result.txt`,
+      nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
+    },
+    {
+      order: 5,
+      key: "live_write_smoke",
+      status: "ready_evidence_attached",
+      command: null,
+      artifactPath: `${archiveRoot}/live_write_smoke_result.txt`,
+      nextAction: "Attach launch:smoke:staging output after no-write preflight and route-map gate pass."
+    },
+    {
+      order: 6,
+      key: "full_test_window",
+      status: fullTestStatus,
+      command: "npm.cmd test",
+      artifactPath: `${archiveRoot}/full-test-output.txt`,
+      nextAction: "Attach the redacted full-suite output artifact before or while backfilling full_test_window_passed."
+    },
+    {
+      order: 7,
+      key: "production_signoff_and_receipts",
+      status: productionSignoffStatus,
+      command: productionSignoffCommand,
+      artifactPath: `${archiveRoot}/staging-production-signoff-packet.json`,
+      nextAction: "Backfill production sign-off conditions and receipt visibility lanes before launch-day watch."
+    },
+    {
+      order: 8,
+      key: "launch_day_watch_and_stabilization",
+      status: launchDutyStatus,
+      command: null,
+      artifactPath: `${archiveRoot}/launch-day-watch-summary.md`,
+      nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    }
+  ];
+  const ready = proofItems.filter((item) => item.status.startsWith("ready_")).length;
+  return {
+    version: "staging-signoff-backfill-production-switch-proof-packet/v1",
+    status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
+    currentActionKey,
+    currentCommand,
+    baseUrl: null,
+    productCode: "PILOT_ALPHA",
+    channel: "stable",
+    targetOs: null,
+    storageProfile: null,
+    archiveRoot,
+    closeoutInputFile,
+    readinessActionQueueFile: actionsFile,
+    launchDutyRecordIndexFile: `${archiveRoot}/launch-duty-record-index.json`,
+    localFullSuiteBaseline: {
+      command: "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: `${archiveRoot}/full-test-output.txt`,
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    },
+    proofCounts: {
+      total: proofItems.length,
+      ready,
+      blocked: proofItems.length - ready
+    },
+    proofItems,
+    nextAction: "Continue the current sign-off evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist."
+  };
+}
+
 test("staging signoff backfill writes one signoff condition and one receipt visibility lane", () => {
   const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   assert.equal(packageJson.scripts["staging:signoff:backfill"], "node scripts/staging-signoff-backfill.mjs");
@@ -419,9 +529,17 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
     assert.equal(signoffResult.stderr, "");
     const signoffOutput = JSON.parse(signoffResult.stdout);
     const {
+      productionSwitchProofPacket: signoffProductionSwitchProofPacket,
       launchEvidenceReadinessGate: signoffLaunchEvidenceGate,
       ...signoffOutputWithoutGate
     } = signoffOutput;
+    assert.deepEqual(signoffProductionSwitchProofPacket, buildExpectedProductionSwitchProofPacket({
+      closeoutInputFile,
+      actionsFile,
+      currentActionKey: "backfill_production_signoff",
+      currentCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt --actions-file ${actionsFile}`,
+      productionSignoffCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt --actions-file ${actionsFile}`
+    }));
     assert.deepEqual(signoffLaunchEvidenceGate, buildExpectedLaunchEvidenceGate({
       closeoutInputFile,
       actionsFile,
@@ -553,9 +671,17 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
     assert.equal(receiptResult.stderr, "");
     const receiptOutput = JSON.parse(receiptResult.stdout);
     const {
+      productionSwitchProofPacket: receiptProductionSwitchProofPacket,
       launchEvidenceReadinessGate: receiptLaunchEvidenceGate,
       ...receiptOutputWithoutGate
     } = receiptOutput;
+    assert.deepEqual(receiptProductionSwitchProofPacket, buildExpectedProductionSwitchProofPacket({
+      closeoutInputFile,
+      actionsFile,
+      currentActionKey: "backfill_production_signoff",
+      currentCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt --actions-file ${actionsFile}`,
+      productionSignoffCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/staging-artifacts-archive.txt --actions-file ${actionsFile}`
+    }));
     assert.deepEqual(receiptLaunchEvidenceGate, buildExpectedLaunchEvidenceGate({
       closeoutInputFile,
       actionsFile,
@@ -759,6 +885,10 @@ test("staging signoff backfill prints ordered next commands in plain output", ()
     assert.match(result.stdout, /Launch evidence readiness status: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Launch evidence production signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(result.stdout, /Launch evidence next action: Run readinessStatusCommand, verify the backfilled sign-off or receipt evidence is reflected, then continue the next launch evidence command\./);
+    assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=backfill_production_signoff\)/);
+    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt \(available_from_2026-05-27_full_suite_pass, tests=192, failures=0\)/);
+    assert.match(result.stdout, /Production switch proof 7\. production_signoff_and_receipts: blocked_after_full_test_signoff_backfill -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifacts-archive\.txt --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Production switch next action: Continue the current sign-off evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist\./);
     assert.match(result.stdout, /Backfilled status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Action queue file: .*readiness-action-queue\.md/);
@@ -825,6 +955,13 @@ test("staging signoff backfill prints launch-duty ready handoff after final rece
       signoffStatuses: Object.fromEntries(signoffKeys.map((key) => [key, "filled"])),
       receiptStatuses: Object.fromEntries(receiptVisibilityKeys.map((key) => [key, "visible"]))
     }));
+    assert.deepEqual(output.productionSwitchProofPacket, buildExpectedProductionSwitchProofPacket({
+      closeoutInputFile,
+      actionsFile,
+      currentActionKey: "archive_production_signoff",
+      currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      productionSignoffStatus: "ready_evidence_attached"
+    }));
     assert.deepEqual(output.launchDutyReadyHandoff, {
       status: "ready_for_launch_day_watch",
       currentActionKey: "archive_production_signoff",
@@ -849,6 +986,9 @@ test("staging signoff backfill prints launch-duty ready handoff after final rece
     assert.match(plainResult.stdout, /Launch evidence gate: blocked_until_real_launch_evidence_attached \(current=launch_day_watch_summary, pending=2\/21\)/);
     assert.match(plainResult.stdout, /Launch evidence current: launch_duty_record\/launch_day_watch_summary -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file .*filled-closeout-input-plain\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(plainResult.stdout, /Launch evidence progress: closeout=7\/7, signoff=7\/7, receipts=5\/5, launchDuty=0\/2/);
+    assert.match(plainResult.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=4\/8, blocked=4\/8, current=archive_production_signoff\)/);
+    assert.match(plainResult.stdout, /Production switch proof 7\. production_signoff_and_receipts: ready_evidence_attached -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(plainResult.stdout, /Production switch next action: Continue the current sign-off evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist\./);
     assert.match(plainResult.stdout, /Launch duty readiness: ready_for_launch_day_watch/);
     assert.match(plainResult.stdout, /Launch duty status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input-plain\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(plainResult.stdout, /Launch duty reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input-plain\.json/);

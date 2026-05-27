@@ -101,6 +101,19 @@ Recommended smoke tests:
   - heartbeat successfully
 - `/developer/launch-mainline` has fresh `Record Launch Rehearsal Run` evidence after one realistic release, smoke, review, ops, and mainline rehearsal.
 
+Production switch proof packet:
+
+- Generate or refresh the staging profile with `npm.cmd run staging:profile:init`, then keep following the same `productionSwitchProofPacket` through `staging:rehearsal`, `staging:closeout:init`, `staging:closeout:backfill`, `staging:readiness:status`, `staging:signoff:backfill`, and `staging:launch-duty:record`.
+- Do not switch until the packet shows `ready=8/8`, `blocked=0/8`, and `status=ready_for_production_switch_review`.
+- Confirm proof item `launch_day_watch_and_stabilization` points to `first-wave-closeout.md` and carries the stable-operations rehearsal reload command.
+- Keep the same packet open from all four launch-entry surfaces:
+  - Developer Ops: `format=production-switch-proof-packet`
+  - Launch Mainline: `format=production-switch-proof-packet`
+  - Launch Review: `format=production-switch-proof-packet`
+  - Launch Smoke Kit: `format=production-switch-proof-packet`
+- Confirm each surface also includes `production-switch-proof-packet.txt` in its checksum and zip package before handing the lane to launch duty.
+- Keep the shared `launch-duty-record-index.json` beside the proof packet; it is the record index that proves launch-day watch and first-wave closeout reached 6/6 before stable operations handoff.
+
 ## Phase 7: First-week operations
 
 - Check logs every day for repeated auth or heartbeat failures.

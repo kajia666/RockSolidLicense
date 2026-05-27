@@ -521,6 +521,45 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
     const output = JSON.parse(result.stdout);
+    assert.equal(output.productionSwitchProofPacket.version, "staging-readiness-production-switch-proof-packet/v1");
+    assert.equal(output.productionSwitchProofPacket.status, "blocked_until_real_environment_evidence");
+    assert.equal(output.productionSwitchProofPacket.currentActionKey, "backfill_production_signoff");
+    assert.equal(
+      output.productionSwitchProofPacket.currentCommand,
+      `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file ${actionsFile}`
+    );
+    assert.equal(output.productionSwitchProofPacket.productCode, "<productCode>");
+    assert.equal(output.productionSwitchProofPacket.channel, "<channel>");
+    assert.equal(output.productionSwitchProofPacket.archiveRoot, "artifacts/staging/<productCode>/<channel>");
+    assert.equal(output.productionSwitchProofPacket.closeoutInputFile, inputFile);
+    assert.equal(output.productionSwitchProofPacket.readinessActionQueueFile, actionsFile);
+    assert.equal(output.productionSwitchProofPacket.launchDutyRecordIndexFile, "artifacts/staging/<productCode>/<channel>/launch-duty-record-index.json");
+    assert.deepEqual(output.productionSwitchProofPacket.localFullSuiteBaseline, {
+      command: "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    });
+    assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
+      total: 8,
+      ready: 3,
+      blocked: 5
+    });
+    assert.deepEqual(
+      output.productionSwitchProofPacket.proofItems.map((item) => [item.order, item.key, item.status, item.artifactPath]),
+      [
+        [1, "public_https_entrypoint", "pending_real_environment_value", null],
+        [2, "non_default_secret_env", "pending_real_environment_confirmation", null],
+        [3, "storage_profile_selected", "pending_real_environment_value", null],
+        [4, "backup_restore_drill", "ready_evidence_attached", "artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt"],
+        [5, "live_write_smoke", "ready_evidence_attached", "artifacts/staging/<productCode>/<channel>/live-write-smoke-output.json"],
+        [6, "full_test_window", "ready_evidence_attached", "artifacts/staging/<productCode>/<channel>/full-test-output.txt"],
+        [7, "production_signoff_and_receipts", "blocked_after_full_test_signoff_backfill", "artifacts/staging/<productCode>/<channel>/staging-production-signoff-packet.json"],
+        [8, "launch_day_watch_and_stabilization", "blocked_after_production_signoff_readiness", "artifacts/staging/<productCode>/<channel>/launch-day-watch-summary.md"]
+      ]
+    );
     assert.deepEqual(
       {
         version: output.launchEvidenceReadinessGate.version,
@@ -641,8 +680,17 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(plain.stdout, /Launch evidence launch-day watch: artifacts\/staging\/<productCode>\/<channel>\/launch-day-watch-summary\.md/);
     assert.match(plain.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/<productCode>\/<channel>\/first-wave-closeout\.md/);
     assert.match(plain.stdout, /Launch evidence next action: Run command with real redacted evidence, then statusCommand to continue production sign-off\./);
+    assert.match(plain.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=backfill_production_signoff\)/);
+    assert.match(plain.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt \(available_from_2026-05-27_full_suite_pass, tests=192, failures=0\)/);
+    assert.match(plain.stdout, /Production switch proof 4\. backup_restore_drill: ready_evidence_attached -> artifacts\/staging\/<productCode>\/<channel>\/backup-restore-drill\.txt/);
+    assert.match(plain.stdout, /Production switch proof 7\. production_signoff_and_receipts: blocked_after_full_test_signoff_backfill -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
 
     const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /## Production Switch Proof Packet/);
+    assert.match(markdown, /Production switch proof packet: `blocked_until_real_environment_evidence` \(ready `3\/8`, blocked `5\/8`, current `backfill_production_signoff`\)/);
+    assert.match(markdown, /Production switch local baseline: `npm\.cmd test` -> `artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt`/);
+    assert.match(markdown, /- 4\. `backup_restore_drill` \[ready_evidence_attached\] artifact `artifacts\/staging\/<productCode>\/<channel>\/backup-restore-drill\.txt`/);
+    assert.match(markdown, /- 8\. `launch_day_watch_and_stabilization` \[blocked_after_production_signoff_readiness\] artifact `artifacts\/staging\/<productCode>\/<channel>\/launch-day-watch-summary\.md`/);
     assert.match(markdown, /## Launch Evidence Readiness Gate/);
     assert.match(markdown, /Launch evidence gate: `blocked_until_real_launch_evidence_attached` \(current `staging_artifacts_archived`, pending `12\/21`\)/);
     assert.match(markdown, /Launch evidence current: `production_signoff_condition\/staging_artifacts_archived`/);

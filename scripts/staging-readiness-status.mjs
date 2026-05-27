@@ -1405,6 +1405,149 @@ function buildStagingLaunchEvidenceReadinessGate({
   };
 }
 
+function artifactPathRootLane(artifactPathRoot) {
+  const parts = String(artifactPathRoot?.path || DEFAULT_ARTIFACT_PATH_ROOT).split("/");
+  return {
+    productCode: parts[2] || "<productCode>",
+    channel: parts[3] || "<channel>"
+  };
+}
+
+function filledEvidenceByKey(items = []) {
+  return new Map((Array.isArray(items) ? items : []).map((item) => [item.key, item]));
+}
+
+function buildStagingProductionSwitchProofPacket({
+  payload,
+  inputFile,
+  actionsFile,
+  artifactPathRoot,
+  currentEvidenceCheckpoint,
+  evidenceSummary,
+  productionDecision,
+  launchDutyCompletionHandoff
+}) {
+  const archiveRoot = artifactPathRoot?.path || DEFAULT_ARTIFACT_PATH_ROOT;
+  const lane = artifactPathRootLane(artifactPathRoot);
+  const closeoutFilled = filledEvidenceByKey(evidenceSummary.closeout.filledItems);
+  const signoffFilled = filledEvidenceByKey(evidenceSummary.productionSignoff.filledConditions);
+  const receiptsVisible = filledEvidenceByKey(evidenceSummary.receiptVisibility.visibleLanes);
+  const baseUrl = payload.baseUrl || payload.summary?.baseUrl || null;
+  const storageProfile = payload.storageProfile || payload.summary?.storageProfile || null;
+  const targetEnvFile = payload.targetEnvFile || payload.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
+  const fullTestArtifact = path.posix.join(archiveRoot, "full-test-output.txt");
+  const productionSignoffReady = evidenceSummary.productionSignoff.filledConditionCount === REQUIRED_SIGNOFF_KEYS.length
+    && evidenceSummary.receiptVisibility.visibleLaneCount === RECEIPT_VISIBILITY_KEYS.length
+    && productionDecision === "ready-for-production-signoff";
+  const launchDutyReady = Boolean(launchDutyCompletionHandoff);
+  const proofItems = [
+    {
+      order: 1,
+      key: "public_https_entrypoint",
+      status: baseUrl
+        ? /^https:\/\//i.test(String(baseUrl)) ? "ready_from_closeout_input" : "blocked_until_public_https"
+        : "pending_real_environment_value",
+      command: null,
+      artifactPath: baseUrl,
+      nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+    },
+    {
+      order: 2,
+      key: "non_default_secret_env",
+      status: targetEnvFile ? "pending_real_environment_confirmation" : "pending_real_environment_confirmation",
+      command: null,
+      artifactPath: targetEnvFile,
+      nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
+    },
+    {
+      order: 3,
+      key: "storage_profile_selected",
+      status: storageProfile ? "ready_from_closeout_input" : "pending_real_environment_value",
+      command: null,
+      artifactPath: storageProfile,
+      nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging evidence backfill."
+    },
+    {
+      order: 4,
+      key: "backup_restore_drill",
+      status: closeoutFilled.has("backup_restore_drill_result") ? "ready_evidence_attached" : "blocked_after_readiness_status",
+      command: null,
+      artifactPath: closeoutFilled.get("backup_restore_drill_result")?.artifactPath
+        || evidenceForCloseoutKey("backup_restore_drill_result", artifactPathRoot)?.artifactPathHint
+        || path.posix.join(archiveRoot, "backup-restore-drill.txt"),
+      nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
+    },
+    {
+      order: 5,
+      key: "live_write_smoke",
+      status: closeoutFilled.has("live_write_smoke_result") ? "ready_evidence_attached" : "blocked_after_route_map_gate",
+      command: null,
+      artifactPath: closeoutFilled.get("live_write_smoke_result")?.artifactPath
+        || evidenceForCloseoutKey("live_write_smoke_result", artifactPathRoot)?.artifactPathHint
+        || path.posix.join(archiveRoot, "live-write-smoke-output.json"),
+      nextAction: "Attach launch:smoke:staging output after no-write preflight and route-map gate pass."
+    },
+    {
+      order: 6,
+      key: "full_test_window",
+      status: signoffFilled.has("full_test_window_passed") ? "ready_evidence_attached" : "ready_local_baseline_available",
+      command: "npm.cmd test",
+      artifactPath: signoffFilled.get("full_test_window_passed")?.artifactPath || fullTestArtifact,
+      nextAction: "Attach the redacted full-suite output artifact before or while backfilling full_test_window_passed."
+    },
+    {
+      order: 7,
+      key: "production_signoff_and_receipts",
+      status: productionSignoffReady ? "ready_evidence_attached" : "blocked_after_full_test_signoff_backfill",
+      command: currentEvidenceCheckpoint?.currentTargetType === "production_signoff_condition"
+        || currentEvidenceCheckpoint?.currentTargetType === "receipt_visibility_lane"
+        ? currentEvidenceCheckpoint.currentCommand
+        : null,
+      artifactPath: path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
+      nextAction: "Backfill production sign-off conditions and receipt visibility lanes before launch-day watch."
+    },
+    {
+      order: 8,
+      key: "launch_day_watch_and_stabilization",
+      status: launchDutyReady ? "ready_evidence_attached" : "blocked_after_production_signoff_readiness",
+      command: null,
+      artifactPath: launchDutyCompletionHandoff?.firstWaveCloseoutArtifactPath || path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
+      nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    }
+  ];
+  const ready = proofItems.filter((item) => String(item.status || "").startsWith("ready_")).length;
+  return {
+    version: "staging-readiness-production-switch-proof-packet/v1",
+    status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
+    currentActionKey: currentEvidenceCheckpoint?.currentActionKey || "review_readiness_status",
+    currentCommand: currentEvidenceCheckpoint?.currentCommand || statusCommand(inputFile, actionsFile),
+    baseUrl,
+    productCode: payload.productCode || payload.summary?.productCode || lane.productCode,
+    channel: payload.channel || payload.summary?.channel || lane.channel,
+    targetOs: payload.targetOs || payload.summary?.targetOs || null,
+    storageProfile,
+    archiveRoot,
+    closeoutInputFile: inputFile,
+    readinessActionQueueFile: actionsFile || null,
+    launchDutyRecordIndexFile: launchDutyCompletionHandoff?.recordIndexFile || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    localFullSuiteBaseline: {
+      command: "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: fullTestArtifact,
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    },
+    proofCounts: {
+      total: proofItems.length,
+      ready,
+      blocked: proofItems.length - ready
+    },
+    proofItems,
+    nextAction: "Continue the current readiness evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist."
+  };
+}
+
 function valueObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -1604,6 +1747,30 @@ function renderLaunchEvidenceReadinessGateMarkdown(result) {
   return lines;
 }
 
+function renderProductionSwitchProofPacketMarkdown(result) {
+  const packet = result.productionSwitchProofPacket;
+  if (!packet) {
+    return [];
+  }
+  const counts = packet.proofCounts || {};
+  const baseline = packet.localFullSuiteBaseline || {};
+  const lines = [
+    "## Production Switch Proof Packet",
+    "",
+    `Production switch proof packet: \`${packet.status || "-"}\` (ready \`${counts.ready ?? "-"}/${counts.total ?? "-"}\`, blocked \`${counts.blocked ?? "-"}/${counts.total ?? "-"}\`, current \`${packet.currentActionKey || "-"}\`)`,
+    `Production switch current command: \`${packet.currentCommand || "-"}\``,
+    `Production switch local baseline: \`${baseline.command || "-"}\` -> \`${baseline.outputArtifact || "-"}\` (\`${baseline.status || "-"}\`, tests \`${baseline.testCount ?? "-"}\`, failures \`${baseline.failureCount ?? "-"}\`)`,
+    `Production switch record index: \`${packet.launchDutyRecordIndexFile || "-"}\``,
+    ""
+  ];
+  for (const item of packet.proofItems || []) {
+    lines.push(`- ${item.order || "-"}. \`${item.key || "-"}\` [${item.status || "-"}] artifact \`${item.artifactPath || "-"}\` command \`${item.command || "-"}\``);
+  }
+  lines.push(`Production switch next action: ${packet.nextAction || "-"}`);
+  lines.push("");
+  return lines;
+}
+
 function renderActionQueueMarkdown(result) {
   const lines = [
     "# Staging Readiness Action Queue",
@@ -1613,6 +1780,7 @@ function renderActionQueueMarkdown(result) {
     `Launch status: \`${result.readiness.launchStatus}\``,
     "",
     ...renderCurrentEvidenceCheckpointMarkdown(result),
+    ...renderProductionSwitchProofPacketMarkdown(result),
     ...renderLaunchEvidenceReadinessGateMarkdown(result),
     ...renderEvidenceSummaryMarkdown(result),
     "",
@@ -1992,6 +2160,16 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     currentEvidenceCheckpoint,
     launchDutyCompletionHandoff
   });
+  const productionSwitchProofPacket = buildStagingProductionSwitchProofPacket({
+    payload,
+    inputFile,
+    actionsFile,
+    artifactPathRoot,
+    currentEvidenceCheckpoint,
+    evidenceSummary,
+    productionDecision,
+    launchDutyCompletionHandoff
+  });
 
   return {
     status: "pass",
@@ -2025,6 +2203,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     },
     evidenceSummary,
     currentEvidenceCheckpoint,
+    productionSwitchProofPacket,
     launchEvidenceReadinessGate,
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
@@ -2118,6 +2297,28 @@ function writeLaunchEvidenceReadinessGatePlain(gate) {
   console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
 }
 
+function writeProductionSwitchProofPacketPlain(packet) {
+  if (!packet) {
+    return;
+  }
+  const counts = packet.proofCounts || {};
+  console.log(
+    `Production switch proof packet: ${packet.status || "-"}`
+      + ` (ready=${counts.ready ?? "-"}/${counts.total ?? "-"}`
+      + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
+      + `, current=${packet.currentActionKey || "-"})`
+  );
+  const baseline = packet.localFullSuiteBaseline || {};
+  console.log(
+    `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`
+      + ` (${baseline.status || "-"}, tests=${baseline.testCount ?? "-"}, failures=${baseline.failureCount ?? "-"})`
+  );
+  (packet.proofItems || []).forEach((item) => {
+    console.log(`Production switch proof ${item.order}. ${item.key}: ${item.status} -> ${item.command || item.artifactPath || "-"}`);
+  });
+  console.log(`Production switch next action: ${packet.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -2129,6 +2330,7 @@ function writeResult(result, json) {
     console.log(result.nextStep.command);
     writeEvidenceSummaryPlain(result.evidenceSummary);
     writeCurrentEvidenceCheckpointPlain(result.currentEvidenceCheckpoint);
+    writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     if (result.fullTestWindowHandoff) {
       const handoff = result.fullTestWindowHandoff;

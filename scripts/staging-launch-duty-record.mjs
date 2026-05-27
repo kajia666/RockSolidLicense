@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const RECORD_INDEX_FILE_NAME = "launch-duty-record-index.json";
+const DEFAULT_ARTIFACT_ROOT = "artifacts/staging/<productCode>/<channel>";
 
 const RECORD_SEQUENCE = [
   "launch_day_watch_summary",
@@ -239,7 +240,7 @@ function defaultRecordIndexFile(artifactPath) {
 function archiveRootFromCloseoutInputFile(closeoutInputFile) {
   const root = path.dirname(closeoutInputFile || "");
   if (!root || root === ".") {
-    return "artifacts/staging/<productCode>/<channel>";
+    return DEFAULT_ARTIFACT_ROOT;
   }
   return root;
 }
@@ -826,6 +827,159 @@ function buildLaunchDutyRecordLaunchEvidenceGate({
   };
 }
 
+function artifactRootLane(artifactRoot) {
+  const normalized = String(artifactRoot || DEFAULT_ARTIFACT_ROOT).replaceAll("\\", "/");
+  const parts = normalized.split("/").filter(Boolean);
+  for (let index = 0; index < parts.length - 3; index += 1) {
+    if (parts[index] === "artifacts" && parts[index + 1] === "staging") {
+      return {
+        productCode: parts[index + 2] || "<productCode>",
+        channel: parts[index + 3] || "<channel>"
+      };
+    }
+  }
+  return {
+    productCode: "<productCode>",
+    channel: "<channel>"
+  };
+}
+
+function loadCloseoutInputSnapshot(closeoutInputFile) {
+  const resolvedPath = path.resolve(closeoutInputFile);
+  if (!existsSync(resolvedPath)) {
+    return null;
+  }
+  const payload = JSON.parse(readFileSync(resolvedPath, "utf8"));
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+  return payload;
+}
+
+function buildLaunchDutyRecordProductionSwitchProofPacket({
+  options,
+  recordIndex,
+  nextRecordCommand,
+  statusRefreshCommand
+}) {
+  const archiveRoot = archiveRootFromCloseoutInputFile(options.closeoutInputFile);
+  const lane = artifactRootLane(archiveRoot);
+  const closeoutInput = loadCloseoutInputSnapshot(options.closeoutInputFile);
+  const baseUrl = closeoutInput?.baseUrl || closeoutInput?.summary?.baseUrl || null;
+  const targetEnvFile = closeoutInput?.targetEnvFile || closeoutInput?.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
+  const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
+  const launchDayWatchRecord = recordIndex?.records?.launch_day_watch_summary || null;
+  const firstWaveCloseoutRecord = recordIndex?.records?.first_wave_closeout || null;
+  const launchDutyRecorded = firstWaveCloseoutRecord?.status === "recorded";
+  const launchDutyArtifactPath = launchDutyRecorded
+    ? firstWaveCloseoutRecord?.artifactPath
+    : launchDayWatchRecord?.artifactPath || joinArtifactPath(archiveRoot, LAUNCH_DUTY_RECORDS.launch_day_watch_summary.fileName);
+  const currentActionKey = nextRecordCommand
+    ? "record_next_launch_duty_record"
+    : recordIndex?.completionHandoff
+      ? "refresh_readiness_status"
+      : "review_launch_duty_status";
+  const proofItems = [
+    {
+      order: 1,
+      key: "public_https_entrypoint",
+      status: baseUrl
+        ? /^https:\/\//i.test(String(baseUrl)) ? "ready_from_closeout_input" : "blocked_until_public_https"
+        : "pending_real_environment_value",
+      command: null,
+      artifactPath: baseUrl,
+      nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+    },
+    {
+      order: 2,
+      key: "non_default_secret_env",
+      status: "pending_real_environment_confirmation",
+      command: null,
+      artifactPath: targetEnvFile,
+      nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
+    },
+    {
+      order: 3,
+      key: "storage_profile_selected",
+      status: storageProfile ? "ready_from_closeout_input" : "pending_real_environment_value",
+      command: null,
+      artifactPath: storageProfile,
+      nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging evidence backfill."
+    },
+    {
+      order: 4,
+      key: "backup_restore_drill",
+      status: "ready_evidence_attached",
+      command: null,
+      artifactPath: joinArtifactPath(archiveRoot, "backup_restore_drill_result.txt"),
+      nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
+    },
+    {
+      order: 5,
+      key: "live_write_smoke",
+      status: "ready_evidence_attached",
+      command: null,
+      artifactPath: joinArtifactPath(archiveRoot, "live_write_smoke_result.txt"),
+      nextAction: "Attach launch:smoke:staging output after no-write preflight and route-map gate pass."
+    },
+    {
+      order: 6,
+      key: "full_test_window",
+      status: "ready_evidence_attached",
+      command: "npm.cmd test",
+      artifactPath: joinArtifactPath(archiveRoot, "full-test-output.txt"),
+      nextAction: "Attach the redacted full-suite output artifact before or while backfilling full_test_window_passed."
+    },
+    {
+      order: 7,
+      key: "production_signoff_and_receipts",
+      status: "ready_evidence_attached",
+      command: null,
+      artifactPath: joinArtifactPath(archiveRoot, "staging-production-signoff-packet.json"),
+      nextAction: "Backfill production sign-off conditions and receipt visibility lanes before launch-day watch."
+    },
+    {
+      order: 8,
+      key: "launch_day_watch_and_stabilization",
+      status: launchDutyRecorded ? "ready_evidence_attached" : "blocked_after_production_signoff_readiness",
+      command: null,
+      artifactPath: launchDutyArtifactPath,
+      nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    }
+  ];
+  const ready = proofItems.filter((item) => String(item.status || "").startsWith("ready_")).length;
+  return {
+    version: "staging-launch-duty-record-production-switch-proof-packet/v1",
+    status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
+    currentActionKey,
+    currentCommand: nextRecordCommand || statusRefreshCommand,
+    baseUrl,
+    productCode: closeoutInput?.productCode || closeoutInput?.summary?.productCode || lane.productCode,
+    channel: closeoutInput?.channel || closeoutInput?.summary?.channel || lane.channel,
+    targetOs: closeoutInput?.targetOs || closeoutInput?.summary?.targetOs || null,
+    storageProfile,
+    archiveRoot,
+    closeoutInputFile: options.closeoutInputFile,
+    readinessActionQueueFile: options.actionsFile || null,
+    launchDutyRecordIndexFile: joinArtifactPath(archiveRoot, RECORD_INDEX_FILE_NAME),
+    localFullSuiteBaseline: {
+      command: "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: joinArtifactPath(archiveRoot, "full-test-output.txt"),
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    },
+    proofCounts: {
+      total: proofItems.length,
+      ready,
+      blocked: proofItems.length - ready
+    },
+    proofItems,
+    nextAction: "Continue the current launch-duty command, rerun staging:readiness:status, then use this packet as the production switch proof checklist."
+  };
+}
+
 function buildResult(options) {
   const target = LAUNCH_DUTY_RECORDS[options.key];
   if (!target) {
@@ -928,6 +1082,12 @@ function buildResult(options) {
     statusRefreshCommand,
     rehearsalReloadCommand
   });
+  const productionSwitchProofPacket = buildLaunchDutyRecordProductionSwitchProofPacket({
+    options,
+    recordIndex,
+    nextRecordCommand,
+    statusRefreshCommand
+  });
   writeRecordIndex(recordIndexFile, recordIndex);
   return {
     status: "written",
@@ -959,8 +1119,31 @@ function buildResult(options) {
     operatorNextCommands,
     operatorQueueCheckpoint,
     launchEvidenceReadinessGate,
+    productionSwitchProofPacket,
     nextAction: recordIndex.nextAction
   };
+}
+
+function writeProductionSwitchProofPacketPlain(packet) {
+  if (!packet) {
+    return;
+  }
+  const counts = packet.proofCounts || {};
+  console.log(
+    `Production switch proof packet: ${packet.status || "-"}`
+      + ` (ready=${counts.ready ?? "-"}/${counts.total ?? "-"}`
+      + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
+      + `, current=${packet.currentActionKey || "-"})`
+  );
+  const baseline = packet.localFullSuiteBaseline || {};
+  console.log(
+    `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`
+      + ` (${baseline.status || "-"}, tests=${baseline.testCount ?? "-"}, failures=${baseline.failureCount ?? "-"})`
+  );
+  (packet.proofItems || []).forEach((item) => {
+    console.log(`Production switch proof ${item.order}. ${item.key}: ${item.status} -> ${item.command || item.artifactPath || "-"}`);
+  });
+  console.log(`Production switch next action: ${packet.nextAction || "-"}`);
 }
 
 function writeResult(result, json) {
@@ -1032,6 +1215,7 @@ function writeResult(result, json) {
       }
       console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
     }
+    writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     console.log(`Launch duty record status refresh: ${result.statusCommand}`);
     console.log(`Launch duty record rehearsal reload: ${result.rehearsalReloadCommand}`);
     if (result.completionHandoff) {

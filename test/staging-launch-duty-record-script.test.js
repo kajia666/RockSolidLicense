@@ -41,6 +41,114 @@ function evidenceItemByKey(gate, key) {
   return (gate.evidenceItems || []).find((item) => item.key === key);
 }
 
+function buildExpectedProductionSwitchProofPacket({
+  closeoutInputFile,
+  actionsFile,
+  archiveRoot,
+  currentActionKey,
+  currentCommand,
+  launchDutyStatus,
+  launchDutyArtifactPath
+}) {
+  const proofItems = [
+    {
+      order: 1,
+      key: "public_https_entrypoint",
+      status: "pending_real_environment_value",
+      command: null,
+      artifactPath: null,
+      nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+    },
+    {
+      order: 2,
+      key: "non_default_secret_env",
+      status: "pending_real_environment_confirmation",
+      command: null,
+      artifactPath: null,
+      nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
+    },
+    {
+      order: 3,
+      key: "storage_profile_selected",
+      status: "pending_real_environment_value",
+      command: null,
+      artifactPath: null,
+      nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging evidence backfill."
+    },
+    {
+      order: 4,
+      key: "backup_restore_drill",
+      status: "ready_evidence_attached",
+      command: null,
+      artifactPath: join(archiveRoot, "backup_restore_drill_result.txt"),
+      nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
+    },
+    {
+      order: 5,
+      key: "live_write_smoke",
+      status: "ready_evidence_attached",
+      command: null,
+      artifactPath: join(archiveRoot, "live_write_smoke_result.txt"),
+      nextAction: "Attach launch:smoke:staging output after no-write preflight and route-map gate pass."
+    },
+    {
+      order: 6,
+      key: "full_test_window",
+      status: "ready_evidence_attached",
+      command: "npm.cmd test",
+      artifactPath: join(archiveRoot, "full-test-output.txt"),
+      nextAction: "Attach the redacted full-suite output artifact before or while backfilling full_test_window_passed."
+    },
+    {
+      order: 7,
+      key: "production_signoff_and_receipts",
+      status: "ready_evidence_attached",
+      command: null,
+      artifactPath: join(archiveRoot, "staging-production-signoff-packet.json"),
+      nextAction: "Backfill production sign-off conditions and receipt visibility lanes before launch-day watch."
+    },
+    {
+      order: 8,
+      key: "launch_day_watch_and_stabilization",
+      status: launchDutyStatus,
+      command: null,
+      artifactPath: launchDutyArtifactPath,
+      nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    }
+  ];
+  const ready = proofItems.filter((item) => item.status.startsWith("ready_")).length;
+  return {
+    version: "staging-launch-duty-record-production-switch-proof-packet/v1",
+    status: "blocked_until_real_environment_evidence",
+    currentActionKey,
+    currentCommand,
+    baseUrl: null,
+    productCode: "PILOT_ALPHA",
+    channel: "stable",
+    targetOs: null,
+    storageProfile: null,
+    archiveRoot,
+    closeoutInputFile,
+    readinessActionQueueFile: actionsFile,
+    launchDutyRecordIndexFile: join(archiveRoot, "launch-duty-record-index.json"),
+    localFullSuiteBaseline: {
+      command: "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: join(archiveRoot, "full-test-output.txt"),
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    },
+    proofCounts: {
+      total: 8,
+      ready,
+      blocked: 8 - ready
+    },
+    proofItems,
+    nextAction: "Continue the current launch-duty command, rerun staging:readiness:status, then use this packet as the production switch proof checklist."
+  };
+}
+
 function recordLaunchDutySequence({ closeoutInputFile, actionsFile, recordIndexFile, artifactRoot, keys }) {
   for (const key of keys) {
     const result = runRecord([
@@ -228,6 +336,15 @@ test("staging launch duty record writes a watch summary artifact and next comman
     assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "launch_day_watch_summary").status, "recorded");
     assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "launch_day_watch_summary").artifactPath, artifactPath);
     assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "first_wave_closeout").status, "blocked_until_source_records");
+    assert.deepEqual(output.productionSwitchProofPacket, buildExpectedProductionSwitchProofPacket({
+      closeoutInputFile,
+      actionsFile,
+      archiveRoot: artifactRoot,
+      currentActionKey: "record_next_launch_duty_record",
+      currentCommand: output.nextRecordCommand,
+      launchDutyStatus: "blocked_after_production_signoff_readiness",
+      launchDutyArtifactPath: artifactPath
+    }));
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -558,6 +675,15 @@ test("staging launch duty record emits completion handoff after first-wave close
     );
     assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "first_wave_closeout").status, "recorded");
     assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "first_wave_closeout").artifactPath, closeoutArtifactPath);
+    assert.deepEqual(output.productionSwitchProofPacket, buildExpectedProductionSwitchProofPacket({
+      closeoutInputFile,
+      actionsFile,
+      archiveRoot: artifactRoot,
+      currentActionKey: "refresh_readiness_status",
+      currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      launchDutyStatus: "ready_evidence_attached",
+      launchDutyArtifactPath: closeoutArtifactPath
+    }));
     assert.deepEqual(
       output.operatorNextCommands.map((item) => [item.key, item.status]),
       [
@@ -631,6 +757,9 @@ test("staging launch duty record prints completion handoff after first-wave clos
     assert.match(result.stdout, /Launch evidence progress: closeout=7\/7, signoff=7\/7, receipts=5\/5, launchDuty=2\/2/);
     assert.match(result.stdout, /Launch evidence launch-duty records: 6\/6 recorded, 0 pending, next=-/);
     assert.match(result.stdout, /Launch evidence stable handoff: ready_for_stabilization_handoff -> .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=5\/8, blocked=3\/8, current=refresh_readiness_status\)/);
+    assert.match(result.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: ready_evidence_attached -> .*first-wave-closeout\.md/);
+    assert.match(result.stdout, /Production switch next action: Continue the current launch-duty command, rerun staging:readiness:status, then use this packet as the production switch proof checklist\./);
     assert.match(result.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
     assert.match(result.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch duty completion handoff next action: Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner\./);

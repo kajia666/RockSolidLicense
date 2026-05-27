@@ -25960,7 +25960,7 @@ function buildDeveloperLaunchMainlineSteadyStateHandoffLandingExecutionDownloadT
   lines.push("Operator Notes:");
   lines.push("- Use this direct file after packet review and launch-duty record-index readbacks are complete.");
   lines.push("- It carries the steady-state handoff brief route, bridge checks, duty receipt review action, and shared launch-duty record index.");
-  lines.push("- Keep it beside steady-state-handoff-brief.txt so launch duty can transfer into stable operations without reopening the full route map.");
+  lines.push("- Keep it beside steady-state-handoff-brief.txt and launch-duty-record-index.json so launch duty transfers into stable operations from direct handoff files.");
   return lines.join("\n").trimEnd();
 }
 
@@ -26090,7 +26090,7 @@ function buildDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecutionDownlo
   lines.push("Operator Notes:");
   lines.push("- Use this direct file after the steady-state duty receipt is recorded and before stable operations handoff.");
   lines.push("- It carries the duty receipt audit, visibility status, source download, and shared launch-duty record index in one review artifact.");
-  lines.push("- Keep it beside steady-state-duty-board.txt so receipt review can be completed without reopening the longer handoff route map.");
+  lines.push("- Keep it beside steady-state-duty-board.txt and launch-duty-record-index.json so receipt review stays inside the direct handoff files.");
   return lines.join("\n").trimEnd();
 }
 
@@ -26234,7 +26234,7 @@ function buildDeveloperLaunchMainlineRolloutWideningDecisionExecutionDownloadTex
   lines.push("Operator Notes:");
   lines.push("- Use this direct file after the first stable operating window has evidence and before widening rollout.");
   lines.push("- It carries queue/attention state, the source duty-board download, production sign-off packet, launch-day watch entry, and launch-duty record index.");
-  lines.push("- Keep it beside steady-state-duty-board.txt so rollout widening can be reviewed without reopening the longer handoff route map.");
+  lines.push("- Keep it beside steady-state-duty-board.txt and launch-duty-record-index.json so rollout widening stays inside the direct decision file and duty-board evidence.");
   return lines.join("\n").trimEnd();
 }
 
@@ -26406,7 +26406,7 @@ function buildDeveloperLaunchMainlineFirstOperatingResultHandoffExecutionDownloa
   lines.push("Operator Notes:");
   lines.push("- Use this direct file after rollout widening decision review to see whether the first operating result can be handed off.");
   lines.push("- It carries the blocking receipt state, overview-status download, rollout queue state, and shared launch-duty record index.");
-  lines.push("- Keep it beside launch-operations-overview-status.txt so the first operating result handoff can resume without reopening the full route map.");
+  lines.push("- Keep it beside launch-operations-overview-status.txt and launch-duty-record-index.json so the first operating result handoff resumes from direct evidence files.");
   return lines.join("\n").trimEnd();
 }
 
@@ -26749,7 +26749,7 @@ function buildDeveloperLaunchMainlineFirstOperatingResultReviewExecutionDownload
   lines.push("Operator Notes:");
   lines.push("- Use this direct file after the first operating result handoff receipt readback is ready.");
   lines.push("- It carries the exact review action, handoff receipt audit, overview-status download, queue state, required checks, and launch-duty record index.");
-  lines.push("- Keep it beside first-operating-result-handoff-receipt-readback-execution.txt so review can start without another route-map lookup.");
+  lines.push("- Keep it beside first-operating-result-handoff-receipt-readback-execution.txt and launch-operations-overview-status.txt so review starts from direct evidence files.");
   return lines.join("\n").trimEnd();
 }
 

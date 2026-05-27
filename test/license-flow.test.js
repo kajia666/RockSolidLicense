@@ -25713,6 +25713,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
       /Steady-State Duty Receipt Review Visibility:[^\n]*visibility=visible[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
+      /Operator Notes:[\s\S]*Keep it beside steady-state-duty-board\.txt and launch-duty-record-index\.json so receipt review stays inside the direct handoff files\./
+    );
+    assert.doesNotMatch(launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body, /longer handoff route map/);
     const launchMainlineRolloutWideningDecisionExecutionDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=rollout-widening-decision-execution",
@@ -25734,6 +25739,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineRolloutWideningDecisionExecutionDirectDownload.body,
       /Rollout Widening Decision Record:[^\n]*productionSignoffPacket=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineRolloutWideningDecisionExecutionDirectDownload.body,
+      /Operator Notes:[\s\S]*Keep it beside steady-state-duty-board\.txt and launch-duty-record-index\.json so rollout widening stays inside the direct decision file and duty-board evidence\./
+    );
+    assert.doesNotMatch(launchMainlineRolloutWideningDecisionExecutionDirectDownload.body, /longer handoff route map/);
     const launchMainlineFirstOperatingResultHandoffExecutionDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=first-operating-result-handoff-execution",
@@ -25755,6 +25765,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineFirstOperatingResultHandoffExecutionDirectDownload.body,
       /First Operating Result Handoff Blockers:[^\n]*blockedBy=rollout_widening_receipt[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineFirstOperatingResultHandoffExecutionDirectDownload.body,
+      /Operator Notes:[\s\S]*Keep it beside launch-operations-overview-status\.txt and launch-duty-record-index\.json so the first operating result handoff resumes from direct evidence files\./
+    );
+    assert.doesNotMatch(launchMainlineFirstOperatingResultHandoffExecutionDirectDownload.body, /full route map/);
 
     const launchMainlinePostLaunchIndexSelectionDownload = await getText(
       baseUrl,
@@ -33437,6 +33452,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineFirstOperatingResultReviewExecutionDirectDownload.body,
       /First Operating Result Review Blockers:[^\n]*blockedBy=-[^\n]*checks=first_operating_result_handoff_receipt_recorded,receipt_visible_in_developer_ops,launch_operations_overview_attached[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
+    assert.match(
+      launchMainlineFirstOperatingResultReviewExecutionDirectDownload.body,
+      /Operator Notes:[\s\S]*Keep it beside first-operating-result-handoff-receipt-readback-execution\.txt and launch-operations-overview-status\.txt so review starts from direct evidence files\./
+    );
+    assert.doesNotMatch(launchMainlineFirstOperatingResultReviewExecutionDirectDownload.body, /route-map lookup/);
     const launchMainlineSteadyStateHandoffLandingExecutionDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=steady-state-handoff-landing-execution",
@@ -33460,6 +33480,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         `Steady-State Handoff Landing Receipt Review:[\\s\\S]*status=ready_for_receipt_review \\| audit=${launchDutyPacketReviewReceipt.auditLogId} \\| action=packet_review_readback \\| format=launch-duty-packet-review`
       )
     );
+    assert.match(
+      launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body,
+      /Operator Notes:[\s\S]*Keep it beside steady-state-handoff-brief\.txt and launch-duty-record-index\.json so launch duty transfers into stable operations from direct handoff files\./
+    );
+    assert.doesNotMatch(launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body, /full route map/);
 
     const forbiddenExport = await getJsonExpectError(
       baseUrl,

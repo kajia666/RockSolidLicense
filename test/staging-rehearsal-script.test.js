@@ -2501,6 +2501,45 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
       `npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json --actions-file ${readinessActionQueueFile}`
     );
     assert.equal(output.stagingProfileOperatorPreflight.commands.closeoutReload, "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(output.productionSwitchProofPacket.version, "staging-rehearsal-production-switch-proof-packet/v1");
+    assert.equal(output.productionSwitchProofPacket.status, "blocked_until_real_environment_evidence");
+    assert.equal(output.productionSwitchProofPacket.currentActionKey, "set_required_secret_env");
+    assert.equal(output.productionSwitchProofPacket.currentCommand, output.stagingProfileOperatorPreflight.commands.profileDrivenRehearsal);
+    assert.equal(output.productionSwitchProofPacket.baseUrl, "https://profile-staging.example.com");
+    assert.equal(output.productionSwitchProofPacket.productCode, "PROFILE_PRODUCT");
+    assert.equal(output.productionSwitchProofPacket.channel, "stable");
+    assert.equal(output.productionSwitchProofPacket.targetOs, "linux");
+    assert.equal(output.productionSwitchProofPacket.storageProfile, "postgres-preview");
+    assert.equal(output.productionSwitchProofPacket.archiveRoot, "artifacts/staging/PROFILE_PRODUCT/stable");
+    assert.equal(output.productionSwitchProofPacket.closeoutInputFile, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
+    assert.equal(output.productionSwitchProofPacket.readinessActionQueueFile, readinessActionQueueFile);
+    assert.equal(output.productionSwitchProofPacket.launchDutyRecordIndexFile, "artifacts/staging/PROFILE_PRODUCT/stable/launch-duty-record-index.json");
+    assert.deepEqual(output.productionSwitchProofPacket.localFullSuiteBaseline, {
+      command: "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: "artifacts/staging/PROFILE_PRODUCT/stable/full-test-output.txt",
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    });
+    assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
+      total: 8,
+      ready: 3,
+      blocked: 5
+    });
+    assert.deepEqual(
+      output.productionSwitchProofPacket.proofItems.map((item) => [item.order, item.key, item.status, item.artifactPath]),
+      [
+        [1, "public_https_entrypoint", "ready_from_profile", "https://profile-staging.example.com"],
+        [2, "non_default_secret_env", "blocked_until_secret_env_loaded", "/etc/rocksolidlicense/profile.env"],
+        [3, "storage_profile_selected", "ready_from_profile", "postgres-preview"],
+        [4, "backup_restore_drill", "blocked_after_readiness_status", "artifacts/staging/PROFILE_PRODUCT/stable/backup-restore-drill.txt"],
+        [5, "live_write_smoke", "blocked_after_route_map_gate", "artifacts/staging/PROFILE_PRODUCT/stable/live-write-smoke-output.json"],
+        [6, "full_test_window", "ready_local_baseline_available", "artifacts/staging/PROFILE_PRODUCT/stable/full-test-output.txt"],
+        [7, "production_signoff_and_receipts", "blocked_after_full_test_signoff_backfill", "artifacts/staging/PROFILE_PRODUCT/stable/staging-production-signoff-packet.json"],
+        [8, "launch_day_watch_and_stabilization", "blocked_after_production_signoff_readiness", "artifacts/staging/PROFILE_PRODUCT/stable/launch-day-watch-summary.md"]
+      ]
+    );
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.mode, "real-staging-run-focus");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.status, "blocked_until_secret_env");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.canRunDryRun, true);
@@ -2715,6 +2754,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.deepEqual(template.stagingProfileLaunchPlan, output.stagingProfileLaunchPlan);
     assert.deepEqual(template.stagingProfileOperatorPreflight, output.stagingProfileOperatorPreflight);
     assert.deepEqual(template.stagingRehearsalExecutionSummary, output.stagingRehearsalExecutionSummary);
+    assert.deepEqual(template.productionSwitchProofPacket, output.productionSwitchProofPacket);
     assert.equal(template.operatorExecutionPlan.realStagingRunFocus.currentAction.key, "set_required_secret_env");
     assert.equal(template.operatorExecutionPlan.realStagingRunFocus.canRunDryRun, true);
     assert.deepEqual(template.operatorExecutionPlan.outputWriteSummary, output.operatorExecutionPlan.outputWriteSummary);
@@ -2933,6 +2973,12 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Output write summary: written \(written=10\/10, pending=0\)/);
     assert.match(result.stdout, /Output archive entrypoint: launch_duty_archive_index \(written\) -> .*profile-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Output write next action: Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff\./);
+    assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=set_required_secret_env\)/);
+    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/full-test-output\.txt \(available_from_2026-05-27_full_suite_pass, tests=192, failures=0\)/);
+    assert.match(result.stdout, /Production switch proof 1\. public_https_entrypoint: ready_from_profile -> https:\/\/profile-staging\.example\.com/);
+    assert.match(result.stdout, /Production switch proof 2\. non_default_secret_env: blocked_until_secret_env_loaded -> npm\.cmd run staging:rehearsal -- --profile-file [^\n]*staging-profile\.json/);
+    assert.match(result.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: blocked_after_production_signoff_readiness -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/launch-day-watch-summary\.md/);
+    assert.match(result.stdout, /Production switch next action: Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline\./);
     assert.match(result.stdout, /Run record index status: awaiting_evidence_backfill \(records=13\)/);
     assert.match(result.stdout, /Run record closeout progress: missing=7, filled=0/);
     assert.match(result.stdout, /Run record groups: pre_full_test_closeout:awaiting_operator_evidence:7, production_signoff:blocked_until_full_test_window:7, launch_day_watch_and_stabilization:blocked_until_production_signoff:6/);

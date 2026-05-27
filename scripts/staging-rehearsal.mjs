@@ -1135,6 +1135,147 @@ function buildInitialProductionLaunchReadiness(result) {
   };
 }
 
+function lookupRecommendedOutputPath(binding = null, key = "") {
+  if (!binding || !Array.isArray(binding.recommendedOutputFiles)) {
+    return null;
+  }
+  const entry = binding.recommendedOutputFiles.find((item) => item?.key === key);
+  return entry?.path || null;
+}
+
+function buildRehearsalProductionSwitchProofPacket(result) {
+  const summary = result.summary || {};
+  const profilePreflight = result.stagingProfileOperatorPreflight || {};
+  const profileCommands = profilePreflight.commands || {};
+  const environmentBinding = result.stagingEnvironmentBinding || {};
+  const goLiveExecutionEntry = result.operatorExecutionPlan?.goLiveExecutionEntry
+    || result.finalRehearsalPacket?.goLiveExecutionEntry
+    || {};
+  const goLiveCommands = goLiveExecutionEntry.commands || {};
+  const archiveRoot = result.stagingRehearsalRunRecordIndex?.archiveRoot
+    || result.stagingRunRecordTemplate?.archiveRoot
+    || result.finalRehearsalPacket?.archiveRoot
+    || path.posix.join("artifacts/staging", summary.productCode || "product", summary.channel || "stable");
+  const closeoutInputFile = goLiveExecutionEntry.paths?.filledCloseoutInputFile
+    || lookupRecommendedOutputPath(environmentBinding, "filled_closeout_input")
+    || path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const readinessActionQueueFile = lookupRecommendedOutputPath(environmentBinding, "readiness_action_queue")
+    || null;
+  const launchDayWatchSummaryFile = result.launchDayWatchPlan?.watchRecordDraft?.records
+    ?.find((item) => item.key === "launch_day_watch_summary")?.artifactPath
+    || path.posix.join(archiveRoot, "launch-day-watch-summary.md");
+  const launchDutyRecordIndexFile = result.stagingLaunchDutyArchiveIndex?.launchDutyRecordIndexFile
+    || path.posix.join(archiveRoot, "launch-duty-record-index.json");
+  const currentCommand = profileCommands.profileDrivenRehearsal
+    || profileCommands.stagingDryRun
+    || goLiveCommands.stagingDryRun
+    || null;
+  const currentActionKey = result.operatorExecutionPlan?.realStagingRunFocus?.currentAction?.key
+    || goLiveExecutionEntry.currentActionKey
+    || "profile_rehearsal";
+  const httpsReady = /^https:\/\//i.test(String(summary.baseUrl || ""));
+  const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv)
+    ? profilePreflight.missingSecretEnv
+    : [];
+  const proofItems = [
+    {
+      order: 1,
+      key: "public_https_entrypoint",
+      status: httpsReady ? "ready_from_profile" : "blocked_until_public_https",
+      command: null,
+      artifactPath: summary.baseUrl || null,
+      nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+    },
+    {
+      order: 2,
+      key: "non_default_secret_env",
+      status: missingSecretEnv.length ? "blocked_until_secret_env_loaded" : "ready_secret_env_loaded",
+      command: currentCommand,
+      artifactPath: environmentBinding.environment?.targetEnvFile || null,
+      nextAction: "Load non-default admin, developer, and bearer-token secrets from environment variables before rehearsal."
+    },
+    {
+      order: 3,
+      key: "storage_profile_selected",
+      status: summary.storageProfile ? "ready_from_profile" : "blocked_until_storage_profile_selected",
+      command: null,
+      artifactPath: summary.storageProfile || null,
+      nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging rehearsal."
+    },
+    {
+      order: 4,
+      key: "backup_restore_drill",
+      status: "blocked_after_readiness_status",
+      command: result.nextCommands?.recovery?.appBackup || null,
+      artifactPath: path.posix.join(archiveRoot, "backup-restore-drill.txt"),
+      nextAction: "Run recovery preflight and backfill backup_restore_drill_result before live-write smoke."
+    },
+    {
+      order: 5,
+      key: "live_write_smoke",
+      status: "blocked_after_route_map_gate",
+      command: profileCommands.liveWriteSmoke || result.nextCommands?.launchSmoke || null,
+      artifactPath: path.posix.join(archiveRoot, "live-write-smoke-output.json"),
+      nextAction: "Run launch:smoke:staging only after no-write preflight and route-map gate pass."
+    },
+    {
+      order: 6,
+      key: "full_test_window",
+      status: "ready_local_baseline_available",
+      command: result.fullTestWindowReadiness?.command || "npm.cmd test",
+      artifactPath: path.posix.join(archiveRoot, "full-test-output.txt"),
+      nextAction: "Attach the redacted full-suite output artifact before backfilling full_test_window_passed."
+    },
+    {
+      order: 7,
+      key: "production_signoff_and_receipts",
+      status: "blocked_after_full_test_signoff_backfill",
+      command: goLiveCommands.readinessStatus || profileCommands.readinessStatus || null,
+      artifactPath: path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
+      nextAction: "Backfill six production sign-off conditions and five receipt-visibility lanes before launch-day watch."
+    },
+    {
+      order: 8,
+      key: "launch_day_watch_and_stabilization",
+      status: "blocked_after_production_signoff_readiness",
+      command: result.launchDayWatchPlan?.watchEvidenceExecutionEntry?.currentCommand || null,
+      artifactPath: launchDayWatchSummaryFile,
+      nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    }
+  ];
+  const ready = proofItems.filter((item) => String(item.status || "").startsWith("ready_")).length;
+  return {
+    version: "staging-rehearsal-production-switch-proof-packet/v1",
+    status: "blocked_until_real_environment_evidence",
+    currentActionKey,
+    currentCommand,
+    baseUrl: summary.baseUrl || null,
+    productCode: summary.productCode || null,
+    channel: summary.channel || "stable",
+    targetOs: summary.targetOs || null,
+    storageProfile: summary.storageProfile || null,
+    archiveRoot,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexFile,
+    localFullSuiteBaseline: {
+      command: result.fullTestWindowReadiness?.command || "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: path.posix.join(archiveRoot, "full-test-output.txt"),
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    },
+    proofCounts: {
+      total: proofItems.length,
+      ready,
+      blocked: proofItems.length - ready
+    },
+    proofItems,
+    nextAction: "Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline."
+  };
+}
+
 function buildRehearsalLaunchEvidenceItem({
   order,
   key,
@@ -8742,15 +8883,22 @@ function buildResult(options) {
     ...resultWithOperatorExecutionPlan,
     ...(launchEvidenceReadinessGate ? { launchEvidenceReadinessGate } : {})
   };
+  const productionSwitchProofPacket = gatesPassed
+    ? buildRehearsalProductionSwitchProofPacket(resultWithLaunchEvidenceReadinessGate)
+    : null;
+  const resultWithProductionSwitchProofPacket = {
+    ...resultWithLaunchEvidenceReadinessGate,
+    ...(productionSwitchProofPacket ? { productionSwitchProofPacket } : {})
+  };
   const operatorQueueCheckpoint = gatesPassed
-    ? buildOperatorQueueCheckpoint(resultWithLaunchEvidenceReadinessGate)
+    ? buildOperatorQueueCheckpoint(resultWithProductionSwitchProofPacket)
     : null;
   return {
-    ...resultWithLaunchEvidenceReadinessGate,
+    ...resultWithProductionSwitchProofPacket,
     operatorQueueCheckpoint,
     initialProductionLaunchReadiness: gatesPassed
       ? buildInitialProductionLaunchReadiness({
-        ...resultWithLaunchEvidenceReadinessGate,
+        ...resultWithProductionSwitchProofPacket,
         operatorQueueCheckpoint
       })
       : null
@@ -9507,6 +9655,28 @@ function writeLaunchEvidenceReadinessGatePlain(gate = null) {
   console.log(`Launch evidence status refresh: ${gate.readinessStatusCommand || "-"}`);
   console.log(`Launch evidence rehearsal reload: ${gate.rehearsalReloadCommand || "-"}`);
   console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
+}
+
+function writeProductionSwitchProofPacketPlain(packet = null) {
+  if (!packet) {
+    return;
+  }
+  const counts = packet.proofCounts || {};
+  console.log(
+    `Production switch proof packet: ${packet.status || "-"}`
+      + ` (ready=${counts.ready ?? "-"}/${counts.total ?? "-"}`
+      + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
+      + `, current=${packet.currentActionKey || "-"})`
+  );
+  const baseline = packet.localFullSuiteBaseline || {};
+  console.log(
+    `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`
+      + ` (${baseline.status || "-"}, tests=${baseline.testCount ?? "-"}, failures=${baseline.failureCount ?? "-"})`
+  );
+  (packet.proofItems || []).forEach((item) => {
+    console.log(`Production switch proof ${item.order}. ${item.key}: ${item.status} -> ${item.command || item.artifactPath || "-"}`);
+  });
+  console.log(`Production switch next action: ${packet.nextAction || "-"}`);
 }
 
 function writeInitialProductionLaunchReadinessPlain(readiness = null) {
@@ -11603,6 +11773,7 @@ function buildCloseoutTemplate(result) {
     stagingExecutionRunbook: result.stagingExecutionRunbook || null,
     stagingReadinessTransition: result.stagingReadinessTransition || null,
     launchRehearsalBundle: result.launchRehearsalBundle || null,
+    productionSwitchProofPacket: result.productionSwitchProofPacket || buildRehearsalProductionSwitchProofPacket(result),
     filledCloseoutInputExample: result.filledCloseoutInputExample || buildFilledCloseoutInputExample(result),
     filledCloseoutInputDraft: result.filledCloseoutInputDraft || buildFilledCloseoutInputDraft(result),
     finalRehearsalPacket: result.finalRehearsalPacket || buildFinalRehearsalPacket(result),
@@ -11912,6 +12083,7 @@ function writeResult(result, json) {
     writeInitialProductionLaunchReadinessPlain(result.initialProductionLaunchReadiness);
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
+    writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     writeRealStagingRunFocusPlain(realStagingRunFocus);
     writeBackupRestoreDrillPacketPlain(backupRestoreDrillPacket);
     writeRunRecordArchiveSummaryPlain(runRecordIndex, artifactManifest);

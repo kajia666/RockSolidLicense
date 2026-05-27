@@ -415,6 +415,102 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       ],
       nextAction: "Run the current setup command and closeout init, then attach route_map_gate_result as the first real launch evidence item before continuing through readiness refresh, smoke, full-test, signoff, receipt visibility, launch-day watch, and first-wave closeout."
     };
+    const productionSwitchProofPacket = {
+      version: "staging-profile-init-production-switch-proof-packet/v1",
+      status: "blocked_until_real_environment_evidence",
+      currentActionKey: "profile_rehearsal",
+      currentCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+      baseUrl: "https://staging.example.com",
+      productCode: "PILOT_ALPHA",
+      channel: "beta",
+      targetOs: "linux",
+      storageProfile: "postgres-preview",
+      archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
+      closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      launchDutyRecordIndexFile,
+      localFullSuiteBaseline: {
+        command: "npm.cmd test",
+        status: "available_from_2026-05-27_full_suite_pass",
+        testCount: 192,
+        failureCount: 0,
+        outputArtifact: fullTestOutputFile,
+        nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+      },
+      proofCounts: {
+        total: 8,
+        ready: 3,
+        blocked: 5
+      },
+      proofItems: [
+        {
+          order: 1,
+          key: "public_https_entrypoint",
+          status: "ready_from_profile",
+          command: null,
+          artifactPath: "https://staging.example.com",
+          nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+        },
+        {
+          order: 2,
+          key: "non_default_secret_env",
+          status: "blocked_until_secret_env_loaded",
+          command: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+          artifactPath: "/etc/rocksolidlicense/staging.env",
+          nextAction: "Load non-default admin, developer, and bearer-token secrets from environment variables before rehearsal."
+        },
+        {
+          order: 3,
+          key: "storage_profile_selected",
+          status: "ready_from_profile",
+          command: null,
+          artifactPath: "postgres-preview",
+          nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging rehearsal."
+        },
+        {
+          order: 4,
+          key: "backup_restore_drill",
+          status: "blocked_after_readiness_status",
+          command: recoveryPreflightCommand,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt",
+          nextAction: "Run recovery preflight and backfill backup_restore_drill_result before live-write smoke."
+        },
+        {
+          order: 5,
+          key: "live_write_smoke",
+          status: "blocked_after_route_map_gate",
+          command: launchSmokeStagingCommand,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/live-write-smoke-output.json",
+          nextAction: "Run launch:smoke:staging only after no-write preflight and route-map gate pass."
+        },
+        {
+          order: 6,
+          key: "full_test_window",
+          status: "ready_local_baseline_available",
+          command: "npm.cmd test",
+          artifactPath: fullTestOutputFile,
+          nextAction: "Attach the redacted full-suite output artifact before backfilling full_test_window_passed."
+        },
+        {
+          order: 7,
+          key: "production_signoff_and_receipts",
+          status: "blocked_after_full_test_signoff_backfill",
+          command: postProductionSignoffReadinessStatusCommand,
+          artifactPath: "artifacts/staging/PILOT_ALPHA/beta/staging-production-signoff-packet.json",
+          nextAction: "Backfill six production sign-off conditions and five receipt-visibility lanes before launch-day watch."
+        },
+        {
+          order: 8,
+          key: "launch_day_watch_and_stabilization",
+          status: "blocked_after_production_signoff_readiness",
+          command: launchDayWatchRecordCommand,
+          artifactPath: launchDayWatchSummaryFile,
+          nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+        }
+      ],
+      nextAction: "Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline."
+    };
+    assert.deepEqual(output.productionSwitchProofPacket, productionSwitchProofPacket);
     assert.deepEqual(
       output.productionSignoffBackfillCommands.map((item) => [item.key, item.status, item.artifactPath, item.command]),
       productionSignoffBackfillCommands.map((item) => [item.key, item.status, item.artifactPath, item.command])
@@ -555,6 +651,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         nextAction: "Run the current profile rehearsal command, then follow closeout_init and readiness_status before recovery preflight."
       },
       launchEvidenceReadinessGate,
+      productionSwitchProofPacket,
       launchDayWatchRecordCommand,
       stabilizationRecordCommands,
       operatorNextCommands: [
@@ -930,6 +1027,12 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Launch evidence launch-day watch: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-day-watch-summary\.md/);
     assert.match(result.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch evidence next action: Run the current setup command and closeout init, then attach route_map_gate_result as the first real launch evidence item before continuing through readiness refresh, smoke, full-test, signoff, receipt visibility, launch-day watch, and first-wave closeout\./);
+    assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=profile_rehearsal\)/);
+    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/beta\/full-test-output\.txt \(available_from_2026-05-27_full_suite_pass, tests=192, failures=0\)/);
+    assert.match(result.stdout, /Production switch proof 1\. public_https_entrypoint: ready_from_profile -> https:\/\/staging\.example\.com/);
+    assert.match(result.stdout, /Production switch proof 4\. backup_restore_drill: blocked_after_readiness_status -> npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file \/etc\/rocksolidlicense\/staging\.env --app-backup-dir \/var\/lib\/rocksolid\/backups --postgres-backup-dir \/var\/lib\/rocksolid\/postgres-backups --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: blocked_after_production_signoff_readiness -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/launch-day-watch-summary\.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Production switch next action: Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline\./);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
     assert.match(result.stdout, /Closeout init: npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);

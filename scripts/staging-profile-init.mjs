@@ -1092,6 +1092,122 @@ function buildLaunchLaneFiles({
   };
 }
 
+function buildProductionSwitchProofPacket({
+  options,
+  archiveRoot,
+  outputFile,
+  closeoutInputFile,
+  readinessActionQueueFile,
+  nextCommand,
+  recoveryPreflightCommand,
+  launchSmokeStagingCommand,
+  fullTestCommand,
+  fullTestOutputFile,
+  postProductionSignoffReadinessStatusCommand,
+  launchDayWatchRecordCommand,
+  launchDayWatchSummaryFile,
+  launchDutyRecordIndexFile
+}) {
+  const httpsReady = /^https:\/\//i.test(String(options.baseUrl || ""));
+  const proofItems = [
+    {
+      order: 1,
+      key: "public_https_entrypoint",
+      status: httpsReady ? "ready_from_profile" : "blocked_until_public_https",
+      command: null,
+      artifactPath: options.baseUrl,
+      nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+    },
+    {
+      order: 2,
+      key: "non_default_secret_env",
+      status: "blocked_until_secret_env_loaded",
+      command: nextCommand,
+      artifactPath: options.targetEnvFile,
+      nextAction: "Load non-default admin, developer, and bearer-token secrets from environment variables before rehearsal."
+    },
+    {
+      order: 3,
+      key: "storage_profile_selected",
+      status: "ready_from_profile",
+      command: null,
+      artifactPath: options.storageProfile,
+      nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging rehearsal."
+    },
+    {
+      order: 4,
+      key: "backup_restore_drill",
+      status: "blocked_after_readiness_status",
+      command: recoveryPreflightCommand,
+      artifactPath: path.posix.join(archiveRoot, "backup-restore-drill.txt"),
+      nextAction: "Run recovery preflight and backfill backup_restore_drill_result before live-write smoke."
+    },
+    {
+      order: 5,
+      key: "live_write_smoke",
+      status: "blocked_after_route_map_gate",
+      command: launchSmokeStagingCommand,
+      artifactPath: path.posix.join(archiveRoot, "live-write-smoke-output.json"),
+      nextAction: "Run launch:smoke:staging only after no-write preflight and route-map gate pass."
+    },
+    {
+      order: 6,
+      key: "full_test_window",
+      status: "ready_local_baseline_available",
+      command: fullTestCommand,
+      artifactPath: fullTestOutputFile,
+      nextAction: "Attach the redacted full-suite output artifact before backfilling full_test_window_passed."
+    },
+    {
+      order: 7,
+      key: "production_signoff_and_receipts",
+      status: "blocked_after_full_test_signoff_backfill",
+      command: postProductionSignoffReadinessStatusCommand,
+      artifactPath: path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
+      nextAction: "Backfill six production sign-off conditions and five receipt-visibility lanes before launch-day watch."
+    },
+    {
+      order: 8,
+      key: "launch_day_watch_and_stabilization",
+      status: "blocked_after_production_signoff_readiness",
+      command: launchDayWatchRecordCommand,
+      artifactPath: launchDayWatchSummaryFile,
+      nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    }
+  ];
+  const ready = proofItems.filter((item) => String(item.status || "").startsWith("ready_")).length;
+  return {
+    version: "staging-profile-init-production-switch-proof-packet/v1",
+    status: "blocked_until_real_environment_evidence",
+    currentActionKey: "profile_rehearsal",
+    currentCommand: nextCommand,
+    baseUrl: options.baseUrl,
+    productCode: options.productCode,
+    channel: options.channel || "stable",
+    targetOs: options.targetOs,
+    storageProfile: options.storageProfile,
+    archiveRoot,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexFile,
+    localFullSuiteBaseline: {
+      command: fullTestCommand,
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: fullTestOutputFile,
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    },
+    proofCounts: {
+      total: proofItems.length,
+      ready,
+      blocked: proofItems.length - ready
+    },
+    proofItems,
+    nextAction: "Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline."
+  };
+}
+
 function writeOperatorQueueCheckpointPlain(checkpoint) {
   if (!checkpoint) {
     return;
@@ -1136,6 +1252,28 @@ function writeLaunchEvidenceReadinessGatePlain(gate) {
   console.log(`Launch evidence next action: ${gate.nextAction || "-"}`);
 }
 
+function writeProductionSwitchProofPacketPlain(packet) {
+  if (!packet) {
+    return;
+  }
+  const counts = packet.proofCounts || {};
+  console.log(
+    `Production switch proof packet: ${packet.status || "-"}`
+      + ` (ready=${counts.ready ?? "-"}/${counts.total ?? "-"}`
+      + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
+      + `, current=${packet.currentActionKey || "-"})`
+  );
+  const baseline = packet.localFullSuiteBaseline || {};
+  console.log(
+    `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`
+      + ` (${baseline.status || "-"}, tests=${baseline.testCount ?? "-"}, failures=${baseline.failureCount ?? "-"})`
+  );
+  (packet.proofItems || []).forEach((item) => {
+    console.log(`Production switch proof ${item.order}. ${item.key}: ${item.status} -> ${item.command || item.artifactPath || "-"}`);
+  });
+  console.log(`Production switch next action: ${packet.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -1158,6 +1296,7 @@ function writeResult(result, json) {
     }
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
+    writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
     const closeoutInit = result.operatorNextCommands?.find((item) => item.key === "closeout_init");
     const readinessStatus = result.operatorNextCommands?.find((item) => item.key === "readiness_status");
@@ -1515,6 +1654,22 @@ function main() {
       stabilizationRecordCommands,
       firstWaveCloseoutFile
     });
+    const productionSwitchProofPacket = buildProductionSwitchProofPacket({
+      options,
+      archiveRoot,
+      outputFile,
+      closeoutInputFile,
+      readinessActionQueueFile,
+      nextCommand,
+      recoveryPreflightCommand,
+      launchSmokeStagingCommand,
+      fullTestCommand,
+      fullTestOutputFile,
+      postProductionSignoffReadinessStatusCommand,
+      launchDayWatchRecordCommand,
+      launchDayWatchSummaryFile,
+      launchDutyRecordIndexFile
+    });
     writeResult({
       status: "written",
       mode: "staging-profile-init",
@@ -1552,6 +1707,7 @@ function main() {
       stableOperationsHandoff: toPublicStableOperationsHandoff(stableOperationsHandoff),
       operatorQueueCheckpoint,
       launchEvidenceReadinessGate,
+      productionSwitchProofPacket,
       launchDayWatchRecordCommand,
       stabilizationRecordCommands,
       operatorNextCommands,

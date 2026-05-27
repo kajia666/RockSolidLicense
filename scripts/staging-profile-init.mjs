@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
+
+const ADMIN_PASSWORD_ENV = "RSL_SMOKE_ADMIN_PASSWORD";
+const DEVELOPER_PASSWORD_ENV = "RSL_SMOKE_DEVELOPER_PASSWORD";
+const DEVELOPER_BEARER_TOKEN_ENV = "RSL_DEVELOPER_BEARER_TOKEN";
 
 const SECRET_FLAGS = new Set([
   "--admin-password",
@@ -1109,6 +1114,18 @@ function buildProductionSwitchProofPacket({
   launchDutyRecordIndexFile
 }) {
   const httpsReady = /^https:\/\//i.test(String(options.baseUrl || ""));
+  const secretEnvProof = buildBoundSecretEnvProof({
+    stagingEnvironmentBinding: {
+      credentialEnv: {
+        adminPassword: ADMIN_PASSWORD_ENV,
+        developerPassword: DEVELOPER_PASSWORD_ENV,
+        developerBearerToken: DEVELOPER_BEARER_TOKEN_ENV
+      }
+    }
+  });
+  const secretEnvStatus = secretEnvProof.status === "ready_secret_env_loaded"
+    ? "ready_secret_env_loaded"
+    : "blocked_until_secret_env_loaded";
   const proofItems = [
     {
       order: 1,
@@ -1121,7 +1138,7 @@ function buildProductionSwitchProofPacket({
     {
       order: 2,
       key: "non_default_secret_env",
-      status: "blocked_until_secret_env_loaded",
+      status: secretEnvStatus,
       command: nextCommand,
       artifactPath: options.targetEnvFile,
       nextAction: "Load non-default admin, developer, and bearer-token secrets from environment variables before rehearsal."

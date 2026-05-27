@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
 
 const RECEIPT_VISIBILITY_KEYS = [
   "launchMainline",
@@ -802,6 +803,11 @@ function buildSignoffBackfillProductionSwitchProofPacket({
   const productionSignoffReady = signoffProgress?.status === "filled" && productionDecision === "ready-for-production-signoff";
   const launchDutyProgress = launchEvidenceReadinessGate?.progress?.launchDuty || {};
   const launchDutyReady = launchDutyProgress.total > 0 && launchDutyProgress.completed === launchDutyProgress.total;
+  const launchDutyCommand = launchDutyReady
+    ? null
+    : launchEvidenceReadinessGate?.currentEvidenceType === "launch_duty_record"
+      ? launchEvidenceReadinessGate.currentCommand
+      : null;
   const currentActionKey = signoffProgress?.currentTarget?.type === "production_signoff_condition"
     ? "backfill_production_signoff"
     : signoffProgress?.currentTarget?.type === "receipt_visibility_lane"
@@ -812,6 +818,7 @@ function buildSignoffBackfillProductionSwitchProofPacket({
   const targetEnvFile = closeoutInput?.targetEnvFile || closeoutInput?.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
   const baseUrl = closeoutInput?.baseUrl || closeoutInput?.summary?.baseUrl || null;
   const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
+  const secretEnvProof = buildBoundSecretEnvProof(closeoutInput);
   const proofItems = [
     {
       order: 1,
@@ -826,7 +833,7 @@ function buildSignoffBackfillProductionSwitchProofPacket({
     {
       order: 2,
       key: "non_default_secret_env",
-      status: "pending_real_environment_confirmation",
+      status: secretEnvProof.status,
       command: null,
       artifactPath: targetEnvFile,
       nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
@@ -878,7 +885,7 @@ function buildSignoffBackfillProductionSwitchProofPacket({
       order: 8,
       key: "launch_day_watch_and_stabilization",
       status: launchDutyReady ? "ready_evidence_attached" : "blocked_after_production_signoff_readiness",
-      command: null,
+      command: launchDutyCommand,
       artifactPath: path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
       nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
     }

@@ -1166,17 +1166,29 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     || path.posix.join(archiveRoot, "launch-day-watch-summary.md");
   const launchDutyRecordIndexFile = result.stagingLaunchDutyArchiveIndex?.launchDutyRecordIndexFile
     || path.posix.join(archiveRoot, "launch-duty-record-index.json");
-  const currentCommand = profileCommands.profileDrivenRehearsal
+  const launchDutyCompletionHandoff = result.launchDutyCompletionHandoff
+    || result.operatorExecutionPlan?.launchDutyCurrentAction?.completionHandoff
+    || result.finalRehearsalPacket?.launchDutyCurrentAction?.completionHandoff
+    || null;
+  const currentCommand = launchDutyCompletionHandoff?.statusCommand
+    || profileCommands.profileDrivenRehearsal
     || profileCommands.stagingDryRun
     || goLiveCommands.stagingDryRun
     || null;
-  const currentActionKey = result.operatorExecutionPlan?.realStagingRunFocus?.currentAction?.key
+  const currentActionKey = launchDutyCompletionHandoff
+    ? "stable_operations_handoff"
+    : result.operatorExecutionPlan?.realStagingRunFocus?.currentAction?.key
     || goLiveExecutionEntry.currentActionKey
     || "profile_rehearsal";
   const httpsReady = /^https:\/\//i.test(String(summary.baseUrl || ""));
   const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv)
     ? profilePreflight.missingSecretEnv
     : [];
+  const launchDutyProofReady = Boolean(launchDutyCompletionHandoff);
+  const launchDutyProofCommand = launchDutyCompletionHandoff?.statusCommand
+    || result.launchDayWatchPlan?.watchEvidenceExecutionEntry?.currentCommand
+    || null;
+  const launchDutyProofArtifactPath = launchDutyCompletionHandoff?.firstWaveCloseoutArtifactPath || launchDayWatchSummaryFile;
   const proofItems = [
     {
       order: 1,
@@ -1237,9 +1249,9 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     {
       order: 8,
       key: "launch_day_watch_and_stabilization",
-      status: "blocked_after_production_signoff_readiness",
-      command: result.launchDayWatchPlan?.watchEvidenceExecutionEntry?.currentCommand || null,
-      artifactPath: launchDayWatchSummaryFile,
+      status: launchDutyProofReady ? "ready_evidence_attached" : "blocked_after_production_signoff_readiness",
+      command: launchDutyProofCommand,
+      artifactPath: launchDutyProofArtifactPath,
       nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
     }
   ];

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
 
 const REQUIRED_CLOSEOUT_KEYS = [
   "route_map_gate_result",
@@ -440,6 +441,11 @@ function evidenceArgs(evidence) {
 
 function commandForCloseoutBackfillExample(inputFile, key, evidence, actionsFile = null) {
   return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key}${evidenceArgs(evidence)}${actionsFileArgs(actionsFile)}`;
+}
+
+function commandForCloseoutBackfillProofItem(inputFile, key, evidence, actionsFile = null) {
+  const artifactArg = evidence?.artifactPathHint ? ` --artifact-path ${evidence.artifactPathHint}` : "";
+  return `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key ${key} --value-json <redacted-json>${artifactArg}${receiptIdArgs(evidence?.receiptOperations || [])}${actionsFileArgs(actionsFile)}`;
 }
 
 function commandForSignoffCondition(inputFile, key, includeDecision = false, actionsFile = null) {
@@ -1435,11 +1441,22 @@ function buildStagingProductionSwitchProofPacket({
   const baseUrl = payload.baseUrl || payload.summary?.baseUrl || null;
   const storageProfile = payload.storageProfile || payload.summary?.storageProfile || null;
   const targetEnvFile = payload.targetEnvFile || payload.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
+  const secretEnvProof = buildBoundSecretEnvProof(payload);
   const fullTestArtifact = path.posix.join(archiveRoot, "full-test-output.txt");
+  const backupRestoreEvidence = evidenceForCloseoutKey("backup_restore_drill_result", artifactPathRoot);
+  const liveWriteEvidence = evidenceForCloseoutKey("live_write_smoke_result", artifactPathRoot);
+  const backupRestoreCommand = closeoutFilled.has("backup_restore_drill_result")
+    ? null
+    : commandForCloseoutBackfillProofItem(inputFile, "backup_restore_drill_result", backupRestoreEvidence, actionsFile);
+  const liveWriteCommand = closeoutFilled.has("live_write_smoke_result")
+    ? null
+    : commandForCloseoutBackfillProofItem(inputFile, "live_write_smoke_result", liveWriteEvidence, actionsFile);
   const productionSignoffReady = evidenceSummary.productionSignoff.filledConditionCount === REQUIRED_SIGNOFF_KEYS.length
     && evidenceSummary.receiptVisibility.visibleLaneCount === RECEIPT_VISIBILITY_KEYS.length
     && productionDecision === "ready-for-production-signoff";
   const launchDutyReady = Boolean(launchDutyCompletionHandoff);
+  const launchDutyCommand = launchDutyCompletionHandoff?.rehearsalReloadCommand
+    || (currentEvidenceCheckpoint?.currentTargetType === "launch_duty_record" ? currentEvidenceCheckpoint.currentCommand : null);
   const proofItems = [
     {
       order: 1,
@@ -1454,7 +1471,7 @@ function buildStagingProductionSwitchProofPacket({
     {
       order: 2,
       key: "non_default_secret_env",
-      status: targetEnvFile ? "pending_real_environment_confirmation" : "pending_real_environment_confirmation",
+      status: secretEnvProof.status,
       command: null,
       artifactPath: targetEnvFile,
       nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
@@ -1471,9 +1488,9 @@ function buildStagingProductionSwitchProofPacket({
       order: 4,
       key: "backup_restore_drill",
       status: closeoutFilled.has("backup_restore_drill_result") ? "ready_evidence_attached" : "blocked_after_readiness_status",
-      command: null,
+      command: backupRestoreCommand,
       artifactPath: closeoutFilled.get("backup_restore_drill_result")?.artifactPath
-        || evidenceForCloseoutKey("backup_restore_drill_result", artifactPathRoot)?.artifactPathHint
+        || backupRestoreEvidence?.artifactPathHint
         || path.posix.join(archiveRoot, "backup-restore-drill.txt"),
       nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
     },
@@ -1481,9 +1498,9 @@ function buildStagingProductionSwitchProofPacket({
       order: 5,
       key: "live_write_smoke",
       status: closeoutFilled.has("live_write_smoke_result") ? "ready_evidence_attached" : "blocked_after_route_map_gate",
-      command: null,
+      command: liveWriteCommand,
       artifactPath: closeoutFilled.get("live_write_smoke_result")?.artifactPath
-        || evidenceForCloseoutKey("live_write_smoke_result", artifactPathRoot)?.artifactPathHint
+        || liveWriteEvidence?.artifactPathHint
         || path.posix.join(archiveRoot, "live-write-smoke-output.json"),
       nextAction: "Attach launch:smoke:staging output after no-write preflight and route-map gate pass."
     },
@@ -1510,7 +1527,7 @@ function buildStagingProductionSwitchProofPacket({
       order: 8,
       key: "launch_day_watch_and_stabilization",
       status: launchDutyReady ? "ready_evidence_attached" : "blocked_after_production_signoff_readiness",
-      command: null,
+      command: launchDutyCommand,
       artifactPath: launchDutyCompletionHandoff?.firstWaveCloseoutArtifactPath || path.posix.join(archiveRoot, "launch-day-watch-summary.md"),
       nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
     }

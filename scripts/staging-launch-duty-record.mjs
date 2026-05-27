@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
 
 const RECORD_INDEX_FILE_NAME = "launch-duty-record-index.json";
 const DEFAULT_ARTIFACT_ROOT = "artifacts/staging/<productCode>/<channel>";
@@ -868,6 +869,7 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
   const baseUrl = closeoutInput?.baseUrl || closeoutInput?.summary?.baseUrl || null;
   const targetEnvFile = closeoutInput?.targetEnvFile || closeoutInput?.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
   const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
+  const secretEnvProof = buildBoundSecretEnvProof(closeoutInput);
   const launchDayWatchRecord = recordIndex?.records?.launch_day_watch_summary || null;
   const firstWaveCloseoutRecord = recordIndex?.records?.first_wave_closeout || null;
   const launchDutyRecorded = firstWaveCloseoutRecord?.status === "recorded";
@@ -893,7 +895,7 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
     {
       order: 2,
       key: "non_default_secret_env",
-      status: "pending_real_environment_confirmation",
+      status: secretEnvProof.status,
       command: null,
       artifactPath: targetEnvFile,
       nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
@@ -942,7 +944,7 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
       order: 8,
       key: "launch_day_watch_and_stabilization",
       status: launchDutyRecorded ? "ready_evidence_attached" : "blocked_after_production_signoff_readiness",
-      command: null,
+      command: launchDutyRecorded ? null : nextRecordCommand,
       artifactPath: launchDutyArtifactPath,
       nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
     }

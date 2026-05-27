@@ -46,10 +46,14 @@ const validRehearsalArgs = [
   "/var/lib/rocksolid/postgres-backups"
 ];
 
-function runBackfill(args) {
+function runBackfill(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-closeout-backfill.mjs", "--json", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env
+    },
     timeout: 120_000
   });
 }
@@ -74,7 +78,7 @@ function runRehearsal(args) {
   });
 }
 
-function writeCloseoutInput(file) {
+function writeCloseoutInput(file, overrides = {}) {
   const payload = {
     mode: "staging-closeout-input-draft",
     status: "awaiting_real_evidence",
@@ -92,7 +96,8 @@ function writeCloseoutInput(file) {
     productionSignoff: {
       decision: null,
       conditions: []
-    }
+    },
+    ...overrides
   };
   writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
@@ -276,6 +281,123 @@ function buildExpectedLaunchEvidenceGate({
   };
 }
 
+function buildExpectedProductionSwitchProofPacket({
+  closeoutInputFile,
+  actionsFile,
+  archiveRoot,
+  currentActionKey,
+  currentCommand,
+  backupRestoreStatus = "blocked_after_readiness_status",
+  liveWriteStatus = "blocked_after_route_map_gate",
+  fullTestStatus = "ready_local_baseline_available",
+  productionSignoffStatus = "blocked_after_full_test_signoff_backfill",
+  launchDutyStatus = "blocked_after_production_signoff_readiness"
+}) {
+  const backupRestoreCommand = backupRestoreStatus.startsWith("ready_")
+    ? null
+    : `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key backup_restore_drill_result --value-json <redacted-json> --artifact-path ${archiveRoot}/backup_restore_drill_result.txt --actions-file ${actionsFile}`;
+  const liveWriteCommand = liveWriteStatus.startsWith("ready_")
+    ? null
+    : `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key live_write_smoke_result --value-json <redacted-json> --artifact-path ${archiveRoot}/live_write_smoke_result.txt --actions-file ${actionsFile}`;
+  const proofItems = [
+    {
+      order: 1,
+      key: "public_https_entrypoint",
+      status: "pending_real_environment_value",
+      command: null,
+      artifactPath: null,
+      nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+    },
+    {
+      order: 2,
+      key: "non_default_secret_env",
+      status: "pending_real_environment_confirmation",
+      command: null,
+      artifactPath: null,
+      nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
+    },
+    {
+      order: 3,
+      key: "storage_profile_selected",
+      status: "pending_real_environment_value",
+      command: null,
+      artifactPath: null,
+      nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging evidence backfill."
+    },
+    {
+      order: 4,
+      key: "backup_restore_drill",
+      status: backupRestoreStatus,
+      command: backupRestoreCommand,
+      artifactPath: `${archiveRoot}/backup_restore_drill_result.txt`,
+      nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
+    },
+    {
+      order: 5,
+      key: "live_write_smoke",
+      status: liveWriteStatus,
+      command: liveWriteCommand,
+      artifactPath: `${archiveRoot}/live_write_smoke_result.txt`,
+      nextAction: "Attach launch:smoke:staging output after no-write preflight and route-map gate pass."
+    },
+    {
+      order: 6,
+      key: "full_test_window",
+      status: fullTestStatus,
+      command: "npm.cmd test",
+      artifactPath: `${archiveRoot}/full-test-output.txt`,
+      nextAction: "Attach the redacted full-suite output artifact before or while backfilling full_test_window_passed."
+    },
+    {
+      order: 7,
+      key: "production_signoff_and_receipts",
+      status: productionSignoffStatus,
+      command: null,
+      artifactPath: `${archiveRoot}/staging-production-signoff-packet.json`,
+      nextAction: "Backfill production sign-off conditions and receipt visibility lanes before launch-day watch."
+    },
+    {
+      order: 8,
+      key: "launch_day_watch_and_stabilization",
+      status: launchDutyStatus,
+      command: null,
+      artifactPath: `${archiveRoot}/launch-day-watch-summary.md`,
+      nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    }
+  ];
+  const ready = proofItems.filter((item) => item.status.startsWith("ready_")).length;
+  return {
+    version: "staging-closeout-backfill-production-switch-proof-packet/v1",
+    status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
+    currentActionKey,
+    currentCommand,
+    baseUrl: null,
+    productCode: "PILOT_ALPHA",
+    channel: "stable",
+    targetOs: null,
+    storageProfile: null,
+    archiveRoot,
+    closeoutInputFile,
+    readinessActionQueueFile: actionsFile,
+    launchDutyRecordIndexFile: `${archiveRoot}/launch-duty-record-index.json`,
+    localFullSuiteBaseline: {
+      command: "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: `${archiveRoot}/full-test-output.txt`,
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    },
+    proofCounts: {
+      total: proofItems.length,
+      ready,
+      blocked: proofItems.length - ready
+    },
+    proofItems,
+    nextAction: "Continue the current closeout evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist."
+  };
+}
+
 test("staging closeout backfill writes one evidence field without clearing remaining readiness", () => {
   const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   assert.equal(packageJson.scripts["staging:closeout:backfill"], "node scripts/staging-closeout-backfill.mjs");
@@ -304,6 +426,7 @@ test("staging closeout backfill writes one evidence field without clearing remai
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
     const output = JSON.parse(result.stdout);
+    const archiveRoot = "artifacts/staging/PILOT_ALPHA/stable";
     const firstCloseoutItems = closeoutKeys.map((key, index) => ({
       order: index + 1,
       key,
@@ -367,6 +490,13 @@ test("staging closeout backfill writes one evidence field without clearing remai
         nextAction: "Run statusCommand, then run nextBackfillCommand with real redacted evidence."
       },
       launchEvidenceReadinessGate,
+      productionSwitchProofPacket: buildExpectedProductionSwitchProofPacket({
+        closeoutInputFile,
+        actionsFile,
+        archiveRoot,
+        currentActionKey: "backfill_closeout_evidence",
+        currentCommand: `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/backup_restore_drill_result.txt --actions-file ${actionsFile}`
+      }),
       nextCloseoutEvidenceHandoff: {
         status: "ready_for_next_closeout_backfill",
         currentActionKey: "backfill_closeout_evidence",
@@ -467,6 +597,64 @@ test("staging closeout backfill writes one evidence field without clearing remai
   }
 });
 
+test("staging closeout backfill marks bound non-default secret env ready when required env vars are present", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-backfill-secret-env-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeCloseoutInput(inputFile, {
+      baseUrl: "https://staging.example.com",
+      storageProfile: "postgres-preview",
+      stagingEnvironmentBinding: {
+        environment: {
+          targetEnvFile: "/etc/rocksolidlicense/staging.env"
+        },
+        credentialEnv: {
+          adminPassword: "RSL_SMOKE_ADMIN_PASSWORD",
+          developerPassword: "RSL_SMOKE_DEVELOPER_PASSWORD",
+          developerBearerToken: "RSL_DEVELOPER_BEARER_TOKEN"
+        }
+      }
+    });
+
+    const result = runBackfill([
+      "--input-file",
+      inputFile,
+      "--key",
+      "route_map_gate_result",
+      "--value-json",
+      "{\"result\":\"pass\"}",
+      "--artifact-path",
+      "artifacts/staging/PILOT_ALPHA/stable/route-map-gate-output.txt",
+      "--actions-file",
+      actionsFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "RealAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "RealDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: "real-bearer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(
+      output.productionSwitchProofPacket.proofItems.slice(0, 3).map((item) => [item.key, item.status, item.artifactPath]),
+      [
+        ["public_https_entrypoint", "ready_from_closeout_input", "https://staging.example.com"],
+        ["non_default_secret_env", "ready_secret_env_loaded", "/etc/rocksolidlicense/staging.env"],
+        ["storage_profile_selected", "ready_from_closeout_input", "postgres-preview"]
+      ]
+    );
+    assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
+      total: 8,
+      ready: 4,
+      blocked: 4
+    });
+    assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging closeout backfill prints ordered next commands in plain output", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-backfill-plain-"));
   try {
@@ -512,6 +700,9 @@ test("staging closeout backfill prints ordered next commands in plain output", (
     assert.match(result.stdout, /Launch evidence full-test: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt/);
     assert.match(result.stdout, /Launch evidence production signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(result.stdout, /Launch evidence next action: Run readinessStatusCommand, verify the backfilled evidence is reflected, then continue the next launch evidence command\./);
+    assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=1\/8, blocked=7\/8, current=backfill_closeout_evidence\)/);
+    assert.match(result.stdout, /Production switch proof 6\. full_test_window: ready_local_baseline_available -> npm\.cmd test/);
+    assert.match(result.stdout, /Production switch next action: Continue the current closeout evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist\./);
     assert.match(result.stdout, /Next closeout handoff: ready_for_next_closeout_backfill/);
     assert.match(result.stdout, /Next closeout status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Next closeout backfill: npm\.cmd run staging:closeout:backfill -- --input-file .*filled-closeout-input\.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt --actions-file .*readiness-action-queue\.md/);
@@ -659,6 +850,15 @@ test("staging closeout backfill prints full-test handoff after final go/no-go ev
       signoffBackfillCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt --decision ready-for-production-signoff --actions-file ${actionsFile}`,
       nextAction: "Run statusCommand to confirm full-test readiness, run fullTestCommand, then use signoffBackfillCommand with the redacted full-test result."
     });
+    assert.deepEqual(output.productionSwitchProofPacket, buildExpectedProductionSwitchProofPacket({
+      closeoutInputFile,
+      actionsFile,
+      archiveRoot: "artifacts/staging/PILOT_ALPHA/stable",
+      currentActionKey: "run_full_test_window",
+      currentCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt --decision ready-for-production-signoff --actions-file ${actionsFile}`,
+      backupRestoreStatus: "ready_evidence_attached",
+      liveWriteStatus: "ready_evidence_attached"
+    }));
 
     const plainResult = runBackfillPlain([
       "--input-file",
@@ -679,6 +879,9 @@ test("staging closeout backfill prints full-test handoff after final go/no-go ev
     assert.match(plainResult.stdout, /Launch evidence gate: blocked_until_real_launch_evidence_attached \(current=full_test_window_passed, pending=14\/21\)/);
     assert.match(plainResult.stdout, /Launch evidence current: production_signoff_condition\/full_test_window_passed -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input-plain\.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
     assert.match(plainResult.stdout, /Launch evidence progress: closeout=7\/7, signoff=0\/7, receipts=0\/5, launchDuty=0\/2/);
+    assert.match(plainResult.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=run_full_test_window\)/);
+    assert.match(plainResult.stdout, /Production switch proof 4\. backup_restore_drill: ready_evidence_attached -> artifacts\/staging\/PILOT_ALPHA\/stable\/backup_restore_drill_result\.txt/);
+    assert.match(plainResult.stdout, /Production switch next action: Continue the current closeout evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist\./);
     assert.match(plainResult.stdout, /Full-test readiness: ready_for_full_test_window/);
     assert.match(plainResult.stdout, /Full-test status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input-plain\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(plainResult.stdout, /Full-test rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input-plain\.json/);

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,10 +9,14 @@ import test from "node:test";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
 
-function runRecord(args) {
+function runRecord(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-launch-duty-record.mjs", "--json", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env
+    },
     timeout: 120_000
   });
 }
@@ -48,7 +52,8 @@ function buildExpectedProductionSwitchProofPacket({
   currentActionKey,
   currentCommand,
   launchDutyStatus,
-  launchDutyArtifactPath
+  launchDutyArtifactPath,
+  launchDutyCommand = launchDutyStatus.startsWith("ready_") ? null : currentCommand
 }) {
   const proofItems = [
     {
@@ -111,7 +116,7 @@ function buildExpectedProductionSwitchProofPacket({
       order: 8,
       key: "launch_day_watch_and_stabilization",
       status: launchDutyStatus,
-      command: null,
+      command: launchDutyCommand,
       artifactPath: launchDutyArtifactPath,
       nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
     }
@@ -345,6 +350,71 @@ test("staging launch duty record writes a watch summary artifact and next comman
       launchDutyStatus: "blocked_after_production_signoff_readiness",
       launchDutyArtifactPath: artifactPath
     }));
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging launch duty record marks bound non-default secret env ready when required env vars are present", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-launch-duty-record-secret-env-"));
+  try {
+    const artifactRoot = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable");
+    const closeoutInputFile = join(artifactRoot, "filled-closeout-input.json");
+    const actionsFile = join(artifactRoot, "readiness-action-queue.md");
+    const artifactPath = join(artifactRoot, "launch-day-watch-summary.md");
+    const recordIndexFile = join(artifactRoot, "launch-duty-record-index.json");
+    mkdirSync(artifactRoot, { recursive: true });
+    writeFileSync(closeoutInputFile, `${JSON.stringify({
+      mode: "staging-closeout-template",
+      baseUrl: "https://staging.example.com",
+      storageProfile: "postgres-preview",
+      stagingEnvironmentBinding: {
+        environment: {
+          targetEnvFile: "/etc/rocksolidlicense/staging.env"
+        },
+        credentialEnv: {
+          adminPassword: "RSL_SMOKE_ADMIN_PASSWORD",
+          developerPassword: "RSL_SMOKE_DEVELOPER_PASSWORD",
+          developerBearerToken: "RSL_DEVELOPER_BEARER_TOKEN"
+        }
+      }
+    }, null, 2)}\n`, "utf8");
+
+    const result = runRecord([
+      "--closeout-input-file",
+      closeoutInputFile,
+      "--actions-file",
+      actionsFile,
+      "--key",
+      "launch_day_watch_summary",
+      "--artifact-path",
+      artifactPath,
+      "--value-json",
+      "{\"result\":\"recorded\",\"summary\":\"redacted cutover watch\"}",
+      "--record-index-file",
+      recordIndexFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "RealAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "RealDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: "real-bearer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(
+      output.productionSwitchProofPacket.proofItems.slice(0, 3).map((item) => [item.key, item.status, item.artifactPath]),
+      [
+        ["public_https_entrypoint", "ready_from_closeout_input", "https://staging.example.com"],
+        ["non_default_secret_env", "ready_secret_env_loaded", "/etc/rocksolidlicense/staging.env"],
+        ["storage_profile_selected", "ready_from_closeout_input", "postgres-preview"]
+      ]
+    );
+    assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
+      total: 8,
+      ready: 7,
+      blocked: 1
+    });
+    assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

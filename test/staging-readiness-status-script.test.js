@@ -37,10 +37,14 @@ const receiptVisibilityKeys = [
   "launchOpsOverviewStatus"
 ];
 
-function runStatus(args) {
+function runStatus(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-readiness-status.mjs", "--json", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env
+    },
     timeout: 120_000
   });
 }
@@ -58,7 +62,8 @@ function writeCloseoutInput(file, {
   decision = null,
   productionDecision = null,
   filledSignoffKeys = [],
-  visibleReceiptLanes = []
+  visibleReceiptLanes = [],
+  extra = {}
 } = {}) {
   const payload = {
     mode: "staging-closeout-template",
@@ -82,7 +87,8 @@ function writeCloseoutInput(file, {
         status: filledSignoffKeys.includes(key) ? "filled" : "pending_operator_entry",
         value: filledSignoffKeys.includes(key) ? { result: key === "full_test_window_passed" ? "pass" : "confirmed" } : null
       }))
-    }
+    },
+    ...extra
   };
   writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
@@ -150,6 +156,64 @@ test("staging readiness status reports closeout gap and next backfill command", 
       output.actionQueue[0].exampleCommand,
       `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key backup_restore_drill_result --value-json '{"result":"pass","restoreDryRun":"pass","healthcheck":"pass","summary":"<redacted operator summary>"}' --artifact-path artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id>`
     );
+    const proofItems = new Map(output.productionSwitchProofPacket.proofItems.map((item) => [item.key, item]));
+    assert.equal(
+      proofItems.get("backup_restore_drill").command,
+      `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id>`
+    );
+    assert.equal(
+      proofItems.get("live_write_smoke").command,
+      `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key live_write_smoke_result --value-json <redacted-json> --artifact-path artifacts/staging/<productCode>/<channel>/live-write-smoke-output.json --receipt-id <record_launch_rehearsal_run-receipt-id>`
+    );
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging readiness status marks bound non-default secret env ready when required env vars are present", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-readiness-status-secret-env-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    writeCloseoutInput(inputFile, {
+      filledCloseoutKeys: ["route_map_gate_result"],
+      extra: {
+        baseUrl: "https://staging.example.com",
+        storageProfile: "postgres-preview",
+        stagingEnvironmentBinding: {
+          environment: {
+            targetEnvFile: "/etc/rocksolidlicense/staging.env"
+          },
+          credentialEnv: {
+            adminPassword: "RSL_SMOKE_ADMIN_PASSWORD",
+            developerPassword: "RSL_SMOKE_DEVELOPER_PASSWORD",
+            developerBearerToken: "RSL_DEVELOPER_BEARER_TOKEN"
+          }
+        }
+      }
+    });
+
+    const result = runStatus(["--input-file", inputFile], {
+      RSL_SMOKE_ADMIN_PASSWORD: "RealAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "RealDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: "real-bearer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(
+      output.productionSwitchProofPacket.proofItems.slice(0, 3).map((item) => [item.key, item.status, item.artifactPath]),
+      [
+        ["public_https_entrypoint", "ready_from_closeout_input", "https://staging.example.com"],
+        ["non_default_secret_env", "ready_secret_env_loaded", "/etc/rocksolidlicense/staging.env"],
+        ["storage_profile_selected", "ready_from_closeout_input", "postgres-preview"]
+      ]
+    );
+    assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
+      total: 8,
+      ready: 4,
+      blocked: 4
+    });
+    assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -1340,6 +1404,15 @@ test("staging readiness status reports stabilization handoff when launch-duty re
       output.launchEvidenceReadinessGate.evidenceItems.find((item) => item.key === "first_wave_closeout")?.artifactPath,
       firstWaveCloseoutArtifactPath
     );
+    const proofItems = new Map(output.productionSwitchProofPacket.proofItems.map((item) => [item.key, item]));
+    assert.equal(
+      proofItems.get("launch_day_watch_and_stabilization").command,
+      completionHandoff.rehearsalReloadCommand
+    );
+    assert.equal(
+      proofItems.get("launch_day_watch_and_stabilization").artifactPath,
+      firstWaveCloseoutArtifactPath
+    );
     assert.deepEqual(output.nextStep, {
       key: "reload_rehearsal_for_stabilization_handoff",
       targetKey: null,
@@ -1417,6 +1490,7 @@ test("staging readiness status reports stabilization handoff when launch-duty re
     assert.match(plain.stdout, /Launch evidence progress: closeout=7\/7, signoff=7\/7, receipts=5\/5, launchDuty=2\/2/);
     assert.match(plain.stdout, /Launch evidence launch-duty records: 6\/6 recorded, 0 pending, next=-/);
     assert.match(plain.stdout, /Launch evidence stable handoff: ready_for_stabilization_handoff -> .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(plain.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: ready_evidence_attached -> npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(plain.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
     assert.match(plain.stdout, /Launch duty completion progress: 6\/6 recorded, 0 pending/);
     assert.match(plain.stdout, /Launch duty completion first-wave closeout: .*first-wave-closeout\.md/);

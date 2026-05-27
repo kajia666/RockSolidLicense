@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 import { AppError } from "./http.js";
 import { buildZipArchive } from "./archive.js";
 import { rotateLicenseKeyStore } from "./license-keys.js";
@@ -4030,13 +4031,26 @@ function createLaunchWorkflowOpsContinuationDownloadShortcut(workspaceAction, co
 }
 
 function createLaunchWorkflowReviewDownloadShortcut(label = "Launch review summary", fileName = "launch-review.txt", format = "summary", params = null) {
+  const normalizedFormat = String(format || "summary").trim().toLowerCase() || "summary";
+  const keyByFormat = {
+    json: "launch_review_json",
+    summary: "launch_review_summary",
+    "handoff-routes": "launch_review_handoff_routes",
+    "surface-review-closeout-action": "launch_review_surface_review_closeout_action",
+    "first-wave-runtime-evidence": "launch_review_first_wave_runtime_evidence",
+    "first-wave-support-inspection-confirmation": "launch_review_first_wave_support_inspection_confirmation",
+    "production-switch-proof-packet": "launch_review_production_switch_proof_packet",
+    checksums: "launch_review_checksums",
+    zip: "launch_review_zip"
+  };
+  const fallbackKey = `launch_review_${normalizedFormat.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "download"}`;
   return createLaunchWorkflowDownloadShortcut(
-    "launch_review_summary",
+    keyByFormat[normalizedFormat] || fallbackKey,
     fileName,
     label,
     {
       source: "developer-launch-review",
-      format,
+      format: normalizedFormat,
       params: params && typeof params === "object"
         ? { ...params }
       : {}
@@ -4045,13 +4059,26 @@ function createLaunchWorkflowReviewDownloadShortcut(label = "Launch review summa
 }
 
 function createLaunchWorkflowSmokeKitDownloadShortcut(label = "Launch smoke kit summary", fileName = "launch-smoke-kit.txt", format = "summary", params = null) {
+  const normalizedFormat = String(format || "summary").trim().toLowerCase() || "summary";
+  const keyByFormat = {
+    json: "launch_smoke_kit_json",
+    summary: "launch_smoke_kit_summary",
+    "handoff-routes": "launch_smoke_kit_handoff_routes",
+    "surface-review-closeout-action": "launch_smoke_surface_review_closeout_action",
+    "first-wave-runtime-evidence": "launch_smoke_first_wave_runtime_evidence",
+    "first-wave-support-inspection-confirmation": "launch_smoke_first_wave_support_inspection_confirmation",
+    "production-switch-proof-packet": "launch_smoke_production_switch_proof_packet",
+    checksums: "launch_smoke_kit_checksums",
+    zip: "launch_smoke_kit_zip"
+  };
+  const fallbackKey = `launch_smoke_kit_${normalizedFormat.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "download"}`;
   return createLaunchWorkflowDownloadShortcut(
-    "launch_smoke_kit_summary",
+    keyByFormat[normalizedFormat] || fallbackKey,
     fileName,
     label,
     {
       source: "developer-launch-smoke-kit",
-      format,
+      format: normalizedFormat,
       params: params && typeof params === "object"
         ? { ...params }
       : {}
@@ -12129,6 +12156,12 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       || reviewSummary.routeFocus
       || null
   );
+  const productionSwitchProofPacket = reviewSummary.productionSwitchProofPacket
+    && typeof reviewSummary.productionSwitchProofPacket === "object"
+      ? reviewSummary.productionSwitchProofPacket
+      : getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
+        opsSnapshot.summary?.initialLaunchOpsReadiness || null
+      );
   const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(
     opsSnapshot.summary?.initialLaunchOpsReadiness || null
   );
@@ -12185,6 +12218,9 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     "Launch Review Receipt Visibility:"
   );
   appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
+  appendProductionSwitchProofPacketLines(lines, productionSwitchProofPacket, {
+    heading: "Launch Review Production Switch Proof Packet:"
+  });
   if (launchOperationsOverviewStatus) {
     lines.push("");
     appendDeveloperOpsLaunchOperationsOverviewStatusLines(lines, launchOperationsOverviewStatus, {
@@ -12430,8 +12466,10 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const workflowSummary = launchWorkflow?.workflowSummary || {};
   const workflowChecklist = launchWorkflow?.workflowChecklist || {};
   const opsOverview = opsSnapshot?.overview || {};
-  const launchDutyActionOrder = opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
-  const launchOperationsOverviewStatusBase = opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
+  const initialLaunchOpsReadiness = opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
+  const launchOperationsOverviewStatusBase = initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
+  const productionSwitchProofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const reviewMode = String(filters.reviewMode || "matched").trim().toLowerCase() || "matched";
   const routeProductCode = launchWorkflow?.manifest?.project?.code || filters.productCode || null;
   const routeChannel = launchWorkflow?.manifest?.channel || filters.channel || "stable";
@@ -12497,6 +12535,18 @@ function buildDeveloperLaunchReviewSummaryPayload({
     "handoff-routes",
     scopedOpsParams
   );
+  const reviewSurfaceReviewCloseoutActionDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch review surface review closeout action",
+    "launch-review-surface-review-closeout-action.txt",
+    "surface-review-closeout-action",
+    scopedOpsParams
+  );
+  const reviewProductionSwitchProofPacketDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch review production switch proof packet",
+    "launch-review-production-switch-proof-packet.txt",
+    "production-switch-proof-packet",
+    scopedOpsParams
+  );
   const reviewChecksumsDownload = createLaunchWorkflowReviewDownloadShortcut(
     "Launch review checksums",
     "launch-review-sha256.txt",
@@ -12559,6 +12609,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
       params: { ...scopedOpsParams, limit: 80 }
     }
   );
+  const opsPreStagingReadinessSelfCheckDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_pre_staging_readiness_self_check",
+    "developer-ops-pre-staging-readiness-self-check.txt",
+    "Developer Ops Pre-Staging Readiness Self-Check",
+    {
+      source: "developer-ops",
+      format: "pre-staging-readiness-self-check",
+      params: { ...scopedOpsParams, limit: 80 }
+    }
+  );
   const firstWaveRuntimeEvidence = opsOverview.firstWaveRuntimeEvidence?.ready === true
     && typeof opsOverview.firstWaveRuntimeEvidence === "object"
     ? { ...opsOverview.firstWaveRuntimeEvidence }
@@ -12566,7 +12626,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const latestLaunchReceipt = Array.isArray(opsOverview.latestLaunchReceipts)
     ? opsOverview.latestLaunchReceipts[0] || null
     : null;
-  const firstWaveSupportInspectionConfirmation = opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
+  const firstWaveSupportInspectionConfirmation = initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
     || selectFirstWaveSupportInspectionConfirmation(
       opsOverview.latestFirstWaveSupportInspectionConfirmations,
       {
@@ -12575,7 +12635,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
         channel: routeChannel || ""
       }
     );
-  const firstWaveReadinessBridge = opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstWaveReadinessBridge
+  const firstWaveReadinessBridge = initialLaunchOpsReadiness?.firstWaveReadinessBridge
     || (Array.isArray(opsOverview.latestFirstWaveReadinessBridges)
       ? opsOverview.latestFirstWaveReadinessBridges[0]
       : null)
@@ -13378,6 +13438,15 @@ function buildDeveloperLaunchReviewSummaryPayload({
     workspaceAction: stayAction,
     recommendedDownload: reviewHandoffRoutesDownload
   }));
+  pushActionPlan(createLaunchWorkflowActionPlanStep({
+    key: "launch_review_pre_staging_readiness_self_check",
+    title: "Open pre-staging readiness self-check",
+    summary: "Open the direct pre-staging readiness self-check from this lane so the third front-loaded handoff artifact is available without leaving Launch Review.",
+    status: workflowBlocked ? "block" : workflowNeedsReview || queueHasUrgent ? "review" : "pass",
+    priority: "secondary",
+    workspaceAction: opsWorkspaceAction,
+    recommendedDownload: opsPreStagingReadinessSelfCheckDownload
+  }));
   if (launchOperationsOverviewStatus) {
     pushActionPlan(createLaunchWorkflowActionPlanStep({
       key: "launch_review_launch_ops_overview",
@@ -13392,6 +13461,35 @@ function buildDeveloperLaunchReviewSummaryPayload({
         overviewStatus: launchOperationsOverviewStatus,
         overviewDownload: launchOperationsOverviewDownload
       })
+    }));
+  }
+  const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  if (launchSurfaceReviewCloseoutAction) {
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_surface_review_closeout_action",
+      title: "Review launch surface closeout action",
+      summary: launchSurfaceReviewCloseoutAction.nextAction
+        || "Use the launch surface closeout action to confirm review downloads, confirmation submission, and ops refresh are aligned.",
+      status: launchSurfaceReviewCloseoutAction.ready === true ? "pass" : "review",
+      priority: launchSurfaceReviewCloseoutAction.ready === true ? "secondary" : "primary",
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: reviewSurfaceReviewCloseoutActionDownload
+    }));
+  }
+  if (productionSwitchProofPacket) {
+    const proofCounts = productionSwitchProofPacket.proofCounts || {};
+    const blockedCount = Number(proofCounts.blocked || 0);
+    const totalCount = Number(proofCounts.total || 0);
+    pushActionPlan(createLaunchWorkflowActionPlanStep({
+      key: "launch_review_production_switch_proof_packet",
+      title: "Review production switch proof packet",
+      summary: blockedCount > 0
+        ? `Production switch proof remains blocked (${blockedCount}/${totalCount || "-"}) and should be reviewed from this Launch Review lane before handoff.`
+        : "Production switch proof packet is fully ready from this Launch Review lane.",
+      status: blockedCount > 0 ? "review" : "pass",
+      priority: blockedCount > 0 ? "primary" : "secondary",
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: reviewProductionSwitchProofPacketDownload
     }));
   }
   if (firstWaveRuntimeEvidenceSource) {
@@ -13558,6 +13656,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
   };
   pushRecommendedDownload(reviewDownload);
   pushRecommendedDownload(reviewHandoffRoutesDownload);
+  pushRecommendedDownload(reviewSurfaceReviewCloseoutActionDownload);
+  pushRecommendedDownload(reviewProductionSwitchProofPacketDownload);
   pushRecommendedDownload(reviewChecksumsDownload);
   pushRecommendedDownload(reviewZipDownload);
   if (firstWaveRecommendationsZipDownload) {
@@ -13583,6 +13683,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(opsSummaryDownload);
   pushRecommendedDownload(opsHandoffIndexDownload);
   pushRecommendedDownload(opsLaunchMainlineRoutesDownload);
+  pushRecommendedDownload(opsPreStagingReadinessSelfCheckDownload);
   pushRecommendedDownload(launchOperationsOverviewDownload);
   if (handoffDownload) {
     pushRecommendedDownload(handoffDownload);
@@ -13688,11 +13789,33 @@ function buildDeveloperLaunchReviewSummaryPayload({
         label: "Download Review Summary",
         recommendedDownload: reviewDownload
       },
+      {
+        kind: "download",
+        label: "Download Review Handoff Routes",
+        recommendedDownload: reviewHandoffRoutesDownload
+      },
+      {
+        kind: "download",
+        label: "Download Surface Closeout Action",
+        recommendedDownload: reviewSurfaceReviewCloseoutActionDownload
+      },
+      {
+        kind: "download",
+        label: "Download Production Switch Proof",
+        recommendedDownload: reviewProductionSwitchProofPacketDownload
+      },
       launchOperationsOverviewDownload
         ? {
             kind: "download",
             label: "Download Launch Ops Overview",
             recommendedDownload: launchOperationsOverviewDownload
+          }
+        : null,
+      opsPreStagingReadinessSelfCheckDownload
+        ? {
+            kind: "download",
+            label: "Download Pre-Staging Self-Check",
+            recommendedDownload: opsPreStagingReadinessSelfCheckDownload
           }
         : null,
       firstWaveRecommendationsZipDownload
@@ -13769,12 +13892,15 @@ function buildDeveloperLaunchReviewSummaryPayload({
     launchDutyActionOrder,
     launchOperationsOverviewStatus,
     launchReadinessNextGate,
+    productionSwitchProofPacket,
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
     firstWaveRecommendationsZipDownload,
     handoffRouteDownloads: {
       launchReviewSummary: reviewDownload,
       launchReviewHandoffRoutes: reviewHandoffRoutesDownload,
+      launchReviewSurfaceReviewCloseoutAction: reviewSurfaceReviewCloseoutActionDownload,
+      launchReviewProductionSwitchProofPacket: reviewProductionSwitchProofPacketDownload,
       launchReviewChecksums: reviewChecksumsDownload,
       launchReviewZip: reviewZipDownload,
       firstWaveRecommendationsZip: firstWaveRecommendationsZipDownload,
@@ -13783,6 +13909,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       developerOpsSummary: opsSummaryDownload,
       developerOpsHandoffIndex: opsHandoffIndexDownload,
       developerOpsLaunchMainlineRoutes: opsLaunchMainlineRoutesDownload,
+      developerOpsPreStagingReadinessSelfCheck: opsPreStagingReadinessSelfCheckDownload,
       launchOpsOverviewStatus: launchOperationsOverviewDownload,
       launchMainlineSummary: mainlineSummaryDownload,
       launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
@@ -13840,15 +13967,19 @@ function buildDeveloperLaunchReviewPayload({
   const fileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
   const handoffRoutesFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-handoff-routes.txt`;
+  const surfaceReviewCloseoutActionFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-surface-review-closeout-action.txt`;
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
+  const productionSwitchProofPacketFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-production-switch-proof-packet.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
     handoffRoutesFileName,
+    surfaceReviewCloseoutActionFileName,
     firstWaveRuntimeEvidenceFileName,
     firstWaveSupportInspectionConfirmationFileName,
+    productionSwitchProofPacketFileName,
     manifest: {
       generatedAt,
       channel,
@@ -14152,6 +14283,8 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
     packageDownloads: [
       downloads.launchReviewSummary,
       downloads.launchReviewHandoffRoutes,
+      downloads.launchReviewSurfaceReviewCloseoutAction,
+      downloads.launchReviewProductionSwitchProofPacket,
       downloads.launchReviewChecksums,
       downloads.launchReviewZip,
       downloads.firstWaveRecommendationsZip,
@@ -14162,6 +14295,7 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.developerOpsSummary,
       downloads.developerOpsHandoffIndex,
       downloads.developerOpsLaunchMainlineRoutes,
+      downloads.developerOpsPreStagingReadinessSelfCheck,
       downloads.launchOpsOverviewStatus,
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
@@ -14284,6 +14418,72 @@ function buildDeveloperLaunchReviewFirstWaveSupportInspectionConfirmationText(pa
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchReviewSurfaceReviewCloseoutActionText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const action = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const lines = [
+    "RockSolid Developer Launch Review Surface Review Closeout Action",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (action) {
+    appendLaunchSurfaceReviewCloseoutActionText(lines, action, {
+      leadingBlank: false,
+      heading: "Launch Surface Review Closeout:"
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Keep this closeout action aligned with Launch Smoke, Developer Ops, and Launch Mainline before handoff.");
+    lines.push("- Start from the current action key, then confirm refresh and handoff decision from the same launch-duty record index.");
+  } else {
+    lines.push("Launch Surface Review Closeout:");
+    lines.push("- status=not_available");
+    lines.push("- summary=No launch surface review closeout action is available from the current scoped launch readiness snapshot.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchReviewProductionSwitchProofPacketText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const proofPacket = payload.reviewSummary?.productionSwitchProofPacket
+    && typeof payload.reviewSummary.productionSwitchProofPacket === "object"
+    ? payload.reviewSummary.productionSwitchProofPacket
+    : getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
+      payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null
+    );
+  const lines = [
+    "RockSolid Developer Launch Review Production Switch Proof Packet",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (proofPacket) {
+    appendProductionSwitchProofPacketLines(lines, proofPacket, {
+      leadingBlank: false,
+      heading: "Production Switch Proof Packet:"
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Keep this packet aligned with Developer Ops and Launch Mainline before launch-duty handoff.");
+    lines.push("- Backfill or review the current proof item first, then refresh readiness from the same record index.");
+  } else {
+    lines.push("Production Switch Proof Packet:");
+    lines.push("- status=not_available");
+    lines.push("- summary=No launch proof packet is available from the current scoped launch readiness snapshot.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchReviewFiles(payload = {}) {
   const files = [
     {
@@ -14340,6 +14540,16 @@ function buildDeveloperLaunchReviewFiles(payload = {}) {
       ? buildDeveloperLaunchReviewFirstWaveSupportInspectionConfirmationText(payload)
       : ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.surfaceReviewCloseoutActionFileName || "developer-launch-review-surface-review-closeout-action.txt",
+    buildDeveloperLaunchReviewSurfaceReviewCloseoutActionText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.productionSwitchProofPacketFileName || "developer-launch-review-production-switch-proof-packet.txt",
+    buildDeveloperLaunchReviewProductionSwitchProofPacketText(payload)
+  );
   return files;
 }
 
@@ -14351,7 +14561,7 @@ function buildDeveloperLaunchReviewZipEntries(payload = {}) {
 function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "handoff-routes", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "checksums", "zip"],
+    ["json", "summary", "handoff-routes", "surface-review-closeout-action", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "production-switch-proof-packet", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_REVIEW_FORMAT",
     "Developer launch review format"
@@ -14385,6 +14595,13 @@ function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
       body: buildDeveloperLaunchReviewHandoffRoutesText(payload)
     };
   }
+  if (normalizedFormat === "surface-review-closeout-action") {
+    return {
+      fileName: payload.surfaceReviewCloseoutActionFileName || "developer-launch-review-surface-review-closeout-action.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchReviewSurfaceReviewCloseoutActionText(payload)
+    };
+  }
   if (normalizedFormat === "first-wave-runtime-evidence") {
     return {
       fileName: payload.firstWaveRuntimeEvidenceFileName || "developer-launch-review-first-wave-runtime-evidence.txt",
@@ -14397,6 +14614,13 @@ function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
       fileName: payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-review-first-wave-support-inspection-confirmation.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchReviewFirstWaveSupportInspectionConfirmationText(payload)
+    };
+  }
+  if (normalizedFormat === "production-switch-proof-packet") {
+    return {
+      fileName: payload.productionSwitchProofPacketFileName || "developer-launch-review-production-switch-proof-packet.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchReviewProductionSwitchProofPacketText(payload)
     };
   }
 
@@ -14526,6 +14750,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
 } = {}) {
   const manifest = launchWorkflow?.manifest || {};
   const project = manifest.project || {};
+  const initialLaunchOpsReadiness = opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
   const featureConfig = project?.featureConfig && typeof project.featureConfig === "object"
     ? project.featureConfig
     : {};
@@ -14563,7 +14788,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   );
   const routeProductCode = project.code || filters.productCode || null;
   const routeChannel = manifest.channel || filters.channel || "stable";
-  const launchDutyActionOrder = opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchDutyActionOrder || null;
+  const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
+  const productionSwitchProofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const routedOperation = String(filters.operation || "").trim().toLowerCase();
   const routedActionKey = String(filters.actionKey || "").trim();
   const routedDownloadKey = String(filters.downloadKey || "").trim();
@@ -14589,7 +14815,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const latestLaunchReceipt = Array.isArray(opsSnapshot?.overview?.latestLaunchReceipts)
     ? opsSnapshot.overview.latestLaunchReceipts[0] || null
     : null;
-  const firstWaveSupportInspectionConfirmation = opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
+  const firstWaveSupportInspectionConfirmation = initialLaunchOpsReadiness?.firstWaveSupportInspectionConfirmation
     || selectFirstWaveSupportInspectionConfirmation(
       opsSnapshot?.overview?.latestFirstWaveSupportInspectionConfirmations,
       {
@@ -14598,11 +14824,12 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         channel: routeChannel || ""
       }
     );
-  const firstWaveReadinessBridge = opsSnapshot?.summary?.initialLaunchOpsReadiness?.firstWaveReadinessBridge
+  const firstWaveReadinessBridge = initialLaunchOpsReadiness?.firstWaveReadinessBridge
     || (Array.isArray(opsSnapshot?.overview?.latestFirstWaveReadinessBridges)
       ? opsSnapshot.overview.latestFirstWaveReadinessBridges[0]
       : null)
     || null;
+  const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const firstWaveRecommendationsZipDownload = firstWaveReadinessBridge?.downloads?.zip
     && typeof firstWaveReadinessBridge.downloads.zip === "object"
       ? ensureLaunchWorkflowDownloadHref(firstWaveReadinessBridge.downloads.zip, smokeRouteParams)
@@ -15118,6 +15345,18 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     "handoff-routes",
     smokeRouteParams
   );
+  const launchSmokeKitSurfaceReviewCloseoutActionDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
+    "Launch smoke surface review closeout action",
+    "launch-smoke-surface-review-closeout-action.txt",
+    "surface-review-closeout-action",
+    smokeRouteParams
+  );
+  const launchSmokeKitProductionSwitchProofPacketDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
+    "Launch smoke production switch proof packet",
+    "launch-smoke-production-switch-proof-packet.txt",
+    "production-switch-proof-packet",
+    smokeRouteParams
+  );
   const launchSmokeKitChecksumsDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
     "Launch smoke checksums",
     "launch-smoke-sha256.txt",
@@ -15172,9 +15411,21 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       params: { ...smokeRouteParams, limit: 80 }
     }
   );
+  const developerOpsPreStagingReadinessSelfCheckDownload = createLaunchWorkflowDownloadShortcut(
+    "ops_pre_staging_readiness_self_check",
+    "developer-ops-pre-staging-readiness-self-check.txt",
+    "Developer Ops Pre-Staging Readiness Self-Check",
+    {
+      source: "developer-ops",
+      format: "pre-staging-readiness-self-check",
+      params: { ...smokeRouteParams, limit: 80 }
+    }
+  );
   const recommendedDownloads = [
     launchSmokeKitSummaryDownload,
     launchSmokeKitHandoffRoutesDownload,
+    launchSmokeKitSurfaceReviewCloseoutActionDownload,
+    launchSmokeKitProductionSwitchProofPacketDownload,
     launchSmokeKitChecksumsDownload,
     launchSmokeKitZipDownload,
     launchReviewSummaryDownload,
@@ -15182,6 +15433,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     developerOpsSummaryDownload,
     developerOpsHandoffIndexDownload,
     developerOpsLaunchMainlineRoutesDownload,
+    developerOpsPreStagingReadinessSelfCheckDownload,
     firstWaveRecommendationsZipDownload,
     firstWaveSupportInspectionConfirmationDownload,
     firstWaveRuntimeEvidenceDownload,
@@ -15634,6 +15886,28 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       workspaceAction: firstWaveRuntimeEvidenceWorkspaceAction,
       recommendedDownload: firstWaveSupportInspectionConfirmationDownload
     } : null,
+    launchSurfaceReviewCloseoutAction ? {
+      key: "launch_smoke_surface_review_closeout_action",
+      title: "Review launch surface closeout action",
+      priority: launchSurfaceReviewCloseoutAction.ready === true ? "secondary" : "primary",
+      status: launchSurfaceReviewCloseoutAction.ready === true ? "pass" : "review",
+      summary: launchSurfaceReviewCloseoutAction.nextAction
+        || "Use the launch surface closeout action to confirm review downloads, confirmation submission, and ops refresh are aligned.",
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: launchSmokeKitSurfaceReviewCloseoutActionDownload
+    } : null,
+    productionSwitchProofPacket ? {
+      key: "launch_smoke_production_switch_proof_packet",
+      title: "Review production switch proof packet",
+      priority: Number(productionSwitchProofPacket?.proofCounts?.blocked || 0) > 0 ? "primary" : "secondary",
+      status: Number(productionSwitchProofPacket?.proofCounts?.blocked || 0) > 0 ? "review" : "pass",
+      summary: Number(productionSwitchProofPacket?.proofCounts?.blocked || 0) > 0
+        ? `Production switch proof remains blocked (${productionSwitchProofPacket?.proofCounts?.blocked ?? "-"}`
+          + `/${productionSwitchProofPacket?.proofCounts?.total ?? "-"}) and should be reviewed from this Launch Smoke lane before handoff.`
+        : "Production switch proof packet is fully ready from this Launch Smoke lane.",
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload
+    } : null,
     {
       key: "launch_mainline_overview",
       title: "Review the unified launch mainline handoff",
@@ -15651,6 +15925,15 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       summary: "Keep the smoke kit connected to the front-loaded path: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt before passing the lane forward.",
       workspaceAction: smokeWorkspaceAction,
       recommendedDownload: launchSmokeKitHandoffRoutesDownload
+    },
+    {
+      key: "launch_smoke_pre_staging_readiness_self_check",
+      title: "Open pre-staging readiness self-check",
+      priority: "secondary",
+      status: startupBlocked || !readyPaths.length ? "block" : blockingPaths.length || reviewPaths.length ? "review" : "pass",
+      summary: "Open the direct pre-staging readiness self-check from this lane so the third front-loaded handoff artifact is available before switching surfaces.",
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: developerOpsPreStagingReadinessSelfCheckDownload
     },
     primaryReviewTarget?.workspaceAction ? {
       key: "launch_smoke_primary_review",
@@ -15790,6 +16073,28 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         label: "Download Smoke Summary",
         recommendedDownload: launchSmokeKitSummaryDownload
       },
+      {
+        kind: "download",
+        label: "Download Smoke Handoff Routes",
+        recommendedDownload: launchSmokeKitHandoffRoutesDownload
+      },
+      {
+        kind: "download",
+        label: "Download Surface Closeout Action",
+        recommendedDownload: launchSmokeKitSurfaceReviewCloseoutActionDownload
+      },
+      {
+        kind: "download",
+        label: "Download Production Switch Proof",
+        recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload
+      },
+      developerOpsPreStagingReadinessSelfCheckDownload
+        ? {
+            kind: "download",
+            label: "Download Pre-Staging Self-Check",
+            recommendedDownload: developerOpsPreStagingReadinessSelfCheckDownload
+          }
+        : null,
       firstWaveRecommendationsZipDownload
         ? {
             kind: "download",
@@ -15834,6 +16139,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     recommendedWorkspace,
     workspaceActions,
     launchDutyActionOrder,
+    productionSwitchProofPacket,
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
     firstWaveRecommendationsZipDownload,
@@ -15841,6 +16147,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     handoffRouteDownloads: {
       launchSmokeSummary: launchSmokeKitSummaryDownload,
       launchSmokeHandoffRoutes: launchSmokeKitHandoffRoutesDownload,
+      launchSmokeSurfaceReviewCloseoutAction: launchSmokeKitSurfaceReviewCloseoutActionDownload,
+      launchSmokeProductionSwitchProofPacket: launchSmokeKitProductionSwitchProofPacketDownload,
       launchSmokeChecksums: launchSmokeKitChecksumsDownload,
       launchSmokeZip: launchSmokeKitZipDownload,
       launchReviewSummary: launchReviewSummaryDownload,
@@ -15851,6 +16159,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       developerOpsSummary: developerOpsSummaryDownload,
       developerOpsHandoffIndex: developerOpsHandoffIndexDownload,
       developerOpsLaunchMainlineRoutes: developerOpsLaunchMainlineRoutesDownload,
+      developerOpsPreStagingReadinessSelfCheck: developerOpsPreStagingReadinessSelfCheckDownload,
       launchMainlineSummary: launchMainlineSummaryDownload,
       launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
@@ -15910,6 +16219,12 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
       || smokeSummary.routeFocus
       || null
   );
+  const productionSwitchProofPacket = smokeSummary.productionSwitchProofPacket
+    && typeof smokeSummary.productionSwitchProofPacket === "object"
+      ? smokeSummary.productionSwitchProofPacket
+      : getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
+        opsSnapshot.summary?.initialLaunchOpsReadiness || null
+      );
   const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(
     opsSnapshot.summary?.initialLaunchOpsReadiness || null
   );
@@ -15950,6 +16265,9 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     "Launch Smoke Receipt Visibility:"
   );
   appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
+  appendProductionSwitchProofPacketLines(lines, productionSwitchProofPacket, {
+    heading: "Launch Smoke Production Switch Proof Packet:"
+  });
   if (launchDutyActionOrder) {
     lines.push("");
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
@@ -16088,15 +16406,19 @@ function buildDeveloperLaunchSmokeKitPayload({
   const fileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}.json`;
   const summaryFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-summary.txt`;
   const handoffRoutesFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-handoff-routes.txt`;
+  const surfaceReviewCloseoutActionFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-surface-review-closeout-action.txt`;
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
+  const productionSwitchProofPacketFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-production-switch-proof-packet.txt`;
   const payload = {
     generatedAt,
     fileName,
     summaryFileName,
     handoffRoutesFileName,
+    surfaceReviewCloseoutActionFileName,
     firstWaveRuntimeEvidenceFileName,
     firstWaveSupportInspectionConfirmationFileName,
+    productionSwitchProofPacketFileName,
     manifest: {
       generatedAt,
       channel,
@@ -16149,6 +16471,8 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
     packageDownloads: [
       downloads.launchSmokeSummary,
       downloads.launchSmokeHandoffRoutes,
+      downloads.launchSmokeSurfaceReviewCloseoutAction,
+      downloads.launchSmokeProductionSwitchProofPacket,
       downloads.launchSmokeChecksums,
       downloads.launchSmokeZip,
       downloads.launchReviewSummary,
@@ -16161,6 +16485,7 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.developerOpsSummary,
       downloads.developerOpsHandoffIndex,
       downloads.developerOpsLaunchMainlineRoutes,
+      downloads.developerOpsPreStagingReadinessSelfCheck,
       downloads.launchMainlineSummary,
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
@@ -16296,6 +16621,72 @@ function buildDeveloperLaunchSmokeKitFirstWaveSupportInspectionConfirmationText(
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchSmokeKitSurfaceReviewCloseoutActionText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const action = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const lines = [
+    "RockSolid Developer Launch Smoke Kit Surface Review Closeout Action",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (action) {
+    appendLaunchSurfaceReviewCloseoutActionText(lines, action, {
+      leadingBlank: false,
+      heading: "Launch Surface Review Closeout:"
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Keep this closeout action aligned with Launch Review, Developer Ops, and Launch Mainline before handoff.");
+    lines.push("- Start from the current action key, then confirm refresh and handoff decision from the same launch-duty record index.");
+  } else {
+    lines.push("Launch Surface Review Closeout:");
+    lines.push("- status=not_available");
+    lines.push("- summary=No launch surface review closeout action is available from the current scoped launch readiness snapshot.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchSmokeKitProductionSwitchProofPacketText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const proofPacket = payload.smokeSummary?.productionSwitchProofPacket
+    && typeof payload.smokeSummary.productionSwitchProofPacket === "object"
+    ? payload.smokeSummary.productionSwitchProofPacket
+    : getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
+      payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null
+    );
+  const lines = [
+    "RockSolid Developer Launch Smoke Kit Production Switch Proof Packet",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (proofPacket) {
+    appendProductionSwitchProofPacketLines(lines, proofPacket, {
+      leadingBlank: false,
+      heading: "Production Switch Proof Packet:"
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Keep this packet aligned with Developer Ops and Launch Mainline before launch-duty handoff.");
+    lines.push("- Backfill or review the current proof item first, then refresh readiness from the same record index.");
+  } else {
+    lines.push("Production Switch Proof Packet:");
+    lines.push("- status=not_available");
+    lines.push("- summary=No launch proof packet is available from the current scoped launch readiness snapshot.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
   const files = [
     {
@@ -16347,6 +16738,16 @@ function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
       ? buildDeveloperLaunchSmokeKitFirstWaveSupportInspectionConfirmationText(payload)
       : ""
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.surfaceReviewCloseoutActionFileName || "developer-launch-smoke-kit-surface-review-closeout-action.txt",
+    buildDeveloperLaunchSmokeKitSurfaceReviewCloseoutActionText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.productionSwitchProofPacketFileName || "developer-launch-smoke-kit-production-switch-proof-packet.txt",
+    buildDeveloperLaunchSmokeKitProductionSwitchProofPacketText(payload)
+  );
   return files;
 }
 
@@ -16358,7 +16759,7 @@ function buildDeveloperLaunchSmokeKitZipEntries(payload = {}) {
 function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "handoff-routes", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "checksums", "zip"],
+    ["json", "summary", "handoff-routes", "surface-review-closeout-action", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "production-switch-proof-packet", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_SMOKE_KIT_FORMAT",
     "Developer launch smoke kit format"
@@ -16392,6 +16793,13 @@ function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
       body: buildDeveloperLaunchSmokeKitHandoffRoutesText(payload)
     };
   }
+  if (normalizedFormat === "surface-review-closeout-action") {
+    return {
+      fileName: payload.surfaceReviewCloseoutActionFileName || "developer-launch-smoke-kit-surface-review-closeout-action.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchSmokeKitSurfaceReviewCloseoutActionText(payload)
+    };
+  }
   if (normalizedFormat === "first-wave-runtime-evidence") {
     return {
       fileName: payload.firstWaveRuntimeEvidenceFileName || "developer-launch-smoke-kit-first-wave-runtime-evidence.txt",
@@ -16404,6 +16812,13 @@ function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
       fileName: payload.firstWaveSupportInspectionConfirmationFileName || "developer-launch-smoke-kit-first-wave-support-inspection-confirmation.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchSmokeKitFirstWaveSupportInspectionConfirmationText(payload)
+    };
+  }
+  if (normalizedFormat === "production-switch-proof-packet") {
+    return {
+      fileName: payload.productionSwitchProofPacketFileName || "developer-launch-smoke-kit-production-switch-proof-packet.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchSmokeKitProductionSwitchProofPacketText(payload)
     };
   }
 
@@ -16731,6 +17146,13 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     && typeof launchOperationsOperatorEntry.launchEvidenceReadinessGate === "object"
       ? launchOperationsOperatorEntry.launchEvidenceReadinessGate
       : null;
+  const productionSwitchProofPacket = launchOperationsOperatorEntry?.productionSwitchProofPacket
+    && typeof launchOperationsOperatorEntry.productionSwitchProofPacket === "object"
+      ? launchOperationsOperatorEntry.productionSwitchProofPacket
+      : launchEvidenceReadinessGate?.productionSwitchProofPacket
+      && typeof launchEvidenceReadinessGate.productionSwitchProofPacket === "object"
+        ? launchEvidenceReadinessGate.productionSwitchProofPacket
+        : null;
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate
     && typeof launchOperationsOperatorEntry.launchCandidateFullVerificationGate === "object"
       ? launchOperationsOperatorEntry.launchCandidateFullVerificationGate
@@ -21324,6 +21746,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     initialLaunchOpsOverviewStatus,
     launchDutyActionOrder,
     launchEvidenceReadinessGate,
+    productionSwitchProofPacket,
     operatorQueueCheckpoint,
     mirroredLaunchSurfaceFreeze,
     preStagingReadinessSelfCheck,
@@ -24186,6 +24609,7 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const launchReadinessDistance = mainlineSummary.launchReadinessDistance
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const productionSwitchProofPacket = getDeveloperLaunchMainlineProductionSwitchProofPacket(payload);
   const initialProductionLaunchReadiness = mainlineSummary.initialProductionLaunchReadiness
     || buildDeveloperLaunchMainlineInitialProductionLaunchReadiness(payload);
   const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
@@ -29418,6 +29842,35 @@ function getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload = {})
   };
 }
 
+function getDeveloperLaunchMainlineProductionSwitchProofPacket(payload = {}) {
+  const packet = payload.mainlineSummary?.productionSwitchProofPacket
+    && typeof payload.mainlineSummary.productionSwitchProofPacket === "object"
+      ? payload.mainlineSummary.productionSwitchProofPacket
+      : null;
+  if (packet) {
+    return packet;
+  }
+  return getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
+    payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null
+  );
+}
+
+function getDeveloperLaunchMainlineProductionSwitchProofPacketDownload(payload = {}) {
+  const proofPacket = getDeveloperLaunchMainlineProductionSwitchProofPacket(payload);
+  if (!proofPacket) {
+    return null;
+  }
+  return {
+    ...createLaunchMainlineDownloadShortcut(
+      "Launch Mainline production switch proof packet",
+      "production-switch-proof-packet.txt",
+      "production-switch-proof-packet",
+      buildDeveloperLaunchMainlineRouteParams(payload)
+    ),
+    launchDutyRecordIndexPath: proofPacket.launchDutyRecordIndexFile || null
+  };
+}
+
 function getDeveloperLaunchMainlineLaunchSwitchReadinessDownload(payload = {}) {
   const entry = getDeveloperLaunchMainlineOperatorEntry(payload);
   const launchSwitchReadinessSummary = entry?.launchSwitchReadinessSummary || null;
@@ -29478,6 +29931,33 @@ function buildDeveloperLaunchMainlineLaunchReadinessDistanceDownloadText(payload
   lines.push("- This is a launch-control readback, not a substitute for the real staging run, guarded full-test output, or production sign-off evidence.");
   appendLaunchMainlineReadinessGateChainOperatorNote(lines);
   lines.push("- Keep the full gate chain beside the live staging lane during cutover preparation.");
+  return lines.join("\n").trimEnd();
+}
+
+function buildDeveloperLaunchMainlineProductionSwitchProofPacketDownloadText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const proofPacket = getDeveloperLaunchMainlineProductionSwitchProofPacket(payload);
+  if (!proofPacket) {
+    return "";
+  }
+  const lines = [
+    "RockSolid Launch Mainline Production Switch Proof Packet Download",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    "Source Surface: launch-mainline"
+  ];
+  appendProductionSwitchProofPacketLines(lines, proofPacket, {
+    heading: "Production Switch Proof Packet:"
+  });
+  lines.push("");
+  lines.push("Operator Notes:");
+  lines.push("- Use this packet as the Launch Mainline first-screen proof review before production switch.");
+  lines.push("- Keep it beside Developer Ops, Launch Review, and Launch Smoke proof packets so all launch surfaces agree on the same ready/blocked proof count.");
+  lines.push("- Do not switch production until this packet reaches ready_for_production_switch_review with 8/8 ready proof items.");
   return lines.join("\n").trimEnd();
 }
 
@@ -31160,6 +31640,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const launchReadinessDistance = mainlineSummary.launchReadinessDistance
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const productionSwitchProofPacket = getDeveloperLaunchMainlineProductionSwitchProofPacket(payload);
   const initialProductionLaunchReadiness = mainlineSummary.initialProductionLaunchReadiness
     || buildDeveloperLaunchMainlineInitialProductionLaunchReadiness(payload);
   const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
@@ -31378,6 +31859,7 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       }
     : null;
   const launchReadinessDistanceDownload = getDeveloperLaunchMainlineLaunchReadinessDistanceDownload(payload);
+  const productionSwitchProofPacketDownload = getDeveloperLaunchMainlineProductionSwitchProofPacketDownload(payload);
   const initialProductionLaunchReadinessDownload = getDeveloperLaunchMainlineInitialProductionLaunchReadinessDownload(payload);
   const launchSwitchReadinessDownload = getDeveloperLaunchMainlineLaunchSwitchReadinessDownload(payload);
   const launchCandidateFullVerificationGateDownload = getDeveloperLaunchMainlineLaunchCandidateFullVerificationGateDownload(payload);
@@ -32002,6 +32484,18 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
       "Launch Mainline launch readiness distance",
       opsFiles.launchReadinessDistance || "ops/launch-readiness-distance.txt",
       launchReadinessDistanceDownload || {}
+    );
+  }
+  if (productionSwitchProofPacket) {
+    lines.push("");
+    appendProductionSwitchProofPacketLines(lines, productionSwitchProofPacket, {
+      heading: "Production Switch Proof Packet Route:"
+    });
+    pushRoute(
+      "production-switch-proof-packet",
+      "Launch Mainline production switch proof packet",
+      opsFiles.productionSwitchProofPacket || "ops/production-switch-proof-packet.txt",
+      productionSwitchProofPacketDownload || {}
     );
   }
   if (initialProductionLaunchReadiness) {
@@ -32692,6 +33186,11 @@ function buildDeveloperLaunchMainlineFiles(payload = {}) {
   );
   appendLaunchWorkflowFileIfPresent(
     files,
+    "ops/production-switch-proof-packet.txt",
+    buildDeveloperLaunchMainlineProductionSwitchProofPacketDownloadText(payload)
+  );
+  appendLaunchWorkflowFileIfPresent(
+    files,
     "ops/initial-production-launch-readiness.txt",
     buildDeveloperLaunchMainlineInitialProductionLaunchReadinessDownloadText(payload)
   );
@@ -33250,7 +33749,7 @@ function buildDeveloperLaunchMainlineZipEntries(payload = {}) {
 function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "initial-production-launch-readiness", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "stable-operations-packet-review-bridge", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "rollout-widening-decision-execution", "first-operating-result-handoff-execution", "first-operating-result-handoff-receipt-readback-execution", "first-operating-result-review-execution", "next-rollout-widening-decision-execution", "next-rollout-widening-decision-receipt-readback-execution", "widened-rollout-monitoring-execution", "widened-rollout-monitoring-result-review-execution", "widened-rollout-next-decision-execution", "widened-rollout-next-decision-receipt-readback-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
+    ["json", "summary", "initial-launch-ops-readiness", "production-handoff", "cutover-handoff", "recovery-drill-handoff", "operations-handoff", "post-launch-sweep-handoff", "closeout-handoff", "stabilization-handoff", "post-launch-handoff-index", "handoff-download-routes", "launch-readiness-distance", "production-switch-proof-packet", "initial-production-launch-readiness", "production-signoff-entry-handoff", "signoff-archive-watch-handoff", "launch-duty-receipt-execution-handoff", "stabilization-receipt-execution-handoff", "stable-operations-handoff-execution", "stable-operations-transition-review", "stable-operations-packet-review-bridge", "steady-state-handoff-landing-execution", "steady-state-duty-receipt-review-execution", "rollout-widening-decision-execution", "first-operating-result-handoff-execution", "first-operating-result-handoff-receipt-readback-execution", "first-operating-result-review-execution", "next-rollout-widening-decision-execution", "next-rollout-widening-decision-receipt-readback-execution", "widened-rollout-monitoring-execution", "widened-rollout-monitoring-result-review-execution", "widened-rollout-next-decision-execution", "widened-rollout-next-decision-receipt-readback-execution", "launch-switch-readiness", "launch-candidate-full-verification-gate", "post-archive-launch-day-watch-readback", "launch-day-watch-summary-record-readback", "receipt-visibility-snapshot-record-readback", "first-wave-incident-log-record-readback", "rollback-signal-review-record-readback", "stabilization-owner-handoff-record-readback", "first-wave-closeout-record-readback", "surface-review-closeout-shortcut-download", "first-wave-closeout-stable-operations-shortcut-download", "stable-operations-transition-shortcut-download", "first-launch-handoff", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "rehearsal-guide", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_MAINLINE_FORMAT",
     "Developer launch mainline format"
@@ -33352,6 +33851,13 @@ function buildDeveloperLaunchMainlineDownloadAsset(payload, format = "json") {
       fileName: "launch-readiness-distance.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchMainlineLaunchReadinessDistanceDownloadText(payload)
+    };
+  }
+  if (normalizedFormat === "production-switch-proof-packet") {
+    return {
+      fileName: "production-switch-proof-packet.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchMainlineProductionSwitchProofPacketDownloadText(payload)
     };
   }
   if (normalizedFormat === "initial-production-launch-readiness") {
@@ -35031,6 +35537,7 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate || null;
   const launchReadinessDistance = mainlineSummary.launchReadinessDistance
     || buildDeveloperLaunchMainlineLaunchReadinessDistance(payload);
+  const productionSwitchProofPacket = getDeveloperLaunchMainlineProductionSwitchProofPacket(payload);
   const productionSignoffEntryHandoff = mainlineSummary.productionSignoffEntryHandoff
     || getDeveloperLaunchMainlineProductionSignoffEntryHandoff(payload);
   const signoffArchiveWatchHandoff = mainlineSummary.signoffArchiveWatchHandoff
@@ -35278,6 +35785,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
     handoffFiles.push([
       "Launch readiness distance",
       opsFiles.launchReadinessDistance || "ops/launch-readiness-distance.txt"
+    ]);
+  }
+  if (productionSwitchProofPacket) {
+    handoffFiles.push([
+      "Production switch proof packet",
+      opsFiles.productionSwitchProofPacket || "ops/production-switch-proof-packet.txt"
     ]);
   }
   if (mainlineSummary.initialProductionLaunchReadiness || launchReadinessDistance) {
@@ -36100,6 +36613,12 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   if (launchReadinessDistance) {
     lines.push("");
     appendLaunchReadinessDistanceLines(lines, launchReadinessDistance);
+  }
+  if (productionSwitchProofPacket) {
+    lines.push("");
+    appendProductionSwitchProofPacketLines(lines, productionSwitchProofPacket, {
+      heading: "Production Switch Proof Packet:"
+    });
   }
   if (productionSignoffEntryHandoff) {
     lines.push("");
@@ -39778,6 +40297,19 @@ function buildDeveloperOpsInitialLaunchReadinessDownload(scope = {}) {
     {
       source: "developer-ops",
       format: "initial-launch-ops-readiness",
+      params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
+    }
+  );
+}
+
+function buildDeveloperOpsProductionSwitchProofPacketDownload(scope = {}) {
+  return createLaunchWorkflowDownloadShortcut(
+    "ops_production_switch_proof_packet",
+    "developer-ops-production-switch-proof-packet.txt",
+    "Developer Ops production switch proof packet",
+    {
+      source: "developer-ops",
+      format: "production-switch-proof-packet",
       params: buildDeveloperOpsRouteReviewBaseDownloadParams(scope)
     }
   );
@@ -50363,6 +50895,240 @@ function isDeveloperOpsLaunchEvidenceComplete(status = null) {
   ].includes(String(status || "").toLowerCase());
 }
 
+function normalizeDeveloperOpsLaunchEvidencePath(value = null) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.replaceAll("\\", "/").trim();
+  return normalized || null;
+}
+
+function extractCommandOptionValue(command = null, optionName = "") {
+  if (typeof command !== "string" || !optionName) {
+    return null;
+  }
+  const pattern = new RegExp(`--${optionName}\\s+("[^"]+"|\\S+)`);
+  const match = command.match(pattern);
+  if (!match) {
+    return null;
+  }
+  return match[1].replace(/^"|"$/g, "");
+}
+
+function inferDeveloperOpsLaunchEvidenceArchiveRoot(gate = null, {
+  productCode = null,
+  channel = null
+} = {}) {
+  const candidates = [
+    gate?.fullTestOutputArtifact,
+    gate?.productionSignoffPacket,
+    gate?.launchDayWatchArtifact,
+    gate?.firstWaveCloseoutArtifact,
+    gate?.currentArtifactPath
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeDeveloperOpsLaunchEvidencePath(candidate);
+    if (!normalized) {
+      continue;
+    }
+    const dirname = path.posix.dirname(normalized);
+    if (dirname && dirname !== ".") {
+      return dirname;
+    }
+  }
+  const recordIndexPath = normalizeDeveloperOpsLaunchEvidencePath(gate?.launchDutyRecordIndexPath);
+  if (recordIndexPath) {
+    const dirname = path.posix.dirname(recordIndexPath);
+    if (dirname && dirname !== ".") {
+      return dirname;
+    }
+  }
+  return `artifacts/staging/${productCode || "<productCode>"}/${channel || "<channel>"}`;
+}
+
+function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
+  productCode = null,
+  channel = null,
+  gate = null
+} = {}) {
+  if (!gate || typeof gate !== "object") {
+    return null;
+  }
+  const evidenceItems = Array.isArray(gate.evidenceItems) ? gate.evidenceItems : [];
+  const evidenceByKey = new Map(evidenceItems.filter((item) => item?.key).map((item) => [item.key, item]));
+  const archiveRoot = inferDeveloperOpsLaunchEvidenceArchiveRoot(gate, { productCode, channel });
+  const readyForStabilization = gate.status === "ready_for_stabilization_handoff"
+    || gate.status === "ready_for_launch_switch"
+    || Number(gate.pendingEvidenceCount ?? 1) === 0;
+  const closeoutActionKeys = new Set([
+    "route_map_gate_result",
+    "backup_restore_drill_result",
+    "live_write_smoke_result",
+    "launch_smoke_handoff",
+    "launch_mainline_evidence_receipts",
+    "receipt_visibility_review",
+    "operator_go_no_go"
+  ]);
+  const launchDutyActionKeys = new Set([
+    "launch_day_watch_summary",
+    "stabilization_owner_handoff",
+    "first_wave_closeout"
+  ]);
+  const currentEvidenceKey = String(gate.currentEvidenceKey || "").trim();
+  const currentActionKey = readyForStabilization
+    ? "refresh_readiness_status"
+    : closeoutActionKeys.has(currentEvidenceKey)
+      ? "backfill_closeout_evidence"
+      : currentEvidenceKey === "full_test_window_passed"
+        ? "run_full_test_window"
+        : currentEvidenceKey === "production_signoff_packet"
+          ? "backfill_production_signoff"
+          : launchDutyActionKeys.has(currentEvidenceKey)
+            ? "record_launch_day_watch_and_stabilization"
+            : "review_readiness_status";
+  const backupRestoreEvidence = evidenceByKey.get("backup_restore_drill_result") || null;
+  const liveWriteEvidence = evidenceByKey.get("live_write_smoke_result") || null;
+  const fullTestEvidence = evidenceByKey.get("full_test_window_passed") || null;
+  const productionSignoffEvidence = evidenceByKey.get("production_signoff_packet") || null;
+  const launchDayWatchEvidence = evidenceByKey.get("launch_day_watch_summary") || null;
+  const firstWaveCloseoutEvidence = evidenceByKey.get("first_wave_closeout") || null;
+  const stableOperationsHandoff = gate.stableOperationsHandoff && typeof gate.stableOperationsHandoff === "object"
+    ? gate.stableOperationsHandoff
+    : null;
+  const firstWaveCloseoutReady = isDeveloperOpsLaunchEvidenceComplete(firstWaveCloseoutEvidence?.status);
+  const launchDayWatchProofArtifact = firstWaveCloseoutReady
+    ? normalizeDeveloperOpsLaunchEvidencePath(stableOperationsHandoff?.firstWaveCloseoutArtifactPath)
+      || normalizeDeveloperOpsLaunchEvidencePath(firstWaveCloseoutEvidence?.artifactPath)
+      || normalizeDeveloperOpsLaunchEvidencePath(gate.firstWaveCloseoutArtifact)
+      || normalizeDeveloperOpsLaunchEvidencePath(gate.launchDayWatchArtifact)
+      || path.posix.join(archiveRoot, "first-wave-closeout.md")
+    : normalizeDeveloperOpsLaunchEvidencePath(gate.launchDayWatchArtifact)
+      || normalizeDeveloperOpsLaunchEvidencePath(launchDayWatchEvidence?.artifactPath)
+      || normalizeDeveloperOpsLaunchEvidencePath(firstWaveCloseoutEvidence?.artifactPath)
+      || path.posix.join(archiveRoot, "launch-day-watch-summary.md");
+  const launchDayWatchProofCommand = firstWaveCloseoutReady
+    ? stableOperationsHandoff?.nextCommand
+      || stableOperationsHandoff?.currentCommand
+      || firstWaveCloseoutEvidence?.command
+      || null
+    : launchDayWatchEvidence?.command
+      || firstWaveCloseoutEvidence?.command
+      || null;
+  const proofItems = [
+    {
+      order: 1,
+      key: "public_https_entrypoint",
+      status: readyForStabilization ? "ready_confirmed_by_launch_gate" : "pending_real_environment_value",
+      command: null,
+      artifactPath: null,
+      nextAction: "Keep the public staging entrypoint on HTTPS for all live-write smoke and launch switch checks."
+    },
+    {
+      order: 2,
+      key: "non_default_secret_env",
+      status: readyForStabilization ? "ready_confirmed_by_launch_gate" : "pending_real_environment_confirmation",
+      command: null,
+      artifactPath: null,
+      nextAction: "Confirm non-default admin, developer, and bearer-token secrets are loaded from environment variables before continuing evidence backfill."
+    },
+    {
+      order: 3,
+      key: "storage_profile_selected",
+      status: readyForStabilization ? "ready_confirmed_by_launch_gate" : "pending_real_environment_value",
+      command: null,
+      artifactPath: null,
+      nextAction: "Keep storage profile and backup paths aligned through recovery preflight and staging evidence backfill."
+    },
+    {
+      order: 4,
+      key: "backup_restore_drill",
+      status: isDeveloperOpsLaunchEvidenceComplete(backupRestoreEvidence?.status) ? "ready_evidence_attached" : "blocked_after_readiness_status",
+      command: null,
+      artifactPath: normalizeDeveloperOpsLaunchEvidencePath(backupRestoreEvidence?.artifactPath)
+        || normalizeDeveloperOpsLaunchEvidencePath(gate.currentArtifactPath)
+        || path.posix.join(archiveRoot, "backup-restore-drill.txt"),
+      nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
+    },
+    {
+      order: 5,
+      key: "live_write_smoke",
+      status: isDeveloperOpsLaunchEvidenceComplete(liveWriteEvidence?.status) ? "ready_evidence_attached" : "blocked_after_route_map_gate",
+      command: null,
+      artifactPath: normalizeDeveloperOpsLaunchEvidencePath(liveWriteEvidence?.artifactPath)
+        || path.posix.join(archiveRoot, "live-write-smoke-output.json"),
+      nextAction: "Attach launch:smoke:staging output after no-write preflight and route-map gate pass."
+    },
+    {
+      order: 6,
+      key: "full_test_window",
+      status: isDeveloperOpsLaunchEvidenceComplete(fullTestEvidence?.status) ? "ready_evidence_attached" : "ready_local_baseline_available",
+      command: gate.fullTestCommand || "npm.cmd test",
+      artifactPath: normalizeDeveloperOpsLaunchEvidencePath(gate.fullTestOutputArtifact)
+        || normalizeDeveloperOpsLaunchEvidencePath(fullTestEvidence?.artifactPath)
+        || path.posix.join(archiveRoot, "full-test-output.txt"),
+      nextAction: "Attach the redacted full-suite output artifact before or while backfilling full_test_window_passed."
+    },
+    {
+      order: 7,
+      key: "production_signoff_and_receipts",
+      status: isDeveloperOpsLaunchEvidenceComplete(productionSignoffEvidence?.status) ? "ready_evidence_attached" : "blocked_after_full_test_signoff_backfill",
+      command: null,
+      artifactPath: normalizeDeveloperOpsLaunchEvidencePath(gate.productionSignoffPacket)
+        || normalizeDeveloperOpsLaunchEvidencePath(productionSignoffEvidence?.artifactPath)
+        || path.posix.join(archiveRoot, "staging-production-signoff-packet.json"),
+      nextAction: "Backfill production sign-off conditions and receipt visibility lanes before launch-day watch."
+    },
+    {
+      order: 8,
+      key: "launch_day_watch_and_stabilization",
+      status: isDeveloperOpsLaunchEvidenceComplete(firstWaveCloseoutEvidence?.status) ? "ready_evidence_attached" : "blocked_after_production_signoff_readiness",
+      command: launchDayWatchProofCommand,
+      artifactPath: launchDayWatchProofArtifact,
+      nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    }
+  ];
+  const ready = proofItems.filter((item) => String(item.status || "").startsWith("ready_")).length;
+  const currentCommand = gate.currentCommand || gate.readinessStatusCommand || null;
+  const closeoutInputFile = extractCommandOptionValue(currentCommand, "input-file")
+    || extractCommandOptionValue(gate.readinessStatusCommand, "input-file")
+    || null;
+  const readinessActionQueueFile = extractCommandOptionValue(currentCommand, "actions-file")
+    || extractCommandOptionValue(gate.readinessStatusCommand, "actions-file")
+    || null;
+  return {
+    version: "developer-ops-launch-evidence-production-switch-proof-packet/v1",
+    status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
+    currentActionKey,
+    currentCommand,
+    baseUrl: null,
+    productCode: productCode || "<productCode>",
+    channel: channel || "<channel>",
+    targetOs: null,
+    storageProfile: null,
+    archiveRoot,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexFile: normalizeDeveloperOpsLaunchEvidencePath(gate.launchDutyRecordIndexPath)
+      || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    localFullSuiteBaseline: {
+      command: gate.fullTestCommand || "npm.cmd test",
+      status: "available_from_2026-05-27_full_suite_pass",
+      testCount: 192,
+      failureCount: 0,
+      outputArtifact: normalizeDeveloperOpsLaunchEvidencePath(gate.fullTestOutputArtifact)
+        || path.posix.join(archiveRoot, "full-test-output.txt"),
+      nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+    },
+    proofCounts: {
+      total: proofItems.length,
+      ready,
+      blocked: proofItems.length - ready
+    },
+    proofItems,
+    nextAction: "Continue the current launch evidence command, rerun the launch operations export, then use this packet as the production switch proof checklist."
+  };
+}
+
 function buildDeveloperOpsLaunchEvidenceReadinessGate({
   productCode = null,
   channel = null,
@@ -50617,7 +51383,7 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
   const blockerCount = launchDutyCloseoutReadyForStableHandoff
     ? 0
     : Number(fullGate?.blockerCount ?? closeoutEvidenceHandoff?.fullTestEntryGate?.blockerCount ?? 0);
-  return {
+  const gatePayload = {
     version: "developer-ops-launch-evidence-readiness-gate/v1",
     productCode,
     channel,
@@ -50668,6 +51434,14 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
       || fullGate?.nextAction
       || watchBridge?.nextAction
       || "Attach real staging, closeout, full-test, sign-off, and launch-day watch evidence before launch switch."
+  };
+  return {
+    ...gatePayload,
+    productionSwitchProofPacket: buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
+      productCode,
+      channel,
+      gate: gatePayload
+    })
   };
 }
 
@@ -50746,6 +51520,13 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
   launchOperationsOperatorChecklistDownload = null,
   launchOperationsOperatorEntryDownload = null,
   launchOperationsShiftActionPlan = null,
+  steadyStateOperationalReview = null,
+  steadyStateExceptionDigest = null,
+  steadyStateHandoffBrief = null,
+  steadyStateDutyBoard = null,
+  steadyStateDutyActionLinks = null,
+  launchOperationsHandoffSummary = null,
+  launchOperationsDailyBrief = null,
   latestSteadyStateDutyPlanReceipt = null,
   stagingLaunchDutyArchive = null,
   launchOperationsFileIndex = [],
@@ -50855,6 +51636,11 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
         channel
       })
     : null;
+  const productionSwitchProofPacketDownload = buildDeveloperOpsProductionSwitchProofPacketDownload({
+    ...scope,
+    productCode,
+    channel
+  });
   const launchCandidateFullVerificationGate = checklist?.launchCandidateFullVerificationGate
     || buildDeveloperOpsLaunchCandidateFullVerificationGate(stagingReadinessBridge, {
       scope: { ...scope, productCode, channel },
@@ -51312,9 +52098,18 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchMainlineHandoffRoutesDownload,
     surfaceReviewCloseoutShortcutDownloadRoute,
     preStagingReadinessSelfCheckDownload,
+    productionSwitchProofPacketDownload,
     launchDutySteadyStateHandoffDownload,
     launchDutyStableOperationsTransitionDownload,
     launchDutyStableOperationsPacketReviewBridgeDownload,
+    steadyStateOperationalReview?.reviewDownload || null,
+    steadyStateExceptionDigest?.digestDownload || null,
+    steadyStateHandoffBrief?.handoffDownload || null,
+    steadyStateDutyBoard?.boardDownload || null,
+    steadyStateDutyActionLinks?.actionLinksDownload || null,
+    launchOperationsHandoffSummary?.handoffDownload || null,
+    launchOperationsDailyBrief?.briefDownload || null,
+    launchOperationsShiftActionPlan?.actionPlanDownload || null,
     firstWaveCloseoutStableOperationsShortcutDownloadRoute,
     stableOperationsTransitionShortcutDownloadRoute,
     launchDutyRecordIndexNextDownload,
@@ -51396,6 +52191,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     receiptVisibilityStatus: checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || null,
     launchDutyRecordIndexPath,
     launchEvidenceReadinessGate,
+    productionSwitchProofPacket: launchEvidenceReadinessGate?.productionSwitchProofPacket || null,
     operatorQueueCheckpoint,
     checklistCurrentStepKey: checklist?.currentStepKey || null,
     checklistStepCount: Number(checklist?.stepCount ?? (Array.isArray(checklist?.steps) ? checklist.steps.length : 0)),
@@ -52084,6 +52880,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessPayload({
     launchOperationsOperatorChecklistDownload,
     launchOperationsOperatorEntryDownload,
     launchOperationsShiftActionPlan,
+    steadyStateOperationalReview,
+    steadyStateExceptionDigest,
+    steadyStateHandoffBrief,
+    steadyStateDutyBoard,
+    steadyStateDutyActionLinks,
+    launchOperationsHandoffSummary,
+    launchOperationsDailyBrief,
     latestSteadyStateDutyPlanReceipt,
     stagingLaunchDutyArchive,
     launchOperationsFileIndex,
@@ -56922,6 +57725,66 @@ function appendDeveloperOpsLaunchReadinessNextGateHandoffText(lines = [], {
 
 function getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {
   return initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.receiptVisibilityConfirmationQueue?.launchSurfaceReviewCloseoutAction || null;
+}
+
+function getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {
+  const launchOperationsOperatorEntry = initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+    && typeof initialLaunchOpsReadiness.launchOperationsOperatorEntry === "object"
+      ? initialLaunchOpsReadiness.launchOperationsOperatorEntry
+      : null;
+  const entryPacket = launchOperationsOperatorEntry?.productionSwitchProofPacket
+    && typeof launchOperationsOperatorEntry.productionSwitchProofPacket === "object"
+      ? launchOperationsOperatorEntry.productionSwitchProofPacket
+      : null;
+  if (entryPacket) {
+    return entryPacket;
+  }
+  const gatePacket = launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.productionSwitchProofPacket
+    && typeof launchOperationsOperatorEntry.launchEvidenceReadinessGate.productionSwitchProofPacket === "object"
+      ? launchOperationsOperatorEntry.launchEvidenceReadinessGate.productionSwitchProofPacket
+      : null;
+  return gatePacket || null;
+}
+
+function appendProductionSwitchProofPacketLines(lines = [], proofPacket = null, {
+  leadingBlank = true,
+  heading = "Production Switch Proof Packet:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  if (!proofPacket || typeof proofPacket !== "object") {
+    return false;
+  }
+  if (leadingBlank) {
+    lines.push("");
+  }
+  lines.push(heading);
+  const counts = proofPacket.proofCounts || {};
+  lines.push(
+    `- productionSwitchProof=${proofPacket.status || "-"}`
+    + ` | ready=${counts.ready ?? "-"}/${counts.total ?? "-"}`
+    + ` | blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
+    + ` | current=${proofPacket.currentActionKey || "-"}`
+  );
+  const baseline = proofPacket.localFullSuiteBaseline || {};
+  lines.push(
+    `- productionSwitchBaseline=${baseline.command || "-"}`
+    + ` | output=${baseline.outputArtifact || "-"}`
+    + ` | status=${baseline.status || "-"}`
+    + ` | tests=${baseline.testCount ?? "-"}`
+    + ` | failures=${baseline.failureCount ?? "-"}`
+  );
+  for (const item of Array.isArray(proofPacket.proofItems) ? proofPacket.proofItems : []) {
+    lines.push(
+      `proof ${item.order || "-"}. ${item.key || "-"}`
+      + ` | status=${item.status || "-"}`
+      + ` | artifact=${item.artifactPath || "-"}`
+      + ` | command=${item.command || "-"}`
+    );
+  }
+  lines.push(`- productionSwitchNextAction=${proofPacket.nextAction || "-"}`);
+  return true;
 }
 
 function appendLaunchSurfaceReviewCloseoutActionText(lines = [], action = null, {
@@ -63448,6 +64311,10 @@ function appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines = [], gate = n
     `- launchDayWatch=${gate.launchDayWatchArtifact || "-"}`
     + ` | firstWaveCloseout=${gate.firstWaveCloseoutArtifact || "-"}`
   );
+  appendProductionSwitchProofPacketLines(lines, gate.productionSwitchProofPacket, {
+    leadingBlank: false,
+    heading: "Production Switch Proof Packet:"
+  });
   for (const item of evidenceItems) {
     const receipts = Array.isArray(item.receiptOperations) && item.receiptOperations.length
       ? item.receiptOperations.join(",")
@@ -65233,6 +66100,39 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
   return lines.join("\n");
 }
 
+function buildDeveloperOpsProductionSwitchProofPacketText(payload = {}) {
+  const scope = payload.scope || {};
+  const summary = payload.summary || {};
+  const readiness = summary.initialLaunchOpsReadiness || buildDeveloperOpsInitialLaunchOpsReadinessPayload({
+    scope,
+    overview: payload.overview || {},
+    launchReceiptFollowUps: payload.overview?.launchReceiptFollowUps || [],
+    launchReceiptFollowUpPriorities: summary.launchReceiptFollowUpPriorities || {},
+    launchReceiptNextFollowUp: summary.launchReceiptNextFollowUp || null,
+    mainlineHandoff: payload.mainlineHandoff || null
+  });
+  const proofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(readiness);
+  const lines = [
+    "RockSolid Developer Ops Production Switch Proof Packet",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${scope.productCode || readiness.productCode || "-"}`,
+    `Channel: ${scope.channel || readiness.channel || "stable"}`
+  ];
+
+  if (!appendProductionSwitchProofPacketLines(lines, proofPacket, {
+    heading: "Production Switch Proof Packet:"
+  })) {
+    lines.push("");
+    lines.push("Production Switch Proof Packet:");
+    lines.push("- productionSwitchProof=unavailable");
+  }
+  lines.push("");
+  lines.push("Operator Order:");
+  lines.push("- Keep this file beside launch-operations-operator-entry.txt, launch-mainline-handoff-routes.txt, and the staging readiness action queue during production switch review.");
+  lines.push("- Do not switch production until the packet reaches ready_for_production_switch_review with 8/8 ready proof items.");
+  return lines.join("\n");
+}
+
 function buildDeveloperOpsPreStagingReadinessSelfCheckText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -65429,6 +66329,10 @@ function buildDeveloperOpsExportFiles(payload) {
     {
       path: "pre-staging-readiness-self-check.txt",
       body: buildDeveloperOpsPreStagingReadinessSelfCheckText(payload)
+    },
+    {
+      path: "production-switch-proof-packet.txt",
+      body: buildDeveloperOpsProductionSwitchProofPacketText(payload)
     },
     {
       path: "launch-operations-file-index.json",
@@ -66498,7 +67402,7 @@ function buildDeveloperOpsRouteReviewContinuations(scope = {}, routeReview = {})
 function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "zip", "checksums", "handoff-index", "pre-staging-readiness-self-check", "launch-operations-file-index", "launch-operations-operator-entry", "launch-operations-operator-checklist", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
+    ["json", "summary", "zip", "checksums", "handoff-index", "pre-staging-readiness-self-check", "production-switch-proof-packet", "launch-operations-file-index", "launch-operations-operator-entry", "launch-operations-operator-checklist", "launch-mainline-handoff-routes", "route-review-primary", "route-review-next", "route-review-remaining", "route-review-section-accounts", "route-review-section-entitlements", "route-review-section-sessions", "route-review-section-devices", "route-review-section-audit", "launch-receipt-next-follow-up", "launch-receipt-backfill-status", "first-wave-audit-backfill-status", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "launch-receipt-follow-ups", "initial-launch-ops-readiness", "staging-launch-duty-archive", "stabilization-handoff", "steady-state-operational-review", "steady-state-exception-digest", "steady-state-handoff-brief", "steady-state-duty-board", "steady-state-duty-action-links", "launch-operations-handoff-summary", "launch-operations-daily-brief", "launch-operations-shift-action-plan", "launch-operations-overview-status"],
     "json",
     "INVALID_DEVELOPER_OPS_EXPORT_FORMAT",
     "Developer ops export format"
@@ -66541,6 +67445,14 @@ function buildDeveloperOpsExportDownloadAsset(payload, format = "json") {
       fileName: "developer-ops-pre-staging-readiness-self-check.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperOpsPreStagingReadinessSelfCheckText(payload)
+    };
+  }
+
+  if (normalizedFormat === "production-switch-proof-packet") {
+    return {
+      fileName: "developer-ops-production-switch-proof-packet.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperOpsProductionSwitchProofPacketText(payload)
     };
   }
 

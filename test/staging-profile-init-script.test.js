@@ -9,18 +9,30 @@ import test from "node:test";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
 
-function runProfileInit(args) {
+function buildTestEnv(env = {}) {
+  return {
+    ...process.env,
+    RSL_SMOKE_ADMIN_PASSWORD: "",
+    RSL_SMOKE_DEVELOPER_PASSWORD: "",
+    RSL_DEVELOPER_BEARER_TOKEN: "",
+    ...env
+  };
+}
+
+function runProfileInit(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-profile-init.mjs", "--json", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: buildTestEnv(env),
     timeout: 120_000
   });
 }
 
-function runProfileInitPlain(args) {
+function runProfileInitPlain(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-profile-init.mjs", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: buildTestEnv(env),
     timeout: 120_000
   });
 }
@@ -1062,6 +1074,60 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Post-first-wave closeout rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json/);
     assert.match(result.stdout, /Stable-operations handoff: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json; artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md/);
     assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff\./);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging profile init marks non-default secret env ready when required env vars are already present", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-profile-init-secret-env-"));
+  try {
+    const outputFile = join(tempDir, "staging-profile.json");
+    const result = runProfileInit([
+      "--base-url",
+      "https://staging.example.com",
+      "--product-code",
+      "PILOT_ALPHA",
+      "--channel",
+      "beta",
+      "--admin-username",
+      "admin@example.com",
+      "--developer-username",
+      "launch.smoke.owner",
+      "--target-os",
+      "linux",
+      "--storage-profile",
+      "postgres-preview",
+      "--target-env-file",
+      "/etc/rocksolidlicense/staging.env",
+      "--app-backup-dir",
+      "/var/lib/rocksolid/backups",
+      "--postgres-backup-dir",
+      "/var/lib/rocksolid/postgres-backups",
+      "--output-file",
+      outputFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "RealAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "RealDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: "real-bearer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(
+      output.productionSwitchProofPacket.proofItems.slice(0, 3).map((item) => [item.key, item.status, item.artifactPath]),
+      [
+        ["public_https_entrypoint", "ready_from_profile", "https://staging.example.com"],
+        ["non_default_secret_env", "ready_secret_env_loaded", "/etc/rocksolidlicense/staging.env"],
+        ["storage_profile_selected", "ready_from_profile", "postgres-preview"]
+      ]
+    );
+    assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
+      total: 8,
+      ready: 4,
+      blocked: 4
+    });
+    assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

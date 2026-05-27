@@ -74,10 +74,14 @@ const validRehearsalArgs = [
   "/var/lib/rocksolid/postgres-backups"
 ];
 
-function runBackfill(args) {
+function runBackfill(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-signoff-backfill.mjs", "--json", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env
+    },
     timeout: 120_000
   });
 }
@@ -102,7 +106,7 @@ function runRehearsal(args) {
   });
 }
 
-function writeReadyForFullTestInput(file) {
+function writeReadyForFullTestInput(file, overrides = {}) {
   const payload = {
     mode: "staging-closeout-template",
     decision: "ready-for-full-test-window",
@@ -121,7 +125,8 @@ function writeReadyForFullTestInput(file) {
         status: "pending_operator_entry",
         value: null
       }))
-    }
+    },
+    ...overrides
   };
   writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
@@ -396,7 +401,8 @@ function buildExpectedProductionSwitchProofPacket({
   fullTestStatus = "ready_evidence_attached",
   productionSignoffStatus = "blocked_after_full_test_signoff_backfill",
   launchDutyStatus = "blocked_after_production_signoff_readiness",
-  productionSignoffCommand = null
+  productionSignoffCommand = null,
+  launchDutyCommand = null
 }) {
   const archiveRoot = "artifacts/staging/PILOT_ALPHA/stable";
   const proofItems = [
@@ -460,7 +466,7 @@ function buildExpectedProductionSwitchProofPacket({
       order: 8,
       key: "launch_day_watch_and_stabilization",
       status: launchDutyStatus,
-      command: null,
+      command: launchDutyCommand,
       artifactPath: `${archiveRoot}/launch-day-watch-summary.md`,
       nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
     }
@@ -838,6 +844,62 @@ test("staging signoff backfill writes one signoff condition and one receipt visi
   }
 });
 
+test("staging signoff backfill marks bound non-default secret env ready when required env vars are present", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-signoff-backfill-secret-env-"));
+  try {
+    const inputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeReadyForFullTestInput(inputFile, {
+      baseUrl: "https://staging.example.com",
+      storageProfile: "postgres-preview",
+      stagingEnvironmentBinding: {
+        environment: {
+          targetEnvFile: "/etc/rocksolidlicense/staging.env"
+        },
+        credentialEnv: {
+          adminPassword: "RSL_SMOKE_ADMIN_PASSWORD",
+          developerPassword: "RSL_SMOKE_DEVELOPER_PASSWORD",
+          developerBearerToken: "RSL_DEVELOPER_BEARER_TOKEN"
+        }
+      }
+    });
+
+    const result = runBackfill([
+      "--input-file",
+      inputFile,
+      "--condition-key",
+      "full_test_window_passed",
+      "--value-json",
+      "{\"result\":\"pass\"}",
+      "--artifact-path",
+      "artifacts/staging/PILOT_ALPHA/stable/full-test-output.txt",
+      "--decision",
+      "ready-for-production-signoff",
+      "--actions-file",
+      actionsFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "RealAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "RealDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: "real-bearer-token"
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(
+      output.productionSwitchProofPacket.proofItems.slice(0, 3).map((item) => [item.key, item.status, item.artifactPath]),
+      [
+        ["public_https_entrypoint", "ready_from_closeout_input", "https://staging.example.com"],
+        ["non_default_secret_env", "ready_secret_env_loaded", "/etc/rocksolidlicense/staging.env"],
+        ["storage_profile_selected", "ready_from_closeout_input", "postgres-preview"]
+      ]
+    );
+    assert.equal(output.productionSwitchProofPacket.proofCounts.ready, 6);
+    assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
 test("staging signoff backfill prints ordered next commands in plain output", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "rsl-signoff-backfill-plain-"));
   try {
@@ -960,7 +1022,15 @@ test("staging signoff backfill prints launch-duty ready handoff after final rece
       actionsFile,
       currentActionKey: "archive_production_signoff",
       currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
-      productionSignoffStatus: "ready_evidence_attached"
+      productionSignoffStatus: "ready_evidence_attached",
+      launchDutyCommand: buildLaunchDutyRecordCommand({
+        closeoutInputFile,
+        actionsFile,
+        archiveRoot: "artifacts/staging/PILOT_ALPHA/stable",
+        key: "launch_day_watch_summary",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md",
+        receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
+      })
     }));
     assert.deepEqual(output.launchDutyReadyHandoff, {
       status: "ready_for_launch_day_watch",
@@ -988,6 +1058,7 @@ test("staging signoff backfill prints launch-duty ready handoff after final rece
     assert.match(plainResult.stdout, /Launch evidence progress: closeout=7\/7, signoff=7\/7, receipts=5\/5, launchDuty=0\/2/);
     assert.match(plainResult.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=4\/8, blocked=4\/8, current=archive_production_signoff\)/);
     assert.match(plainResult.stdout, /Production switch proof 7\. production_signoff_and_receipts: ready_evidence_attached -> artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
+    assert.match(plainResult.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: blocked_after_production_signoff_readiness -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file .*filled-closeout-input-plain\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(plainResult.stdout, /Production switch next action: Continue the current sign-off evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist\./);
     assert.match(plainResult.stdout, /Launch duty readiness: ready_for_launch_day_watch/);
     assert.match(plainResult.stdout, /Launch duty status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input-plain\.json --actions-file .*readiness-action-queue\.md/);

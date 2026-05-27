@@ -12367,6 +12367,44 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchReviewAction.recommendedDownload?.href || "", /format=first-wave-runtime-evidence/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /session\.login=1/);
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket,
+      runtimeEvidenceLaunchReview.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.productionSwitchProofPacket
+        || runtimeEvidenceLaunchReview.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.productionSwitchProofPacket
+        || null
+    );
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Production Switch Proof Packet:/);
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /productionSwitchProof=/);
+    const runtimeEvidenceReviewPreStagingSelfCheckDownload = runtimeEvidenceLaunchReview.reviewSummary.recommendedDownloads?.find((item) =>
+      item?.key === "ops_pre_staging_readiness_self_check"
+    ) || null;
+    assert.ok(runtimeEvidenceReviewPreStagingSelfCheckDownload);
+    assert.equal(runtimeEvidenceReviewPreStagingSelfCheckDownload?.source, "developer-ops");
+    assert.equal(runtimeEvidenceReviewPreStagingSelfCheckDownload?.format, "pre-staging-readiness-self-check");
+    assert.match(runtimeEvidenceReviewPreStagingSelfCheckDownload?.href || "", /format=pre-staging-readiness-self-check/);
+    for (const [key, format] of [
+      ["launch_review_handoff_routes", "handoff-routes"],
+      ["launch_review_surface_review_closeout_action", "surface-review-closeout-action"],
+      ["launch_review_production_switch_proof_packet", "production-switch-proof-packet"]
+    ]) {
+      const download = runtimeEvidenceLaunchReview.reviewSummary.recommendedDownloads?.find((item) => item?.key === key) || null;
+      assert.ok(download, `missing Launch Review recommended download ${key}`);
+      assert.equal(download?.source, "developer-launch-review");
+      assert.equal(download?.format, format);
+      assert.match(download?.href || "", new RegExp(`format=${format}`));
+      assert.ok(runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.some((item) =>
+        item?.recommendedDownload?.key === key
+        && item?.recommendedDownload?.format === format
+      ), `missing Launch Review route focus control ${key}`);
+    }
+    assert.ok(runtimeEvidenceLaunchReview.reviewSummary.actionPlan.some((item) =>
+      item.key === "launch_review_pre_staging_readiness_self_check"
+      && item.recommendedDownload?.format === "pre-staging-readiness-self-check"
+    ));
+    assert.ok(runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.some((item) =>
+      item?.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
+      && item?.recommendedDownload?.format === "pre-staging-readiness-self-check"
+    ));
 
     const runtimeEvidenceReviewDownload = await getText(
       baseUrl,
@@ -12383,12 +12421,36 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.doesNotMatch(runtimeEvidenceReviewDownload.body, new RegExp(firstLaunchDirectCard.cardKey));
     assert.doesNotMatch(runtimeEvidenceReviewDownload.body, new RegExp(firstWaveRuntimeLogin.sessionToken));
 
+    const runtimeEvidenceReviewProductionSwitchProofPacketDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=production-switch-proof-packet",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.contentDisposition || "", /production-switch-proof-packet\.txt"/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /RockSolid Developer Launch Review Production Switch Proof Packet/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /productionSwitchProof=/);
+
+    const runtimeEvidenceReviewSurfaceReviewCloseoutActionDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=surface-review-closeout-action",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceReviewSurfaceReviewCloseoutActionDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceReviewSurfaceReviewCloseoutActionDownload.contentDisposition || "", /surface-review-closeout-action\.txt"/);
+    assert.match(runtimeEvidenceReviewSurfaceReviewCloseoutActionDownload.body, /RockSolid Developer Launch Review Surface Review Closeout Action/);
+    assert.match(runtimeEvidenceReviewSurfaceReviewCloseoutActionDownload.body, /Launch Surface Review Closeout:/);
+    assert.match(runtimeEvidenceReviewSurfaceReviewCloseoutActionDownload.body, /status=/);
+
     const runtimeEvidenceReviewChecksums = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=checksums",
       ownerSession.token
     );
     assert.match(runtimeEvidenceReviewChecksums.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceReviewChecksums.body, /surface-review-closeout-action\.txt/);
+    assert.match(runtimeEvidenceReviewChecksums.body, /production-switch-proof-packet\.txt/);
     assert.match(runtimeEvidenceReviewChecksums.body, /handoff-routes\.txt/);
 
     const runtimeEvidenceReviewHandoffRoutes = await getText(
@@ -12404,6 +12466,9 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Launch Mainline Routes:.*format=launch-mainline-handoff-routes/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Mainline Handoff Routes:.*format=handoff-download-routes/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Mainline Post-Launch Index:.*format=post-launch-handoff-index/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch review surface review closeout action:.*format=surface-review-closeout-action/i);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch review production switch proof packet:.*format=production-switch-proof-packet/i);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Pre-Staging Readiness Self-Check:.*format=pre-staging-readiness-self-check/);
     assert.match(
       runtimeEvidenceReviewHandoffRoutes.body,
       /Front-Loaded Launch Path:[\s\S]*1\. launch-mainline-handoff-routes\.txt[\s\S]*2\. surface-review-closeout-shortcut-download\.txt[\s\S]*3\. developer-ops-pre-staging-readiness-self-check\.txt/
@@ -12426,6 +12491,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     const runtimeEvidenceReviewZipText = runtimeEvidenceReviewZip.body.toString("latin1");
     assert.match(runtimeEvidenceReviewZipText, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceReviewZipText, /surface-review-closeout-action\.txt/);
+    assert.match(runtimeEvidenceReviewZipText, /production-switch-proof-packet\.txt/);
+    assert.match(runtimeEvidenceReviewZipText, /Launch Surface Review Closeout:/);
+    assert.match(runtimeEvidenceReviewZipText, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceReviewZipText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceReviewZipText, /handoff-routes\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /RockSolid Developer Launch Review Handoff Routes/);
@@ -12475,6 +12544,44 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchSmokeAction.recommendedDownload?.href || "", /format=first-wave-runtime-evidence/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /session\.login=1/);
+    assert.deepEqual(
+      runtimeEvidenceLaunchSmoke.smokeSummary.productionSwitchProofPacket,
+      runtimeEvidenceLaunchSmoke.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.productionSwitchProofPacket
+        || runtimeEvidenceLaunchSmoke.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.productionSwitchProofPacket
+        || null
+    );
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /Launch Smoke Production Switch Proof Packet:/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /productionSwitchProof=/);
+    const runtimeEvidenceSmokePreStagingSelfCheckDownload = runtimeEvidenceLaunchSmoke.smokeSummary.recommendedDownloads?.find((item) =>
+      item?.key === "ops_pre_staging_readiness_self_check"
+    ) || null;
+    assert.ok(runtimeEvidenceSmokePreStagingSelfCheckDownload);
+    assert.equal(runtimeEvidenceSmokePreStagingSelfCheckDownload?.source, "developer-ops");
+    assert.equal(runtimeEvidenceSmokePreStagingSelfCheckDownload?.format, "pre-staging-readiness-self-check");
+    assert.match(runtimeEvidenceSmokePreStagingSelfCheckDownload?.href || "", /format=pre-staging-readiness-self-check/);
+    for (const [key, format] of [
+      ["launch_smoke_kit_handoff_routes", "handoff-routes"],
+      ["launch_smoke_surface_review_closeout_action", "surface-review-closeout-action"],
+      ["launch_smoke_production_switch_proof_packet", "production-switch-proof-packet"]
+    ]) {
+      const download = runtimeEvidenceLaunchSmoke.smokeSummary.recommendedDownloads?.find((item) => item?.key === key) || null;
+      assert.ok(download, `missing Launch Smoke recommended download ${key}`);
+      assert.equal(download?.source, "developer-launch-smoke-kit");
+      assert.equal(download?.format, format);
+      assert.match(download?.href || "", new RegExp(`format=${format}`));
+      assert.ok(runtimeEvidenceLaunchSmoke.smokeSummary.routeFocus?.controls?.some((item) =>
+        item?.recommendedDownload?.key === key
+        && item?.recommendedDownload?.format === format
+      ), `missing Launch Smoke route focus control ${key}`);
+    }
+    assert.ok(runtimeEvidenceLaunchSmoke.smokeSummary.actionPlan.some((item) =>
+      item.key === "launch_smoke_pre_staging_readiness_self_check"
+      && item.recommendedDownload?.format === "pre-staging-readiness-self-check"
+    ));
+    assert.ok(runtimeEvidenceLaunchSmoke.smokeSummary.routeFocus?.controls?.some((item) =>
+      item?.recommendedDownload?.key === "ops_pre_staging_readiness_self_check"
+      && item?.recommendedDownload?.format === "pre-staging-readiness-self-check"
+    ));
 
     const runtimeEvidenceSmokeDownload = await getText(
       baseUrl,
@@ -12491,12 +12598,36 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.doesNotMatch(runtimeEvidenceSmokeDownload.body, new RegExp(firstLaunchDirectCard.cardKey));
     assert.doesNotMatch(runtimeEvidenceSmokeDownload.body, new RegExp(firstWaveRuntimeLogin.sessionToken));
 
+    const runtimeEvidenceSmokeProductionSwitchProofPacketDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=production-switch-proof-packet",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.contentDisposition || "", /production-switch-proof-packet\.txt"/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /RockSolid Developer Launch Smoke Kit Production Switch Proof Packet/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /productionSwitchProof=/);
+
+    const runtimeEvidenceSmokeSurfaceReviewCloseoutActionDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=surface-review-closeout-action",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceSmokeSurfaceReviewCloseoutActionDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceSmokeSurfaceReviewCloseoutActionDownload.contentDisposition || "", /surface-review-closeout-action\.txt"/);
+    assert.match(runtimeEvidenceSmokeSurfaceReviewCloseoutActionDownload.body, /RockSolid Developer Launch Smoke Kit Surface Review Closeout Action/);
+    assert.match(runtimeEvidenceSmokeSurfaceReviewCloseoutActionDownload.body, /Launch Surface Review Closeout:/);
+    assert.match(runtimeEvidenceSmokeSurfaceReviewCloseoutActionDownload.body, /status=/);
+
     const runtimeEvidenceSmokeChecksums = await getText(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=checksums",
       ownerSession.token
     );
     assert.match(runtimeEvidenceSmokeChecksums.body, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceSmokeChecksums.body, /surface-review-closeout-action\.txt/);
+    assert.match(runtimeEvidenceSmokeChecksums.body, /production-switch-proof-packet\.txt/);
     assert.match(runtimeEvidenceSmokeChecksums.body, /handoff-routes\.txt/);
 
     const runtimeEvidenceSmokeHandoffRoutes = await getText(
@@ -12513,6 +12644,9 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Developer Ops Launch Mainline Routes:.*format=launch-mainline-handoff-routes/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Mainline Handoff Routes:.*format=handoff-download-routes/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Mainline Post-Launch Index:.*format=post-launch-handoff-index/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch smoke surface review closeout action:.*format=surface-review-closeout-action/i);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch smoke production switch proof packet:.*format=production-switch-proof-packet/i);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Developer Ops Pre-Staging Readiness Self-Check:.*format=pre-staging-readiness-self-check/);
     assert.match(
       runtimeEvidenceSmokeHandoffRoutes.body,
       /Front-Loaded Launch Path:[\s\S]*1\. launch-mainline-handoff-routes\.txt[\s\S]*2\. surface-review-closeout-shortcut-download\.txt[\s\S]*3\. developer-ops-pre-staging-readiness-self-check\.txt/
@@ -12535,6 +12669,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     const runtimeEvidenceSmokeZipText = runtimeEvidenceSmokeZip.body.toString("latin1");
     assert.match(runtimeEvidenceSmokeZipText, /first-wave-runtime-evidence\.txt/);
+    assert.match(runtimeEvidenceSmokeZipText, /surface-review-closeout-action\.txt/);
+    assert.match(runtimeEvidenceSmokeZipText, /production-switch-proof-packet\.txt/);
+    assert.match(runtimeEvidenceSmokeZipText, /Launch Surface Review Closeout:/);
+    assert.match(runtimeEvidenceSmokeZipText, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceSmokeZipText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceSmokeZipText, /handoff-routes\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /RockSolid Developer Launch Smoke Kit Handoff Routes/);
@@ -20949,6 +21087,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       expectedSteadyStateLaunchDutyRecordIndexPath,
       "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json"
     );
+    const steadyStateOperatorEntryQuickAccess =
+      steadyStateSnapshot.summary.initialLaunchOpsReadiness.launchOperationsOperatorEntry?.quickAccessDownloads || [];
+    for (const [key, format] of [
+      ["ops_production_switch_proof_packet", "production-switch-proof-packet"],
+      ["ops_steady_state_operational_review", "steady-state-operational-review"],
+      ["ops_steady_state_exception_digest", "steady-state-exception-digest"],
+      ["ops_steady_state_handoff_brief", "steady-state-handoff-brief"],
+      ["ops_steady_state_duty_board", "steady-state-duty-board"],
+      ["ops_steady_state_duty_action_links", "steady-state-duty-action-links"],
+      ["ops_launch_operations_handoff_summary", "launch-operations-handoff-summary"],
+      ["ops_launch_operations_daily_brief", "launch-operations-daily-brief"],
+      ["ops_launch_operations_shift_action_plan", "launch-operations-shift-action-plan"],
+      ["ops_launch_operations_overview_status", "launch-operations-overview-status"]
+    ]) {
+      const download = steadyStateOperatorEntryQuickAccess.find((item) => item.key === key) || null;
+      assert.ok(download, `missing steady-state operator quick access ${key}`);
+      assert.equal(download.format, format);
+      assert.match(download.href || "", new RegExp(`format=${format}`));
+      assert.equal(download.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    }
     const steadyStateLaunchDutyRecordIndexPattern =
       /launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/;
     const steadyStateWatchRecordDraftStatus = steadyStateOperationalReview.watchRecordDraftStatus;
@@ -23094,6 +23252,72 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       }
     );
     assert.deepEqual(
+      {
+        version: launchEvidenceReadinessGate.productionSwitchProofPacket?.version,
+        status: launchEvidenceReadinessGate.productionSwitchProofPacket?.status,
+        currentActionKey: launchEvidenceReadinessGate.productionSwitchProofPacket?.currentActionKey,
+        currentCommand: launchEvidenceReadinessGate.productionSwitchProofPacket?.currentCommand,
+        archiveRoot: launchEvidenceReadinessGate.productionSwitchProofPacket?.archiveRoot,
+        launchDutyRecordIndexFile: launchEvidenceReadinessGate.productionSwitchProofPacket?.launchDutyRecordIndexFile,
+        proofCounts: launchEvidenceReadinessGate.productionSwitchProofPacket?.proofCounts,
+        localFullSuiteBaseline: launchEvidenceReadinessGate.productionSwitchProofPacket?.localFullSuiteBaseline
+      },
+      {
+        version: "developer-ops-launch-evidence-production-switch-proof-packet/v1",
+        status: "blocked_until_real_environment_evidence",
+        currentActionKey: "backfill_closeout_evidence",
+        currentCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        archiveRoot: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable",
+        launchDutyRecordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+        proofCounts: {
+          total: 8,
+          ready: 1,
+          blocked: 7
+        },
+        localFullSuiteBaseline: {
+          command: "npm.cmd test",
+          status: "available_from_2026-05-27_full_suite_pass",
+          testCount: 192,
+          failureCount: 0,
+          outputArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt",
+          nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
+        }
+      }
+    );
+    assert.deepEqual(
+      launchEvidenceReadinessGate.productionSwitchProofPacket?.proofItems?.map((item) => [
+        item.order,
+        item.key,
+        item.status,
+        item.artifactPath,
+        item.command
+      ]),
+      [
+        [1, "public_https_entrypoint", "pending_real_environment_value", null, null],
+        [2, "non_default_secret_env", "pending_real_environment_confirmation", null, null],
+        [3, "storage_profile_selected", "pending_real_environment_value", null, null],
+        [4, "backup_restore_drill", "blocked_after_readiness_status", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt", null],
+        [5, "live_write_smoke", "blocked_after_route_map_gate", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json", null],
+        [6, "full_test_window", "ready_local_baseline_available", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt", "npm.cmd test"],
+        [7, "production_signoff_and_receipts", "blocked_after_full_test_signoff_backfill", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json", null],
+        [
+          8,
+          "launch_day_watch_and_stabilization",
+          "blocked_after_production_signoff_readiness",
+          "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md",
+          "npm.cmd run staging:launch-duty:record -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key launch_day_watch_summary --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+        ]
+      ]
+    );
+    assert.deepEqual(
+      launchOperationsOperatorEntry.productionSwitchProofPacket,
+      launchEvidenceReadinessGate.productionSwitchProofPacket
+    );
+    assert.deepEqual(
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.productionSwitchProofPacket,
+      launchEvidenceReadinessGate.productionSwitchProofPacket
+    );
+    assert.deepEqual(
       launchEvidenceReadinessGate.evidenceItems.map((item) => [
         item.order,
         item.key,
@@ -23127,6 +23351,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*fullTest=npm\.cmd test/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchProof=blocked_until_real_environment_evidence \| ready=1\/8 \| blocked=7\/8 \| current=backfill_closeout_evidence/
     );
     assert.equal(launchOperationsOperatorEntry.checklistStepCount, 14);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
@@ -25270,6 +25498,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /production-switch-proof-packet: [^\n]*file=production-switch-proof-packet\.txt[^\n]*format=production-switch-proof-packet[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Production Signoff Entry Handoff Route:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
     );
     assert.match(
@@ -25369,6 +25601,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-readiness-distance\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/production-switch-proof-packet\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/initial-production-launch-readiness\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/production-signoff-entry-handoff\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-switch-readiness\.txt/);
@@ -25416,6 +25649,34 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /first-launch-handoff-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /rehearsal-guide-download\.txt/);
 
+    const launchMainlineProductionSwitchProofPacketDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=production-switch-proof-packet",
+      ownerSession.token
+    );
+    assert.equal(launchMainlineProductionSwitchProofPacketDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(
+      launchMainlineProductionSwitchProofPacketDownload.contentDisposition || "",
+      /production-switch-proof-packet\.txt/
+    );
+    assert.match(
+      launchMainlineProductionSwitchProofPacketDownload.body,
+      /RockSolid Launch Mainline Production Switch Proof Packet Download/
+    );
+    assert.match(launchMainlineProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
+    assert.match(
+      launchMainlineProductionSwitchProofPacketDownload.body,
+      /productionSwitchProof=blocked_until_real_environment_evidence \| ready=1\/8 \| blocked=7\/8 \| current=backfill_closeout_evidence/
+    );
+    assert.match(
+      launchMainlineProductionSwitchProofPacketDownload.body,
+      /proof 8\. launch_day_watch_and_stabilization \| status=blocked_after_production_signoff_readiness \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md \| command=npm\.cmd run staging:launch-duty:record/
+    );
+    assert.match(
+      launchMainlineProductionSwitchProofPacketDownload.body,
+      /6\. full_test_window \| status=ready_local_baseline_available \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt \| command=npm\.cmd test/
+    );
+
     const launchMainlineOpsRouteMirrorZipDownload = await getBinary(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
@@ -25447,6 +25708,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-readiness-distance\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/production-switch-proof-packet\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Production Switch Proof Packet Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /Production Switch Proof Packet:/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Launch Readiness Distance Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Readiness Distance:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Readiness Distance Commands:[\s\S]*current=npm\.cmd run staging:readiness:status/);
@@ -25994,6 +26258,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Included Handoff Files:[\s\S]*Production switch proof packet: ops\/production-switch-proof-packet\.txt/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Included Handoff Files:[\s\S]*Production signoff entry handoff: ops\/production-signoff-entry-handoff\.txt/
     );
     assert.doesNotMatch(
@@ -26177,6 +26445,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*currentEvidence=route_map_gate_result/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*fullTest=npm\.cmd test/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*productionSwitchProof=blocked_until_real_environment_evidence \| ready=1\/8 \| blocked=7\/8 \| current=backfill_closeout_evidence/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*proof 8\. launch_day_watch_and_stabilization \| status=blocked_after_production_signoff_readiness \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md \| command=npm\.cmd run staging:launch-duty:record/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*12\. first_wave_closeout \| status=blocked_until_stabilization_records/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Receipt Visibility Summary Downloads:[\s\S]*- Launch Review summary \| Launch Review receipt visibility summary \| launch-review\.txt \| href=.*format=summary \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
@@ -27928,6 +28198,31 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsChecksumsDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsChecksumsDownload.body, /launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsChecksumsDownload.body, /pre-staging-readiness-self-check\.txt/);
+    assert.match(launchOperationsChecksumsDownload.body, /production-switch-proof-packet\.txt/);
+
+    const launchOperationsProductionSwitchProofPacketDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=production-switch-proof-packet",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsProductionSwitchProofPacketDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(
+      launchOperationsProductionSwitchProofPacketDownload.contentDisposition || "",
+      /developer-ops-production-switch-proof-packet\.txt/
+    );
+    assert.match(
+      launchOperationsProductionSwitchProofPacketDownload.body,
+      /RockSolid Developer Ops Production Switch Proof Packet/
+    );
+    assert.match(launchOperationsProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
+    assert.match(
+      launchOperationsProductionSwitchProofPacketDownload.body,
+      /productionSwitchProof=blocked_until_real_environment_evidence \| ready=1\/8 \| blocked=7\/8 \| current=backfill_closeout_evidence/
+    );
+    assert.match(
+      launchOperationsProductionSwitchProofPacketDownload.body,
+      /6\. full_test_window \| status=ready_local_baseline_available \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt \| command=npm\.cmd test/
+    );
 
     const launchOperationsPreStagingSelfCheckDownload = await getText(
       baseUrl,
@@ -27989,6 +28284,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsZipText, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsZipText, /launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsZipText, /pre-staging-readiness-self-check\.txt/);
+    assert.match(launchOperationsZipText, /production-switch-proof-packet\.txt/);
+    assert.match(launchOperationsZipText, /RockSolid Developer Ops Production Switch Proof Packet/);
+    assert.match(launchOperationsZipText, /Production Switch Proof Packet:/);
     assert.match(launchOperationsZipText, /RockSolid Developer Ops Pre-Staging Readiness Self-Check/);
     assert.match(launchOperationsZipText, /launchOpsOverviewContextLaunchDutyRecordIndexPath/);
     assert.match(launchOperationsZipText, /artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/);
@@ -30384,6 +30682,55 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         stableOperationsHandoff: expectedLaunchDutyGateStableHandoff
       }
     );
+    assert.deepEqual(
+      {
+        version: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.version,
+        status: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.status,
+        currentActionKey: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.currentActionKey,
+        currentCommand: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.currentCommand,
+        proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
+      },
+      {
+        version: "developer-ops-launch-evidence-production-switch-proof-packet/v1",
+        status: "ready_for_production_switch_review",
+        currentActionKey: "refresh_readiness_status",
+        currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        proofCounts: {
+          total: 8,
+          ready: 8,
+          blocked: 0
+        }
+      }
+    );
+    assert.deepEqual(
+      launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofItems?.map((item) => [
+        item.order,
+        item.key,
+        item.status,
+        item.artifactPath,
+        item.command
+      ]),
+      [
+        [1, "public_https_entrypoint", "ready_confirmed_by_launch_gate", null, null],
+        [2, "non_default_secret_env", "ready_confirmed_by_launch_gate", null, null],
+        [3, "storage_profile_selected", "ready_confirmed_by_launch_gate", null, null],
+        [4, "backup_restore_drill", "ready_evidence_attached", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt", null],
+        [5, "live_write_smoke", "ready_evidence_attached", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json", null],
+        [6, "full_test_window", "ready_evidence_attached", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt", "npm.cmd test"],
+        [7, "production_signoff_and_receipts", "ready_evidence_attached", "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json", null],
+        [
+          8,
+          "launch_day_watch_and_stabilization",
+          "ready_evidence_attached",
+          "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+          "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json"
+        ]
+      ]
+    );
+    assert.deepEqual(
+      launchDutyCloseoutRecordedOperatorEntry.productionSwitchProofPacket,
+      launchDutyCloseoutRecordedGate.productionSwitchProofPacket
+    );
     assert.equal(
       launchDutyCloseoutRecordedGate.evidenceItems.find((item) => item.key === "first_wave_closeout")?.status,
       "recorded"
@@ -30787,6 +31134,52 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    const launchDutyCloseoutRecordedOpsProofPacketDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=production-switch-proof-packet",
+      ownerSession.token
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsProofPacketDownload.body,
+      /RockSolid Developer Ops Production Switch Proof Packet/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsProofPacketDownload.body,
+      /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsProofPacketDownload.body,
+      /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    const launchDutyCloseoutRecordedOpsChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=checksums",
+      ownerSession.token
+    );
+    assert.match(launchDutyCloseoutRecordedOpsChecksumsDownload.body, /production-switch-proof-packet\.txt/);
+    const launchDutyCloseoutRecordedOpsZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=zip",
+      ownerSession.token
+    );
+    const launchDutyCloseoutRecordedOpsZipText = launchDutyCloseoutRecordedOpsZipDownload.body.toString("latin1");
+    assert.match(launchDutyCloseoutRecordedOpsZipText, /production-switch-proof-packet\.txt/);
+    assert.match(
+      launchDutyCloseoutRecordedOpsZipText,
+      /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsZipText,
+      /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Stabilization Receipt Write Queue:[\s\S]*status=complete \| handoffReady=yes \| handoffComplete=yes \| current=- \| records=4 \| closeout=first_wave_closeout/
     );
     assert.match(
@@ -31084,6 +31477,133 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    const launchMainlineCloseoutRecordedProofPacketDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=production-switch-proof-packet",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedProofPacketDownload.body,
+      /RockSolid Launch Mainline Production Switch Proof Packet Download/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedProofPacketDownload.body,
+      /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedProofPacketDownload.body,
+      /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    const launchReviewCloseoutRecordedProofPacketDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=production-switch-proof-packet",
+      ownerSession.token
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
+      /RockSolid Developer Launch Review Production Switch Proof Packet/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
+      /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
+      /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    const launchReviewCloseoutRecordedHandoffRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-routes",
+      ownerSession.token
+    );
+    assert.match(
+      launchReviewCloseoutRecordedHandoffRoutesDownload.body,
+      /Launch review production switch proof packet:.*format=production-switch-proof-packet/i
+    );
+    assert.match(
+      launchReviewCloseoutRecordedHandoffRoutesDownload.body,
+      /launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchReviewCloseoutRecordedChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
+      ownerSession.token
+    );
+    assert.match(launchReviewCloseoutRecordedChecksumsDownload.body, /production-switch-proof-packet\.txt/);
+    const launchReviewCloseoutRecordedZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=zip",
+      ownerSession.token
+    );
+    const launchReviewCloseoutRecordedZipText = launchReviewCloseoutRecordedZipDownload.body.toString("latin1");
+    assert.match(launchReviewCloseoutRecordedZipText, /production-switch-proof-packet\.txt/);
+    assert.match(
+      launchReviewCloseoutRecordedZipText,
+      /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedZipText,
+      /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    const launchSmokeCloseoutRecordedProofPacketDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&format=production-switch-proof-packet",
+      ownerSession.token
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /RockSolid Developer Launch Smoke Kit Production Switch Proof Packet/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    const launchSmokeCloseoutRecordedHandoffRoutesDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&format=handoff-routes",
+      ownerSession.token
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedHandoffRoutesDownload.body,
+      /Launch smoke production switch proof packet:.*format=production-switch-proof-packet/i
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedHandoffRoutesDownload.body,
+      /launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    const launchSmokeCloseoutRecordedChecksumsDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&format=checksums",
+      ownerSession.token
+    );
+    assert.match(launchSmokeCloseoutRecordedChecksumsDownload.body, /production-switch-proof-packet\.txt/);
+    const launchSmokeCloseoutRecordedZipDownload = await getBinary(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&format=zip",
+      ownerSession.token
+    );
+    const launchSmokeCloseoutRecordedZipText = launchSmokeCloseoutRecordedZipDownload.body.toString("latin1");
+    assert.match(launchSmokeCloseoutRecordedZipText, /production-switch-proof-packet\.txt/);
+    assert.match(
+      launchSmokeCloseoutRecordedZipText,
+      /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedZipText,
+      /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Stable Operations Packet Review Bridge:[\s\S]*status=ready_for_packet_result_review \| ready=yes \| current=run_record_index \| next=artifact_manifest \| progress=0\/6/
     );
     assert.match(
@@ -31362,6 +31882,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedChecksumsDownload.body,
+      /ops\/production-switch-proof-packet\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedChecksumsDownload.body,
       /ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/
     );
     assert.match(
@@ -31382,6 +31906,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     const launchMainlineCloseoutRecordedZipText = launchMainlineCloseoutRecordedZipDownload.body.toString("latin1");
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /ops\/production-switch-proof-packet\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
     assert.match(
       launchMainlineCloseoutRecordedZipText,
       /ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/

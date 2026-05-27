@@ -6447,6 +6447,19 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.status, "ready_for_stabilization_handoff");
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.packetPath, firstWaveCloseoutArtifactPath);
     assert.equal(output.operatorExecutionPlan.launchDutyCurrentAction.recordIndexFile, recordIndexFile);
+    const productionSwitchProofItems = new Map(output.productionSwitchProofPacket.proofItems.map((item) => [item.key, item]));
+    assert.equal(
+      productionSwitchProofItems.get("launch_day_watch_and_stabilization").status,
+      "ready_evidence_attached"
+    );
+    assert.equal(
+      productionSwitchProofItems.get("launch_day_watch_and_stabilization").command,
+      completionHandoff.statusCommand
+    );
+    assert.equal(
+      productionSwitchProofItems.get("launch_day_watch_and_stabilization").artifactPath,
+      firstWaveCloseoutArtifactPath
+    );
     assert.deepEqual(
       {
         status: output.launchEvidenceReadinessGate?.status,
@@ -6568,6 +6581,7 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.match(plain.stdout, /Launch evidence progress: closeout=7\/7, signoff=7\/7, receipts=5\/5, launchDuty=2\/2/);
     assert.match(plain.stdout, /Launch evidence launch-duty records: 6\/6 recorded, 0 pending, next=-/);
     assert.match(plain.stdout, /Launch evidence stable handoff: ready_for_stabilization_handoff -> .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(plain.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: ready_evidence_attached -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
     assert.match(plain.stdout, /Launch duty current action: stable_operations_handoff \(stage=stable_operations_handoff, source=launchDutyCompletionHandoff\)/);
     assert.match(plain.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
     assert.match(plain.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);

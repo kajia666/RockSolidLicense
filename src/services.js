@@ -4173,6 +4173,135 @@ function createLaunchMainlineDownloadShortcut(label = "Launch mainline summary",
   );
 }
 
+const MIRRORED_LAUNCH_SURFACE_FREEZE_FRONT_LOADED_PATH = [
+  "launch-mainline-handoff-routes.txt",
+  "surface-review-closeout-shortcut-download.txt",
+  "developer-ops-pre-staging-readiness-self-check.txt"
+];
+
+function buildMirroredLaunchSurfaceFreezeChecklist({
+  params = {},
+  launchDutyRecordIndexPath = "",
+  finalGoLiveTestWindowCommand = "npm.cmd test"
+} = {}) {
+  const normalizedParams = params && typeof params === "object" ? { ...params } : {};
+  const recordIndexPath = String(launchDutyRecordIndexPath || "").trim() || "-";
+  const withRecordIndex = (download = null) => download && typeof download === "object"
+    ? {
+        ...download,
+        status: "frozen",
+        launchDutyRecordIndexPath: recordIndexPath
+      }
+    : null;
+  const surfaces = [
+    withRecordIndex(createLaunchWorkflowDownloadShortcut(
+      "launch_review_handoff_routes",
+      "launch-review-handoff-routes.txt",
+      "Launch Review handoff routes",
+      {
+        source: "developer-launch-review",
+        format: "handoff-routes",
+        params: normalizedParams
+      }
+    )),
+    withRecordIndex(createLaunchWorkflowDownloadShortcut(
+      "launch_smoke_handoff_routes",
+      "launch-smoke-handoff-routes.txt",
+      "Launch Smoke handoff routes",
+      {
+        source: "developer-launch-smoke-kit",
+        format: "handoff-routes",
+        params: normalizedParams
+      }
+    )),
+    withRecordIndex(createLaunchMainlineDownloadShortcut(
+      "Launch Mainline handoff download routes",
+      "handoff-download-routes.txt",
+      "handoff-download-routes",
+      normalizedParams
+    )),
+    withRecordIndex(createLaunchWorkflowDownloadShortcut(
+      "developer_ops_launch_mainline_handoff_routes",
+      "developer-ops-launch-mainline-handoff-routes.txt",
+      "Developer Ops launch mainline handoff routes",
+      {
+        source: "developer-ops",
+        format: "launch-mainline-handoff-routes",
+        params: normalizedParams
+      }
+    )),
+    {
+      ...withRecordIndex(createLaunchMainlineDownloadShortcut(
+        "Stable operations direct files",
+        "steady-state-handoff-landing-execution.txt",
+        "steady-state-handoff-landing-execution",
+        normalizedParams
+      )),
+      key: "stable_operations_direct_files",
+      label: "Stable operations direct files",
+      supportingFormats: [
+        "steady-state-duty-receipt-review-execution",
+        "rollout-widening-decision-execution",
+        "first-operating-result-handoff-execution",
+        "first-operating-result-review-execution"
+      ]
+    }
+  ].filter(Boolean);
+  const frozenSurfaceCount = surfaces.filter((item) => item.status === "frozen").length;
+  return {
+    version: "developer-launch-mainline-mirrored-launch-surface-freeze/v1",
+    status: "mirrored_surfaces_frozen",
+    readyForFinalGoLiveTestWindow: frozenSurfaceCount === surfaces.length && surfaces.length > 0,
+    readyForProductionSwitch: false,
+    surfaceCount: surfaces.length,
+    frozenSurfaceCount,
+    launchDutyRecordIndexPath: recordIndexPath,
+    frontLoadedPath: MIRRORED_LAUNCH_SURFACE_FREEZE_FRONT_LOADED_PATH.slice(),
+    finalGoLiveTestWindowCommand: finalGoLiveTestWindowCommand || "npm.cmd test",
+    nextAction: "Run the guarded final go-live test window after this freeze remains unchanged, then use launch-duty-record-index.json for the production switch check.",
+    surfaces
+  };
+}
+
+function appendMirroredLaunchSurfaceFreezeLines(lines = [], freeze = null, {
+  title = "Mirrored Launch Surface Freeze:"
+} = {}) {
+  if (!Array.isArray(lines) || !freeze || typeof freeze !== "object") {
+    return false;
+  }
+  const surfaces = Array.isArray(freeze.surfaces) ? freeze.surfaces : [];
+  lines.push(title);
+  lines.push(
+    `- status=${freeze.status || "-"}`
+    + ` | readyForFinalGoLiveTestWindow=${freeze.readyForFinalGoLiveTestWindow === true ? "yes" : "no"}`
+    + ` | readyForProductionSwitch=${freeze.readyForProductionSwitch === true ? "yes" : "no"}`
+    + ` | surfaces=${freeze.frozenSurfaceCount ?? 0}/${freeze.surfaceCount ?? surfaces.length}`
+    + ` | launchDutyRecordIndex=${freeze.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`- frontLoadedPath=${(Array.isArray(freeze.frontLoadedPath) ? freeze.frontLoadedPath : []).join(" -> ") || "-"}`);
+  lines.push(
+    `- finalGoLiveTestWindow=${freeze.finalGoLiveTestWindowCommand || "-"}`
+    + ` | nextAction=${freeze.nextAction || "-"}`
+  );
+  lines.push("Frozen Surface Downloads:");
+  if (!surfaces.length) {
+    lines.push("- none");
+  } else {
+    surfaces.forEach((item, index) => {
+      lines.push(
+        `${index + 1}. ${item.key || "surface"}`
+        + ` | status=${item.status || "-"}`
+        + ` | file=${item.fileName || "-"}`
+        + ` | format=${item.format || "-"}`
+        + ` | source=${item.source || "-"}`
+        + ` | href=${item.href || "-"}`
+        + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || freeze.launchDutyRecordIndexPath || "-"}`
+      );
+    });
+  }
+  return true;
+}
+
 function buildFocusKindControlLabel(focusKind = "", suffix = "") {
   const normalized = String(focusKind || "").trim().toLowerCase();
   if (normalized === "account") {
@@ -16602,6 +16731,21 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     && typeof launchOperationsOperatorEntry.launchEvidenceReadinessGate === "object"
       ? launchOperationsOperatorEntry.launchEvidenceReadinessGate
       : null;
+  const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate
+    && typeof launchOperationsOperatorEntry.launchCandidateFullVerificationGate === "object"
+      ? launchOperationsOperatorEntry.launchCandidateFullVerificationGate
+      : null;
+  const mirroredLaunchSurfaceFreezeRecordIndexPath = launchOperationsOperatorEntry?.launchDutyRecordIndexPath
+    || launchEvidenceReadinessGate?.launchDutyRecordIndexPath
+    || launchDutyActionOrder?.stagingArchiveNextOperations?.launchDutyRecordIndexPath
+    || initialLaunchOpsOverviewStatus?.launchOpsOverviewContext?.launchDutyRecordIndexPath
+    || initialLaunchOpsOverviewStatus?.overviewDownload?.launchDutyRecordIndexPath
+    || "";
+  const mirroredLaunchSurfaceFreeze = buildMirroredLaunchSurfaceFreezeChecklist({
+    params,
+    launchDutyRecordIndexPath: mirroredLaunchSurfaceFreezeRecordIndexPath,
+    finalGoLiveTestWindowCommand: launchCandidateFullVerificationGate?.fullTestCommand || "npm.cmd test"
+  });
   const postArchiveLaunchDayWatchReadback = getPostArchiveLaunchDayWatchReadbackFromOperatorEntry(
     launchOperationsOperatorEntry
   );
@@ -21181,6 +21325,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     launchDutyActionOrder,
     launchEvidenceReadinessGate,
     operatorQueueCheckpoint,
+    mirroredLaunchSurfaceFreeze,
     preStagingReadinessSelfCheck,
     steadyStateHandoffLanding,
     steadyStateDutyReceiptReview,
@@ -24095,6 +24240,12 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
   const launchEvidenceReadinessGate = mainlineSummary.launchEvidenceReadinessGate
     || launchOperationsOperatorEntry?.launchEvidenceReadinessGate
     || null;
+  const mirroredLaunchSurfaceFreeze = mainlineSummary.mirroredLaunchSurfaceFreeze
+    || buildMirroredLaunchSurfaceFreezeChecklist({
+      params: getDeveloperLaunchMainlineRouteParams(payload),
+      launchDutyRecordIndexPath: getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload),
+      finalGoLiveTestWindowCommand: launchCandidateFullVerificationGate?.fullTestCommand || "npm.cmd test"
+    });
   const launchReceiptAuditBackfill = Number(payload.opsSnapshot?.auditLogs?.filters?.launchReceiptBackfill || 0);
   const launchReceiptAuditBackfillStatus = payload.postLaunchHandoffTraceability?.launchReceiptAuditBackfillStatus
     || payload.opsSnapshot?.summary?.launchReceiptAuditBackfillStatus
@@ -24164,6 +24315,9 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     title: "Launch Mainline Launch Evidence Readiness Gate:"
   });
   if (launchEvidenceReadinessGate) {
+    lines.push("");
+  }
+  if (appendMirroredLaunchSurfaceFreezeLines(lines, mirroredLaunchSurfaceFreeze)) {
     lines.push("");
   }
   appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
@@ -30882,6 +31036,13 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
     ? nextFollowUp.recommendedDownload
     : {};
   const mainlineSummary = payload.mainlineSummary || {};
+  const mirroredLaunchSurfaceFreeze = mainlineSummary.mirroredLaunchSurfaceFreeze
+    || buildMirroredLaunchSurfaceFreezeChecklist({
+      params: getDeveloperLaunchMainlineRouteParams(payload),
+      launchDutyRecordIndexPath: getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload),
+      finalGoLiveTestWindowCommand: mainlineSummary.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchCandidateFullVerificationGate?.fullTestCommand
+        || "npm.cmd test"
+    });
   const firstWaveReadinessBridge = mainlineSummary.firstWaveReadinessBridge
     && typeof mainlineSummary.firstWaveReadinessBridge === "object"
       ? mainlineSummary.firstWaveReadinessBridge
@@ -31272,6 +31433,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   ];
   appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
   lines.push("");
+  if (appendMirroredLaunchSurfaceFreezeLines(lines, mirroredLaunchSurfaceFreeze)) {
+    lines.push("");
+  }
   if (launchDutyActionOrder) {
     appendDeveloperOpsLaunchDutyActionOrderLines(lines, launchDutyActionOrder, {
       title: "Launch Mainline Launch Duty Action Order:"
@@ -34701,6 +34865,13 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   const project = manifest.project || {};
   const filters = payload.filters || {};
   const mainlineSummary = payload.mainlineSummary || {};
+  const mirroredLaunchSurfaceFreeze = mainlineSummary.mirroredLaunchSurfaceFreeze
+    || buildMirroredLaunchSurfaceFreezeChecklist({
+      params: getDeveloperLaunchMainlineRouteParams(payload),
+      launchDutyRecordIndexPath: getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload),
+      finalGoLiveTestWindowCommand: mainlineSummary.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchCandidateFullVerificationGate?.fullTestCommand
+        || "npm.cmd test"
+    });
   const firstWaveHandoffConfirmation = mainlineSummary.firstWaveHandoffConfirmation || null;
   const firstWaveConfirmationChain = mainlineSummary.firstWaveConfirmationChain || null;
   const lifecycle = mainlineSummary.productionGate?.postLaunchLifecycle || {};
@@ -35361,6 +35532,9 @@ function buildDeveloperLaunchMainlinePostLaunchHandoffIndexText(payload = {}) {
   ];
   appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
   lines.push("");
+  if (appendMirroredLaunchSurfaceFreezeLines(lines, mirroredLaunchSurfaceFreeze)) {
+    lines.push("");
+  }
 
   if (surfaceReviewCloseoutShortcut) {
     appendSurfaceReviewCloseoutShortcutLines(lines, surfaceReviewCloseoutShortcut, {

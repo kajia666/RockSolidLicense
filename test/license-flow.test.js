@@ -21571,6 +21571,34 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.steadyStateDutyReceiptReview.launchDutyRecordIndexPath,
       expectedSteadyStateLaunchDutyRecordIndexPath
     );
+    const mirroredLaunchSurfaceFreeze = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.mirroredLaunchSurfaceFreeze;
+    assert.ok(mirroredLaunchSurfaceFreeze);
+    assert.equal(
+      mirroredLaunchSurfaceFreeze.version,
+      "developer-launch-mainline-mirrored-launch-surface-freeze/v1"
+    );
+    assert.equal(mirroredLaunchSurfaceFreeze.status, "mirrored_surfaces_frozen");
+    assert.equal(mirroredLaunchSurfaceFreeze.readyForFinalGoLiveTestWindow, true);
+    assert.equal(mirroredLaunchSurfaceFreeze.readyForProductionSwitch, false);
+    assert.equal(mirroredLaunchSurfaceFreeze.surfaceCount, 5);
+    assert.equal(mirroredLaunchSurfaceFreeze.frozenSurfaceCount, 5);
+    assert.equal(mirroredLaunchSurfaceFreeze.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    assert.deepEqual(mirroredLaunchSurfaceFreeze.frontLoadedPath, [
+      "launch-mainline-handoff-routes.txt",
+      "surface-review-closeout-shortcut-download.txt",
+      "developer-ops-pre-staging-readiness-self-check.txt"
+    ]);
+    assert.deepEqual(
+      mirroredLaunchSurfaceFreeze.surfaces.map((item) => [item.key, item.status, item.fileName, item.format]),
+      [
+        ["launch_review_handoff_routes", "frozen", "launch-review-handoff-routes.txt", "handoff-routes"],
+        ["launch_smoke_handoff_routes", "frozen", "launch-smoke-handoff-routes.txt", "handoff-routes"],
+        ["launch_mainline_handoff_download_routes", "frozen", "handoff-download-routes.txt", "handoff-download-routes"],
+        ["developer_ops_launch_mainline_handoff_routes", "frozen", "developer-ops-launch-mainline-handoff-routes.txt", "launch-mainline-handoff-routes"],
+        ["stable_operations_direct_files", "frozen", "steady-state-handoff-landing-execution.txt", "steady-state-handoff-landing-execution"]
+      ]
+    );
+    assert.match(mirroredLaunchSurfaceFreeze.nextAction, /guarded final go-live test window/);
     const expectedSteadyStateDutyReceiptOperatorOrder = [
       "Review the steady-state duty receipt review route before stable operations handoff."
     ];
@@ -25165,6 +25193,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Mirrored Launch Surface Freeze:[\s\S]*status=mirrored_surfaces_frozen \| readyForFinalGoLiveTestWindow=yes \| readyForProductionSwitch=no \| surfaces=5\/5 \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Frozen Surface Downloads:[\s\S]*3\. launch_mainline_handoff_download_routes \| status=frozen \| file=handoff-download-routes\.txt \| format=handoff-download-routes[\s\S]*4\. developer_ops_launch_mainline_handoff_routes \| status=frozen \| file=developer-ops-launch-mainline-handoff-routes\.txt \| format=launch-mainline-handoff-routes/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Operator Order:[\s\S]*Check the front-loaded path first: launch-mainline-handoff-routes\.txt -> surface-review-closeout-shortcut-download\.txt -> developer-ops-pre-staging-readiness-self-check\.txt\./
     );
     assert.doesNotMatch(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /Use this route map when reviewing the Launch Mainline zip offline/);
@@ -25779,6 +25815,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, /RockSolid Developer Launch Mainline Post-Launch Handoff Index/);
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Mirrored Launch Surface Freeze:[\s\S]*status=mirrored_surfaces_frozen \| readyForFinalGoLiveTestWindow=yes \| readyForProductionSwitch=no \| surfaces=5\/5 \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Frozen Surface Downloads:[\s\S]*1\. launch_review_handoff_routes \| status=frozen \| file=launch-review-handoff-routes\.txt \| format=handoff-routes[\s\S]*5\. stable_operations_direct_files \| status=frozen \| file=steady-state-handoff-landing-execution\.txt \| format=steady-state-handoff-landing-execution/
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
       /Launch Mainline Surface Review Closeout Shortcut:[\s\S]*Lifecycle Phase Statuses:/
     );
     assert.match(launchMainlinePostLaunchIndexSelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
@@ -26077,6 +26121,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSummarySelectionDownload.body,
       /Mainline Recommended Downloads:[\s\S]*initial-production-launch-readiness\.txt/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /Mirrored Launch Surface Freeze:[\s\S]*status=mirrored_surfaces_frozen \| readyForFinalGoLiveTestWindow=yes \| readyForProductionSwitch=no \| surfaces=5\/5 \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineSummarySelectionDownload.body,
+      /frontLoadedPath=launch-mainline-handoff-routes\.txt -> surface-review-closeout-shortcut-download\.txt -> developer-ops-pre-staging-readiness-self-check\.txt/
     );
     const initialProductionLaunchReadinessDownload = await getText(
       baseUrl,

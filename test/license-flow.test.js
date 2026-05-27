@@ -12404,6 +12404,15 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Launch Mainline Routes:.*format=launch-mainline-handoff-routes/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Mainline Handoff Routes:.*format=handoff-download-routes/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Mainline Post-Launch Index:.*format=post-launch-handoff-index/);
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /Front-Loaded Launch Path:[\s\S]*1\. launch-mainline-handoff-routes\.txt[\s\S]*2\. surface-review-closeout-shortcut-download\.txt[\s\S]*3\. developer-ops-pre-staging-readiness-self-check\.txt/
+    );
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /Operator Notes:[\s\S]*Use the front-loaded path before reopening broader Ops\/Mainline continuation routes\./
+    );
+    assert.doesNotMatch(runtimeEvidenceReviewHandoffRoutes.body, /Open Developer Ops Handoff Index first/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch mainline zip:.*format=zip/i);
     assert.match(
       runtimeEvidenceReviewHandoffRoutes.body,
@@ -12504,6 +12513,15 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Developer Ops Launch Mainline Routes:.*format=launch-mainline-handoff-routes/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Mainline Handoff Routes:.*format=handoff-download-routes/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Mainline Post-Launch Index:.*format=post-launch-handoff-index/);
+    assert.match(
+      runtimeEvidenceSmokeHandoffRoutes.body,
+      /Front-Loaded Launch Path:[\s\S]*1\. launch-mainline-handoff-routes\.txt[\s\S]*2\. surface-review-closeout-shortcut-download\.txt[\s\S]*3\. developer-ops-pre-staging-readiness-self-check\.txt/
+    );
+    assert.match(
+      runtimeEvidenceSmokeHandoffRoutes.body,
+      /Operator Notes:[\s\S]*Use the front-loaded path before reopening broader Ops\/Mainline continuation routes\./
+    );
+    assert.doesNotMatch(runtimeEvidenceSmokeHandoffRoutes.body, /Developer Ops Handoff Index if ownership/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch mainline zip:.*format=zip/i);
     assert.match(
       runtimeEvidenceSmokeHandoffRoutes.body,

@@ -13958,6 +13958,12 @@ function buildLaunchSurfaceHandoffRoutesText({
     lines.push("");
   }
 
+  lines.push("Front-Loaded Launch Path:");
+  lines.push("1. launch-mainline-handoff-routes.txt");
+  lines.push("2. surface-review-closeout-shortcut-download.txt");
+  lines.push("3. developer-ops-pre-staging-readiness-self-check.txt");
+  lines.push("");
+
   lines.push(packageSectionTitle);
   appendLaunchSurfaceHandoffDownloadLines(lines, packageDownloads, launchDutyRecordIndexPath);
 
@@ -13980,6 +13986,7 @@ function buildLaunchSurfaceHandoffRoutesText({
       ];
   lines.push("");
   lines.push("Operator Notes:");
+  lines.push("- Use the front-loaded path before reopening broader Ops/Mainline continuation routes.");
   for (const note of notes) {
     lines.push(`- ${note}`);
   }
@@ -14068,7 +14075,7 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
     launchDutyActionOrder: payload.reviewSummary?.launchDutyActionOrder || null,
     operatorNotes: [
       "Use this file when Launch Review is the current handoff surface and the next operator needs Ops/Mainline routes without rebuilding filters.",
-      "Open Developer Ops Handoff Index first when follow-up ownership is unclear, then use Launch Mainline Handoff Routes for the cross-surface package."
+      "Use the broader Ops/Mainline continuation routes only after the front-loaded path has been checked."
     ]
   });
 }
@@ -16066,7 +16073,7 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
     launchDutyActionOrder: payload.smokeSummary?.launchDutyActionOrder || null,
     operatorNotes: [
       "Use this file when Launch Smoke is the current handoff surface and the next operator must continue into Review, Ops, or Mainline without rebuilding filters.",
-      "Run Launch Review Summary after smoke login/recharge evidence, then use Developer Ops Handoff Index if ownership or next follow-up is unclear."
+      "Run Launch Review Summary after smoke login/recharge evidence, then check the front-loaded path before reopening broader Ops/Mainline continuation routes."
     ]
   });
 }

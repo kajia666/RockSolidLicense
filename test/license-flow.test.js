@@ -25077,6 +25077,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsOperatorChecklistDownload.body,
+      /Operator Order:[\s\S]*Keep launch-mainline-handoff-routes\.txt, surface-review-closeout-shortcut-download\.txt, and developer-ops-pre-staging-readiness-self-check\.txt open as the cross-surface handoff path\./
+    );
+    assert.doesNotMatch(launchOperationsOperatorChecklistDownload.body, /cross-surface route map/);
+    assert.match(
+      launchOperationsOperatorChecklistDownload.body,
       /Launch Candidate Full Verification Gate:[\s\S]*status=blocked_until_closeout_evidence_readbacks_complete \| ready=false \| current=complete_closeout_readbacks \| command=npm\.cmd test \| output=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt/
     );
     assert.match(
@@ -25095,6 +25100,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /Operator Order:[\s\S]*Check the front-loaded path first: launch-mainline-handoff-routes\.txt -> surface-review-closeout-shortcut-download\.txt -> developer-ops-pre-staging-readiness-self-check\.txt\./
+    );
+    assert.doesNotMatch(launchOperationsMainlineHandoffRoutesDownload.body, /complete Launch Mainline route map/);
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, latestLaunchDutySelectionChecklistStepPattern);
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
@@ -25153,6 +25163,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Operator Order:[\s\S]*Check the front-loaded path first: launch-mainline-handoff-routes\.txt -> surface-review-closeout-shortcut-download\.txt -> developer-ops-pre-staging-readiness-self-check\.txt\./
+    );
+    assert.doesNotMatch(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /Use this route map when reviewing the Launch Mainline zip offline/);
+    assert.doesNotMatch(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /complete Launch Mainline route map/);
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, latestLaunchDutySelectionChecklistStepPattern);
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
@@ -25374,6 +25390,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-mainline-handoff-routes-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Launch Mainline Handoff Routes Download/);
+    assert.match(
+      launchMainlineOpsRouteMirrorZipText,
+      /RockSolid Developer Ops Launch Mainline Handoff Routes Download[\s\S]*Check the front-loaded path before comparing Mainline, Review, Smoke, and Ops entrypoints: launch-mainline-handoff-routes\.txt -> surface-review-closeout-shortcut-download\.txt -> developer-ops-pre-staging-readiness-self-check\.txt\./
+    );
+    assert.doesNotMatch(launchMainlineOpsRouteMirrorZipText, /validate cross-surface download hrefs without reopening Developer Ops/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=launch-mainline-handoff-routes/);
     assert.match(launchMainlineOpsRouteMirrorZipText, latestLaunchDutySelectionChecklistStepPattern);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/handoff-index-download\.txt/);

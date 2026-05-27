@@ -28191,10 +28191,10 @@ function buildDeveloperLaunchMainlineLaunchMainlineHandoffRoutesDownloadText(pay
     download: getDeveloperLaunchMainlineLaunchMainlineHandoffRoutesDownload(payload),
     status: payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.status || "",
     action: "review_launch_mainline_handoff_routes",
-    operatorOrder: ["Open the Developer Ops Launch Mainline handoff routes before comparing Mainline, Review, Smoke, and Ops entrypoints."],
+    operatorOrder: ["Check the front-loaded path before comparing Mainline, Review, Smoke, and Ops entrypoints: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt."],
     notes: [
       "Use this route to re-fetch the Developer Ops Launch Mainline handoff routes from the offline Mainline package.",
-      "Keep it beside launch-mainline-handoff-routes.txt so reviewers can validate cross-surface download hrefs without reopening Developer Ops."
+      "Keep it beside surface-review-closeout-shortcut-download.txt and developer-ops-pre-staging-readiness-self-check.txt so reviewers validate the same front-loaded path before reopening broader Ops context."
     ]
   });
 }
@@ -32404,7 +32404,8 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
 
   lines.push("");
   lines.push("Operator Order:");
-  lines.push("- Use this route map when reviewing the Launch Mainline zip offline.");
+  lines.push("- Check the front-loaded path first: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt.");
+  lines.push("- Use this handoff download list when reviewing the Launch Mainline zip offline.");
   lines.push("- Prefer the href values here over reconstructing download URLs from source and format names.");
   const steadyStateHandoffLandingOperatorOrder = Array.isArray(steadyStateHandoffLanding?.operatorOrder)
     ? steadyStateHandoffLanding.operatorOrder
@@ -60875,7 +60876,7 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
   lines.push("");
   lines.push("Operator Order:");
   lines.push("- Open this file from the Developer Ops export when handing launch duty to a reviewer who does not have the Launch Mainline zip open.");
-  lines.push("- Prefer the handoff-download-routes link when the reviewer needs the complete Launch Mainline route map.");
+  lines.push("- Check the front-loaded path first: launch-mainline-handoff-routes.txt -> surface-review-closeout-shortcut-download.txt -> developer-ops-pre-staging-readiness-self-check.txt.");
   if (latestSteadyStateDutyPlanReceipt) {
     lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
   }
@@ -63172,7 +63173,7 @@ function buildDeveloperOpsLaunchOperationsOperatorChecklistText(payload = {}) {
     lines.push("- Review the steady-state duty receipt review route before stable operations handoff.");
   }
   lines.push("- Open the four Launch Operations files first, then verify Launch Review and Launch Smoke receipt visibility with the same launch-duty record index.");
-  lines.push("- Keep the Launch Mainline handoff routes open as the cross-surface route map for recovery or reviewer handoff.");
+  lines.push("- Keep launch-mainline-handoff-routes.txt, surface-review-closeout-shortcut-download.txt, and developer-ops-pre-staging-readiness-self-check.txt open as the cross-surface handoff path.");
   lines.push("- Review the Launch Mainline readiness gate chain in order before production signoff: launch-readiness-distance.txt -> initial-production-launch-readiness.txt -> launch-switch-readiness.txt -> launch-candidate-full-verification-gate.txt -> production-signoff-entry-handoff.txt.");
   if (launchCandidateFullVerificationGate) {
     lines.push("- Review the Launch Candidate Full Verification Gate before reserving or running the guarded full-test window.");

@@ -25399,7 +25399,10 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
     appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(
       lines,
       launchSurfaceReviewCloseoutAction.operatorNextActions,
-      { title: "Launch Mainline Surface Review Closeout Operator Next Actions:" }
+      {
+        title: "Launch Mainline Surface Review Closeout Operator Next Actions:",
+        executionSummary: launchSurfaceReviewCloseoutAction.operatorExecutionSummary
+      }
     );
     if (operatorOrder.length) {
       lines.push("Operator Order:");
@@ -49287,6 +49290,65 @@ function buildDeveloperOpsOperatorRequestTemplate({
   };
 }
 
+function buildLaunchSurfaceReviewCloseoutOperatorExecutionSummary({
+  status = "unknown",
+  currentActionKey = null,
+  actions = []
+} = {}) {
+  const queue = Array.isArray(actions)
+    ? actions.filter((item) => item && typeof item === "object" && item.key)
+    : [];
+  if (!queue.length) {
+    return null;
+  }
+  const currentIndex = Math.max(0, queue.findIndex((item) => item.key === currentActionKey));
+  const currentAction = queue[currentIndex] || queue.find((item) => item.command) || queue[0];
+  const normalizedCurrentIndex = Math.max(0, queue.indexOf(currentAction));
+  const isReadyOrClosed = (item) => {
+    const normalizedStatus = String(item?.status || "").trim().toLowerCase();
+    return item?.ready === true
+      || normalizedStatus === "aligned"
+      || normalizedStatus === "completed"
+      || normalizedStatus === "already_confirmed"
+      || normalizedStatus === "ready_for_launch_duty_handoff";
+  };
+  const completedActionKeys = queue
+    .slice(0, normalizedCurrentIndex)
+    .filter((item) => isReadyOrClosed(item))
+    .map((item) => item.key);
+  const blockedActionKeys = queue
+    .slice(normalizedCurrentIndex + 1)
+    .filter((item) => !isReadyOrClosed(item))
+    .map((item) => item.key);
+  const requestTemplate = currentAction?.requestTemplate && typeof currentAction.requestTemplate === "object"
+    ? currentAction.requestTemplate
+    : null;
+  const commandRequiredEnv = [
+    requestTemplate?.baseUrlEnv || null,
+    requestTemplate?.bearerTokenEnv || null
+  ].filter(Boolean);
+  const readyActionCount = queue.filter((item) => isReadyOrClosed(item)).length;
+  return {
+    version: "developer-ops-launch-operations-surface-closeout-operator-execution-summary/v1",
+    status,
+    actionCount: queue.length,
+    readyActionCount,
+    blockedActionCount: blockedActionKeys.length,
+    currentActionKey: currentAction?.key || null,
+    currentActionStatus: currentAction?.status || null,
+    currentActionKind: currentAction?.kind || null,
+    currentCommand: currentAction?.command || null,
+    commandRequiredEnv,
+    completedActionKeys,
+    blockedActionKeys,
+    nextBlockedActionKey: blockedActionKeys[0] || null,
+    launchDutyRecordIndexPath: currentAction?.launchDutyRecordIndexPath || null,
+    nextAction: blockedActionKeys.length
+      ? `Run ${currentAction?.key || "the current action"} before continuing to ${blockedActionKeys[0]}.`
+      : `Run ${currentAction?.key || "the current action"} to continue the closeout handoff.`
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQueue({
   productCode = "",
   channel = "stable",
@@ -49710,6 +49772,11 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       launchDutyRecordIndexPath: resolvedRecordIndexPath
     }
   ];
+  const launchSurfaceReviewCloseoutOperatorExecutionSummary = buildLaunchSurfaceReviewCloseoutOperatorExecutionSummary({
+    status: queueStatus,
+    currentActionKey: closeoutCurrentActionKey,
+    actions: launchSurfaceReviewCloseoutOperatorNextActions
+  });
   const launchSurfaceReviewCloseoutAction = {
     version: "developer-ops-launch-operations-launch-surface-review-closeout-action/v1",
     key: "launch_surface_review_closeout",
@@ -49727,6 +49794,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     launchDutyRecordIndexPath: resolvedRecordIndexPath,
     reviewDownloads: closeoutReviewDownloads,
     operatorNextActions: launchSurfaceReviewCloseoutOperatorNextActions,
+    operatorExecutionSummary: launchSurfaceReviewCloseoutOperatorExecutionSummary,
     confirmationSubmission: {
       status: confirmationSubmissionPacket.status,
       ready: confirmationSubmissionPacket.ready,
@@ -49838,6 +49906,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     operatorHandoffPacket,
     launchSurfaceReviewCloseoutAction,
     operatorNextActions: launchSurfaceReviewCloseoutOperatorNextActions,
+    operatorExecutionSummary: launchSurfaceReviewCloseoutOperatorExecutionSummary,
     currentStepKey,
     nextStepKey,
     stepCount: steps.length,
@@ -65204,7 +65273,9 @@ function appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines = [], gate = n
 }
 
 function appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(lines = [], actions = [], {
-  title = "Launch Surface Review Closeout Operator Next Actions:"
+  title = "Launch Surface Review Closeout Operator Next Actions:",
+  executionSummary = null,
+  executionTitle = null
 } = {}) {
   if (!Array.isArray(lines) || !Array.isArray(actions) || !actions.length) {
     return;
@@ -65226,6 +65297,32 @@ function appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(lines = [], ac
       + ` | target=${target}`
       + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
       + (item.command ? ` | command=${item.command}` : "")
+    );
+  }
+  const summary = executionSummary && typeof executionSummary === "object"
+    ? executionSummary
+    : null;
+  if (summary) {
+    const summaryTitle = executionTitle
+      || String(title || "Launch Surface Review Closeout Operator Next Actions:")
+        .replace(/Operator Next Actions:?$/u, "Operator Execution Summary:");
+    lines.push(summaryTitle);
+    lines.push(
+      `- status=${summary.status || "-"}`
+      + ` | current=${summary.currentActionKey || "-"}`
+      + ` | ready=${summary.readyActionCount ?? 0}/${summary.actionCount ?? actions.length}`
+      + ` | blocked=${summary.blockedActionCount ?? 0}`
+      + ` | completed=${Array.isArray(summary.completedActionKeys) && summary.completedActionKeys.length
+        ? summary.completedActionKeys.join(",")
+        : "-"}`
+    );
+    lines.push(
+      `- command=${summary.currentCommand || "-"}`
+      + ` | env=${Array.isArray(summary.commandRequiredEnv) && summary.commandRequiredEnv.length
+        ? summary.commandRequiredEnv.join(",")
+        : "-"}`
+      + ` | nextBlocked=${summary.nextBlockedActionKey || "-"}`
+      + ` | launchDutyRecordIndex=${summary.launchDutyRecordIndexPath || "-"}`
     );
   }
 }
@@ -65312,7 +65409,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     );
     appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(
       lines,
-      launchSurfaceReviewCloseoutAction.operatorNextActions
+      launchSurfaceReviewCloseoutAction.operatorNextActions,
+      { executionSummary: launchSurfaceReviewCloseoutAction.operatorExecutionSummary }
     );
     lines.push("");
   }
@@ -67695,7 +67793,10 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
   appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(
     lines,
     launchSurfaceReviewCloseoutAction.operatorNextActions,
-    { title: "Surface Review Closeout Bridge Operator Next Actions:" }
+    {
+      title: "Surface Review Closeout Bridge Operator Next Actions:",
+      executionSummary: launchSurfaceReviewCloseoutAction.operatorExecutionSummary
+    }
   );
   if (operatorOrder.length) {
     lines.push("Surface Review Closeout Operator Order:");

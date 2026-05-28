@@ -24645,6 +24645,28 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorNextActions[4].command || "",
       /launch-duty record index[\s\S]*handoff_launch_duty_to_post_signoff/i
     );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.currentActionKey,
+      "confirm_first_wave_handoff"
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.currentCommand,
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorNextActions[2].command
+    );
+    assert.deepEqual(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.completedActionKeys,
+      ["review_launch_review_summary", "review_launch_smoke_summary"]
+    );
+    assert.deepEqual(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.blockedActionKeys,
+      ["refresh_developer_ops_overview", "handoff_launch_duty_to_post_signoff"]
+    );
+    assert.deepEqual(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.commandRequiredEnv,
+      ["RSL_DEVELOPER_BASE_URL", "RSL_DEVELOPER_BEARER_TOKEN"]
+    );
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.readyActionCount, 3);
+    assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.blockedActionCount, 2);
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.status, "ready_to_submit");
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.ready, true);
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.method, "POST");
@@ -26693,6 +26715,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:[\s\S]*5\. handoff_launch_duty_to_post_signoff \| kind=handoff \| status=awaiting_first_wave_confirmation \| ready=no/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:[\s\S]*3\. confirm_first_wave_handoff[\s\S]*command=.*RSL_DEVELOPER_BEARER_TOKEN[\s\S]*Invoke-RestMethod -Method Post/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:[\s\S]*4\. refresh_developer_ops_overview[\s\S]*command=.*RSL_DEVELOPER_BASE_URL[\s\S]*Invoke-RestMethod -Method Get/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Execution Summary:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Execution Summary:[\s\S]*current=confirm_first_wave_handoff \| ready=3\/5 \| blocked=2 \| completed=review_launch_review_summary,review_launch_smoke_summary/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Execution Summary:[\s\S]*command=.*RSL_DEVELOPER_BEARER_TOKEN[\s\S]*Invoke-RestMethod -Method Post/);
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Launch Surface Review Closeout Action:[\s\S]*stableTransitionStatus=[^\n]*\| stableTransitionReady=(yes|no)[^\n]*\| stableTransitionCurrent=[^\n]*\| stableTransitionNextDownload=[^\n]*\| stableTransitionNextHref=[^\n]*/
@@ -33921,6 +33946,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout Operator Execution Summary:[\s\S]*current=[^\n]+ \| ready=\d+\/5 \| blocked=\d+ \| completed=/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Mainline Action Plan:[\s\S]*Open steady-state handoff brief[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
     );
     assert.match(
@@ -34576,6 +34605,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       primaryRouteReviewDownload.body,
       /Surface Review Closeout Bridge Operator Next Actions:[\s\S]*3\. confirm_first_wave_handoff[\s\S]*command=.*RSL_DEVELOPER_BEARER_TOKEN[\s\S]*Invoke-RestMethod -Method Post/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge Operator Execution Summary:[\s\S]*current=[^\n]+ \| ready=\d+\/5 \| blocked=\d+ \| completed=/
     );
 
     const nextRouteReviewDownload = await getText(

@@ -59560,6 +59560,43 @@ function getOperatorQueueCheckpointFromInitialLaunchOpsReadiness(initialLaunchOp
   return proofPlanCheckpoint || null;
 }
 
+function isProductionSwitchProofItemReady(item = null) {
+  const status = String(item?.status || "").trim().toLowerCase();
+  return status.startsWith("ready_") || status === "ready" || status === "completed" || status === "recorded";
+}
+
+function selectProductionSwitchProofExecutionItem(proofPacket = null, {
+  command = null,
+  readyForCutoverWatch = false
+} = {}) {
+  const proofItems = Array.isArray(proofPacket?.proofItems)
+    ? proofPacket.proofItems.filter((item) => item && typeof item === "object")
+    : [];
+  if (!proofItems.length) {
+    return null;
+  }
+  const normalizedCommand = String(command || "").trim();
+  const commandMatchedItem = normalizedCommand
+    ? proofItems.find((item) => {
+        const itemCommand = String(item?.command || "").trim();
+        return itemCommand && (itemCommand === normalizedCommand
+          || normalizedCommand.includes(itemCommand)
+          || itemCommand.includes(normalizedCommand));
+      }) || null
+    : null;
+  if (commandMatchedItem) {
+    return commandMatchedItem;
+  }
+  if (readyForCutoverWatch) {
+    return proofItems.slice().reverse().find((item) =>
+      isProductionSwitchProofItemReady(item) && (item.artifactPath || item.command)
+    ) || proofItems.slice().reverse().find(isProductionSwitchProofItemReady) || proofItems[proofItems.length - 1] || null;
+  }
+  return proofItems.find((item) =>
+    !isProductionSwitchProofItemReady(item) && (item.artifactPath || item.command)
+  ) || proofItems.find((item) => !isProductionSwitchProofItemReady(item)) || proofItems[0] || null;
+}
+
 function buildLaunchCutoverTriageProofExecutionEntrypoint({
   checkpoint = null,
   productionSwitchProofPacket = null
@@ -59579,15 +59616,26 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
   const launchDutyRecordIndexPath = checkpoint.launchDutyRecordIndexPath
     || proofPacket?.launchDutyRecordIndexFile
     || null;
+  const readyForCutoverWatch = status === "ready_for_cutover_watch";
+  const proofItem = selectProductionSwitchProofExecutionItem(proofPacket, {
+    command,
+    readyForCutoverWatch
+  });
   return {
     mode: "production-switch-proof-execution-entrypoint/v1",
     status: proofStatus,
     actionKey,
     command,
     launchDutyRecordIndexPath,
-    readyForCutoverWatch: status === "ready_for_cutover_watch",
+    proofItemOrder: proofItem?.order ?? null,
+    proofItemKey: proofItem?.key || null,
+    proofItemStatus: proofItem?.status || null,
+    proofItemArtifactPath: proofItem?.artifactPath || null,
+    proofItemCommand: proofItem?.command || null,
+    proofItemNextAction: proofItem?.nextAction || null,
+    readyForCutoverWatch,
     recommendedDownloadFormat: "production-switch-proof-packet",
-    nextAction: status === "ready_for_cutover_watch"
+    nextAction: readyForCutoverWatch
       ? "Refresh readiness status from the shared launch-duty record index, then continue cutover watch."
       : "Run the current production-switch proof command, then refresh Launch Review and Launch Smoke."
   };
@@ -59802,6 +59850,12 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
     + ` | blocked=${checkpoint.productionSwitchProofBlockedCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
+  );
+  lines.push(
+    `- proofItem=${checkpoint.proofExecutionEntrypoint?.proofItemKey || "-"}`
+    + ` | proofStatus=${checkpoint.proofExecutionEntrypoint?.proofItemStatus || "-"}`
+    + ` | proofArtifact=${checkpoint.proofExecutionEntrypoint?.proofItemArtifactPath || "-"}`
+    + ` | proofCommand=${checkpoint.proofExecutionEntrypoint?.proofItemCommand || "-"}`
   );
   lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
   lines.push(`- cutoverTriageNextAction=${checkpoint.nextAction || "-"}`);
@@ -66370,6 +66424,12 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | blocked=${checkpoint.productionSwitchProofBlockedCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
+  );
+  lines.push(
+    `- proofItem=${checkpoint.proofExecutionEntrypoint?.proofItemKey || "-"}`
+    + ` | proofStatus=${checkpoint.proofExecutionEntrypoint?.proofItemStatus || "-"}`
+    + ` | proofArtifact=${checkpoint.proofExecutionEntrypoint?.proofItemArtifactPath || "-"}`
+    + ` | proofCommand=${checkpoint.proofExecutionEntrypoint?.proofItemCommand || "-"}`
   );
   lines.push(`- launchCutoverTriage=${checkpoint.launchCutoverTriageStatus || "-"}`);
   lines.push(

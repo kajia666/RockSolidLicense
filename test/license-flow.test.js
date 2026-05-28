@@ -12385,7 +12385,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     for (const [key, format] of [
       ["launch_review_handoff_routes", "handoff-routes"],
       ["launch_review_surface_review_closeout_action", "surface-review-closeout-action"],
-      ["launch_review_production_switch_proof_packet", "production-switch-proof-packet"]
+      ["launch_review_production_switch_proof_packet", "production-switch-proof-packet"],
+      ["launch_review_launch_execution_phase_plan", "launch-execution-phase-plan"]
     ]) {
       const download = runtimeEvidenceLaunchReview.reviewSummary.recommendedDownloads?.find((item) => item?.key === key) || null;
       assert.ok(download, `missing Launch Review recommended download ${key}`);
@@ -12431,6 +12432,16 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /RockSolid Developer Launch Review Production Switch Proof Packet/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /productionSwitchProof=/);
+    const runtimeEvidenceReviewLaunchExecutionPhasePlanDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=launch-execution-phase-plan",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceReviewLaunchExecutionPhasePlanDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceReviewLaunchExecutionPhasePlanDownload.contentDisposition || "", /launch-execution-phase-plan\.txt"/);
+    assert.match(runtimeEvidenceReviewLaunchExecutionPhasePlanDownload.body, /RockSolid Developer Launch Review Launch Execution Phase Plan/);
+    assert.match(runtimeEvidenceReviewLaunchExecutionPhasePlanDownload.body, /Launch Execution Phase Plan:/);
+    assert.match(runtimeEvidenceReviewLaunchExecutionPhasePlanDownload.body, /launchExecutionPhase=/);
 
     const runtimeEvidenceReviewSurfaceReviewCloseoutActionDownload = await getText(
       baseUrl,
@@ -12451,6 +12462,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewChecksums.body, /first-wave-runtime-evidence\.txt/);
     assert.match(runtimeEvidenceReviewChecksums.body, /surface-review-closeout-action\.txt/);
     assert.match(runtimeEvidenceReviewChecksums.body, /production-switch-proof-packet\.txt/);
+    assert.match(runtimeEvidenceReviewChecksums.body, /launch-execution-phase-plan\.txt/);
     assert.match(runtimeEvidenceReviewChecksums.body, /handoff-routes\.txt/);
 
     const runtimeEvidenceReviewHandoffRoutes = await getText(
@@ -12468,6 +12480,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Mainline Post-Launch Index:.*format=post-launch-handoff-index/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch review surface review closeout action:.*format=surface-review-closeout-action/i);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch review production switch proof packet:.*format=production-switch-proof-packet/i);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch review launch execution phase plan:.*format=launch-execution-phase-plan/i);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Pre-Staging Readiness Self-Check:.*format=pre-staging-readiness-self-check/);
     assert.match(
       runtimeEvidenceReviewHandoffRoutes.body,
@@ -12493,8 +12506,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewZipText, /first-wave-runtime-evidence\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /surface-review-closeout-action\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /production-switch-proof-packet\.txt/);
+    assert.match(runtimeEvidenceReviewZipText, /launch-execution-phase-plan\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /Launch Surface Review Closeout:/);
     assert.match(runtimeEvidenceReviewZipText, /Production Switch Proof Packet:/);
+    assert.match(runtimeEvidenceReviewZipText, /Launch Execution Phase Plan:/);
     assert.match(runtimeEvidenceReviewZipText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceReviewZipText, /handoff-routes\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /RockSolid Developer Launch Review Handoff Routes/);
@@ -12562,7 +12577,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     for (const [key, format] of [
       ["launch_smoke_kit_handoff_routes", "handoff-routes"],
       ["launch_smoke_surface_review_closeout_action", "surface-review-closeout-action"],
-      ["launch_smoke_production_switch_proof_packet", "production-switch-proof-packet"]
+      ["launch_smoke_production_switch_proof_packet", "production-switch-proof-packet"],
+      ["launch_smoke_launch_execution_phase_plan", "launch-execution-phase-plan"]
     ]) {
       const download = runtimeEvidenceLaunchSmoke.smokeSummary.recommendedDownloads?.find((item) => item?.key === key) || null;
       assert.ok(download, `missing Launch Smoke recommended download ${key}`);
@@ -12608,6 +12624,16 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /RockSolid Developer Launch Smoke Kit Production Switch Proof Packet/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /productionSwitchProof=/);
+    const runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=launch-execution-phase-plan",
+      ownerSession.token
+    );
+    assert.match(runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload.contentType || "", /^text\/plain/);
+    assert.match(runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload.contentDisposition || "", /launch-execution-phase-plan\.txt"/);
+    assert.match(runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload.body, /RockSolid Developer Launch Smoke Kit Launch Execution Phase Plan/);
+    assert.match(runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload.body, /Launch Execution Phase Plan:/);
+    assert.match(runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload.body, /launchExecutionPhase=/);
 
     const runtimeEvidenceSmokeSurfaceReviewCloseoutActionDownload = await getText(
       baseUrl,
@@ -12628,6 +12654,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeChecksums.body, /first-wave-runtime-evidence\.txt/);
     assert.match(runtimeEvidenceSmokeChecksums.body, /surface-review-closeout-action\.txt/);
     assert.match(runtimeEvidenceSmokeChecksums.body, /production-switch-proof-packet\.txt/);
+    assert.match(runtimeEvidenceSmokeChecksums.body, /launch-execution-phase-plan\.txt/);
     assert.match(runtimeEvidenceSmokeChecksums.body, /handoff-routes\.txt/);
 
     const runtimeEvidenceSmokeHandoffRoutes = await getText(
@@ -12646,6 +12673,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Mainline Post-Launch Index:.*format=post-launch-handoff-index/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch smoke surface review closeout action:.*format=surface-review-closeout-action/i);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch smoke production switch proof packet:.*format=production-switch-proof-packet/i);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch smoke launch execution phase plan:.*format=launch-execution-phase-plan/i);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Developer Ops Pre-Staging Readiness Self-Check:.*format=pre-staging-readiness-self-check/);
     assert.match(
       runtimeEvidenceSmokeHandoffRoutes.body,
@@ -12671,8 +12699,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeZipText, /first-wave-runtime-evidence\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /surface-review-closeout-action\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /production-switch-proof-packet\.txt/);
+    assert.match(runtimeEvidenceSmokeZipText, /launch-execution-phase-plan\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /Launch Surface Review Closeout:/);
     assert.match(runtimeEvidenceSmokeZipText, /Production Switch Proof Packet:/);
+    assert.match(runtimeEvidenceSmokeZipText, /Launch Execution Phase Plan:/);
     assert.match(runtimeEvidenceSmokeZipText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceSmokeZipText, /handoff-routes\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /RockSolid Developer Launch Smoke Kit Handoff Routes/);
@@ -31679,6 +31709,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchReviewCloseoutRecordedProofPacketDownload.body,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
+    const launchReviewCloseoutRecordedPhasePlanDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-review/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=launch-execution-phase-plan",
+      ownerSession.token
+    );
+    assert.match(
+      launchReviewCloseoutRecordedPhasePlanDownload.body,
+      /RockSolid Developer Launch Review Launch Execution Phase Plan/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedPhasePlanDownload.body,
+      /launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedPhasePlanDownload.body,
+      /currentAction=refresh_staging_readiness_after_first_wave_closeout \| currentCommand=npm\.cmd run staging:readiness:status/
+    );
     const launchReviewCloseoutRecordedHandoffRoutesDownload = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=handoff-routes",
@@ -31690,6 +31737,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedHandoffRoutesDownload.body,
+      /Launch review launch execution phase plan:.*format=launch-execution-phase-plan/i
+    );
+    assert.match(
+      launchReviewCloseoutRecordedHandoffRoutesDownload.body,
       /launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const launchReviewCloseoutRecordedChecksumsDownload = await getText(
@@ -31697,6 +31748,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "/api/developer/launch-review/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=checksums",
       ownerSession.token
     );
+    assert.match(launchReviewCloseoutRecordedChecksumsDownload.body, /launch-execution-phase-plan\.txt/);
     assert.match(launchReviewCloseoutRecordedChecksumsDownload.body, /production-switch-proof-packet\.txt/);
     const launchReviewCloseoutRecordedZipDownload = await getBinary(
       baseUrl,
@@ -31704,6 +31756,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     const launchReviewCloseoutRecordedZipText = launchReviewCloseoutRecordedZipDownload.body.toString("latin1");
+    assert.match(launchReviewCloseoutRecordedZipText, /launch-execution-phase-plan\.txt/);
+    assert.match(launchReviewCloseoutRecordedZipText, /RockSolid Developer Launch Review Launch Execution Phase Plan/);
     assert.match(launchReviewCloseoutRecordedZipText, /production-switch-proof-packet\.txt/);
     assert.match(
       launchReviewCloseoutRecordedZipText,
@@ -31730,6 +31784,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
+    const launchSmokeCloseoutRecordedPhasePlanDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-smoke-kit/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&format=launch-execution-phase-plan",
+      ownerSession.token
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedPhasePlanDownload.body,
+      /RockSolid Developer Launch Smoke Kit Launch Execution Phase Plan/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedPhasePlanDownload.body,
+      /launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedPhasePlanDownload.body,
+      /currentAction=refresh_staging_readiness_after_first_wave_closeout \| currentCommand=npm\.cmd run staging:readiness:status/
+    );
     const launchSmokeCloseoutRecordedHandoffRoutesDownload = await getText(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&format=handoff-routes",
@@ -31741,6 +31812,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchSmokeCloseoutRecordedHandoffRoutesDownload.body,
+      /Launch smoke launch execution phase plan:.*format=launch-execution-phase-plan/i
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedHandoffRoutesDownload.body,
       /launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const launchSmokeCloseoutRecordedChecksumsDownload = await getText(
@@ -31748,6 +31823,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       "/api/developer/launch-smoke-kit/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&format=checksums",
       ownerSession.token
     );
+    assert.match(launchSmokeCloseoutRecordedChecksumsDownload.body, /launch-execution-phase-plan\.txt/);
     assert.match(launchSmokeCloseoutRecordedChecksumsDownload.body, /production-switch-proof-packet\.txt/);
     const launchSmokeCloseoutRecordedZipDownload = await getBinary(
       baseUrl,
@@ -31755,6 +31831,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     const launchSmokeCloseoutRecordedZipText = launchSmokeCloseoutRecordedZipDownload.body.toString("latin1");
+    assert.match(launchSmokeCloseoutRecordedZipText, /launch-execution-phase-plan\.txt/);
+    assert.match(launchSmokeCloseoutRecordedZipText, /RockSolid Developer Launch Smoke Kit Launch Execution Phase Plan/);
     assert.match(launchSmokeCloseoutRecordedZipText, /production-switch-proof-packet\.txt/);
     assert.match(
       launchSmokeCloseoutRecordedZipText,

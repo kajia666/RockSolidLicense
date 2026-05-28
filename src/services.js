@@ -4040,6 +4040,7 @@ function createLaunchWorkflowReviewDownloadShortcut(label = "Launch review summa
     "first-wave-runtime-evidence": "launch_review_first_wave_runtime_evidence",
     "first-wave-support-inspection-confirmation": "launch_review_first_wave_support_inspection_confirmation",
     "production-switch-proof-packet": "launch_review_production_switch_proof_packet",
+    "launch-execution-phase-plan": "launch_review_launch_execution_phase_plan",
     checksums: "launch_review_checksums",
     zip: "launch_review_zip"
   };
@@ -4068,6 +4069,7 @@ function createLaunchWorkflowSmokeKitDownloadShortcut(label = "Launch smoke kit 
     "first-wave-runtime-evidence": "launch_smoke_first_wave_runtime_evidence",
     "first-wave-support-inspection-confirmation": "launch_smoke_first_wave_support_inspection_confirmation",
     "production-switch-proof-packet": "launch_smoke_production_switch_proof_packet",
+    "launch-execution-phase-plan": "launch_smoke_launch_execution_phase_plan",
     checksums: "launch_smoke_kit_checksums",
     zip: "launch_smoke_kit_zip"
   };
@@ -12470,6 +12472,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const launchOperationsOverviewStatusBase = initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
   const productionSwitchProofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const launchExecutionPhasePlan = getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const reviewMode = String(filters.reviewMode || "matched").trim().toLowerCase() || "matched";
   const routeProductCode = launchWorkflow?.manifest?.project?.code || filters.productCode || null;
   const routeChannel = launchWorkflow?.manifest?.channel || filters.channel || "stable";
@@ -12545,6 +12548,12 @@ function buildDeveloperLaunchReviewSummaryPayload({
     "Launch review production switch proof packet",
     "launch-review-production-switch-proof-packet.txt",
     "production-switch-proof-packet",
+    scopedOpsParams
+  );
+  const reviewLaunchExecutionPhasePlanDownload = createLaunchWorkflowReviewDownloadShortcut(
+    "Launch review launch execution phase plan",
+    "launch-review-launch-execution-phase-plan.txt",
+    "launch-execution-phase-plan",
     scopedOpsParams
   );
   const reviewChecksumsDownload = createLaunchWorkflowReviewDownloadShortcut(
@@ -12734,6 +12743,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
     "Launch Mainline launch readiness distance",
     "launch-readiness-distance.txt",
     "launch-readiness-distance",
+    {
+      productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
+      channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
+      ...scopedOpsParams
+    }
+  );
+  const mainlineLaunchExecutionPhasePlanDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch execution phase plan",
+    "launch-execution-phase-plan.txt",
+    "launch-execution-phase-plan",
     {
       productCode: launchWorkflow?.manifest?.project?.code || filters.productCode || null,
       channel: launchWorkflow?.manifest?.channel || filters.channel || "stable",
@@ -13658,6 +13677,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(reviewHandoffRoutesDownload);
   pushRecommendedDownload(reviewSurfaceReviewCloseoutActionDownload);
   pushRecommendedDownload(reviewProductionSwitchProofPacketDownload);
+  pushRecommendedDownload(reviewLaunchExecutionPhasePlanDownload);
   pushRecommendedDownload(reviewChecksumsDownload);
   pushRecommendedDownload(reviewZipDownload);
   if (firstWaveRecommendationsZipDownload) {
@@ -13692,6 +13712,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   pushRecommendedDownload(mainlineRehearsalGuideDownload);
   pushRecommendedDownload(mainlineHandoffRoutesDownload);
   pushRecommendedDownload(mainlineLaunchReadinessDistanceDownload);
+  pushRecommendedDownload(mainlineLaunchExecutionPhasePlanDownload);
   pushRecommendedDownload(mainlineInitialProductionLaunchReadinessDownload);
   pushRecommendedDownload(mainlineLaunchSwitchReadinessDownload);
   pushRecommendedDownload(mainlineLaunchCandidateFullVerificationGateDownload);
@@ -13804,6 +13825,11 @@ function buildDeveloperLaunchReviewSummaryPayload({
         label: "Download Production Switch Proof",
         recommendedDownload: reviewProductionSwitchProofPacketDownload
       },
+      {
+        kind: "download",
+        label: "Download Launch Execution Phase Plan",
+        recommendedDownload: reviewLaunchExecutionPhasePlanDownload
+      },
       launchOperationsOverviewDownload
         ? {
             kind: "download",
@@ -13893,6 +13919,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     launchOperationsOverviewStatus,
     launchReadinessNextGate,
     productionSwitchProofPacket,
+    launchExecutionPhasePlan,
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
     firstWaveRecommendationsZipDownload,
@@ -13901,6 +13928,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchReviewHandoffRoutes: reviewHandoffRoutesDownload,
       launchReviewSurfaceReviewCloseoutAction: reviewSurfaceReviewCloseoutActionDownload,
       launchReviewProductionSwitchProofPacket: reviewProductionSwitchProofPacketDownload,
+      launchReviewLaunchExecutionPhasePlan: reviewLaunchExecutionPhasePlanDownload,
       launchReviewChecksums: reviewChecksumsDownload,
       launchReviewZip: reviewZipDownload,
       firstWaveRecommendationsZip: firstWaveRecommendationsZipDownload,
@@ -13915,6 +13943,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
       launchMainlineRehearsalGuide: mainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: mainlineHandoffRoutesDownload,
       launchMainlineLaunchReadinessDistance: mainlineLaunchReadinessDistanceDownload,
+      launchMainlineLaunchExecutionPhasePlan: mainlineLaunchExecutionPhasePlanDownload,
       launchMainlineInitialProductionLaunchReadiness: mainlineInitialProductionLaunchReadinessDownload,
       launchMainlineLaunchSwitchReadiness: mainlineLaunchSwitchReadinessDownload,
       launchMainlineLaunchCandidateFullVerificationGate: mainlineLaunchCandidateFullVerificationGateDownload,
@@ -13971,6 +14000,7 @@ function buildDeveloperLaunchReviewPayload({
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
   const productionSwitchProofPacketFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-production-switch-proof-packet.txt`;
+  const launchExecutionPhasePlanFileName = `rocksolid-developer-launch-review-${scopeTag}-${channel}-${timestampTag}-launch-execution-phase-plan.txt`;
   const payload = {
     generatedAt,
     fileName,
@@ -13980,6 +14010,7 @@ function buildDeveloperLaunchReviewPayload({
     firstWaveRuntimeEvidenceFileName,
     firstWaveSupportInspectionConfirmationFileName,
     productionSwitchProofPacketFileName,
+    launchExecutionPhasePlanFileName,
     manifest: {
       generatedAt,
       channel,
@@ -14285,6 +14316,7 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchReviewHandoffRoutes,
       downloads.launchReviewSurfaceReviewCloseoutAction,
       downloads.launchReviewProductionSwitchProofPacket,
+      downloads.launchReviewLaunchExecutionPhasePlan,
       downloads.launchReviewChecksums,
       downloads.launchReviewZip,
       downloads.firstWaveRecommendationsZip,
@@ -14301,6 +14333,7 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
       downloads.launchMainlineLaunchReadinessDistance,
+      downloads.launchMainlineLaunchExecutionPhasePlan,
       downloads.launchMainlineInitialProductionLaunchReadiness,
       downloads.launchMainlineLaunchSwitchReadiness,
       downloads.launchMainlineLaunchCandidateFullVerificationGate,
@@ -14484,6 +14517,40 @@ function buildDeveloperLaunchReviewProductionSwitchProofPacketText(payload = {})
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchReviewLaunchExecutionPhasePlanText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const phasePlan = payload.reviewSummary?.launchExecutionPhasePlan
+    && typeof payload.reviewSummary.launchExecutionPhasePlan === "object"
+      ? payload.reviewSummary.launchExecutionPhasePlan
+      : getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const lines = [
+    "RockSolid Developer Launch Review Launch Execution Phase Plan",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (phasePlan) {
+    appendDeveloperOpsLaunchExecutionPhasePlanLines(lines, phasePlan, {
+      leadingBlank: false,
+      heading: "Launch Execution Phase Plan:"
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Keep this phase cursor aligned with Launch Smoke, Developer Ops, and Launch Mainline before handoff.");
+    lines.push("- Execute or review the current action first, then carry the same launch-duty record index into the next surface.");
+  } else {
+    lines.push("Launch Execution Phase Plan:");
+    lines.push("- launchExecutionPhase=not_available");
+    lines.push("- summary=No launch execution phase plan is available from the current scoped launch readiness snapshot.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchReviewFiles(payload = {}) {
   const files = [
     {
@@ -14550,6 +14617,11 @@ function buildDeveloperLaunchReviewFiles(payload = {}) {
     payload.productionSwitchProofPacketFileName || "developer-launch-review-production-switch-proof-packet.txt",
     buildDeveloperLaunchReviewProductionSwitchProofPacketText(payload)
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.launchExecutionPhasePlanFileName || "developer-launch-review-launch-execution-phase-plan.txt",
+    buildDeveloperLaunchReviewLaunchExecutionPhasePlanText(payload)
+  );
   return files;
 }
 
@@ -14561,7 +14633,7 @@ function buildDeveloperLaunchReviewZipEntries(payload = {}) {
 function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "handoff-routes", "surface-review-closeout-action", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "production-switch-proof-packet", "checksums", "zip"],
+    ["json", "summary", "handoff-routes", "surface-review-closeout-action", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "production-switch-proof-packet", "launch-execution-phase-plan", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_REVIEW_FORMAT",
     "Developer launch review format"
@@ -14621,6 +14693,13 @@ function buildDeveloperLaunchReviewDownloadAsset(payload, format = "json") {
       fileName: payload.productionSwitchProofPacketFileName || "developer-launch-review-production-switch-proof-packet.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchReviewProductionSwitchProofPacketText(payload)
+    };
+  }
+  if (normalizedFormat === "launch-execution-phase-plan") {
+    return {
+      fileName: payload.launchExecutionPhasePlanFileName || "developer-launch-review-launch-execution-phase-plan.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchReviewLaunchExecutionPhasePlanText(payload)
     };
   }
 
@@ -14790,6 +14869,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const routeChannel = manifest.channel || filters.channel || "stable";
   const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const productionSwitchProofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const launchExecutionPhasePlan = getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const routedOperation = String(filters.operation || "").trim().toLowerCase();
   const routedActionKey = String(filters.actionKey || "").trim();
   const routedDownloadKey = String(filters.downloadKey || "").trim();
@@ -15007,6 +15087,17 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     "Launch Mainline launch readiness distance",
     "launch-readiness-distance.txt",
     "launch-readiness-distance",
+    {
+      productCode: routeProductCode,
+      channel: routeChannel,
+      reviewMode: "matched",
+      ...routedParams
+    }
+  );
+  const launchMainlineLaunchExecutionPhasePlanDownload = createLaunchMainlineDownloadShortcut(
+    "Launch Mainline launch execution phase plan",
+    "launch-execution-phase-plan.txt",
+    "launch-execution-phase-plan",
     {
       productCode: routeProductCode,
       channel: routeChannel,
@@ -15357,6 +15448,12 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     "production-switch-proof-packet",
     smokeRouteParams
   );
+  const launchSmokeKitLaunchExecutionPhasePlanDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
+    "Launch smoke launch execution phase plan",
+    "launch-smoke-launch-execution-phase-plan.txt",
+    "launch-execution-phase-plan",
+    smokeRouteParams
+  );
   const launchSmokeKitChecksumsDownload = createLaunchWorkflowSmokeKitDownloadShortcut(
     "Launch smoke checksums",
     "launch-smoke-sha256.txt",
@@ -15426,6 +15523,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchSmokeKitHandoffRoutesDownload,
     launchSmokeKitSurfaceReviewCloseoutActionDownload,
     launchSmokeKitProductionSwitchProofPacketDownload,
+    launchSmokeKitLaunchExecutionPhasePlanDownload,
     launchSmokeKitChecksumsDownload,
     launchSmokeKitZipDownload,
     launchReviewSummaryDownload,
@@ -15441,6 +15539,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchMainlineRehearsalGuideDownload,
     launchMainlineHandoffRoutesDownload,
     launchMainlineLaunchReadinessDistanceDownload,
+    launchMainlineLaunchExecutionPhasePlanDownload,
     launchMainlineInitialProductionLaunchReadinessDownload,
     launchMainlineLaunchSwitchReadinessDownload,
     launchMainlineLaunchCandidateFullVerificationGateDownload,
@@ -16088,6 +16187,11 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         label: "Download Production Switch Proof",
         recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload
       },
+      {
+        kind: "download",
+        label: "Download Launch Execution Phase Plan",
+        recommendedDownload: launchSmokeKitLaunchExecutionPhasePlanDownload
+      },
       developerOpsPreStagingReadinessSelfCheckDownload
         ? {
             kind: "download",
@@ -16140,6 +16244,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     workspaceActions,
     launchDutyActionOrder,
     productionSwitchProofPacket,
+    launchExecutionPhasePlan,
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
     firstWaveRecommendationsZipDownload,
@@ -16149,6 +16254,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchSmokeHandoffRoutes: launchSmokeKitHandoffRoutesDownload,
       launchSmokeSurfaceReviewCloseoutAction: launchSmokeKitSurfaceReviewCloseoutActionDownload,
       launchSmokeProductionSwitchProofPacket: launchSmokeKitProductionSwitchProofPacketDownload,
+      launchSmokeLaunchExecutionPhasePlan: launchSmokeKitLaunchExecutionPhasePlanDownload,
       launchSmokeChecksums: launchSmokeKitChecksumsDownload,
       launchSmokeZip: launchSmokeKitZipDownload,
       launchReviewSummary: launchReviewSummaryDownload,
@@ -16164,6 +16270,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       launchMainlineRehearsalGuide: launchMainlineRehearsalGuideDownload,
       launchMainlineHandoffRoutes: launchMainlineHandoffRoutesDownload,
       launchMainlineLaunchReadinessDistance: launchMainlineLaunchReadinessDistanceDownload,
+      launchMainlineLaunchExecutionPhasePlan: launchMainlineLaunchExecutionPhasePlanDownload,
       launchMainlineInitialProductionLaunchReadiness: launchMainlineInitialProductionLaunchReadinessDownload,
       launchMainlineLaunchSwitchReadiness: launchMainlineLaunchSwitchReadinessDownload,
       launchMainlineLaunchCandidateFullVerificationGate: launchMainlineLaunchCandidateFullVerificationGateDownload,
@@ -16410,6 +16517,7 @@ function buildDeveloperLaunchSmokeKitPayload({
   const firstWaveRuntimeEvidenceFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-runtime-evidence.txt`;
   const firstWaveSupportInspectionConfirmationFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-first-wave-support-inspection-confirmation.txt`;
   const productionSwitchProofPacketFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-production-switch-proof-packet.txt`;
+  const launchExecutionPhasePlanFileName = `rocksolid-developer-launch-smoke-kit-${scopeTag}-${channel}-${timestampTag}-launch-execution-phase-plan.txt`;
   const payload = {
     generatedAt,
     fileName,
@@ -16419,6 +16527,7 @@ function buildDeveloperLaunchSmokeKitPayload({
     firstWaveRuntimeEvidenceFileName,
     firstWaveSupportInspectionConfirmationFileName,
     productionSwitchProofPacketFileName,
+    launchExecutionPhasePlanFileName,
     manifest: {
       generatedAt,
       channel,
@@ -16473,6 +16582,7 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchSmokeHandoffRoutes,
       downloads.launchSmokeSurfaceReviewCloseoutAction,
       downloads.launchSmokeProductionSwitchProofPacket,
+      downloads.launchSmokeLaunchExecutionPhasePlan,
       downloads.launchSmokeChecksums,
       downloads.launchSmokeZip,
       downloads.launchReviewSummary,
@@ -16490,6 +16600,7 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
       downloads.launchMainlineRehearsalGuide,
       downloads.launchMainlineHandoffRoutes,
       downloads.launchMainlineLaunchReadinessDistance,
+      downloads.launchMainlineLaunchExecutionPhasePlan,
       downloads.launchMainlineInitialProductionLaunchReadiness,
       downloads.launchMainlineLaunchSwitchReadiness,
       downloads.launchMainlineLaunchCandidateFullVerificationGate,
@@ -16687,6 +16798,40 @@ function buildDeveloperLaunchSmokeKitProductionSwitchProofPacketText(payload = {
   return lines.join("\n").trimEnd();
 }
 
+function buildDeveloperLaunchSmokeKitLaunchExecutionPhasePlanText(payload = {}) {
+  const manifest = payload.manifest || {};
+  const project = manifest.project || {};
+  const filters = payload.filters || {};
+  const initialLaunchOpsReadiness = payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null;
+  const phasePlan = payload.smokeSummary?.launchExecutionPhasePlan
+    && typeof payload.smokeSummary.launchExecutionPhasePlan === "object"
+      ? payload.smokeSummary.launchExecutionPhasePlan
+      : getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const lines = [
+    "RockSolid Developer Launch Smoke Kit Launch Execution Phase Plan",
+    `Generated At: ${payload.generatedAt || ""}`,
+    `Project Code: ${project.code || filters.productCode || "-"}`,
+    `Project Name: ${project.name || "-"}`,
+    `Channel: ${manifest.channel || filters.channel || "-"}`,
+    ""
+  ];
+  if (phasePlan) {
+    appendDeveloperOpsLaunchExecutionPhasePlanLines(lines, phasePlan, {
+      leadingBlank: false,
+      heading: "Launch Execution Phase Plan:"
+    });
+    lines.push("");
+    lines.push("Operator Notes:");
+    lines.push("- Keep this phase cursor aligned with Launch Review, Developer Ops, and Launch Mainline before handoff.");
+    lines.push("- Execute or review the current action first, then carry the same launch-duty record index into the next surface.");
+  } else {
+    lines.push("Launch Execution Phase Plan:");
+    lines.push("- launchExecutionPhase=not_available");
+    lines.push("- summary=No launch execution phase plan is available from the current scoped launch readiness snapshot.");
+  }
+  return lines.join("\n").trimEnd();
+}
+
 function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
   const files = [
     {
@@ -16748,6 +16893,11 @@ function buildDeveloperLaunchSmokeKitFiles(payload = {}) {
     payload.productionSwitchProofPacketFileName || "developer-launch-smoke-kit-production-switch-proof-packet.txt",
     buildDeveloperLaunchSmokeKitProductionSwitchProofPacketText(payload)
   );
+  appendLaunchWorkflowFileIfPresent(
+    files,
+    payload.launchExecutionPhasePlanFileName || "developer-launch-smoke-kit-launch-execution-phase-plan.txt",
+    buildDeveloperLaunchSmokeKitLaunchExecutionPhasePlanText(payload)
+  );
   return files;
 }
 
@@ -16759,7 +16909,7 @@ function buildDeveloperLaunchSmokeKitZipEntries(payload = {}) {
 function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
   const normalizedFormat = normalizeDownloadFormat(
     format,
-    ["json", "summary", "handoff-routes", "surface-review-closeout-action", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "production-switch-proof-packet", "checksums", "zip"],
+    ["json", "summary", "handoff-routes", "surface-review-closeout-action", "first-wave-runtime-evidence", "first-wave-support-inspection-confirmation", "production-switch-proof-packet", "launch-execution-phase-plan", "checksums", "zip"],
     "json",
     "INVALID_DEVELOPER_LAUNCH_SMOKE_KIT_FORMAT",
     "Developer launch smoke kit format"
@@ -16819,6 +16969,13 @@ function buildDeveloperLaunchSmokeKitDownloadAsset(payload, format = "json") {
       fileName: payload.productionSwitchProofPacketFileName || "developer-launch-smoke-kit-production-switch-proof-packet.txt",
       contentType: "text/plain; charset=utf-8",
       body: buildDeveloperLaunchSmokeKitProductionSwitchProofPacketText(payload)
+    };
+  }
+  if (normalizedFormat === "launch-execution-phase-plan") {
+    return {
+      fileName: payload.launchExecutionPhasePlanFileName || "developer-launch-smoke-kit-launch-execution-phase-plan.txt",
+      contentType: "text/plain; charset=utf-8",
+      body: buildDeveloperLaunchSmokeKitLaunchExecutionPhasePlanText(payload)
     };
   }
 
@@ -58177,6 +58334,33 @@ function getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaun
       ? launchOperationsOperatorEntry.launchEvidenceReadinessGate.productionSwitchProofPacket
       : null;
   return gatePacket || null;
+}
+
+function getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {
+  const launchOperationsOperatorEntry = initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+    && typeof initialLaunchOpsReadiness.launchOperationsOperatorEntry === "object"
+      ? initialLaunchOpsReadiness.launchOperationsOperatorEntry
+      : null;
+  const entryPlan = launchOperationsOperatorEntry?.launchExecutionPhasePlan
+    && typeof launchOperationsOperatorEntry.launchExecutionPhasePlan === "object"
+      ? launchOperationsOperatorEntry.launchExecutionPhasePlan
+      : null;
+  if (entryPlan) {
+    return entryPlan;
+  }
+  const gatePlan = launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.launchExecutionPhasePlan
+    && typeof launchOperationsOperatorEntry.launchEvidenceReadinessGate.launchExecutionPhasePlan === "object"
+      ? launchOperationsOperatorEntry.launchEvidenceReadinessGate.launchExecutionPhasePlan
+      : null;
+  if (gatePlan) {
+    return gatePlan;
+  }
+  const proofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const proofPlan = proofPacket?.launchExecutionPhasePlan
+    && typeof proofPacket.launchExecutionPhasePlan === "object"
+      ? proofPacket.launchExecutionPhasePlan
+      : null;
+  return proofPlan || null;
 }
 
 function appendDeveloperOpsLaunchExecutionPhasePlanLines(lines = [], phasePlan = null, {

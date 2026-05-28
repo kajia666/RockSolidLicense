@@ -59747,6 +59747,40 @@ function buildProductionSwitchProofItemCompletionSequence(proofPacket = null) {
   return sequence;
 }
 
+function buildProductionSwitchProofItemCompletionContinuation({
+  proofItem = null,
+  completionSequence = null
+} = {}) {
+  const sequence = Array.isArray(completionSequence)
+    ? completionSequence.filter((item) => item && typeof item === "object")
+    : [];
+  if (!sequence.length) {
+    return null;
+  }
+  const currentIndex = proofItem?.key
+    ? sequence.findIndex((item) => item.proofItemKey === proofItem.key)
+    : -1;
+  const anchorIndex = currentIndex >= 0 ? currentIndex : 0;
+  const remainingSequence = sequence.slice(anchorIndex).map((item, index) => ({
+    sequenceOrder: anchorIndex + index + 1,
+    proofItemKey: item.proofItemKey || null,
+    completionTargetKey: item.completionTargetKey || null,
+    completionQueueKey: item.completionQueueKey || null,
+    completionCommand: item.completionCommand || null,
+    readinessRefreshCommand: item.readinessRefreshCommand || null
+  }));
+  const nextStep = remainingSequence[1] || null;
+  return {
+    currentSequenceOrder: anchorIndex + 1,
+    currentProofItemKey: remainingSequence[0]?.proofItemKey || proofItem?.key || null,
+    remainingCount: remainingSequence.length,
+    nextProofItemKey: nextStep?.proofItemKey || null,
+    nextCompletionQueueKey: nextStep?.completionQueueKey || null,
+    nextCompletionCommand: nextStep?.completionCommand || null,
+    remainingSequence
+  };
+}
+
 function buildLaunchCutoverTriageProofExecutionEntrypoint({
   checkpoint = null,
   productionSwitchProofPacket = null
@@ -59773,6 +59807,10 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
   });
   const proofItemCompletionTarget = buildProductionSwitchProofItemCompletionTarget(proofItem, proofPacket);
   const proofItemCompletionSequence = buildProductionSwitchProofItemCompletionSequence(proofPacket);
+  const proofItemCompletionContinuation = buildProductionSwitchProofItemCompletionContinuation({
+    proofItem,
+    completionSequence: proofItemCompletionSequence
+  });
   return {
     mode: "production-switch-proof-execution-entrypoint/v1",
     status: proofStatus,
@@ -59791,6 +59829,7 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     proofItemReadinessRefreshCommand: proofItemCompletionTarget?.readinessRefreshCommand || null,
     proofItemRehearsalReloadCommand: proofItemCompletionTarget?.rehearsalReloadCommand || null,
     proofItemCompletionSequence: proofItemCompletionSequence.length ? proofItemCompletionSequence : null,
+    proofItemCompletionContinuation,
     readyForCutoverWatch,
     recommendedDownloadFormat: "production-switch-proof-packet",
     nextAction: readyForCutoverWatch
@@ -60023,6 +60062,18 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
       ? proofCompletionSequence.map((item) =>
         `${item.order || "-"}:${item.proofItemKey || "-"}=>${item.completionQueueKey || "-"}`
       ).join("; ")
+      : "-"}`
+  );
+  const proofCompletionContinuation = checkpoint.proofExecutionEntrypoint?.proofItemCompletionContinuation
+    && typeof checkpoint.proofExecutionEntrypoint.proofItemCompletionContinuation === "object"
+    ? checkpoint.proofExecutionEntrypoint.proofItemCompletionContinuation
+    : null;
+  lines.push(
+    `- proofItemContinuation=${proofCompletionContinuation
+      ? `current=${proofCompletionContinuation.currentProofItemKey || "-"}`
+        + ` | remaining=${proofCompletionContinuation.remainingCount ?? "-"}`
+        + ` | next=${proofCompletionContinuation.nextProofItemKey || "-"}`
+        + ` | nextQueue=${proofCompletionContinuation.nextCompletionQueueKey || "-"}`
       : "-"}`
   );
   lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
@@ -66607,6 +66658,18 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
       ? proofCompletionSequence.map((item) =>
         `${item.order || "-"}:${item.proofItemKey || "-"}=>${item.completionQueueKey || "-"}`
       ).join("; ")
+      : "-"}`
+  );
+  const proofCompletionContinuation = checkpoint.proofExecutionEntrypoint?.proofItemCompletionContinuation
+    && typeof checkpoint.proofExecutionEntrypoint.proofItemCompletionContinuation === "object"
+    ? checkpoint.proofExecutionEntrypoint.proofItemCompletionContinuation
+    : null;
+  lines.push(
+    `- proofItemContinuation=${proofCompletionContinuation
+      ? `current=${proofCompletionContinuation.currentProofItemKey || "-"}`
+        + ` | remaining=${proofCompletionContinuation.remainingCount ?? "-"}`
+        + ` | next=${proofCompletionContinuation.nextProofItemKey || "-"}`
+        + ` | nextQueue=${proofCompletionContinuation.nextCompletionQueueKey || "-"}`
       : "-"}`
   );
   lines.push(`- launchCutoverTriage=${checkpoint.launchCutoverTriageStatus || "-"}`);

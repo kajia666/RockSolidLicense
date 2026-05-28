@@ -53184,6 +53184,31 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       launchCutoverTriageStatus,
       productionSwitchProofStatus: switchProofPacket?.status || null,
       productionSwitchProofCurrentActionKey: switchProofPacket?.currentActionKey || null,
+      productionSwitchProofCurrentCommand,
+      currentActionKey: stableTransition?.currentActionKey
+        || steadyStateHandoff?.actionKey
+        || action?.key
+        || null,
+      currentCommand: stableTransition?.currentCommand
+        || stableTransition?.operatorAction?.command
+        || stableTransition?.nextDownloadHref
+        || steadyStateHandoff?.currentCommand
+        || steadyStateHandoff?.href
+        || action?.command
+        || action?.executionPlan?.receiptPlan?.route
+        || action?.href
+        || null,
+      stableTransitionActionKey: stableTransition?.currentActionKey || null,
+      stableTransitionCommand: stableTransition?.currentCommand
+        || stableTransition?.operatorAction?.command
+        || null,
+      stableTransitionNextDownloadHref: stableTransition?.nextDownloadHref || null,
+      steadyStateHandoffActionKey: steadyStateHandoff?.actionKey || null,
+      steadyStateHandoffHref: steadyStateHandoff?.href || null,
+      nextAction: stableTransition?.nextAction
+        || steadyStateHandoff?.nextAction
+        || receiptReview?.nextAction
+        || null,
       launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath
     },
     productionSwitchProofPacket: switchProofPacket
@@ -59810,6 +59835,70 @@ function buildProductionSwitchProofItemCompletionRunbook({
   };
 }
 
+function buildCutoverStableOperationsRunbook({
+  checkpoint = null,
+  proofItemCompletionRunbook = null
+} = {}) {
+  const source = checkpoint && typeof checkpoint === "object"
+    ? checkpoint
+    : {};
+  const proofRunbook = proofItemCompletionRunbook && typeof proofItemCompletionRunbook === "object"
+    ? proofItemCompletionRunbook
+    : null;
+  const launchCutoverTriageStatus = source.launchCutoverTriageStatus || source.status || null;
+  const readyForCutoverWatch = launchCutoverTriageStatus === "ready_for_cutover_watch";
+  const stableTransitionActionKey = source.stableTransitionActionKey
+    || source.currentActionKey
+    || null;
+  const stableTransitionCommand = source.stableTransitionCommand
+    || source.currentCommand
+    || source.productionSwitchProofCurrentCommand
+    || null;
+  const steadyStateHandoffActionKey = source.steadyStateHandoffActionKey || "open_steady_state_handoff_brief";
+  const steadyStateHandoffHref = source.steadyStateHandoffHref
+    || source.stableTransitionNextDownloadHref
+    || null;
+  const fixedActions = [
+    {
+      order: 1,
+      key: "complete_current_proof_queue",
+      queueKey: proofRunbook?.currentCompletionQueueKey || null,
+      command: proofRunbook?.currentCompletionCommand || null,
+      readinessRefreshCommand: proofRunbook?.readinessRefreshCommand || null
+    },
+    {
+      order: 2,
+      key: "refresh_stable_operations_gate",
+      actionKey: stableTransitionActionKey || "refresh_staging_readiness_after_first_wave_closeout",
+      command: stableTransitionCommand || proofRunbook?.readinessRefreshCommand || null
+    },
+    {
+      order: 3,
+      key: "open_steady_state_handoff",
+      actionKey: steadyStateHandoffActionKey,
+      href: steadyStateHandoffHref
+    }
+  ];
+  return {
+    mode: "launch-cutover-stable-operations-runbook/v1",
+    status: readyForCutoverWatch
+      ? "ready_for_stable_operations_handoff_transition"
+      : "blocked_until_cutover_watch",
+    readyForCutoverWatch,
+    currentProofItemKey: proofRunbook?.currentProofItemKey || null,
+    remainingProofCount: proofRunbook?.remainingCount ?? null,
+    stableTransitionActionKey: stableTransitionActionKey || null,
+    stableTransitionCommand: stableTransitionCommand || null,
+    steadyStateHandoffActionKey,
+    steadyStateHandoffHref,
+    launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    fixedActions,
+    nextAction: readyForCutoverWatch
+      ? "Run the stable-operations readiness refresh, confirm the gate/readback state, then open the steady-state handoff brief."
+      : "Finish cutover proof completion first, then continue the stable-operations transition runbook."
+  };
+}
+
 function buildLaunchCutoverTriageProofExecutionEntrypoint({
   checkpoint = null,
   productionSwitchProofPacket = null
@@ -59845,6 +59934,14 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     proofItemCompletionContinuation,
     readyForCutoverWatch
   });
+  const cutoverStableOperationsRunbook = buildCutoverStableOperationsRunbook({
+    checkpoint: {
+      ...checkpoint,
+      launchCutoverTriageStatus: status,
+      launchDutyRecordIndexPath
+    },
+    proofItemCompletionRunbook
+  });
   return {
     mode: "production-switch-proof-execution-entrypoint/v1",
     status: proofStatus,
@@ -59865,6 +59962,7 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     proofItemCompletionSequence: proofItemCompletionSequence.length ? proofItemCompletionSequence : null,
     proofItemCompletionContinuation,
     proofItemCompletionRunbook,
+    cutoverStableOperationsRunbook,
     readyForCutoverWatch,
     recommendedDownloadFormat: "production-switch-proof-packet",
     nextAction: readyForCutoverWatch
@@ -60120,6 +60218,17 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
       ? `currentQueue=${proofCompletionRunbook.currentCompletionQueueKey || "-"}`
         + ` | refresh=${proofCompletionRunbook.readinessRefreshCommand ? "yes" : "no"}`
         + ` | nextQueue=${proofCompletionRunbook.nextCompletionQueueKey || "-"}`
+      : "-"}`
+  );
+  const cutoverStableRunbook = checkpoint.proofExecutionEntrypoint?.cutoverStableOperationsRunbook
+    && typeof checkpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook === "object"
+    ? checkpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook
+    : null;
+  lines.push(
+    `- cutoverStableRunbook=${cutoverStableRunbook
+      ? `status=${cutoverStableRunbook.status || "-"}`
+        + ` | stableAction=${cutoverStableRunbook.stableTransitionActionKey || "-"}`
+        + ` | steadyStateHref=${cutoverStableRunbook.steadyStateHandoffHref || "-"}`
       : "-"}`
   );
   lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
@@ -66727,6 +66836,17 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
       ? `currentQueue=${proofCompletionRunbook.currentCompletionQueueKey || "-"}`
         + ` | refresh=${proofCompletionRunbook.readinessRefreshCommand ? "yes" : "no"}`
         + ` | nextQueue=${proofCompletionRunbook.nextCompletionQueueKey || "-"}`
+      : "-"}`
+  );
+  const cutoverStableRunbook = checkpoint.proofExecutionEntrypoint?.cutoverStableOperationsRunbook
+    && typeof checkpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook === "object"
+    ? checkpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook
+    : null;
+  lines.push(
+    `- cutoverStableRunbook=${cutoverStableRunbook
+      ? `status=${cutoverStableRunbook.status || "-"}`
+        + ` | stableAction=${cutoverStableRunbook.stableTransitionActionKey || "-"}`
+        + ` | steadyStateHref=${cutoverStableRunbook.steadyStateHandoffHref || "-"}`
       : "-"}`
   );
   lines.push(`- launchCutoverTriage=${checkpoint.launchCutoverTriageStatus || "-"}`);

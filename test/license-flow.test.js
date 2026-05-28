@@ -12524,6 +12524,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchReview.summaryText, /currentCommand=npm\.cmd run staging:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
     const runtimeEvidenceReviewPreStagingSelfCheckDownload = runtimeEvidenceLaunchReview.reviewSummary.recommendedDownloads?.find((item) =>
       item?.key === "ops_pre_staging_readiness_self_check"
     ) || null;
@@ -12890,6 +12891,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /currentCommand=npm\.cmd run staging:/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
     const runtimeEvidenceSmokePreStagingSelfCheckDownload = runtimeEvidenceLaunchSmoke.smokeSummary.recommendedDownloads?.find((item) =>
       item?.key === "ops_pre_staging_readiness_self_check"
     ) || null;
@@ -23705,6 +23707,50 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             remainingCount: 5,
             readyForCutoverWatch: false
           },
+          cutoverStableOperationsRunbook: {
+            mode: "launch-cutover-stable-operations-runbook/v1",
+            status: "blocked_until_cutover_watch",
+            readyForCutoverWatch: false,
+            currentProofItemKey: "backup_restore_drill",
+            remainingProofCount: 5,
+            stableTransitionActionKey: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey || null,
+            stableTransitionCommand: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentCommand
+              || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.operatorAction?.command
+              || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
+              || null,
+            steadyStateHandoffActionKey: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey || "open_steady_state_handoff_brief",
+            steadyStateHandoffHref: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.href
+              || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
+              || null,
+            launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+            fixedActions: [
+              {
+                order: 1,
+                key: "complete_current_proof_queue",
+                queueKey: "backup_restore_drill_result_backfill",
+                command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+                readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+              },
+              {
+                order: 2,
+                key: "refresh_stable_operations_gate",
+                actionKey: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey || null,
+                command: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentCommand
+                  || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.operatorAction?.command
+                  || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
+                  || null
+              },
+              {
+                order: 3,
+                key: "open_steady_state_handoff",
+                actionKey: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey || "open_steady_state_handoff_brief",
+                href: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.href
+                  || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
+                  || null
+              }
+            ],
+            nextAction: "Finish cutover proof completion first, then continue the stable-operations transition runbook."
+          },
           readyForCutoverWatch: false,
           recommendedDownloadFormat: "production-switch-proof-packet",
           nextAction: "Run the current production-switch proof command, then refresh Launch Review and Launch Smoke."
@@ -23768,6 +23814,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
@@ -31793,6 +31843,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.proofItemCompletionRunbook?.nextCompletionQueueKey,
         proofExecutionEntrypointRunbookRemainingCount:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.proofItemCompletionRunbook?.remainingCount,
+        proofExecutionEntrypointCutoverStableRunbookStatus:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.status,
+        proofExecutionEntrypointCutoverStableRunbookStableAction:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.stableTransitionActionKey,
+        proofExecutionEntrypointCutoverStableRunbookSteadyStateHref:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.steadyStateHandoffHref,
         proofExecutionEntrypointReadyForCutoverWatch:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.readyForCutoverWatch,
         launchCutoverTriageStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchCutoverTriageStatus
@@ -31822,6 +31878,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         proofExecutionEntrypointRunbookCurrentCompletionQueueKey: "first_wave_closeout_record",
         proofExecutionEntrypointRunbookNextCompletionQueueKey: null,
         proofExecutionEntrypointRunbookRemainingCount: 1,
+        proofExecutionEntrypointCutoverStableRunbookStatus: "ready_for_stable_operations_handoff_transition",
+        proofExecutionEntrypointCutoverStableRunbookStableAction:
+          launchDutyCloseoutRecordedOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey || null,
+        proofExecutionEntrypointCutoverStableRunbookSteadyStateHref:
+          launchDutyCloseoutRecordedOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref || null,
         proofExecutionEntrypointReadyForCutoverWatch: true,
         launchCutoverTriageStatus: "ready_for_cutover_watch"
       }
@@ -32796,6 +32857,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         remainingCount: 1
       }
     );
+    assert.equal(
+      launchReviewCloseoutRecorded.reviewSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.mode,
+      "launch-cutover-stable-operations-runbook/v1"
+    );
+    assert.equal(
+      launchReviewCloseoutRecorded.reviewSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.status,
+      "ready_for_stable_operations_handoff_transition"
+    );
+    assert.ok(
+      launchReviewCloseoutRecorded.reviewSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.stableTransitionActionKey
+    );
     const launchReviewCloseoutRecordedCutoverTriageAction = launchReviewCloseoutRecorded.reviewSummary.actionPlan.find((item) =>
       item.key === "launch_review_cutover_triage_checkpoint"
     );
@@ -32864,6 +32936,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
       /proofItemRunbook=currentQueue=first_wave_closeout_record \| refresh=yes \| nextQueue=-/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
+      /cutoverStableRunbook=status=ready_for_stable_operations_handoff_transition \| stableAction=.* \| steadyStateHref=.*/
     );
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
@@ -32962,6 +33038,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /cutoverStableRunbook=status=ready_for_stable_operations_handoff_transition \| stableAction=.* \| steadyStateHref=.*/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
     const launchSmokeCloseoutRecorded = await getJson(
@@ -33040,6 +33120,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         nextCompletionQueueKey: null,
         remainingCount: 1
       }
+    );
+    assert.equal(
+      launchSmokeCloseoutRecorded.smokeSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.mode,
+      "launch-cutover-stable-operations-runbook/v1"
+    );
+    assert.equal(
+      launchSmokeCloseoutRecorded.smokeSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.status,
+      "ready_for_stable_operations_handoff_transition"
+    );
+    assert.ok(
+      launchSmokeCloseoutRecorded.smokeSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.stableTransitionActionKey
     );
     const launchSmokeCloseoutRecordedCutoverTriageAction = launchSmokeCloseoutRecorded.smokeSummary.actionPlan.find((item) =>
       item.key === "launch_smoke_cutover_triage_checkpoint"

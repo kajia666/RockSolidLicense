@@ -1288,6 +1288,158 @@ function buildRehearsalProductionSwitchProofPacket(result) {
   };
 }
 
+const LAUNCH_EXECUTION_PHASES = [
+  {
+    order: 1,
+    key: "profile_and_closeout",
+    label: "Profile rehearsal and closeout init",
+    totalCommandCount: 3,
+    firstActionKey: "profile_rehearsal"
+  },
+  {
+    order: 2,
+    key: "recovery_and_route_gate",
+    label: "Recovery drill and route-map gate",
+    totalCommandCount: 5,
+    firstActionKey: "recovery_preflight"
+  },
+  {
+    order: 3,
+    key: "live_write_smoke",
+    label: "No-write preflight, live-write smoke, and post-smoke closeout",
+    totalCommandCount: 7,
+    firstActionKey: "staging_smoke_preflight"
+  },
+  {
+    order: 4,
+    key: "full_test_window",
+    label: "Full-test window and local go-live baseline",
+    totalCommandCount: 3,
+    firstActionKey: "run_full_test_window"
+  },
+  {
+    order: 5,
+    key: "production_signoff_and_receipts",
+    label: "Production sign-off and receipt visibility",
+    totalCommandCount: 12,
+    firstActionKey: "backfill_production_signoff_staging_artifacts_archived"
+  },
+  {
+    order: 6,
+    key: "launch_day_watch_and_stabilization",
+    label: "Launch-day watch and stabilization records",
+    totalCommandCount: 6,
+    firstActionKey: "record_launch_day_watch_summary"
+  },
+  {
+    order: 7,
+    key: "stable_operations_handoff",
+    label: "Stable-operations handoff",
+    totalCommandCount: 3,
+    firstActionKey: "post_first_wave_closeout_readiness_status"
+  }
+];
+
+function inferLaunchExecutionPhaseKeyFromAction(actionKey) {
+  if ([
+    "run_backup_restore_drill",
+    "run_app_backup",
+    "run_postgres_backup",
+    "run_postgres_restore_dry_run",
+    "run_restore_healthcheck",
+    "route_map_gate",
+    "route_map_gate_result",
+    "reload_closeout_input"
+  ].includes(actionKey)) {
+    return "recovery_and_route_gate";
+  }
+  if ([
+    "prepare_live_write_smoke",
+    "run_live_write_smoke",
+    "archive_launch_smoke_handoff",
+    "record_launch_mainline_evidence"
+  ].includes(actionKey)) {
+    return "live_write_smoke";
+  }
+  if (["run_full_test_window", "backfill_full_test_window_passed"].includes(actionKey)) {
+    return "full_test_window";
+  }
+  if ([
+    "complete_production_signoff",
+    "archive_production_signoff",
+    "verify_receipt_visibility",
+    "backfill_production_signoff"
+  ].includes(actionKey)) {
+    return "production_signoff_and_receipts";
+  }
+  if ([
+    "record_launch_day_watch_summary",
+    "record_launch_day_watch_artifact",
+    "verify_cutover_watch_records",
+    "handoff_stabilization_owner",
+    "close_first_wave"
+  ].includes(actionKey)) {
+    return "launch_day_watch_and_stabilization";
+  }
+  if (["stable_operations_handoff", "post_first_wave_closeout_readiness_status", "post_first_wave_closeout_rehearsal_reload"].includes(actionKey)) {
+    return "stable_operations_handoff";
+  }
+  return "profile_and_closeout";
+}
+
+function buildLaunchExecutionPhasePlan(result) {
+  const packet = result.productionSwitchProofPacket || {};
+  const currentActionKey = packet.currentActionKey
+    || result.operatorQueueCheckpoint?.currentActionKey
+    || result.goLiveExecutionEntry?.currentActionKey
+    || "profile_rehearsal";
+  const currentDefinition = LAUNCH_EXECUTION_PHASES.find((phase) =>
+    phase.key === inferLaunchExecutionPhaseKeyFromAction(currentActionKey)
+  ) || LAUNCH_EXECUTION_PHASES[0];
+  const currentCommand = packet.currentCommand
+    || result.operatorQueueCheckpoint?.currentCommand
+    || result.goLiveExecutionEntry?.currentCommand
+    || null;
+  const phases = LAUNCH_EXECUTION_PHASES.map((definition) => {
+    const isReady = definition.order < currentDefinition.order;
+    const isCurrent = definition.key === currentDefinition.key;
+    const status = isReady ? "ready" : isCurrent ? "current" : "blocked";
+    return {
+      order: definition.order,
+      key: definition.key,
+      label: definition.label,
+      status,
+      totalCommandCount: definition.totalCommandCount,
+      currentActionKey: isCurrent ? currentActionKey : null,
+      firstBlockedActionKey: isReady ? null : isCurrent ? currentActionKey : definition.firstActionKey,
+      currentCommand: isCurrent ? currentCommand : null,
+      nextCommand: isCurrent ? currentCommand : null,
+      nextAction: isCurrent ? packet.nextAction || result.operatorQueueCheckpoint?.nextAction || null : null
+    };
+  });
+  const readyPhaseCount = phases.filter((phase) => phase.status === "ready").length;
+  const currentPhaseCount = phases.filter((phase) => phase.status === "current").length;
+  const blockedPhaseCount = phases.filter((phase) => phase.status === "blocked").length;
+  const nextBlockedPhase = phases.find((phase) => phase.order > currentDefinition.order && phase.status === "blocked") || null;
+  return {
+    mode: "staging-rehearsal-launch-execution-phase-plan",
+    status: `awaiting_${currentDefinition.key}`,
+    currentPhaseKey: currentDefinition.key,
+    currentActionKey,
+    currentCommand,
+    totalPhaseCount: phases.length,
+    readyPhaseCount,
+    currentPhaseCount,
+    blockedPhaseCount,
+    totalCommandCount: phases.reduce((sum, phase) => sum + phase.totalCommandCount, 0),
+    nextBlockedPhaseKey: nextBlockedPhase?.key || null,
+    nextAction: nextBlockedPhase
+      ? `Complete the current ${currentDefinition.key} phase, then continue with ${nextBlockedPhase.key}.`
+      : "Complete the current launch execution phase and hand off to stable operations.",
+    phases
+  };
+}
+
 function buildRehearsalLaunchEvidenceItem({
   order,
   key,
@@ -8902,15 +9054,22 @@ function buildResult(options) {
     ...resultWithLaunchEvidenceReadinessGate,
     ...(productionSwitchProofPacket ? { productionSwitchProofPacket } : {})
   };
+  const launchExecutionPhasePlan = gatesPassed
+    ? buildLaunchExecutionPhasePlan(resultWithProductionSwitchProofPacket)
+    : null;
+  const resultWithLaunchExecutionPhasePlan = {
+    ...resultWithProductionSwitchProofPacket,
+    ...(launchExecutionPhasePlan ? { launchExecutionPhasePlan } : {})
+  };
   const operatorQueueCheckpoint = gatesPassed
-    ? buildOperatorQueueCheckpoint(resultWithProductionSwitchProofPacket)
+    ? buildOperatorQueueCheckpoint(resultWithLaunchExecutionPhasePlan)
     : null;
   return {
-    ...resultWithProductionSwitchProofPacket,
+    ...resultWithLaunchExecutionPhasePlan,
     operatorQueueCheckpoint,
     initialProductionLaunchReadiness: gatesPassed
       ? buildInitialProductionLaunchReadiness({
-        ...resultWithProductionSwitchProofPacket,
+        ...resultWithLaunchExecutionPhasePlan,
         operatorQueueCheckpoint
       })
       : null
@@ -9689,6 +9848,25 @@ function writeProductionSwitchProofPacketPlain(packet = null) {
     console.log(`Production switch proof ${item.order}. ${item.key}: ${item.status} -> ${item.command || item.artifactPath || "-"}`);
   });
   console.log(`Production switch next action: ${packet.nextAction || "-"}`);
+}
+
+function writeLaunchExecutionPhasePlanPlain(plan = null) {
+  if (!plan) {
+    return;
+  }
+  console.log(
+    `Launch execution phase plan: ${plan.status || "-"}`
+      + ` (current=${plan.currentPhaseKey || "-"}, ready=${plan.readyPhaseCount ?? "-"}/${plan.totalPhaseCount ?? "-"}`
+      + `, blocked=${plan.blockedPhaseCount ?? "-"}/${plan.totalPhaseCount ?? "-"}, commands=${plan.totalCommandCount ?? "-"})`
+  );
+  for (const phase of plan.phases || []) {
+    console.log(
+      `Launch execution phase ${phase.order}. ${phase.key}: ${phase.status}`
+        + ` (commands=${phase.totalCommandCount ?? "-"}, current=${phase.currentActionKey || "-"}`
+        + `, next=${phase.currentActionKey || phase.firstBlockedActionKey || "-"})`
+    );
+  }
+  console.log(`Launch execution next action: ${plan.nextAction || "-"}`);
 }
 
 function writeInitialProductionLaunchReadinessPlain(readiness = null) {
@@ -12096,6 +12274,7 @@ function writeResult(result, json) {
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
+    writeLaunchExecutionPhasePlanPlain(result.launchExecutionPhasePlan);
     writeRealStagingRunFocusPlain(realStagingRunFocus);
     writeBackupRestoreDrillPacketPlain(backupRestoreDrillPacket);
     writeRunRecordArchiveSummaryPlain(runRecordIndex, artifactManifest);

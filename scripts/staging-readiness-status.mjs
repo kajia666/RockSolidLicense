@@ -1565,6 +1565,140 @@ function buildStagingProductionSwitchProofPacket({
   };
 }
 
+const LAUNCH_EXECUTION_PHASES = [
+  {
+    order: 1,
+    key: "profile_and_closeout",
+    label: "Profile rehearsal and closeout init",
+    totalCommandCount: 3,
+    firstActionKey: "profile_rehearsal"
+  },
+  {
+    order: 2,
+    key: "recovery_and_route_gate",
+    label: "Recovery drill and route-map gate",
+    totalCommandCount: 5,
+    firstActionKey: "recovery_preflight"
+  },
+  {
+    order: 3,
+    key: "live_write_smoke",
+    label: "No-write preflight, live-write smoke, and post-smoke closeout",
+    totalCommandCount: 7,
+    firstActionKey: "staging_smoke_preflight"
+  },
+  {
+    order: 4,
+    key: "full_test_window",
+    label: "Full-test window and local go-live baseline",
+    totalCommandCount: 3,
+    firstActionKey: "run_full_test_window"
+  },
+  {
+    order: 5,
+    key: "production_signoff_and_receipts",
+    label: "Production sign-off and receipt visibility",
+    totalCommandCount: 12,
+    firstActionKey: "backfill_production_signoff_staging_artifacts_archived"
+  },
+  {
+    order: 6,
+    key: "launch_day_watch_and_stabilization",
+    label: "Launch-day watch and stabilization records",
+    totalCommandCount: 6,
+    firstActionKey: "record_launch_day_watch_summary"
+  },
+  {
+    order: 7,
+    key: "stable_operations_handoff",
+    label: "Stable-operations handoff",
+    totalCommandCount: 3,
+    firstActionKey: "post_first_wave_closeout_readiness_status"
+  }
+];
+
+function inferLaunchExecutionPhaseKey({ currentGate, currentEvidenceCheckpoint, launchDutyCompletionHandoff }) {
+  if (launchDutyCompletionHandoff) {
+    return "stable_operations_handoff";
+  }
+  const targetType = currentEvidenceCheckpoint?.currentTargetType;
+  const targetKey = currentEvidenceCheckpoint?.currentTargetKey;
+  if (targetType === "launch_duty_record") {
+    return "launch_day_watch_and_stabilization";
+  }
+  if (targetType === "production_signoff_condition" || targetType === "receipt_visibility_lane" || currentGate === "production_signoff") {
+    return "production_signoff_and_receipts";
+  }
+  if (currentGate === "full_test_window" || targetKey === "operator_go_no_go") {
+    return "full_test_window";
+  }
+  if (targetType === "closeout_evidence") {
+    return ["route_map_gate_result", "backup_restore_drill_result"].includes(targetKey)
+      ? "recovery_and_route_gate"
+      : "live_write_smoke";
+  }
+  return "profile_and_closeout";
+}
+
+function buildLaunchExecutionPhasePlan({
+  currentGate,
+  currentEvidenceCheckpoint,
+  launchDutyCompletionHandoff
+}) {
+  const currentPhaseKey = inferLaunchExecutionPhaseKey({
+    currentGate,
+    currentEvidenceCheckpoint,
+    launchDutyCompletionHandoff
+  });
+  const currentDefinition = LAUNCH_EXECUTION_PHASES.find((phase) => phase.key === currentPhaseKey) || LAUNCH_EXECUTION_PHASES[0];
+  const currentActionKey = launchDutyCompletionHandoff
+    ? "post_first_wave_closeout_readiness_status"
+    : currentEvidenceCheckpoint?.currentActionKey || currentDefinition.firstActionKey;
+  const currentCommand = launchDutyCompletionHandoff
+    ? launchDutyCompletionHandoff.statusCommand || null
+    : currentEvidenceCheckpoint?.currentCommand || null;
+  const phases = LAUNCH_EXECUTION_PHASES.map((definition) => {
+    const isReady = definition.order < currentDefinition.order;
+    const isCurrent = definition.key === currentDefinition.key;
+    const status = isReady ? "ready" : isCurrent ? "current" : "blocked";
+    return {
+      order: definition.order,
+      key: definition.key,
+      label: definition.label,
+      status,
+      totalCommandCount: definition.totalCommandCount,
+      currentActionKey: isCurrent ? currentActionKey : null,
+      firstBlockedActionKey: isReady ? null : isCurrent ? currentActionKey : definition.firstActionKey,
+      currentCommand: isCurrent ? currentCommand : null,
+      nextCommand: isCurrent ? currentCommand : null,
+      nextAction: isCurrent
+        ? currentEvidenceCheckpoint?.nextAction || launchDutyCompletionHandoff?.nextAction || null
+        : null
+    };
+  });
+  const readyPhaseCount = phases.filter((phase) => phase.status === "ready").length;
+  const currentPhaseCount = phases.filter((phase) => phase.status === "current").length;
+  const blockedPhaseCount = phases.filter((phase) => phase.status === "blocked").length;
+  const nextBlockedPhase = phases.find((phase) => phase.order > currentDefinition.order && phase.status === "blocked") || null;
+  return {
+    mode: "staging-readiness-launch-execution-phase-plan",
+    status: `awaiting_${currentDefinition.key}`,
+    currentPhaseKey: currentDefinition.key,
+    currentActionKey,
+    currentCommand,
+    totalPhaseCount: phases.length,
+    readyPhaseCount,
+    currentPhaseCount,
+    blockedPhaseCount,
+    totalCommandCount: phases.reduce((sum, phase) => sum + phase.totalCommandCount, 0),
+    nextBlockedPhaseKey: nextBlockedPhase?.key || null,
+    nextAction: nextBlockedPhase
+      ? `Complete the current ${currentDefinition.key} phase, then continue with ${nextBlockedPhase.key}.`
+      : "Complete the current launch execution phase and hand off to stable operations.",
+    phases
+  };
+}
+
 function valueObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -1706,6 +1840,31 @@ function renderCurrentEvidenceCheckpointMarkdown(result) {
   ];
 }
 
+function renderLaunchExecutionPhasePlanMarkdown(result) {
+  const plan = result.launchExecutionPhasePlan;
+  if (!plan) {
+    return [];
+  }
+  const lines = [
+    "## Launch Execution Phase Plan",
+    "",
+    `Launch execution phase plan: \`${plan.status || "-"}\` (current \`${plan.currentPhaseKey || "-"}\`, ready \`${plan.readyPhaseCount ?? "-"}/${plan.totalPhaseCount ?? "-"}\`, blocked \`${plan.blockedPhaseCount ?? "-"}/${plan.totalPhaseCount ?? "-"}\`, commands \`${plan.totalCommandCount ?? "-"}\`)`,
+    `Launch execution current command: \`${plan.currentCommand || "-"}\``,
+    ""
+  ];
+  for (const phase of plan.phases || []) {
+    lines.push(
+      `- ${phase.order || "-"}. \`${phase.key || "-"}\` [${phase.status || "-"}]`
+      + ` commands \`${phase.totalCommandCount ?? "-"}\``
+      + ` current \`${phase.currentActionKey || "-"}\``
+      + ` next \`${phase.currentActionKey || phase.firstBlockedActionKey || "-"}\``
+    );
+  }
+  lines.push(`Launch execution next action: ${plan.nextAction || "-"}`);
+  lines.push("");
+  return lines;
+}
+
 function renderLaunchEvidenceReadinessGateMarkdown(result) {
   const gate = result.launchEvidenceReadinessGate;
   if (!gate) {
@@ -1797,6 +1956,7 @@ function renderActionQueueMarkdown(result) {
     `Launch status: \`${result.readiness.launchStatus}\``,
     "",
     ...renderCurrentEvidenceCheckpointMarkdown(result),
+    ...renderLaunchExecutionPhasePlanMarkdown(result),
     ...renderProductionSwitchProofPacketMarkdown(result),
     ...renderLaunchEvidenceReadinessGateMarkdown(result),
     ...renderEvidenceSummaryMarkdown(result),
@@ -2187,6 +2347,11 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     productionDecision,
     launchDutyCompletionHandoff
   });
+  const launchExecutionPhasePlan = buildLaunchExecutionPhasePlan({
+    currentGate,
+    currentEvidenceCheckpoint,
+    launchDutyCompletionHandoff
+  });
 
   return {
     status: "pass",
@@ -2220,6 +2385,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     },
     evidenceSummary,
     currentEvidenceCheckpoint,
+    launchExecutionPhasePlan,
     productionSwitchProofPacket,
     launchEvidenceReadinessGate,
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
@@ -2280,6 +2446,25 @@ function writeCurrentEvidenceCheckpointPlain(checkpoint) {
   console.log(`Evidence checkpoint status refresh: ${checkpoint.statusCommand || "-"}`);
   console.log(`Evidence checkpoint rehearsal reload: ${checkpoint.reloadCommand || "-"}`);
   console.log(`Evidence checkpoint next action: ${checkpoint.nextAction || "-"}`);
+}
+
+function writeLaunchExecutionPhasePlanPlain(plan) {
+  if (!plan) {
+    return;
+  }
+  console.log(
+    `Launch execution phase plan: ${plan.status || "-"}`
+      + ` (current=${plan.currentPhaseKey || "-"}, ready=${plan.readyPhaseCount ?? "-"}/${plan.totalPhaseCount ?? "-"}`
+      + `, blocked=${plan.blockedPhaseCount ?? "-"}/${plan.totalPhaseCount ?? "-"}, commands=${plan.totalCommandCount ?? "-"})`
+  );
+  for (const phase of plan.phases || []) {
+    console.log(
+      `Launch execution phase ${phase.order}. ${phase.key}: ${phase.status}`
+        + ` (commands=${phase.totalCommandCount ?? "-"}, current=${phase.currentActionKey || "-"}`
+        + `, next=${phase.currentActionKey || phase.firstBlockedActionKey || "-"})`
+    );
+  }
+  console.log(`Launch execution next action: ${plan.nextAction || "-"}`);
 }
 
 function writeLaunchEvidenceReadinessGatePlain(gate) {
@@ -2347,6 +2532,7 @@ function writeResult(result, json) {
     console.log(result.nextStep.command);
     writeEvidenceSummaryPlain(result.evidenceSummary);
     writeCurrentEvidenceCheckpointPlain(result.currentEvidenceCheckpoint);
+    writeLaunchExecutionPhasePlanPlain(result.launchExecutionPhasePlan);
     writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     if (result.fullTestWindowHandoff) {

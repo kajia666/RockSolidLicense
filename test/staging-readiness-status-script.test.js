@@ -626,6 +626,55 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     );
     assert.deepEqual(
       {
+        mode: output.launchExecutionPhasePlan.mode,
+        status: output.launchExecutionPhasePlan.status,
+        currentPhaseKey: output.launchExecutionPhasePlan.currentPhaseKey,
+        currentActionKey: output.launchExecutionPhasePlan.currentActionKey,
+        currentCommand: output.launchExecutionPhasePlan.currentCommand,
+        totalPhaseCount: output.launchExecutionPhasePlan.totalPhaseCount,
+        readyPhaseCount: output.launchExecutionPhasePlan.readyPhaseCount,
+        currentPhaseCount: output.launchExecutionPhasePlan.currentPhaseCount,
+        blockedPhaseCount: output.launchExecutionPhasePlan.blockedPhaseCount,
+        totalCommandCount: output.launchExecutionPhasePlan.totalCommandCount,
+        nextBlockedPhaseKey: output.launchExecutionPhasePlan.nextBlockedPhaseKey,
+        nextAction: output.launchExecutionPhasePlan.nextAction
+      },
+      {
+        mode: "staging-readiness-launch-execution-phase-plan",
+        status: "awaiting_production_signoff_and_receipts",
+        currentPhaseKey: "production_signoff_and_receipts",
+        currentActionKey: "backfill_production_signoff",
+        currentCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file ${actionsFile}`,
+        totalPhaseCount: 7,
+        readyPhaseCount: 4,
+        currentPhaseCount: 1,
+        blockedPhaseCount: 2,
+        totalCommandCount: 39,
+        nextBlockedPhaseKey: "launch_day_watch_and_stabilization",
+        nextAction: "Complete the current production_signoff_and_receipts phase, then continue with launch_day_watch_and_stabilization."
+      }
+    );
+    assert.deepEqual(
+      output.launchExecutionPhasePlan.phases.map((item) => [
+        item.order,
+        item.key,
+        item.status,
+        item.totalCommandCount,
+        item.currentActionKey,
+        item.firstBlockedActionKey
+      ]),
+      [
+        [1, "profile_and_closeout", "ready", 3, null, null],
+        [2, "recovery_and_route_gate", "ready", 5, null, null],
+        [3, "live_write_smoke", "ready", 7, null, null],
+        [4, "full_test_window", "ready", 3, null, null],
+        [5, "production_signoff_and_receipts", "current", 12, "backfill_production_signoff", "backfill_production_signoff"],
+        [6, "launch_day_watch_and_stabilization", "blocked", 6, null, "record_launch_day_watch_summary"],
+        [7, "stable_operations_handoff", "blocked", 3, null, "post_first_wave_closeout_readiness_status"]
+      ]
+    );
+    assert.deepEqual(
+      {
         version: output.launchEvidenceReadinessGate.version,
         status: output.launchEvidenceReadinessGate.status,
         currentGate: output.launchEvidenceReadinessGate.currentGate,
@@ -748,8 +797,15 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(plain.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt \(available_from_2026-05-28_full_suite_pass, tests=198, failures=0\)/);
     assert.match(plain.stdout, /Production switch proof 4\. backup_restore_drill: ready_evidence_attached -> artifacts\/staging\/<productCode>\/<channel>\/backup-restore-drill\.txt/);
     assert.match(plain.stdout, /Production switch proof 7\. production_signoff_and_receipts: blocked_after_full_test_signoff_backfill -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
+    assert.match(plain.stdout, /Launch execution phase plan: awaiting_production_signoff_and_receipts \(current=production_signoff_and_receipts, ready=4\/7, blocked=2\/7, commands=39\)/);
+    assert.match(plain.stdout, /Launch execution phase 5\. production_signoff_and_receipts: current \(commands=12, current=backfill_production_signoff, next=backfill_production_signoff\)/);
+    assert.match(plain.stdout, /Launch execution phase 6\. launch_day_watch_and_stabilization: blocked \(commands=6, current=-, next=record_launch_day_watch_summary\)/);
 
     const markdown = readFileSync(actionsFile, "utf8");
+    assert.match(markdown, /## Launch Execution Phase Plan/);
+    assert.match(markdown, /Launch execution phase plan: `awaiting_production_signoff_and_receipts` \(current `production_signoff_and_receipts`, ready `4\/7`, blocked `2\/7`, commands `39`\)/);
+    assert.match(markdown, /- 5\. `production_signoff_and_receipts` \[current\] commands `12` current `backfill_production_signoff` next `backfill_production_signoff`/);
+    assert.match(markdown, /- 6\. `launch_day_watch_and_stabilization` \[blocked\] commands `6` current `-` next `record_launch_day_watch_summary`/);
     assert.match(markdown, /## Production Switch Proof Packet/);
     assert.match(markdown, /Production switch proof packet: `blocked_until_real_environment_evidence` \(ready `3\/8`, blocked `5\/8`, current `backfill_production_signoff`\)/);
     assert.match(markdown, /Production switch local baseline: `npm\.cmd test` -> `artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt`/);

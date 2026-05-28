@@ -2540,6 +2540,55 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
         [8, "launch_day_watch_and_stabilization", "blocked_after_production_signoff_readiness", "artifacts/staging/PROFILE_PRODUCT/stable/launch-day-watch-summary.md"]
       ]
     );
+    assert.deepEqual(
+      {
+        mode: output.launchExecutionPhasePlan.mode,
+        status: output.launchExecutionPhasePlan.status,
+        currentPhaseKey: output.launchExecutionPhasePlan.currentPhaseKey,
+        currentActionKey: output.launchExecutionPhasePlan.currentActionKey,
+        currentCommand: output.launchExecutionPhasePlan.currentCommand,
+        totalPhaseCount: output.launchExecutionPhasePlan.totalPhaseCount,
+        readyPhaseCount: output.launchExecutionPhasePlan.readyPhaseCount,
+        currentPhaseCount: output.launchExecutionPhasePlan.currentPhaseCount,
+        blockedPhaseCount: output.launchExecutionPhasePlan.blockedPhaseCount,
+        totalCommandCount: output.launchExecutionPhasePlan.totalCommandCount,
+        nextBlockedPhaseKey: output.launchExecutionPhasePlan.nextBlockedPhaseKey,
+        nextAction: output.launchExecutionPhasePlan.nextAction
+      },
+      {
+        mode: "staging-rehearsal-launch-execution-phase-plan",
+        status: "awaiting_profile_and_closeout",
+        currentPhaseKey: "profile_and_closeout",
+        currentActionKey: "set_required_secret_env",
+        currentCommand: output.stagingProfileOperatorPreflight.commands.profileDrivenRehearsal,
+        totalPhaseCount: 7,
+        readyPhaseCount: 0,
+        currentPhaseCount: 1,
+        blockedPhaseCount: 6,
+        totalCommandCount: 39,
+        nextBlockedPhaseKey: "recovery_and_route_gate",
+        nextAction: "Complete the current profile_and_closeout phase, then continue with recovery_and_route_gate."
+      }
+    );
+    assert.deepEqual(
+      output.launchExecutionPhasePlan.phases.map((item) => [
+        item.order,
+        item.key,
+        item.status,
+        item.totalCommandCount,
+        item.currentActionKey,
+        item.firstBlockedActionKey
+      ]),
+      [
+        [1, "profile_and_closeout", "current", 3, "set_required_secret_env", "set_required_secret_env"],
+        [2, "recovery_and_route_gate", "blocked", 5, null, "recovery_preflight"],
+        [3, "live_write_smoke", "blocked", 7, null, "staging_smoke_preflight"],
+        [4, "full_test_window", "blocked", 3, null, "run_full_test_window"],
+        [5, "production_signoff_and_receipts", "blocked", 12, null, "backfill_production_signoff_staging_artifacts_archived"],
+        [6, "launch_day_watch_and_stabilization", "blocked", 6, null, "record_launch_day_watch_summary"],
+        [7, "stable_operations_handoff", "blocked", 3, null, "post_first_wave_closeout_readiness_status"]
+      ]
+    );
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.mode, "real-staging-run-focus");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.status, "blocked_until_secret_env");
     assert.equal(output.operatorExecutionPlan.realStagingRunFocus.canRunDryRun, true);
@@ -2979,6 +3028,9 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Production switch proof 2\. non_default_secret_env: blocked_until_secret_env_loaded -> npm\.cmd run staging:rehearsal -- --profile-file [^\n]*staging-profile\.json/);
     assert.match(result.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: blocked_after_production_signoff_readiness -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/launch-day-watch-summary\.md/);
     assert.match(result.stdout, /Production switch next action: Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline\./);
+    assert.match(result.stdout, /Launch execution phase plan: awaiting_profile_and_closeout \(current=profile_and_closeout, ready=0\/7, blocked=6\/7, commands=39\)/);
+    assert.match(result.stdout, /Launch execution phase 1\. profile_and_closeout: current \(commands=3, current=set_required_secret_env, next=set_required_secret_env\)/);
+    assert.match(result.stdout, /Launch execution phase 2\. recovery_and_route_gate: blocked \(commands=5, current=-, next=recovery_preflight\)/);
     assert.match(result.stdout, /Run record index status: awaiting_evidence_backfill \(records=13\)/);
     assert.match(result.stdout, /Run record closeout progress: missing=7, filled=0/);
     assert.match(result.stdout, /Run record groups: pre_full_test_closeout:awaiting_operator_evidence:7, production_signoff:blocked_until_full_test_window:7, launch_day_watch_and_stabilization:blocked_until_production_signoff:6/);

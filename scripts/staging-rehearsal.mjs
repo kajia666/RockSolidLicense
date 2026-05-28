@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -1184,6 +1185,29 @@ function buildRehearsalProductionSwitchProofPacket(result) {
   const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv)
     ? profilePreflight.missingSecretEnv
     : [];
+  const boundSecretEnvProof = buildBoundSecretEnvProof({
+    stagingEnvironmentBinding: environmentBinding
+  });
+  const secretEnvRequiredKeys = Array.isArray(boundSecretEnvProof.requiredKeys)
+    ? boundSecretEnvProof.requiredKeys
+    : [];
+  const secretEnvMissingKeys = Array.isArray(boundSecretEnvProof.missingKeys)
+    ? boundSecretEnvProof.missingKeys
+    : [];
+  const secretEnvProof = {
+    status: boundSecretEnvProof.status || (secretEnvMissingKeys.length ? "pending_real_environment_confirmation" : "ready_secret_env_loaded"),
+    requiredKeys: secretEnvRequiredKeys,
+    presentKeys: secretEnvRequiredKeys.filter((key) => !secretEnvMissingKeys.includes(key)),
+    missingKeys: secretEnvMissingKeys,
+    requiredCount: secretEnvRequiredKeys.length,
+    missingCount: secretEnvMissingKeys.length,
+    currentMissingKey: secretEnvMissingKeys[0] || null,
+    targetEnvFile: environmentBinding.environment?.targetEnvFile || null,
+    currentActionKey: secretEnvMissingKeys.length ? "set_required_secret_env" : "confirm_secret_env_loaded",
+    nextAction: secretEnvMissingKeys.length
+      ? `Set ${secretEnvMissingKeys[0]} in the target shell before continuing production switch proof.`
+      : "Required secret environment variables are loaded; continue production switch proof."
+  };
   const launchDutyProofReady = Boolean(launchDutyCompletionHandoff);
   const launchDutyProofCommand = launchDutyCompletionHandoff?.statusCommand
     || result.launchDayWatchPlan?.watchEvidenceExecutionEntry?.currentCommand
@@ -1270,6 +1294,7 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     closeoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexFile,
+    secretEnvProof,
     localFullSuiteBaseline: {
       command: result.fullTestWindowReadiness?.command || "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -9839,6 +9864,17 @@ function writeProductionSwitchProofPacketPlain(packet = null) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const secretEnvProof = packet.secretEnvProof || {};
+  if (secretEnvProof.status) {
+    console.log(
+      `Production switch secret env proof: ${secretEnvProof.status || "-"}`
+        + ` (required=${secretEnvProof.requiredCount ?? "-"}`
+        + `, missing=${secretEnvProof.missingCount ?? "-"}`
+        + `, current=${secretEnvProof.currentMissingKey || "-"})`
+    );
+    console.log(`Production switch secret env required: ${(secretEnvProof.requiredKeys || []).join(", ") || "-"}`);
+    console.log(`Production switch secret env missing: ${(secretEnvProof.missingKeys || []).join(", ") || "-"}`);
+  }
   const baseline = packet.localFullSuiteBaseline || {};
   console.log(
     `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`

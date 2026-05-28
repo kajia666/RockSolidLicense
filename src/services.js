@@ -59781,6 +59781,35 @@ function buildProductionSwitchProofItemCompletionContinuation({
   };
 }
 
+function buildProductionSwitchProofItemCompletionRunbook({
+  proofItemCompletionTarget = null,
+  proofItemCompletionContinuation = null,
+  readyForCutoverWatch = false
+} = {}) {
+  const continuation = proofItemCompletionContinuation
+    && typeof proofItemCompletionContinuation === "object"
+    ? proofItemCompletionContinuation
+    : null;
+  const target = proofItemCompletionTarget && typeof proofItemCompletionTarget === "object"
+    ? proofItemCompletionTarget
+    : null;
+  if (!continuation && !target) {
+    return null;
+  }
+  return {
+    mode: "production-switch-proof-item-completion-runbook/v1",
+    currentProofItemKey: continuation?.currentProofItemKey || null,
+    currentCompletionQueueKey: target?.queueKey || continuation?.remainingSequence?.[0]?.completionQueueKey || null,
+    currentCompletionCommand: target?.command || continuation?.remainingSequence?.[0]?.completionCommand || null,
+    readinessRefreshCommand: target?.readinessRefreshCommand || continuation?.remainingSequence?.[0]?.readinessRefreshCommand || null,
+    nextProofItemKey: continuation?.nextProofItemKey || null,
+    nextCompletionQueueKey: continuation?.nextCompletionQueueKey || null,
+    nextCompletionCommand: continuation?.nextCompletionCommand || null,
+    remainingCount: continuation?.remainingCount ?? null,
+    readyForCutoverWatch: readyForCutoverWatch === true
+  };
+}
+
 function buildLaunchCutoverTriageProofExecutionEntrypoint({
   checkpoint = null,
   productionSwitchProofPacket = null
@@ -59811,6 +59840,11 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     proofItem,
     completionSequence: proofItemCompletionSequence
   });
+  const proofItemCompletionRunbook = buildProductionSwitchProofItemCompletionRunbook({
+    proofItemCompletionTarget,
+    proofItemCompletionContinuation,
+    readyForCutoverWatch
+  });
   return {
     mode: "production-switch-proof-execution-entrypoint/v1",
     status: proofStatus,
@@ -59830,6 +59864,7 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     proofItemRehearsalReloadCommand: proofItemCompletionTarget?.rehearsalReloadCommand || null,
     proofItemCompletionSequence: proofItemCompletionSequence.length ? proofItemCompletionSequence : null,
     proofItemCompletionContinuation,
+    proofItemCompletionRunbook,
     readyForCutoverWatch,
     recommendedDownloadFormat: "production-switch-proof-packet",
     nextAction: readyForCutoverWatch
@@ -60074,6 +60109,17 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
         + ` | remaining=${proofCompletionContinuation.remainingCount ?? "-"}`
         + ` | next=${proofCompletionContinuation.nextProofItemKey || "-"}`
         + ` | nextQueue=${proofCompletionContinuation.nextCompletionQueueKey || "-"}`
+      : "-"}`
+  );
+  const proofCompletionRunbook = checkpoint.proofExecutionEntrypoint?.proofItemCompletionRunbook
+    && typeof checkpoint.proofExecutionEntrypoint.proofItemCompletionRunbook === "object"
+    ? checkpoint.proofExecutionEntrypoint.proofItemCompletionRunbook
+    : null;
+  lines.push(
+    `- proofItemRunbook=${proofCompletionRunbook
+      ? `currentQueue=${proofCompletionRunbook.currentCompletionQueueKey || "-"}`
+        + ` | refresh=${proofCompletionRunbook.readinessRefreshCommand ? "yes" : "no"}`
+        + ` | nextQueue=${proofCompletionRunbook.nextCompletionQueueKey || "-"}`
       : "-"}`
   );
   lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
@@ -66670,6 +66716,17 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
         + ` | remaining=${proofCompletionContinuation.remainingCount ?? "-"}`
         + ` | next=${proofCompletionContinuation.nextProofItemKey || "-"}`
         + ` | nextQueue=${proofCompletionContinuation.nextCompletionQueueKey || "-"}`
+      : "-"}`
+  );
+  const proofCompletionRunbook = checkpoint.proofExecutionEntrypoint?.proofItemCompletionRunbook
+    && typeof checkpoint.proofExecutionEntrypoint.proofItemCompletionRunbook === "object"
+    ? checkpoint.proofExecutionEntrypoint.proofItemCompletionRunbook
+    : null;
+  lines.push(
+    `- proofItemRunbook=${proofCompletionRunbook
+      ? `currentQueue=${proofCompletionRunbook.currentCompletionQueueKey || "-"}`
+        + ` | refresh=${proofCompletionRunbook.readinessRefreshCommand ? "yes" : "no"}`
+        + ` | nextQueue=${proofCompletionRunbook.nextCompletionQueueKey || "-"}`
       : "-"}`
   );
   lines.push(`- launchCutoverTriage=${checkpoint.launchCutoverTriageStatus || "-"}`);

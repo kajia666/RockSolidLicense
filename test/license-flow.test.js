@@ -27235,6 +27235,43 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.fileName === "developer-ops-launch-operations-overview-status.txt"
       && /format=launch-operations-overview-status/.test(item.href || "")
     )));
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.version,
+      "developer-ops-launch-operations-first-operating-result-execution-summary/v1"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.status,
+      "ready_for_first_operating_result_review"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.currentLane,
+      "first_operating_result_review"
+    );
+    assert.equal(firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.ready, true);
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.currentActionKey,
+      "review_first_operating_result_handoff"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.currentReceiptPlan?.route,
+      "/api/developer/ops/steady-state-duty-plan/receipt"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.currentReceiptPlan?.payload?.action,
+      "review_first_operating_result_handoff"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.postCommandReadback?.expectedCurrentActionKey,
+      "prepare_rollout_widening_followup"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.postCommandReadback?.expectedStatus,
+      "recorded_ready_for_rollout_widening_followup"
+    );
+    assert.equal(
+      firstOperatingResultHandoffReceiptOverview.firstOperatingResultExecutionSummary?.handoffContinuation?.actionKey,
+      "prepare_rollout_widening_followup"
+    );
 
     const firstOperatingResultHandoffReceiptActionLinksDownload = await getText(
       baseUrl,
@@ -27274,6 +27311,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
       /Panels:[\s\S]*- first_operating_result_review[^\n]*status=ready_for_first_operating_result_review[^\n]*ready=yes[^\n]*file=developer-ops-launch-operations-overview-status\.txt/
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
+      /firstOperatingResultExecution=ready_for_first_operating_result_review \| lane=first_operating_result_review \| ready=true \| current=review_first_operating_result_handoff/
+    );
+    assert.match(
+      firstOperatingResultHandoffReceiptOverviewStatusDownload.body,
+      /firstOperatingResultExecutionReadback=prepare_rollout_widening_followup \| expectedStatus=recorded_ready_for_rollout_widening_followup \| continuation=prepare_rollout_widening_followup/
     );
 
     const firstOperatingResultReviewReceipt = await postJson(
@@ -27398,9 +27443,41 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       && item.fileName === "developer-ops-launch-operations-overview-status.txt"
       && /format=launch-operations-overview-status/.test(item.href || "")
     )));
+    assert.equal(
+      firstOperatingResultReviewReceiptOverview.firstOperatingResultExecutionSummary?.status,
+      "ready_for_rollout_widening_followup"
+    );
+    assert.equal(
+      firstOperatingResultReviewReceiptOverview.firstOperatingResultExecutionSummary?.currentLane,
+      "rollout_widening_followup"
+    );
+    assert.equal(
+      firstOperatingResultReviewReceiptOverview.firstOperatingResultExecutionSummary?.currentActionKey,
+      "prepare_rollout_widening_followup"
+    );
+    assert.equal(
+      firstOperatingResultReviewReceiptOverview.firstOperatingResultExecutionSummary?.currentReceiptPlan?.payload?.action,
+      "prepare_rollout_widening_followup"
+    );
+    assert.equal(
+      firstOperatingResultReviewReceiptOverview.firstOperatingResultExecutionSummary?.postCommandReadback?.expectedCurrentActionKey,
+      "review_rollout_widening_decision"
+    );
+    assert.equal(
+      firstOperatingResultReviewReceiptOverview.firstOperatingResultExecutionSummary?.handoffContinuation?.actionKey,
+      "review_rollout_widening_decision"
+    );
     assert.match(
       firstOperatingResultReviewReceiptOverviewStatusDownload.body,
       new RegExp(`rolloutWideningFollowup=ready_for_rollout_widening_followup \\| action=prepare_rollout_widening_followup \\| reviewReceipt=${firstOperatingResultReviewReceipt.auditLogId} \\| source=recorded_ready_for_rollout_widening_followup`)
+    );
+    assert.match(
+      firstOperatingResultReviewReceiptOverviewStatusDownload.body,
+      /firstOperatingResultExecution=ready_for_rollout_widening_followup \| lane=rollout_widening_followup \| ready=true \| current=prepare_rollout_widening_followup/
+    );
+    assert.match(
+      firstOperatingResultReviewReceiptOverviewStatusDownload.body,
+      /firstOperatingResultExecutionReadback=review_rollout_widening_decision \| expectedStatus=recorded_ready_for_next_rollout_widening_decision \| continuation=review_rollout_widening_decision/
     );
 
     const rolloutWideningFollowupReceipt = await postJson(

@@ -49229,6 +49229,64 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityParityCheck({
   };
 }
 
+const DEVELOPER_OPS_OPERATOR_BASE_URL_ENV = "RSL_DEVELOPER_BASE_URL";
+const DEVELOPER_OPS_OPERATOR_BEARER_TOKEN_ENV = "RSL_DEVELOPER_BEARER_TOKEN";
+
+function quoteDeveloperOpsPowerShellSingleQuoted(value = "") {
+  return `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function formatDeveloperOpsPowerShellMethod(method = "GET") {
+  const normalized = String(method || "GET").trim().toUpperCase();
+  return normalized.slice(0, 1) + normalized.slice(1).toLowerCase();
+}
+
+function buildDeveloperOpsOperatorRequestTemplate({
+  method = "GET",
+  route = null,
+  href = null,
+  body = null
+} = {}) {
+  const normalizedMethod = String(method || "GET").trim().toUpperCase() || "GET";
+  const target = String(href || route || "").trim();
+  if (!target) {
+    return null;
+  }
+  const uri = /^https?:\/\//i.test(target)
+    ? target
+    : `$baseUrl${target.startsWith("/") ? target : `/${target}`}`;
+  const commandParts = [
+    `$baseUrl=$env:${DEVELOPER_OPS_OPERATOR_BASE_URL_ENV}`,
+    `$headers=@{ Authorization = "Bearer $env:${DEVELOPER_OPS_OPERATOR_BEARER_TOKEN_ENV}" }`
+  ];
+  if (body && normalizedMethod !== "GET") {
+    commandParts.push(`$body=${quoteDeveloperOpsPowerShellSingleQuoted(JSON.stringify(body))}`);
+    commandParts.push(
+      `Invoke-RestMethod -Method ${formatDeveloperOpsPowerShellMethod(normalizedMethod)}`
+      + ` -Uri "${uri}"`
+      + " -Headers $headers -ContentType 'application/json' -Body $body"
+    );
+  } else {
+    commandParts.push(
+      `Invoke-RestMethod -Method ${formatDeveloperOpsPowerShellMethod(normalizedMethod)}`
+      + ` -Uri "${uri}"`
+      + " -Headers $headers"
+    );
+  }
+  const powershell = commandParts.join("; ");
+  return {
+    method: normalizedMethod,
+    route: route || null,
+    href: href || null,
+    target,
+    baseUrlEnv: DEVELOPER_OPS_OPERATOR_BASE_URL_ENV,
+    bearerTokenEnv: DEVELOPER_OPS_OPERATOR_BEARER_TOKEN_ENV,
+    contentType: body && normalizedMethod !== "GET" ? "application/json" : null,
+    body: body || null,
+    powershell
+  };
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQueue({
   productCode = "",
   channel = "stable",
@@ -49565,6 +49623,24 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
   const closeoutCurrentActionKey = postConfirmationSwitchReady
     ? "handoff_launch_duty_to_post_signoff"
     : postConfirmationSwitchNextActionTemplate.actionKey || "review_launch_review_summary";
+  const launchReviewSummaryRequestTemplate = buildDeveloperOpsOperatorRequestTemplate({
+    method: "GET",
+    href: closeoutReviewDownloads[0]?.href || null
+  });
+  const launchSmokeSummaryRequestTemplate = buildDeveloperOpsOperatorRequestTemplate({
+    method: "GET",
+    href: closeoutReviewDownloads[1]?.href || null
+  });
+  const confirmationRequestTemplate = buildDeveloperOpsOperatorRequestTemplate({
+    method: confirmationSubmissionPacket.method,
+    route: confirmationSubmissionPacket.route,
+    body: confirmationSubmissionPacket.payload
+  });
+  const overviewRefreshRequestTemplate = buildDeveloperOpsOperatorRequestTemplate({
+    method: overviewRefreshAction.method,
+    route: overviewRefreshAction.route,
+    href: overviewRefreshAction.href
+  });
   const launchSurfaceReviewCloseoutOperatorNextActions = [
     {
       order: 1,
@@ -49576,6 +49652,8 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       fileName: closeoutReviewDownloads[0]?.fileName || null,
       format: closeoutReviewDownloads[0]?.format || null,
       href: closeoutReviewDownloads[0]?.href || null,
+      requestTemplate: launchReviewSummaryRequestTemplate,
+      command: launchReviewSummaryRequestTemplate?.powershell || null,
       launchDutyRecordIndexPath: closeoutReviewDownloads[0]?.launchDutyRecordIndexPath || resolvedRecordIndexPath
     },
     {
@@ -49588,6 +49666,8 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       fileName: closeoutReviewDownloads[1]?.fileName || null,
       format: closeoutReviewDownloads[1]?.format || null,
       href: closeoutReviewDownloads[1]?.href || null,
+      requestTemplate: launchSmokeSummaryRequestTemplate,
+      command: launchSmokeSummaryRequestTemplate?.powershell || null,
       launchDutyRecordIndexPath: closeoutReviewDownloads[1]?.launchDutyRecordIndexPath || resolvedRecordIndexPath
     },
     {
@@ -49599,6 +49679,8 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       method: confirmationSubmissionPacket.method,
       route: confirmationSubmissionPacket.route,
       payload: confirmationSubmissionPacket.payload,
+      requestTemplate: confirmationRequestTemplate,
+      command: confirmationRequestTemplate?.powershell || null,
       confirmationAuditLogId: confirmationSubmissionPacket.confirmationAuditLogId || null,
       launchDutyRecordIndexPath: resolvedRecordIndexPath
     },
@@ -49611,6 +49693,8 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       method: overviewRefreshAction.method,
       route: overviewRefreshAction.route,
       href: overviewRefreshAction.href,
+      requestTemplate: overviewRefreshRequestTemplate,
+      command: overviewRefreshRequestTemplate?.powershell || null,
       confirmationAuditLogId: overviewRefreshAction.confirmationAuditLogId || null,
       launchDutyRecordIndexPath: resolvedRecordIndexPath
     },
@@ -49622,6 +49706,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       ready: operatorHandoffPacket.ready === true,
       currentActionKey: operatorHandoffPacket.currentActionKey || null,
       confirmationAuditLogId: operatorHandoffPacket.confirmationAuditLogId || null,
+      command: `Review launch-duty record index ${resolvedRecordIndexPath || "-"} and continue handoff_launch_duty_to_post_signoff after first-wave confirmation and Developer Ops overview refresh are visible.`,
       launchDutyRecordIndexPath: resolvedRecordIndexPath
     }
   ];
@@ -65140,6 +65225,7 @@ function appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(lines = [], ac
       + ` | ready=${item.ready === true ? "yes" : "no"}`
       + ` | target=${target}`
       + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+      + (item.command ? ` | command=${item.command}` : "")
     );
   }
 }

@@ -12409,6 +12409,22 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemArtifactPath,
       "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt"
     );
+    assert.equal(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemCompletionTargetKey,
+      "backup_restore_drill_result"
+    );
+    assert.equal(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemCompletionQueueKey,
+      "backup_restore_drill_result_backfill"
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemCompletionCommand || "",
+      /npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key backup_restore_drill_result/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemReadinessRefreshCommand || "",
+      /npm\.cmd run staging:readiness:status/
+    );
     const runtimeEvidenceReviewCutoverTriageAction = runtimeEvidenceLaunchReview.reviewSummary.actionPlan.find((item) =>
       item.key === "launch_review_cutover_triage_checkpoint"
     );
@@ -12696,6 +12712,22 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.equal(
       runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemArtifactPath,
       "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt"
+    );
+    assert.equal(
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemCompletionTargetKey,
+      "backup_restore_drill_result"
+    );
+    assert.equal(
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemCompletionQueueKey,
+      "backup_restore_drill_result_backfill"
+    );
+    assert.match(
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemCompletionCommand || "",
+      /npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key backup_restore_drill_result/
+    );
+    assert.match(
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemReadinessRefreshCommand || "",
+      /npm\.cmd run staging:readiness:status/
     );
     const runtimeEvidenceSmokeCutoverTriageAction = runtimeEvidenceLaunchSmoke.smokeSummary.actionPlan.find((item) =>
       item.key === "launch_smoke_cutover_triage_checkpoint"
@@ -23430,6 +23462,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           proofItemArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt",
           proofItemCommand: null,
           proofItemNextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off.",
+          proofItemCompletionTargetKey: "backup_restore_drill_result",
+          proofItemCompletionQueueKey: "backup_restore_drill_result_backfill",
+          proofItemCompletionCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          proofItemReadinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          proofItemRehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
           readyForCutoverWatch: false,
           recommendedDownloadFormat: "production-switch-proof-packet",
           nextAction: "Run the current production-switch proof command, then refresh Launch Review and Launch Smoke."
@@ -31492,6 +31529,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.proofItemKey,
         proofExecutionEntrypointProofItemArtifactPath:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.proofItemArtifactPath,
+        proofExecutionEntrypointCompletionTargetKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.proofItemCompletionTargetKey,
+        proofExecutionEntrypointReadinessRefreshCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.proofItemReadinessRefreshCommand,
         proofExecutionEntrypointReadyForCutoverWatch:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.readyForCutoverWatch,
         launchCutoverTriageStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchCutoverTriageStatus
@@ -31512,6 +31553,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         proofExecutionEntrypointCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
         proofExecutionEntrypointProofItemKey: "launch_day_watch_and_stabilization",
         proofExecutionEntrypointProofItemArtifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+        proofExecutionEntrypointCompletionTargetKey: "first_wave_closeout",
+        proofExecutionEntrypointReadinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
         proofExecutionEntrypointReadyForCutoverWatch: true,
         launchCutoverTriageStatus: "ready_for_cutover_watch"
       }
@@ -32438,6 +32481,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchReviewCloseoutRecorded.reviewSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.proofItemArtifactPath,
       "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md"
     );
+    assert.equal(
+      launchReviewCloseoutRecorded.reviewSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.proofItemCompletionTargetKey,
+      "first_wave_closeout"
+    );
+    assert.match(
+      launchReviewCloseoutRecorded.reviewSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.proofItemReadinessRefreshCommand || "",
+      /npm\.cmd run staging:readiness:status/
+    );
     const launchReviewCloseoutRecordedCutoverTriageAction = launchReviewCloseoutRecorded.reviewSummary.actionPlan.find((item) =>
       item.key === "launch_review_cutover_triage_checkpoint"
     );
@@ -32618,6 +32669,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       launchSmokeCloseoutRecorded.smokeSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.proofItemArtifactPath,
       "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md"
+    );
+    assert.equal(
+      launchSmokeCloseoutRecorded.smokeSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.proofItemCompletionTargetKey,
+      "first_wave_closeout"
+    );
+    assert.match(
+      launchSmokeCloseoutRecorded.smokeSummary.launchCutoverTriageCheckpoint?.proofExecutionEntrypoint?.proofItemReadinessRefreshCommand || "",
+      /npm\.cmd run staging:readiness:status/
     );
     const launchSmokeCloseoutRecordedCutoverTriageAction = launchSmokeCloseoutRecorded.smokeSummary.actionPlan.find((item) =>
       item.key === "launch_smoke_cutover_triage_checkpoint"

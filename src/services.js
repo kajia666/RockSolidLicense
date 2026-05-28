@@ -59597,6 +59597,67 @@ function selectProductionSwitchProofExecutionItem(proofPacket = null, {
   ) || proofItems.find((item) => !isProductionSwitchProofItemReady(item)) || proofItems[0] || null;
 }
 
+function buildProductionSwitchProofItemCompletionTarget(proofItem = null, proofPacket = null) {
+  if (!proofItem || typeof proofItem !== "object") {
+    return null;
+  }
+  const completionSpecs = {
+    backup_restore_drill: {
+      targetKey: "backup_restore_drill_result",
+      queueKey: "backup_restore_drill_result_backfill",
+      receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"]
+    },
+    live_write_smoke: {
+      targetKey: "live_write_smoke_result",
+      queueKey: "live_write_smoke_result_backfill",
+      receiptOperations: ["<record_launch_rehearsal_run-receipt-id>"]
+    },
+    full_test_window: {
+      targetKey: "full_test_window_passed",
+      queueKey: "full_test_window_passed_backfill",
+      receiptOperations: ["<full-test-window-receipt-id>"]
+    },
+    production_signoff_and_receipts: {
+      targetKey: "production_signoff_packet",
+      queueKey: "production_signoff_packet_backfill",
+      receiptOperations: ["<production-signoff-receipt-id>"]
+    },
+    launch_day_watch_and_stabilization: {
+      targetKey: "first_wave_closeout",
+      queueKey: "first_wave_closeout_record",
+      receiptOperations: ["<first-wave-closeout-receipt-id>"]
+    }
+  };
+  const spec = completionSpecs[proofItem.key] || null;
+  if (!spec) {
+    return null;
+  }
+  const closeoutInputFile = proofPacket?.closeoutInputFile || extractCommandOptionValue(proofPacket?.currentCommand, "input-file") || null;
+  const readinessActionQueueFile = proofPacket?.readinessActionQueueFile
+    || extractCommandOptionValue(proofPacket?.currentCommand, "actions-file")
+    || null;
+  const artifactPath = proofItem.artifactPath || null;
+  const receiptArgs = Array.isArray(spec.receiptOperations) && spec.receiptOperations.length
+    ? spec.receiptOperations.map((receiptId) => ` --receipt-id ${receiptId}`).join("")
+    : "";
+  const completionCommand = spec.targetKey && closeoutInputFile && readinessActionQueueFile && artifactPath
+    ? `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key ${spec.targetKey} --value-json <redacted-json> --artifact-path ${artifactPath}${receiptArgs} --actions-file ${readinessActionQueueFile}`
+    : proofItem.command || null;
+  const readinessRefreshCommand = closeoutInputFile && readinessActionQueueFile
+    ? `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${readinessActionQueueFile}`
+    : proofPacket?.currentCommand || null;
+  const rehearsalReloadCommand = closeoutInputFile
+    ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`
+    : proofItem.command || null;
+  return {
+    targetKey: spec.targetKey,
+    queueKey: spec.queueKey,
+    command: completionCommand,
+    readinessRefreshCommand,
+    rehearsalReloadCommand
+  };
+}
+
 function buildLaunchCutoverTriageProofExecutionEntrypoint({
   checkpoint = null,
   productionSwitchProofPacket = null
@@ -59621,6 +59682,7 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     command,
     readyForCutoverWatch
   });
+  const proofItemCompletionTarget = buildProductionSwitchProofItemCompletionTarget(proofItem, proofPacket);
   return {
     mode: "production-switch-proof-execution-entrypoint/v1",
     status: proofStatus,
@@ -59633,6 +59695,11 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     proofItemArtifactPath: proofItem?.artifactPath || null,
     proofItemCommand: proofItem?.command || null,
     proofItemNextAction: proofItem?.nextAction || null,
+    proofItemCompletionTargetKey: proofItemCompletionTarget?.targetKey || null,
+    proofItemCompletionQueueKey: proofItemCompletionTarget?.queueKey || null,
+    proofItemCompletionCommand: proofItemCompletionTarget?.command || null,
+    proofItemReadinessRefreshCommand: proofItemCompletionTarget?.readinessRefreshCommand || null,
+    proofItemRehearsalReloadCommand: proofItemCompletionTarget?.rehearsalReloadCommand || null,
     readyForCutoverWatch,
     recommendedDownloadFormat: "production-switch-proof-packet",
     nextAction: readyForCutoverWatch

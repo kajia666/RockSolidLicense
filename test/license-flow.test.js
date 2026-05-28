@@ -24585,6 +24585,38 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ["launch_smoke_summary", "aligned", true, "launch-smoke-kit.txt"]
       ]
     );
+    assert.deepEqual(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorNextActions.map((item) => [
+        item.order,
+        item.key,
+        item.status,
+        item.kind,
+        item.ready
+      ]),
+      [
+        [1, "review_launch_review_summary", "aligned", "download", true],
+        [2, "review_launch_smoke_summary", "aligned", "download", true],
+        [3, "confirm_first_wave_handoff", "ready_to_submit", "api", true],
+        [4, "refresh_developer_ops_overview", "pending_confirmation_receipt", "api", false],
+        [5, "handoff_launch_duty_to_post_signoff", "awaiting_first_wave_confirmation", "handoff", false]
+      ]
+    );
+    assert.match(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorNextActions[0].href || "",
+      /\/api\/developer\/launch-review\/download\?/
+    );
+    assert.match(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorNextActions[1].href || "",
+      /\/api\/developer\/launch-smoke-kit\/download\?/
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorNextActions[2].route,
+      "/api/developer/ops/first-wave/recommendations/confirm"
+    );
+    assert.match(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorNextActions[3].href || "",
+      /\/api\/developer\/ops\/export\?/
+    );
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.status, "ready_to_submit");
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.ready, true);
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.method, "POST");
@@ -26625,6 +26657,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Downloads:[\s\S]*launch_review_summary \| status=aligned \| ready=yes \| file=launch-review\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Downloads:[\s\S]*launch_smoke_summary \| status=aligned \| ready=yes \| file=launch-smoke-kit\.txt/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Next:[\s\S]*action=confirm_first_wave_handoff \| method=POST \| route=\/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:[\s\S]*1\. review_launch_review_summary \| kind=download \| status=aligned \| ready=yes \| target=.*\/api\/developer\/launch-review\/download\?.*format=summary/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:[\s\S]*2\. review_launch_smoke_summary \| kind=download \| status=aligned \| ready=yes \| target=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:[\s\S]*3\. confirm_first_wave_handoff \| kind=api \| status=ready_to_submit \| ready=yes \| target=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:[\s\S]*4\. refresh_developer_ops_overview \| kind=api \| status=pending_confirmation_receipt \| ready=no \| target=GET \/api\/developer\/ops\/export\?productCode=EXPORT_CLOSEOUT_READY&channel=stable/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Next Actions:[\s\S]*5\. handoff_launch_duty_to_post_signoff \| kind=handoff \| status=awaiting_first_wave_confirmation \| ready=no/);
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Launch Surface Review Closeout Action:[\s\S]*stableTransitionStatus=[^\n]*\| stableTransitionReady=(yes|no)[^\n]*\| stableTransitionCurrent=[^\n]*\| stableTransitionNextDownload=[^\n]*\| stableTransitionNextHref=[^\n]*/

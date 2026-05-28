@@ -49560,6 +49560,66 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
   const closeoutCurrentActionKey = postConfirmationSwitchReady
     ? "handoff_launch_duty_to_post_signoff"
     : postConfirmationSwitchNextActionTemplate.actionKey || "review_launch_review_summary";
+  const launchSurfaceReviewCloseoutOperatorNextActions = [
+    {
+      order: 1,
+      key: "review_launch_review_summary",
+      kind: "download",
+      status: closeoutReviewDownloads[0]?.status || "missing",
+      ready: closeoutReviewDownloads[0]?.ready === true,
+      label: closeoutReviewDownloads[0]?.label || "Launch Review summary",
+      fileName: closeoutReviewDownloads[0]?.fileName || null,
+      format: closeoutReviewDownloads[0]?.format || null,
+      href: closeoutReviewDownloads[0]?.href || null,
+      launchDutyRecordIndexPath: closeoutReviewDownloads[0]?.launchDutyRecordIndexPath || resolvedRecordIndexPath
+    },
+    {
+      order: 2,
+      key: "review_launch_smoke_summary",
+      kind: "download",
+      status: closeoutReviewDownloads[1]?.status || "missing",
+      ready: closeoutReviewDownloads[1]?.ready === true,
+      label: closeoutReviewDownloads[1]?.label || "Launch Smoke summary",
+      fileName: closeoutReviewDownloads[1]?.fileName || null,
+      format: closeoutReviewDownloads[1]?.format || null,
+      href: closeoutReviewDownloads[1]?.href || null,
+      launchDutyRecordIndexPath: closeoutReviewDownloads[1]?.launchDutyRecordIndexPath || resolvedRecordIndexPath
+    },
+    {
+      order: 3,
+      key: "confirm_first_wave_handoff",
+      kind: "api",
+      status: confirmationSubmissionPacket.status,
+      ready: confirmationSubmissionPacket.ready === true,
+      method: confirmationSubmissionPacket.method,
+      route: confirmationSubmissionPacket.route,
+      payload: confirmationSubmissionPacket.payload,
+      confirmationAuditLogId: confirmationSubmissionPacket.confirmationAuditLogId || null,
+      launchDutyRecordIndexPath: resolvedRecordIndexPath
+    },
+    {
+      order: 4,
+      key: "refresh_developer_ops_overview",
+      kind: "api",
+      status: overviewRefreshAction.status,
+      ready: overviewRefreshAction.ready === true,
+      method: overviewRefreshAction.method,
+      route: overviewRefreshAction.route,
+      href: overviewRefreshAction.href,
+      confirmationAuditLogId: overviewRefreshAction.confirmationAuditLogId || null,
+      launchDutyRecordIndexPath: resolvedRecordIndexPath
+    },
+    {
+      order: 5,
+      key: "handoff_launch_duty_to_post_signoff",
+      kind: "handoff",
+      status: operatorHandoffPacket.status,
+      ready: operatorHandoffPacket.ready === true,
+      currentActionKey: operatorHandoffPacket.currentActionKey || null,
+      confirmationAuditLogId: operatorHandoffPacket.confirmationAuditLogId || null,
+      launchDutyRecordIndexPath: resolvedRecordIndexPath
+    }
+  ];
   const launchSurfaceReviewCloseoutAction = {
     version: "developer-ops-launch-operations-launch-surface-review-closeout-action/v1",
     key: "launch_surface_review_closeout",
@@ -49576,6 +49636,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
       + (overviewRefreshAction.ready === true ? 1 : 0),
     launchDutyRecordIndexPath: resolvedRecordIndexPath,
     reviewDownloads: closeoutReviewDownloads,
+    operatorNextActions: launchSurfaceReviewCloseoutOperatorNextActions,
     confirmationSubmission: {
       status: confirmationSubmissionPacket.status,
       ready: confirmationSubmissionPacket.ready,
@@ -49686,6 +49747,7 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
     overviewRefreshAction,
     operatorHandoffPacket,
     launchSurfaceReviewCloseoutAction,
+    operatorNextActions: launchSurfaceReviewCloseoutOperatorNextActions,
     currentStepKey,
     nextStepKey,
     stepCount: steps.length,
@@ -65051,6 +65113,32 @@ function appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines = [], gate = n
   return true;
 }
 
+function appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(lines = [], actions = [], {
+  title = "Launch Surface Review Closeout Operator Next Actions:"
+} = {}) {
+  if (!Array.isArray(lines) || !Array.isArray(actions) || !actions.length) {
+    return;
+  }
+  lines.push(title);
+  for (const item of actions) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const apiTarget = item.method
+      ? `${item.method} ${item.href || item.route || "-"}`
+      : "";
+    const target = apiTarget || item.href || item.route || item.fileName || item.currentActionKey || "-";
+    lines.push(
+      `- ${item.order ?? "-"}\. ${item.key || "-"}`
+      + ` | kind=${item.kind || "-"}`
+      + ` | status=${item.status || "-"}`
+      + ` | ready=${item.ready === true ? "yes" : "no"}`
+      + ` | target=${target}`
+      + ` | launchDutyRecordIndex=${item.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+}
+
 function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
   const scope = payload.scope || {};
   const summary = payload.summary || {};
@@ -65130,6 +65218,10 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       + ` | method=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.method || "-"}`
       + ` | route=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.route || "-"}`
       + ` | href=${launchSurfaceReviewCloseoutAction.nextActionTemplate?.href || "-"}`
+    );
+    appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(
+      lines,
+      launchSurfaceReviewCloseoutAction.operatorNextActions
     );
     lines.push("");
   }

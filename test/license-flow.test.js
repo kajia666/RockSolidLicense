@@ -22185,6 +22185,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateDutyReceiptReviewExecution.operatorOrder,
       expectedSteadyStateDutyReceiptOperatorOrder
     );
+    assert.deepEqual(
+      steadyStateDutyReceiptReviewExecution.cutoverStableOperationsRunbook,
+      launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.operatorQueueCheckpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook
+    );
     const initialProductionLaunchReadiness = launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.initialProductionLaunchReadiness;
     assert.ok(initialProductionLaunchReadiness);
     assert.equal(initialProductionLaunchReadiness.status, launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.launchReadinessDistance.status);
@@ -22548,6 +22552,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       new RegExp(`Launch Mainline Steady-State Duty Receipt Review Execution:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Steady-State Duty Receipt Review Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*status=blocked_until_cutover_watch/
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
@@ -26131,6 +26139,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsMainlineHandoffRoutesDownload.body,
       new RegExp(`Steady-State Duty Receipt Review Execution Route:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
     );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
+      /Steady-State Duty Receipt Review Execution Route:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*fixedActions=1\.complete_current_proof_queue -> 2\.refresh_stable_operations_gate -> 3\.open_steady_state_handoff/
+    );
     assert.doesNotMatch(
       launchOperationsMainlineHandoffRoutesDownload.body,
       /(^|\n)- steady-state-duty-receipt-review-execution:/
@@ -26202,6 +26214,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       new RegExp(`Steady-State Duty Receipt Review Execution Route:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Steady-State Duty Receipt Review Execution Route:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*status=blocked_until_cutover_watch/
     );
     assert.doesNotMatch(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
@@ -26584,6 +26600,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Developer Ops Steady-State Duty Board/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Steady-State Duty Board Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Steady-State Duty Receipt Review Execution Download/);
+    assert.match(
+      launchMainlineOpsRouteMirrorZipText,
+      /Steady-State Duty Receipt Review Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*fixedActions=1\.complete_current_proof_queue -> 2\.refresh_stable_operations_gate -> 3\.open_steady_state_handoff/
+    );
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Rollout Widening Decision Execution Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline First Operating Result Handoff Execution Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /href=.*\/api\/developer\/ops\/export\/download\?.*format=steady-state-duty-board/);
@@ -26779,6 +26799,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
+      /Cutover Stable Operations Runbook:[\s\S]*status=blocked_until_cutover_watch/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
+      /Cutover Stable Operations Runbook:[\s\S]*nextAction=Finish cutover proof completion first, then continue the stable-operations transition runbook\./
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body,
       /Operator Notes:[\s\S]*Keep it beside steady-state-duty-board\.txt and launch-duty-record-index\.json so receipt review stays inside the direct handoff files\./
     );
     assert.doesNotMatch(launchMainlineSteadyStateDutyReceiptReviewExecutionDirectDownload.body, /longer handoff route map/);
@@ -26861,6 +26889,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
       new RegExp(`Launch Mainline Steady-State Duty Receipt Review Execution:[\\s\\S]*status=recorded \\| ready=yes \\| audit=${steadyStateDutyPlanReceipt.auditLogId} \\| action=download \\| file=developer-ops-steady-state-duty-board\\.txt \\| format=steady-state-duty-board`)
+    );
+    assert.match(
+      launchMainlinePostLaunchIndexSelectionDownload.body,
+      /Launch Mainline Steady-State Duty Receipt Review Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*proof=backup_restore_drill \| remainingProof=5 \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlinePostLaunchIndexSelectionDownload.body,
@@ -34987,6 +35019,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       steadyStateHandoffLandingExecution.receiptReviewOperatorOrder,
       ["Review the steady-state duty receipt review route before stable operations handoff."]
     );
+    assert.deepEqual(
+      steadyStateHandoffLandingExecution.cutoverStableOperationsRunbook,
+      launchMainlineSteadyStateHandoff.mainlineSummary.operatorQueueCheckpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook
+    );
     assert.match(
       launchMainlineSteadyStateHandoff.mainlineSummary.steadyStateHandoffLanding.recommendedDownload.href,
       /\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
@@ -35135,6 +35171,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Steady-State Handoff Landing Execution:[\s\S]*Steady-State Handoff Landing Checks: checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Steady-State Handoff Landing Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition/
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
@@ -35397,6 +35437,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateRoutesDownload.body,
+      /Steady-State Handoff Landing Execution Route:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition/
+    );
+    assert.match(
+      launchMainlineSteadyStateRoutesDownload.body,
       /steady-state-handoff-landing: ops\/steady-state-handoff-landing-execution\.txt[^\n]*file=steady-state-handoff-landing-execution\.txt[^\n]*format=steady-state-handoff-landing-execution[^\n]*source=developer-launch-mainline[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
@@ -35529,6 +35573,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
       /Launch Mainline Steady-State Handoff Landing Execution:[\s\S]*status=ready_for_steady_state_handoff \| ready=yes \| action=open_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineSteadyStatePostLaunchIndexDownload.body,
+      /Launch Mainline Steady-State Handoff Landing Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*steadyStateHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
     assert.match(
       launchMainlineSteadyStatePostLaunchIndexDownload.body,
@@ -35697,6 +35745,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateZipText,
+      /Steady-State Handoff Landing Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*fixedActions=1\.complete_current_proof_queue -> 2\.refresh_stable_operations_gate -> 3\.open_steady_state_handoff/
+    );
+    assert.match(
+      launchMainlineSteadyStateZipText,
       /ops\/first-operating-result-handoff-receipt-readback-execution\.txt/
     );
     assert.match(
@@ -35792,6 +35844,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       new RegExp(
         `Steady-State Handoff Landing Receipt Review:[\\s\\S]*status=ready_for_receipt_review \\| audit=${launchDutyPacketReviewReceipt.auditLogId} \\| action=packet_review_readback \\| format=launch-duty-packet-review`
       )
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body,
+      /Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body,
+      /Cutover Stable Operations Runbook:[\s\S]*nextAction=Run the stable-operations readiness refresh, confirm the gate\/readback state, then open the steady-state handoff brief\./
     );
     assert.match(
       launchMainlineSteadyStateHandoffLandingExecutionDirectDownload.body,

@@ -26778,6 +26778,7 @@ function getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload = 
     || bridge.recordIndexFile
     || receiptReview.launchDutyRecordIndexPath
     || getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload, landing);
+  const cutoverStableOperationsRunbook = getLaunchMainlineCutoverStableOperationsRunbook(payload);
   return {
     version: "developer-launch-mainline-steady-state-handoff-landing-execution/v1",
     status: landing.status || null,
@@ -26811,6 +26812,7 @@ function getDeveloperLaunchMainlineSteadyStateHandoffLandingExecution(payload = 
     steadyStateDutyReceiptReviewRecordIndexPath: receiptReview.launchDutyRecordIndexPath || null,
     operatorOrder,
     receiptReviewOperatorOrder,
+    ...(cutoverStableOperationsRunbook ? { cutoverStableOperationsRunbook } : {}),
     nextAction: landing.nextAction || bridge.nextAction || receiptReview.nextAction || null
   };
 }
@@ -26863,6 +26865,9 @@ function appendSteadyStateHandoffLandingExecutionLines(lines = [], execution = n
     + ` | firstWaveCloseout=${execution.firstWaveCloseoutArtifactPath || "-"}`
     + ` | artifacts=${artifacts || "-"}`
   );
+  if (execution.cutoverStableOperationsRunbook && typeof execution.cutoverStableOperationsRunbook === "object") {
+    appendCutoverStableOperationsRunbookLines(lines, execution.cutoverStableOperationsRunbook);
+  }
   lines.push(`Steady-State Handoff Landing Execution Next: ${execution.nextAction || "-"}`);
   if (Array.isArray(execution.operatorOrder) && execution.operatorOrder.length) {
     lines.push("Steady-State Handoff Landing Operator Order:");
@@ -26944,6 +26949,7 @@ function getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload
     || getDeveloperLaunchMainlineLaunchDutyRecordIndexPath(payload);
   const status = review.status || null;
   const receiptVisibilityStatus = review.receiptVisibilityStatus || null;
+  const cutoverStableOperationsRunbook = getLaunchMainlineCutoverStableOperationsRunbook(payload);
   return {
     version: "developer-launch-mainline-steady-state-duty-receipt-review-execution/v1",
     mode: "developer-launch-mainline-steady-state-duty-receipt-review-execution",
@@ -26967,6 +26973,7 @@ function getDeveloperLaunchMainlineSteadyStateDutyReceiptReviewExecution(payload
     recommendedDownloadSource: download?.source || null,
     recommendedDownload: download || null,
     operatorOrder,
+    ...(cutoverStableOperationsRunbook ? { cutoverStableOperationsRunbook } : {}),
     nextAction: review.nextAction || "Review the recorded steady-state duty receipt from Launch Mainline and keep it attached to the first stable operations handoff."
   };
 }
@@ -26999,6 +27006,9 @@ function appendSteadyStateDutyReceiptReviewExecutionLines(lines = [], execution 
     + ` visibility=${execution.receiptVisibilityStatus || "-"}`
     + ` | launchDutyRecordIndex=${execution.launchDutyRecordIndexPath || "-"}`
   );
+  if (execution.cutoverStableOperationsRunbook && typeof execution.cutoverStableOperationsRunbook === "object") {
+    appendCutoverStableOperationsRunbookLines(lines, execution.cutoverStableOperationsRunbook);
+  }
   lines.push(`Steady-State Duty Receipt Review Execution Next: ${execution.nextAction || "-"}`);
   if (Array.isArray(execution.operatorOrder) && execution.operatorOrder.length) {
     lines.push("Steady-State Duty Receipt Review Operator Order:");
@@ -64014,6 +64024,13 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
     channel: overviewStatusScope.channel || "stable",
     launchDutyRecordIndexPath: receiptVisibilitySummaryRecordIndexPath
   });
+  const cutoverStableOperationsRunbook = getLaunchMainlineCutoverStableOperationsRunbook({
+    opsSnapshot: {
+      summary: {
+        initialLaunchOpsReadiness: readiness
+      }
+    }
+  });
   const steadyStateDutyBoard = readiness.steadyStateDutyBoard
     && typeof readiness.steadyStateDutyBoard === "object"
       ? readiness.steadyStateDutyBoard
@@ -64067,6 +64084,7 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
         recommendedDownloadHref: steadyStateDutyReceiptReviewDownload?.href || null,
         recommendedDownloadSource: steadyStateDutyReceiptReviewDownload?.source || null,
         recommendedDownload: steadyStateDutyReceiptReviewDownload || null,
+        ...(cutoverStableOperationsRunbook ? { cutoverStableOperationsRunbook } : {}),
         operatorOrder: ["Review the steady-state duty receipt review route before stable operations handoff."],
         nextAction: "Review the recorded steady-state duty receipt from Launch Mainline and keep it attached to the first stable operations handoff."
       }

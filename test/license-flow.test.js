@@ -25502,6 +25502,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /launch-execution-phase-plan: [^\n]*file=launch-execution-phase-plan\.txt[^\n]*format=launch-execution-phase-plan[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Production Signoff Entry Handoff Route:[\s\S]*status=blocked_until_post_backfill_readback_confirms_production_signoff \| currentAction=review_production_signoff_packet \| archiveAction=archive_production_signoff_packet \| nextGate=production_signoff \| nextAfterSignoff=enter_after_production_signoff/
     );
     assert.match(
@@ -25602,6 +25606,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-operations-operator-entry-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-readiness-distance\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/production-switch-proof-packet\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-execution-phase-plan\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/initial-production-launch-readiness\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/production-signoff-entry-handoff\.txt/);
     assert.match(launchMainlineOpsRouteMirrorChecksumsDownload.body, /ops\/launch-switch-readiness\.txt/);
@@ -25709,7 +25714,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-operations-operator-entry-download\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-readiness-distance\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/production-switch-proof-packet\.txt/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /ops\/launch-execution-phase-plan\.txt/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Production Switch Proof Packet Download/);
+    assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Launch Execution Phase Plan Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Production Switch Proof Packet:/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /RockSolid Launch Mainline Launch Readiness Distance Download/);
     assert.match(launchMainlineOpsRouteMirrorZipText, /Launch Readiness Distance:[\s\S]*status=blocked_until_full_test_and_signoff \| blockedBy=full_test_and_production_signoff \| readiness=\d+% \| currentBlocker=refresh_staging_readiness_status \| remaining=4/);
@@ -28198,6 +28205,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsChecksumsDownload.body, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsChecksumsDownload.body, /launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsChecksumsDownload.body, /pre-staging-readiness-self-check\.txt/);
+    assert.match(launchOperationsChecksumsDownload.body, /launch-execution-phase-plan\.txt/);
     assert.match(launchOperationsChecksumsDownload.body, /production-switch-proof-packet\.txt/);
 
     const launchOperationsProductionSwitchProofPacketDownload = await getText(
@@ -28222,6 +28230,29 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsProductionSwitchProofPacketDownload.body,
       /6\. full_test_window \| status=ready_local_baseline_available \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt \| command=npm\.cmd test/
+    );
+    const launchOperationsLaunchExecutionPhasePlanDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&format=launch-execution-phase-plan",
+      ownerSession.token
+    );
+    assert.equal(launchOperationsLaunchExecutionPhasePlanDownload.contentType, "text/plain; charset=utf-8");
+    assert.match(
+      launchOperationsLaunchExecutionPhasePlanDownload.contentDisposition || "",
+      /developer-ops-launch-execution-phase-plan\.txt/
+    );
+    assert.match(
+      launchOperationsLaunchExecutionPhasePlanDownload.body,
+      /RockSolid Developer Ops Launch Execution Phase Plan/
+    );
+    assert.match(launchOperationsLaunchExecutionPhasePlanDownload.body, /Launch Execution Phase Plan:/);
+    assert.match(
+      launchOperationsLaunchExecutionPhasePlanDownload.body,
+      /launchExecutionPhase=awaiting_recovery_and_route_gate \| current=recovery_and_route_gate \| ready=1\/7 \| blocked=5\/7 \| commands=39/
+    );
+    assert.match(
+      launchOperationsLaunchExecutionPhasePlanDownload.body,
+      /currentAction=backfill_closeout_evidence \| currentCommand=npm\.cmd run staging:closeout:backfill/
     );
 
     const launchOperationsPreStagingSelfCheckDownload = await getText(
@@ -28284,7 +28315,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsZipText, /launch-operations-operator-checklist\.txt/);
     assert.match(launchOperationsZipText, /launch-operations-operator-entry\.txt/);
     assert.match(launchOperationsZipText, /pre-staging-readiness-self-check\.txt/);
+    assert.match(launchOperationsZipText, /launch-execution-phase-plan\.txt/);
     assert.match(launchOperationsZipText, /production-switch-proof-packet\.txt/);
+    assert.match(launchOperationsZipText, /RockSolid Developer Ops Launch Execution Phase Plan/);
     assert.match(launchOperationsZipText, /RockSolid Developer Ops Production Switch Proof Packet/);
     assert.match(launchOperationsZipText, /Production Switch Proof Packet:/);
     assert.match(launchOperationsZipText, /RockSolid Developer Ops Pre-Staging Readiness Self-Check/);
@@ -31225,11 +31258,29 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
+    const launchDutyCloseoutRecordedOpsPhasePlanDownload = await getText(
+      baseUrl,
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-execution-phase-plan",
+      ownerSession.token
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsPhasePlanDownload.body,
+      /RockSolid Developer Ops Launch Execution Phase Plan/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsPhasePlanDownload.body,
+      /launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsPhasePlanDownload.body,
+      /currentAction=refresh_staging_readiness_after_first_wave_closeout \| currentCommand=npm\.cmd run staging:readiness:status/
+    );
     const launchDutyCloseoutRecordedOpsChecksumsDownload = await getText(
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=checksums",
       ownerSession.token
     );
+    assert.match(launchDutyCloseoutRecordedOpsChecksumsDownload.body, /launch-execution-phase-plan\.txt/);
     assert.match(launchDutyCloseoutRecordedOpsChecksumsDownload.body, /production-switch-proof-packet\.txt/);
     const launchDutyCloseoutRecordedOpsZipDownload = await getBinary(
       baseUrl,
@@ -31237,6 +31288,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     const launchDutyCloseoutRecordedOpsZipText = launchDutyCloseoutRecordedOpsZipDownload.body.toString("latin1");
+    assert.match(launchDutyCloseoutRecordedOpsZipText, /launch-execution-phase-plan\.txt/);
+    assert.match(launchDutyCloseoutRecordedOpsZipText, /RockSolid Developer Ops Launch Execution Phase Plan/);
     assert.match(launchDutyCloseoutRecordedOpsZipText, /production-switch-proof-packet\.txt/);
     assert.match(
       launchDutyCloseoutRecordedOpsZipText,
@@ -31591,6 +31644,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedProofPacketDownload.body,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
+    );
+    const launchMainlineCloseoutRecordedPhasePlanDownload = await getText(
+      baseUrl,
+      "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=launch-execution-phase-plan",
+      ownerSession.token
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedPhasePlanDownload.body,
+      /RockSolid Launch Mainline Launch Execution Phase Plan Download/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedPhasePlanDownload.body,
+      /launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedPhasePlanDownload.body,
+      /currentAction=refresh_staging_readiness_after_first_wave_closeout \| currentCommand=npm\.cmd run staging:readiness:status/
     );
     const launchReviewCloseoutRecordedProofPacketDownload = await getText(
       baseUrl,
@@ -31978,6 +32048,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedChecksumsDownload.body,
+      /ops\/launch-execution-phase-plan\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedChecksumsDownload.body,
       /ops\/first-wave-closeout-stable-operations-shortcut-download\.txt/
     );
     assert.match(
@@ -32001,6 +32075,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedZipText,
       /ops\/production-switch-proof-packet\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /ops\/launch-execution-phase-plan\.txt/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /RockSolid Launch Mainline Launch Execution Phase Plan Download/
     );
     assert.match(
       launchMainlineCloseoutRecordedZipText,

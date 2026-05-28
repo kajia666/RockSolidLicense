@@ -13837,6 +13837,27 @@ function buildDeveloperLaunchReviewSummaryPayload({
             recommendedDownload: launchOperationsOverviewDownload
           }
         : null,
+      opsSummaryDownload
+        ? {
+            kind: "download",
+            label: "Download Developer Ops Summary",
+            recommendedDownload: opsSummaryDownload
+          }
+        : null,
+      opsHandoffIndexDownload
+        ? {
+            kind: "download",
+            label: "Download Developer Ops Handoff Index",
+            recommendedDownload: opsHandoffIndexDownload
+          }
+        : null,
+      opsLaunchMainlineRoutesDownload
+        ? {
+            kind: "download",
+            label: "Download Developer Ops Launch Mainline Routes",
+            recommendedDownload: opsLaunchMainlineRoutesDownload
+          }
+        : null,
       opsPreStagingReadinessSelfCheckDownload
         ? {
             kind: "download",
@@ -16168,6 +16189,11 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         workspaceAction: reviewWorkspaceAction
       },
       {
+        kind: "workspace",
+        label: opsWorkspaceAction.label || "Open Ops Workspace",
+        workspaceAction: opsWorkspaceAction
+      },
+      {
         kind: "download",
         label: "Download Smoke Summary",
         recommendedDownload: launchSmokeKitSummaryDownload
@@ -16192,6 +16218,27 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         label: "Download Launch Execution Phase Plan",
         recommendedDownload: launchSmokeKitLaunchExecutionPhasePlanDownload
       },
+      developerOpsSummaryDownload
+        ? {
+            kind: "download",
+            label: "Download Developer Ops Summary",
+            recommendedDownload: developerOpsSummaryDownload
+          }
+        : null,
+      developerOpsHandoffIndexDownload
+        ? {
+            kind: "download",
+            label: "Download Developer Ops Handoff Index",
+            recommendedDownload: developerOpsHandoffIndexDownload
+          }
+        : null,
+      developerOpsLaunchMainlineRoutesDownload
+        ? {
+            kind: "download",
+            label: "Download Developer Ops Launch Mainline Routes",
+            recommendedDownload: developerOpsLaunchMainlineRoutesDownload
+          }
+        : null,
       developerOpsPreStagingReadinessSelfCheckDownload
         ? {
             kind: "download",

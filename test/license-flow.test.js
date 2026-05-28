@@ -12398,6 +12398,25 @@ test("developer license quickstart first-batch setup can create recommended laun
         && item?.recommendedDownload?.format === format
       ), `missing Launch Review route focus control ${key}`);
     }
+    for (const [key, format] of [
+      ["launch_review_ops_summary", "summary"],
+      ["ops_handoff_index", "handoff-index"],
+      ["ops_launch_mainline_handoff_routes", "launch-mainline-handoff-routes"],
+      ["ops_pre_staging_readiness_self_check", "pre-staging-readiness-self-check"]
+    ]) {
+      const download = runtimeEvidenceLaunchReview.reviewSummary.recommendedDownloads?.find((item) => item?.key === key) || null;
+      assert.ok(download, `missing Launch Review recommended download ${key}`);
+      assert.equal(download?.source, "developer-ops");
+      assert.equal(download?.format, format);
+      assert.match(download?.href || "", new RegExp(`format=${format}`));
+      assert.ok(runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.some((item) =>
+        item?.recommendedDownload?.key === key
+        && item?.recommendedDownload?.format === format
+      ), `missing Launch Review route focus control ${key}`);
+    }
+    assert.ok(runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.some((item) =>
+      item?.workspaceAction?.key === "ops"
+    ));
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.actionPlan.some((item) =>
       item.key === "launch_review_pre_staging_readiness_self_check"
       && item.recommendedDownload?.format === "pre-staging-readiness-self-check"
@@ -12590,6 +12609,25 @@ test("developer license quickstart first-batch setup can create recommended laun
         && item?.recommendedDownload?.format === format
       ), `missing Launch Smoke route focus control ${key}`);
     }
+    for (const [key, format] of [
+      ["launch_smoke_ops_summary", "summary"],
+      ["ops_handoff_index", "handoff-index"],
+      ["ops_launch_mainline_handoff_routes", "launch-mainline-handoff-routes"],
+      ["ops_pre_staging_readiness_self_check", "pre-staging-readiness-self-check"]
+    ]) {
+      const download = runtimeEvidenceLaunchSmoke.smokeSummary.recommendedDownloads?.find((item) => item?.key === key) || null;
+      assert.ok(download, `missing Launch Smoke recommended download ${key}`);
+      assert.equal(download?.source, "developer-ops");
+      assert.equal(download?.format, format);
+      assert.match(download?.href || "", new RegExp(`format=${format}`));
+      assert.ok(runtimeEvidenceLaunchSmoke.smokeSummary.routeFocus?.controls?.some((item) =>
+        item?.recommendedDownload?.key === key
+        && item?.recommendedDownload?.format === format
+      ), `missing Launch Smoke route focus control ${key}`);
+    }
+    assert.ok(runtimeEvidenceLaunchSmoke.smokeSummary.routeFocus?.controls?.some((item) =>
+      item?.workspaceAction?.key === "ops"
+    ));
     assert.ok(runtimeEvidenceLaunchSmoke.smokeSummary.actionPlan.some((item) =>
       item.key === "launch_smoke_pre_staging_readiness_self_check"
       && item.recommendedDownload?.format === "pre-staging-readiness-self-check"

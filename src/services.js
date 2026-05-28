@@ -12164,6 +12164,12 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
       : getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
         opsSnapshot.summary?.initialLaunchOpsReadiness || null
       );
+  const launchCutoverTriageCheckpoint = reviewSummary.launchCutoverTriageCheckpoint
+    && typeof reviewSummary.launchCutoverTriageCheckpoint === "object"
+      ? reviewSummary.launchCutoverTriageCheckpoint
+      : getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(
+        opsSnapshot.summary?.initialLaunchOpsReadiness || null
+      );
   const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(
     opsSnapshot.summary?.initialLaunchOpsReadiness || null
   );
@@ -12220,6 +12226,9 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
     "Launch Review Receipt Visibility:"
   );
   appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
+  appendLaunchCutoverTriageCheckpointLines(lines, launchCutoverTriageCheckpoint, {
+    heading: "Launch Review Cutover Triage Checkpoint:"
+  });
   appendProductionSwitchProofPacketLines(lines, productionSwitchProofPacket, {
     heading: "Launch Review Production Switch Proof Packet:"
   });
@@ -12473,6 +12482,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
   const launchOperationsOverviewStatusBase = initialLaunchOpsReadiness?.launchOperationsOverviewStatus || null;
   const productionSwitchProofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const launchExecutionPhasePlan = getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const launchCutoverTriageCheckpoint = getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const reviewMode = String(filters.reviewMode || "matched").trim().toLowerCase() || "matched";
   const routeProductCode = launchWorkflow?.manifest?.project?.code || filters.productCode || null;
   const routeChannel = launchWorkflow?.manifest?.channel || filters.channel || "stable";
@@ -13941,6 +13951,7 @@ function buildDeveloperLaunchReviewSummaryPayload({
     launchReadinessNextGate,
     productionSwitchProofPacket,
     launchExecutionPhasePlan,
+    launchCutoverTriageCheckpoint,
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
     firstWaveRecommendationsZipDownload,
@@ -14144,6 +14155,7 @@ function buildLaunchSurfaceHandoffRoutesText({
   continuationDownloads = [],
   routeFocus = null,
   launchReadinessNextGate = null,
+  launchCutoverTriageCheckpoint = null,
   launchDutyActionOrder = null,
   operatorNotes = []
 } = {}) {
@@ -14270,6 +14282,13 @@ function buildLaunchSurfaceHandoffRoutesText({
     lines.push("");
   }
 
+  if (launchCutoverTriageCheckpoint && typeof launchCutoverTriageCheckpoint === "object") {
+    appendLaunchCutoverTriageCheckpointLines(lines, launchCutoverTriageCheckpoint, {
+      leadingBlank: false
+    });
+    lines.push("");
+  }
+
   lines.push("Front-Loaded Launch Path:");
   lines.push("1. launch-mainline-handoff-routes.txt");
   lines.push("2. surface-review-closeout-shortcut-download.txt");
@@ -14389,6 +14408,7 @@ function buildDeveloperLaunchReviewHandoffRoutesText(payload = {}) {
     ],
     routeFocus: payload.reviewSummary?.routeFocus || null,
     launchReadinessNextGate: payload.reviewSummary?.launchReadinessNextGate || null,
+    launchCutoverTriageCheckpoint: payload.reviewSummary?.launchCutoverTriageCheckpoint || null,
     launchDutyActionOrder: payload.reviewSummary?.launchDutyActionOrder || null,
     operatorNotes: [
       "Use this file when Launch Review is the current handoff surface and the next operator needs Ops/Mainline routes without rebuilding filters.",
@@ -14513,6 +14533,12 @@ function buildDeveloperLaunchReviewProductionSwitchProofPacketText(payload = {})
     : getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
       payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null
     );
+  const launchCutoverTriageCheckpoint = payload.reviewSummary?.launchCutoverTriageCheckpoint
+    && typeof payload.reviewSummary.launchCutoverTriageCheckpoint === "object"
+      ? payload.reviewSummary.launchCutoverTriageCheckpoint
+      : getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(
+        payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null
+      );
   const lines = [
     "RockSolid Developer Launch Review Production Switch Proof Packet",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -14522,6 +14548,11 @@ function buildDeveloperLaunchReviewProductionSwitchProofPacketText(payload = {})
     ""
   ];
   if (proofPacket) {
+    appendLaunchCutoverTriageCheckpointLines(lines, launchCutoverTriageCheckpoint, {
+      leadingBlank: false,
+      heading: "Launch Review Cutover Triage Checkpoint:"
+    });
+    lines.push("");
     appendProductionSwitchProofPacketLines(lines, proofPacket, {
       leadingBlank: false,
       heading: "Production Switch Proof Packet:"
@@ -14891,6 +14922,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
   const launchDutyActionOrder = initialLaunchOpsReadiness?.launchDutyActionOrder || null;
   const productionSwitchProofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const launchExecutionPhasePlan = getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const launchCutoverTriageCheckpoint = getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   const routedOperation = String(filters.operation || "").trim().toLowerCase();
   const routedActionKey = String(filters.actionKey || "").trim();
   const routedDownloadKey = String(filters.downloadKey || "").trim();
@@ -16292,6 +16324,7 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
     launchDutyActionOrder,
     productionSwitchProofPacket,
     launchExecutionPhasePlan,
+    launchCutoverTriageCheckpoint,
     firstWaveRuntimeEvidence,
     firstWaveSupportInspectionConfirmation,
     firstWaveRecommendationsZipDownload,
@@ -16379,6 +16412,12 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
       : getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
         opsSnapshot.summary?.initialLaunchOpsReadiness || null
       );
+  const launchCutoverTriageCheckpoint = smokeSummary.launchCutoverTriageCheckpoint
+    && typeof smokeSummary.launchCutoverTriageCheckpoint === "object"
+      ? smokeSummary.launchCutoverTriageCheckpoint
+      : getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(
+        opsSnapshot.summary?.initialLaunchOpsReadiness || null
+      );
   const launchSurfaceReviewCloseoutAction = getLaunchSurfaceReviewCloseoutActionFromInitialLaunchOpsReadiness(
     opsSnapshot.summary?.initialLaunchOpsReadiness || null
   );
@@ -16419,6 +16458,9 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
     "Launch Smoke Receipt Visibility:"
   );
   appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
+  appendLaunchCutoverTriageCheckpointLines(lines, launchCutoverTriageCheckpoint, {
+    heading: "Launch Smoke Cutover Triage Checkpoint:"
+  });
   appendProductionSwitchProofPacketLines(lines, productionSwitchProofPacket, {
     heading: "Launch Smoke Production Switch Proof Packet:"
   });
@@ -16682,6 +16724,7 @@ function buildDeveloperLaunchSmokeKitHandoffRoutesText(payload = {}) {
     ],
     routeFocus: payload.smokeSummary?.routeFocus || null,
     launchReadinessNextGate: payload.smokeSummary?.launchReadinessNextGate || null,
+    launchCutoverTriageCheckpoint: payload.smokeSummary?.launchCutoverTriageCheckpoint || null,
     launchDutyActionOrder: payload.smokeSummary?.launchDutyActionOrder || null,
     operatorNotes: [
       "Use this file when Launch Smoke is the current handoff surface and the next operator must continue into Review, Ops, or Mainline without rebuilding filters.",
@@ -16820,6 +16863,12 @@ function buildDeveloperLaunchSmokeKitProductionSwitchProofPacketText(payload = {
     : getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(
       payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null
     );
+  const launchCutoverTriageCheckpoint = payload.smokeSummary?.launchCutoverTriageCheckpoint
+    && typeof payload.smokeSummary.launchCutoverTriageCheckpoint === "object"
+      ? payload.smokeSummary.launchCutoverTriageCheckpoint
+      : getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(
+        payload.opsSnapshot?.summary?.initialLaunchOpsReadiness || null
+      );
   const lines = [
     "RockSolid Developer Launch Smoke Kit Production Switch Proof Packet",
     `Generated At: ${payload.generatedAt || ""}`,
@@ -16829,6 +16878,11 @@ function buildDeveloperLaunchSmokeKitProductionSwitchProofPacketText(payload = {
     ""
   ];
   if (proofPacket) {
+    appendLaunchCutoverTriageCheckpointLines(lines, launchCutoverTriageCheckpoint, {
+      leadingBlank: false,
+      heading: "Launch Smoke Cutover Triage Checkpoint:"
+    });
+    lines.push("");
     appendProductionSwitchProofPacketLines(lines, proofPacket, {
       leadingBlank: false,
       heading: "Production Switch Proof Packet:"
@@ -59419,6 +59473,73 @@ function getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaun
   return gatePacket || null;
 }
 
+function getOperatorQueueCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {
+  const launchOperationsOperatorEntry = initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+    && typeof initialLaunchOpsReadiness.launchOperationsOperatorEntry === "object"
+      ? initialLaunchOpsReadiness.launchOperationsOperatorEntry
+      : null;
+  const entryCheckpoint = launchOperationsOperatorEntry?.operatorQueueCheckpoint
+    && typeof launchOperationsOperatorEntry.operatorQueueCheckpoint === "object"
+      ? launchOperationsOperatorEntry.operatorQueueCheckpoint
+      : null;
+  if (entryCheckpoint) {
+    return entryCheckpoint;
+  }
+  const entryPlanCheckpoint = launchOperationsOperatorEntry?.launchExecutionPhasePlan?.operatorQueueCheckpoint
+    && typeof launchOperationsOperatorEntry.launchExecutionPhasePlan.operatorQueueCheckpoint === "object"
+      ? launchOperationsOperatorEntry.launchExecutionPhasePlan.operatorQueueCheckpoint
+      : null;
+  if (entryPlanCheckpoint) {
+    return entryPlanCheckpoint;
+  }
+  const gatePlanCheckpoint = launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.launchExecutionPhasePlan?.operatorQueueCheckpoint
+    && typeof launchOperationsOperatorEntry.launchEvidenceReadinessGate.launchExecutionPhasePlan.operatorQueueCheckpoint === "object"
+      ? launchOperationsOperatorEntry.launchEvidenceReadinessGate.launchExecutionPhasePlan.operatorQueueCheckpoint
+      : null;
+  if (gatePlanCheckpoint) {
+    return gatePlanCheckpoint;
+  }
+  const proofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
+  const proofPlanCheckpoint = proofPacket?.launchExecutionPhasePlan?.operatorQueueCheckpoint
+    && typeof proofPacket.launchExecutionPhasePlan.operatorQueueCheckpoint === "object"
+      ? proofPacket.launchExecutionPhasePlan.operatorQueueCheckpoint
+      : null;
+  return proofPlanCheckpoint || null;
+}
+
+function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(checkpoint = null) {
+  if (!checkpoint || typeof checkpoint !== "object") {
+    return null;
+  }
+  const status = checkpoint.launchCutoverTriageStatus || null;
+  return {
+    mode: "launch-surface-cutover-triage-checkpoint/v1",
+    sourceMode: checkpoint.mode || null,
+    status,
+    launchEvidenceStatus: checkpoint.launchEvidenceStatus || null,
+    launchEvidenceCurrentKey: checkpoint.launchEvidenceCurrentKey || null,
+    launchEvidenceCurrentStatus: checkpoint.launchEvidenceCurrentStatus || null,
+    launchEvidencePendingCount: checkpoint.launchEvidencePendingCount ?? null,
+    launchEvidenceTotalCount: checkpoint.launchEvidenceTotalCount ?? null,
+    launchEvidenceBlockerCount: checkpoint.launchEvidenceBlockerCount ?? null,
+    productionSwitchProofStatus: checkpoint.productionSwitchProofStatus || null,
+    productionSwitchProofCurrentActionKey: checkpoint.productionSwitchProofCurrentActionKey || null,
+    productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? null,
+    productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? null,
+    productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? null,
+    launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
+    nextAction: status === "ready_for_cutover_watch"
+      ? "Production switch proof is ready; continue cutover watch from the shared launch-duty record index."
+      : checkpoint.nextAction || "Complete launch evidence and refresh production switch proof before cutover watch."
+  };
+}
+
+function getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {
+  return buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
+    getOperatorQueueCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness)
+  );
+}
+
 function getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {
   const launchOperationsOperatorEntry = initialLaunchOpsReadiness?.launchOperationsOperatorEntry
     && typeof initialLaunchOpsReadiness.launchOperationsOperatorEntry === "object"
@@ -59487,6 +59608,36 @@ function appendDeveloperOpsLaunchExecutionPhasePlanLines(lines = [], phasePlan =
     appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines, operatorQueueCheckpoint);
   }
   lines.push(`- launchExecutionNextAction=${phasePlan.nextAction || "-"}`);
+  return true;
+}
+
+function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null, {
+  leadingBlank = true,
+  heading = "Launch Cutover Triage Checkpoint:"
+} = {}) {
+  if (!Array.isArray(lines) || !checkpoint || typeof checkpoint !== "object") {
+    return false;
+  }
+  if (leadingBlank) {
+    lines.push("");
+  }
+  lines.push(heading);
+  lines.push(
+    `- launchCutoverTriage=${checkpoint.status || "-"}`
+    + ` | launchEvidence=${checkpoint.launchEvidenceStatus || "-"}`
+    + ` | currentEvidence=${checkpoint.launchEvidenceCurrentKey || "-"}`
+    + ` | currentStatus=${checkpoint.launchEvidenceCurrentStatus || "-"}`
+    + ` | pending=${checkpoint.launchEvidencePendingCount ?? "-"}/${checkpoint.launchEvidenceTotalCount ?? "-"}`
+    + ` | blockers=${checkpoint.launchEvidenceBlockerCount ?? "-"}`
+  );
+  lines.push(
+    `- productionSwitchProof=${checkpoint.productionSwitchProofStatus || "-"}`
+    + ` | ready=${checkpoint.productionSwitchProofReadyCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
+    + ` | blocked=${checkpoint.productionSwitchProofBlockedCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
+    + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
+  );
+  lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
+  lines.push(`- cutoverTriageNextAction=${checkpoint.nextAction || "-"}`);
   return true;
 }
 

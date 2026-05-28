@@ -12373,8 +12373,26 @@ test("developer license quickstart first-batch setup can create recommended laun
         || runtimeEvidenceLaunchReview.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.productionSwitchProofPacket
         || null
     );
+    const runtimeEvidenceReviewOpsCheckpoint = runtimeEvidenceLaunchReview.opsSnapshot?.summary?.initialLaunchOpsReadiness
+      ?.launchOperationsOperatorEntry?.operatorQueueCheckpoint;
+    assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
+    assert.equal(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.status,
+      runtimeEvidenceReviewOpsCheckpoint?.launchCutoverTriageStatus
+    );
+    assert.equal(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.status, "hold_for_launch_evidence");
+    assert.equal(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.productionSwitchProofStatus,
+      runtimeEvidenceReviewOpsCheckpoint?.productionSwitchProofStatus
+    );
+    assert.equal(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.launchEvidenceCurrentKey,
+      runtimeEvidenceReviewOpsCheckpoint?.launchEvidenceCurrentKey
+    );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /productionSwitchProof=/);
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Cutover Triage Checkpoint:/);
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /launchCutoverTriage=hold_for_launch_evidence/);
     const runtimeEvidenceReviewPreStagingSelfCheckDownload = runtimeEvidenceLaunchReview.reviewSummary.recommendedDownloads?.find((item) =>
       item?.key === "ops_pre_staging_readiness_self_check"
     ) || null;
@@ -12449,6 +12467,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.contentType || "", /^text\/plain/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.contentDisposition || "", /production-switch-proof-packet\.txt"/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /RockSolid Developer Launch Review Production Switch Proof Packet/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /Launch Review Cutover Triage Checkpoint:/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /productionSwitchProof=/);
     const runtimeEvidenceReviewLaunchExecutionPhasePlanDownload = await getText(
@@ -12492,6 +12512,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewHandoffRoutes.contentType || "", /^text\/plain/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.contentDisposition || "", /handoff-routes\.txt"/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /RockSolid Developer Launch Review Handoff Routes/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Cutover Triage Checkpoint:/);
+    assert.match(runtimeEvidenceReviewHandoffRoutes.body, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Review Package:/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Handoff Index:.*format=handoff-index/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Launch Mainline Routes:.*format=launch-mainline-handoff-routes/);
@@ -12527,6 +12549,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewZipText, /production-switch-proof-packet\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /launch-execution-phase-plan\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /Launch Surface Review Closeout:/);
+    assert.match(runtimeEvidenceReviewZipText, /Launch Review Cutover Triage Checkpoint:/);
+    assert.match(runtimeEvidenceReviewZipText, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceReviewZipText, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceReviewZipText, /Launch Execution Phase Plan:/);
     assert.match(runtimeEvidenceReviewZipText, /First-Wave Runtime Evidence:/);
@@ -12584,8 +12608,26 @@ test("developer license quickstart first-batch setup can create recommended laun
         || runtimeEvidenceLaunchSmoke.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.productionSwitchProofPacket
         || null
     );
+    const runtimeEvidenceSmokeOpsCheckpoint = runtimeEvidenceLaunchSmoke.opsSnapshot?.summary?.initialLaunchOpsReadiness
+      ?.launchOperationsOperatorEntry?.operatorQueueCheckpoint;
+    assert.ok(runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint);
+    assert.equal(
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.status,
+      runtimeEvidenceSmokeOpsCheckpoint?.launchCutoverTriageStatus
+    );
+    assert.equal(runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.status, "hold_for_launch_evidence");
+    assert.equal(
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.productionSwitchProofStatus,
+      runtimeEvidenceSmokeOpsCheckpoint?.productionSwitchProofStatus
+    );
+    assert.equal(
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.launchEvidenceCurrentKey,
+      runtimeEvidenceSmokeOpsCheckpoint?.launchEvidenceCurrentKey
+    );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /Launch Smoke Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /productionSwitchProof=/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /Launch Smoke Cutover Triage Checkpoint:/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /launchCutoverTriage=hold_for_launch_evidence/);
     const runtimeEvidenceSmokePreStagingSelfCheckDownload = runtimeEvidenceLaunchSmoke.smokeSummary.recommendedDownloads?.find((item) =>
       item?.key === "ops_pre_staging_readiness_self_check"
     ) || null;
@@ -12660,6 +12702,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.contentType || "", /^text\/plain/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.contentDisposition || "", /production-switch-proof-packet\.txt"/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /RockSolid Developer Launch Smoke Kit Production Switch Proof Packet/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /Launch Smoke Cutover Triage Checkpoint:/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /productionSwitchProof=/);
     const runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload = await getText(
@@ -12703,6 +12747,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeHandoffRoutes.contentType || "", /^text\/plain/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.contentDisposition || "", /handoff-routes\.txt"/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /RockSolid Developer Launch Smoke Kit Handoff Routes/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Cutover Triage Checkpoint:/);
+    assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Smoke Package:/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Review Summary:.*format=summary/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Developer Ops Handoff Index:.*format=handoff-index/);
@@ -12739,6 +12785,8 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeZipText, /production-switch-proof-packet\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /launch-execution-phase-plan\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /Launch Surface Review Closeout:/);
+    assert.match(runtimeEvidenceSmokeZipText, /Launch Smoke Cutover Triage Checkpoint:/);
+    assert.match(runtimeEvidenceSmokeZipText, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceSmokeZipText, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceSmokeZipText, /Launch Execution Phase Plan:/);
     assert.match(runtimeEvidenceSmokeZipText, /First-Wave Runtime Evidence:/);
@@ -32241,6 +32289,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
+      /Launch Review Cutover Triage Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
     );
     assert.match(
@@ -32279,6 +32331,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedHandoffRoutesDownload.body,
+      /Launch Cutover Triage Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedHandoffRoutesDownload.body,
       /launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const launchReviewCloseoutRecordedChecksumsDownload = await getText(
@@ -32299,6 +32355,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchReviewCloseoutRecordedZipText, /production-switch-proof-packet\.txt/);
     assert.match(
       launchReviewCloseoutRecordedZipText,
+      /Launch Review Cutover Triage Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedZipText,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
     );
     assert.match(
@@ -32313,6 +32373,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /RockSolid Developer Launch Smoke Kit Production Switch Proof Packet/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
     );
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
@@ -32354,6 +32418,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchSmokeCloseoutRecordedHandoffRoutesDownload.body,
+      /Launch Cutover Triage Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedHandoffRoutesDownload.body,
       /launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const launchSmokeCloseoutRecordedChecksumsDownload = await getText(
@@ -32372,6 +32440,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchSmokeCloseoutRecordedZipText, /launch-execution-phase-plan\.txt/);
     assert.match(launchSmokeCloseoutRecordedZipText, /RockSolid Developer Launch Smoke Kit Launch Execution Phase Plan/);
     assert.match(launchSmokeCloseoutRecordedZipText, /production-switch-proof-packet\.txt/);
+    assert.match(
+      launchSmokeCloseoutRecordedZipText,
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
+    );
     assert.match(
       launchSmokeCloseoutRecordedZipText,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/

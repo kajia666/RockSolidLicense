@@ -44833,6 +44833,11 @@ function buildLaunchOperationsFirstOperatingResultExecutionSummaryPayload({
   rolloutWideningFollowupAction = null,
   rolloutWideningFollowupReceiptReadbackAction = null,
   nextRolloutWideningDecisionAction = null,
+  nextRolloutWideningDecisionReceiptReadbackAction = null,
+  widenedRolloutMonitoringAction = null,
+  widenedRolloutMonitoringResultReviewAction = null,
+  widenedRolloutNextDecisionAction = null,
+  widenedRolloutNextDecisionReceiptReadbackAction = null,
   overviewDownload = null,
   launchDutyRecordIndexPath = null
 } = {}) {
@@ -44864,11 +44869,66 @@ function buildLaunchOperationsFirstOperatingResultExecutionSummaryPayload({
     && typeof nextRolloutWideningDecisionAction === "object"
       ? nextRolloutWideningDecisionAction
       : null;
+  const nextDecisionReceiptReadback = nextRolloutWideningDecisionReceiptReadbackAction
+    && typeof nextRolloutWideningDecisionReceiptReadbackAction === "object"
+      ? nextRolloutWideningDecisionReceiptReadbackAction
+      : null;
+  const widenedMonitoringAction = widenedRolloutMonitoringAction
+    && typeof widenedRolloutMonitoringAction === "object"
+      ? widenedRolloutMonitoringAction
+      : null;
+  const widenedMonitoringResultReviewAction = widenedRolloutMonitoringResultReviewAction
+    && typeof widenedRolloutMonitoringResultReviewAction === "object"
+      ? widenedRolloutMonitoringResultReviewAction
+      : null;
+  const widenedNextDecisionAction = widenedRolloutNextDecisionAction
+    && typeof widenedRolloutNextDecisionAction === "object"
+      ? widenedRolloutNextDecisionAction
+      : null;
+  const widenedNextDecisionReceiptReadback = widenedRolloutNextDecisionReceiptReadbackAction
+    && typeof widenedRolloutNextDecisionReceiptReadbackAction === "object"
+      ? widenedRolloutNextDecisionReceiptReadbackAction
+      : null;
+  const normalizeAuditLogId = (value = null) => {
+    const normalized = String(value || "").trim();
+    return normalized || null;
+  };
+  const activeFollowupReceiptAuditLogId = normalizeAuditLogId(followupReceiptReadback?.auditLogId);
+  const isOnActiveFollowupChain = (action = null) => {
+    if (!action || typeof action !== "object" || !activeFollowupReceiptAuditLogId) {
+      return false;
+    }
+    const actionFollowupReceiptAuditLogId = normalizeAuditLogId(action.rolloutWideningFollowupReceiptAuditLogId);
+    return actionFollowupReceiptAuditLogId === activeFollowupReceiptAuditLogId;
+  };
+  const activeNextDecisionReceiptReadback = isOnActiveFollowupChain(nextDecisionReceiptReadback)
+    ? nextDecisionReceiptReadback
+    : null;
+  const activeWidenedMonitoringAction = isOnActiveFollowupChain(widenedMonitoringAction)
+    ? widenedMonitoringAction
+    : null;
+  const activeWidenedMonitoringResultReviewAction = isOnActiveFollowupChain(widenedMonitoringResultReviewAction)
+    ? widenedMonitoringResultReviewAction
+    : null;
+  const activeWidenedNextDecisionAction = isOnActiveFollowupChain(widenedNextDecisionAction)
+    ? widenedNextDecisionAction
+    : null;
+  const activeWidenedNextDecisionReceiptReadback = isOnActiveFollowupChain(widenedNextDecisionReceiptReadback)
+    ? widenedNextDecisionReceiptReadback
+    : null;
   const overview = overviewDownload && typeof overviewDownload === "object" ? overviewDownload : null;
   const handoffReceiptPlan = handoffAction.operatorAction?.executionPlan?.receiptPlan
     || handoffAction.receiptPlan
     || null;
-  const currentLane = nextDecisionAction?.ready === true
+  const currentLane = activeWidenedNextDecisionReceiptReadback?.receiptRecorded === true
+    ? "widening_or_hold_followup"
+    : activeWidenedNextDecisionAction?.ready === true
+      ? "widened_rollout_next_decision"
+      : activeWidenedMonitoringResultReviewAction?.ready === true
+        ? "widened_rollout_monitoring_result_review"
+        : activeWidenedMonitoringAction?.ready === true
+          ? "widened_rollout_monitoring"
+          : nextDecisionAction?.ready === true
     ? "next_rollout_widening_decision"
     : followupAction?.ready === true
       ? "rollout_widening_followup"
@@ -44983,6 +45043,111 @@ function buildLaunchOperationsFirstOperatingResultExecutionSummaryPayload({
         lane: "widened_rollout_monitoring",
         nextDownloadFormat: overview?.format || null,
         nextDownloadHref: overview?.href || null
+      }
+    },
+    widened_rollout_monitoring: {
+      action: activeWidenedMonitoringAction,
+      status: activeWidenedMonitoringAction?.status || "ready_for_widened_rollout_monitoring",
+      ready: activeWidenedMonitoringAction?.ready === true,
+      currentActionKey: activeWidenedMonitoringAction?.actionKey || "monitor_widened_rollout_window",
+      currentReceiptPlan: activeWidenedMonitoringAction?.receiptPlan || null,
+      currentAuditLogId: activeWidenedMonitoringAction?.auditLogId
+        || activeWidenedMonitoringAction?.nextRolloutWideningDecisionReceiptAuditLogId
+        || activeNextDecisionReceiptReadback?.auditLogId
+        || null,
+      currentSourceStatus: activeWidenedMonitoringAction?.receiptReadbackStatus
+        || activeNextDecisionReceiptReadback?.status
+        || null,
+      postCommandReadback: {
+        expectedCurrentActionKey: "review_widened_rollout_monitoring_result",
+        expectedStatus: "ready_for_widened_rollout_monitoring_result_review",
+        expectedLane: "widened_rollout_monitoring_result_review"
+      },
+      handoffContinuation: {
+        actionKey: "review_widened_rollout_monitoring_result",
+        status: "ready_for_widened_rollout_monitoring_result_review",
+        lane: "widened_rollout_monitoring_result_review",
+        nextDownloadFormat: activeWidenedMonitoringAction?.nextDownloadFormat || overview?.format || null,
+        nextDownloadHref: activeWidenedMonitoringAction?.nextDownloadHref || overview?.href || null
+      }
+    },
+    widened_rollout_monitoring_result_review: {
+      action: activeWidenedMonitoringResultReviewAction,
+      status: activeWidenedMonitoringResultReviewAction?.status || "ready_for_widened_rollout_monitoring_result_review",
+      ready: activeWidenedMonitoringResultReviewAction?.ready === true,
+      currentActionKey: activeWidenedMonitoringResultReviewAction?.actionKey || "review_widened_rollout_monitoring_result",
+      currentReceiptPlan: activeWidenedMonitoringResultReviewAction?.receiptPlan || null,
+      currentAuditLogId: activeWidenedMonitoringResultReviewAction?.widenedRolloutMonitoringActionAuditLogId
+        || activeWidenedMonitoringAction?.auditLogId
+        || activeNextDecisionReceiptReadback?.auditLogId
+        || null,
+      currentSourceStatus: activeWidenedMonitoringResultReviewAction?.monitoringSourceStatus
+        || activeWidenedMonitoringAction?.status
+        || null,
+      postCommandReadback: {
+        expectedCurrentActionKey: "decide_next_widening_or_hold",
+        expectedStatus: "ready_for_widened_rollout_next_decision",
+        expectedLane: "widened_rollout_next_decision"
+      },
+      handoffContinuation: {
+        actionKey: "decide_next_widening_or_hold",
+        status: "ready_for_widened_rollout_next_decision",
+        lane: "widened_rollout_next_decision",
+        nextDownloadFormat: activeWidenedMonitoringResultReviewAction?.nextDownloadFormat || overview?.format || null,
+        nextDownloadHref: activeWidenedMonitoringResultReviewAction?.nextDownloadHref || overview?.href || null
+      }
+    },
+    widened_rollout_next_decision: {
+      action: activeWidenedNextDecisionAction,
+      status: activeWidenedNextDecisionAction?.status || "ready_for_widened_rollout_next_decision",
+      ready: activeWidenedNextDecisionAction?.ready === true,
+      currentActionKey: activeWidenedNextDecisionAction?.actionKey || "decide_next_widening_or_hold",
+      currentReceiptPlan: activeWidenedNextDecisionAction?.receiptPlan || null,
+      currentAuditLogId: activeWidenedNextDecisionAction?.widenedRolloutMonitoringActionAuditLogId
+        || activeWidenedMonitoringResultReviewAction?.widenedRolloutMonitoringActionAuditLogId
+        || activeWidenedMonitoringAction?.auditLogId
+        || activeNextDecisionReceiptReadback?.auditLogId
+        || null,
+      currentSourceStatus: activeWidenedNextDecisionAction?.monitoringResultReviewStatus
+        || activeWidenedMonitoringResultReviewAction?.status
+        || null,
+      postCommandReadback: {
+        expectedCurrentActionKey: "follow_up_widening_or_hold_decision",
+        expectedStatus: "recorded_ready_for_widening_or_hold_followup",
+        expectedLane: "widening_or_hold_followup"
+      },
+      handoffContinuation: {
+        actionKey: "follow_up_widening_or_hold_decision",
+        status: "recorded_ready_for_widening_or_hold_followup",
+        lane: "widening_or_hold_followup",
+        nextDownloadFormat: activeWidenedNextDecisionAction?.nextDownloadFormat || overview?.format || null,
+        nextDownloadHref: activeWidenedNextDecisionAction?.nextDownloadHref || overview?.href || null
+      }
+    },
+    widening_or_hold_followup: {
+      action: activeWidenedNextDecisionReceiptReadback,
+      status: activeWidenedNextDecisionReceiptReadback?.status || "recorded_ready_for_widening_or_hold_followup",
+      ready: activeWidenedNextDecisionReceiptReadback?.receiptRecorded === true,
+      currentActionKey: activeWidenedNextDecisionReceiptReadback?.currentActionKey || "follow_up_widening_or_hold_decision",
+      currentReceiptPlan: null,
+      currentAuditLogId: activeWidenedNextDecisionReceiptReadback?.auditLogId
+        || activeWidenedNextDecisionAction?.widenedRolloutMonitoringActionAuditLogId
+        || null,
+      currentSourceStatus: activeWidenedNextDecisionReceiptReadback?.widenedRolloutNextDecisionStatus
+        || activeWidenedNextDecisionReceiptReadback?.status
+        || null,
+      postCommandReadback: {
+        expectedCurrentActionKey: "follow_up_widening_or_hold_decision",
+        expectedStatus: "recorded_ready_for_widening_or_hold_followup",
+        expectedLane: "widening_or_hold_followup"
+      },
+      handoffContinuation: {
+        actionKey: "follow_up_widening_or_hold_decision",
+        status: "recorded_ready_for_widening_or_hold_followup",
+        lane: "widening_or_hold_followup",
+        decisionChoice: activeWidenedNextDecisionReceiptReadback?.decisionChoice || null,
+        nextDownloadFormat: activeWidenedNextDecisionReceiptReadback?.nextDownloadFormat || overview?.format || null,
+        nextDownloadHref: activeWidenedNextDecisionReceiptReadback?.nextDownloadHref || overview?.href || null
       }
     }
   };
@@ -47225,6 +47390,11 @@ function buildDeveloperOpsLaunchOperationsOverviewStatusPayload({
     rolloutWideningFollowupAction,
     rolloutWideningFollowupReceiptReadbackAction,
     nextRolloutWideningDecisionAction,
+    nextRolloutWideningDecisionReceiptReadbackAction,
+    widenedRolloutMonitoringAction,
+    widenedRolloutMonitoringResultReviewAction,
+    widenedRolloutNextDecisionAction,
+    widenedRolloutNextDecisionReceiptReadbackAction,
     overviewDownload,
     launchDutyRecordIndexPath
   });

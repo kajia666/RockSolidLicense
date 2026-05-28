@@ -27664,6 +27664,47 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       nextRolloutWideningDecisionReceiptOverviewStatusDownload.body,
       new RegExp(`nextRolloutWideningDecisionReceiptReadback=recorded_ready_for_widened_rollout_monitoring \\| receiptRecorded=true \\| audit=${nextRolloutWideningDecisionReceipt.auditLogId} \\| followupReceipt=${rolloutWideningFollowupReceipt.auditLogId}`)
     );
+    const firstOperatingResultExecutionAfterNextDecisionReceipt = nextRolloutWideningDecisionReceiptOverview
+      .firstOperatingResultExecutionSummary;
+    assert.ok(firstOperatingResultExecutionAfterNextDecisionReceipt);
+    assert.equal(firstOperatingResultExecutionAfterNextDecisionReceipt.ready, true);
+    assert.equal(
+      firstOperatingResultExecutionAfterNextDecisionReceipt.postCommandReadback?.expectedCurrentActionKey,
+      "follow_up_widening_or_hold_decision"
+    );
+    assert.equal(
+      firstOperatingResultExecutionAfterNextDecisionReceipt.postCommandReadback?.expectedStatus,
+      "recorded_ready_for_widening_or_hold_followup"
+    );
+    assert.equal(
+      firstOperatingResultExecutionAfterNextDecisionReceipt.handoffContinuation?.actionKey,
+      "follow_up_widening_or_hold_decision"
+    );
+    if (firstOperatingResultExecutionAfterNextDecisionReceipt.status === "recorded_ready_for_widening_or_hold_followup") {
+      assert.equal(firstOperatingResultExecutionAfterNextDecisionReceipt.currentLane, "widening_or_hold_followup");
+      assert.equal(firstOperatingResultExecutionAfterNextDecisionReceipt.currentActionKey, "follow_up_widening_or_hold_decision");
+      assert.equal(firstOperatingResultExecutionAfterNextDecisionReceipt.currentReceiptPlan, null);
+      assert.match(
+        nextRolloutWideningDecisionReceiptOverviewStatusDownload.body,
+        /firstOperatingResultExecution=recorded_ready_for_widening_or_hold_followup \| lane=widening_or_hold_followup \| ready=true \| current=follow_up_widening_or_hold_decision/
+      );
+    } else {
+      assert.equal(firstOperatingResultExecutionAfterNextDecisionReceipt.status, "ready_for_widened_rollout_next_decision");
+      assert.equal(firstOperatingResultExecutionAfterNextDecisionReceipt.currentLane, "widened_rollout_next_decision");
+      assert.equal(firstOperatingResultExecutionAfterNextDecisionReceipt.currentActionKey, "decide_next_widening_or_hold");
+      assert.equal(
+        firstOperatingResultExecutionAfterNextDecisionReceipt.currentReceiptPlan?.payload?.action,
+        "decide_next_widening_or_hold"
+      );
+      assert.match(
+        nextRolloutWideningDecisionReceiptOverviewStatusDownload.body,
+        /firstOperatingResultExecution=ready_for_widened_rollout_next_decision \| lane=widened_rollout_next_decision \| ready=true \| current=decide_next_widening_or_hold/
+      );
+    }
+    assert.match(
+      nextRolloutWideningDecisionReceiptOverviewStatusDownload.body,
+      /firstOperatingResultExecutionReadback=follow_up_widening_or_hold_decision \| expectedStatus=recorded_ready_for_widening_or_hold_followup \| continuation=follow_up_widening_or_hold_decision/
+    );
     const widenedRolloutMonitoringAction = nextRolloutWideningDecisionReceiptOverview.widenedRolloutMonitoringAction;
     assert.ok(widenedRolloutMonitoringAction);
     assert.equal(widenedRolloutMonitoringAction.status, "ready_for_widened_rollout_monitoring");
@@ -28368,6 +28409,39 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       baseUrl,
       "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&limit=80&format=launch-operations-overview-status",
       ownerSession.token
+    );
+    assert.equal(
+      widenedRolloutNextDecisionReceiptOverview.firstOperatingResultExecutionSummary?.status,
+      "recorded_ready_for_widening_or_hold_followup"
+    );
+    assert.equal(
+      widenedRolloutNextDecisionReceiptOverview.firstOperatingResultExecutionSummary?.currentLane,
+      "widening_or_hold_followup"
+    );
+    assert.equal(widenedRolloutNextDecisionReceiptOverview.firstOperatingResultExecutionSummary?.ready, true);
+    assert.equal(
+      widenedRolloutNextDecisionReceiptOverview.firstOperatingResultExecutionSummary?.currentActionKey,
+      "follow_up_widening_or_hold_decision"
+    );
+    assert.equal(
+      widenedRolloutNextDecisionReceiptOverview.firstOperatingResultExecutionSummary?.postCommandReadback?.expectedCurrentActionKey,
+      "follow_up_widening_or_hold_decision"
+    );
+    assert.equal(
+      widenedRolloutNextDecisionReceiptOverview.firstOperatingResultExecutionSummary?.postCommandReadback?.expectedStatus,
+      "recorded_ready_for_widening_or_hold_followup"
+    );
+    assert.equal(
+      widenedRolloutNextDecisionReceiptOverview.firstOperatingResultExecutionSummary?.handoffContinuation?.actionKey,
+      "follow_up_widening_or_hold_decision"
+    );
+    assert.match(
+      widenedRolloutNextDecisionReceiptOverviewStatusDownload.body,
+      /firstOperatingResultExecution=recorded_ready_for_widening_or_hold_followup \| lane=widening_or_hold_followup \| ready=true \| current=follow_up_widening_or_hold_decision/
+    );
+    assert.match(
+      widenedRolloutNextDecisionReceiptOverviewStatusDownload.body,
+      /firstOperatingResultExecutionReadback=follow_up_widening_or_hold_decision \| expectedStatus=recorded_ready_for_widening_or_hold_followup \| continuation=follow_up_widening_or_hold_decision/
     );
     assert.match(
       widenedRolloutNextDecisionReceiptOverviewStatusDownload.body,

@@ -23390,9 +23390,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         launchEvidenceBlockerCount: launchEvidenceReadinessGate?.blockerCount ?? null,
         productionSwitchProofStatus: productionSwitchProofPacket?.status || null,
         productionSwitchProofCurrentActionKey: productionSwitchProofPacket?.currentActionKey || null,
+        productionSwitchProofCurrentCommand: productionSwitchProofPacket?.currentCommand || null,
         productionSwitchProofReadyCount: productionSwitchProofPacket?.proofCounts?.ready ?? null,
         productionSwitchProofTotalCount: productionSwitchProofPacket?.proofCounts?.total ?? null,
         productionSwitchProofBlockedCount: productionSwitchProofPacket?.proofCounts?.blocked ?? null,
+        proofExecutionEntrypoint: {
+          mode: "production-switch-proof-execution-entrypoint/v1",
+          status: productionSwitchProofPacket?.status || null,
+          actionKey: productionSwitchProofPacket?.currentActionKey || null,
+          command: productionSwitchProofPacket?.currentCommand || null,
+          launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+          readyForCutoverWatch: false,
+          recommendedDownloadFormat: "production-switch-proof-packet",
+          nextAction: "Run the current production-switch proof command, then refresh Launch Review and Launch Smoke."
+        },
         launchCutoverTriageStatus: "hold_for_launch_evidence",
         steadyStateHandoffStatus: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.status || null,
         steadyStateHandoffActionKey: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey || null,
@@ -23444,6 +23455,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*productionSwitchProof=/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*productionSwitchProof=[^\n]*currentCommand=npm\.cmd run staging:closeout:backfill/
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
@@ -31432,9 +31447,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         launchEvidenceTotalCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchEvidenceTotalCount,
         launchEvidenceBlockerCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchEvidenceBlockerCount,
         productionSwitchProofStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofStatus,
+        productionSwitchProofCurrentActionKey: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofCurrentActionKey,
+        productionSwitchProofCurrentCommand: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofCurrentCommand,
         productionSwitchProofReadyCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofReadyCount,
         productionSwitchProofTotalCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofTotalCount,
         productionSwitchProofBlockedCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofBlockedCount,
+        proofExecutionEntrypointActionKey: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.actionKey,
+        proofExecutionEntrypointCommand: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.command,
+        proofExecutionEntrypointReadyForCutoverWatch:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.readyForCutoverWatch,
         launchCutoverTriageStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchCutoverTriageStatus
       },
       {
@@ -31444,9 +31465,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         launchEvidenceTotalCount: 12,
         launchEvidenceBlockerCount: 0,
         productionSwitchProofStatus: "ready_for_production_switch_review",
+        productionSwitchProofCurrentActionKey: "refresh_readiness_status",
+        productionSwitchProofCurrentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
         productionSwitchProofReadyCount: 8,
         productionSwitchProofTotalCount: 8,
         productionSwitchProofBlockedCount: 0,
+        proofExecutionEntrypointActionKey: "refresh_readiness_status",
+        proofExecutionEntrypointCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        proofExecutionEntrypointReadyForCutoverWatch: true,
         launchCutoverTriageStatus: "ready_for_cutover_watch"
       }
     );

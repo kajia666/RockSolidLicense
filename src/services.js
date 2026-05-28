@@ -53169,6 +53169,25 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       ? "ready_for_cutover_watch"
       : "hold_for_launch_evidence"
     : null;
+  const resolvedLaunchDutyRecordIndexPath = launchDutyRecordIndexPath
+    || stableTransition?.launchDutyRecordIndexPath
+    || steadyStateHandoff?.launchDutyRecordIndexPath
+    || action?.launchDutyRecordIndexPath
+    || switchProofPacket?.launchDutyRecordIndexFile
+    || launchEvidenceGate?.launchDutyRecordIndexPath
+    || null;
+  const productionSwitchProofCurrentCommand = switchProofPacket?.currentCommand
+    || switchProofPacket?.launchExecutionPhasePlan?.currentCommand
+    || null;
+  const proofExecutionEntrypoint = buildLaunchCutoverTriageProofExecutionEntrypoint({
+    checkpoint: {
+      launchCutoverTriageStatus,
+      productionSwitchProofStatus: switchProofPacket?.status || null,
+      productionSwitchProofCurrentActionKey: switchProofPacket?.currentActionKey || null,
+      launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath
+    },
+    productionSwitchProofPacket: switchProofPacket
+  });
   return {
     mode: "developer-ops-launch-operations-operator-queue-checkpoint/v1",
     status: stableTransition?.status
@@ -53196,11 +53215,7 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       || action?.executionPlan?.receiptPlan?.route
       || action?.href
       || null,
-    launchDutyRecordIndexPath: launchDutyRecordIndexPath
-      || stableTransition?.launchDutyRecordIndexPath
-      || steadyStateHandoff?.launchDutyRecordIndexPath
-      || action?.launchDutyRecordIndexPath
-      || null,
+    launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
     launchEvidenceStatus: launchEvidenceGate?.status || null,
     launchEvidenceCurrentKey: launchEvidenceGate?.currentEvidenceKey || null,
     launchEvidenceCurrentStatus: launchEvidenceGate?.currentEvidenceStatus || null,
@@ -53209,9 +53224,11 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     launchEvidenceBlockerCount,
     productionSwitchProofStatus: switchProofPacket?.status || null,
     productionSwitchProofCurrentActionKey: switchProofPacket?.currentActionKey || null,
+    productionSwitchProofCurrentCommand,
     productionSwitchProofReadyCount: switchProofReadyCount,
     productionSwitchProofTotalCount: switchProofTotalCount,
     productionSwitchProofBlockedCount: switchProofBlockedCount,
+    proofExecutionEntrypoint,
     launchCutoverTriageStatus,
     steadyStateHandoffStatus: steadyStateHandoff?.status || null,
     steadyStateHandoffActionKey: steadyStateHandoff?.actionKey || null,
@@ -66352,6 +66369,7 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | ready=${checkpoint.productionSwitchProofReadyCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
     + ` | blocked=${checkpoint.productionSwitchProofBlockedCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
+    + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
   lines.push(`- launchCutoverTriage=${checkpoint.launchCutoverTriageStatus || "-"}`);
   lines.push(

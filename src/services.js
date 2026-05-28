@@ -53010,7 +53010,9 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
   currentAction = null,
   launchDutyStableOperationsTransitionAction = null,
   launchDutySteadyStateHandoffLanding = null,
-  firstOperatingResultExecutionSummary = null
+  firstOperatingResultExecutionSummary = null,
+  launchEvidenceReadinessGate = null,
+  productionSwitchProofPacket = null
 } = {}) {
   const stableTransition = launchDutyStableOperationsTransitionAction
     && typeof launchDutyStableOperationsTransitionAction === "object"
@@ -53029,6 +53031,54 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     && typeof firstOperatingResultExecutionSummary === "object"
       ? firstOperatingResultExecutionSummary
       : null;
+  const launchEvidenceGate = launchEvidenceReadinessGate
+    && typeof launchEvidenceReadinessGate === "object"
+      ? launchEvidenceReadinessGate
+      : null;
+  const switchProofPacket = productionSwitchProofPacket
+    && typeof productionSwitchProofPacket === "object"
+      ? productionSwitchProofPacket
+      : launchEvidenceGate?.productionSwitchProofPacket
+        && typeof launchEvidenceGate.productionSwitchProofPacket === "object"
+          ? launchEvidenceGate.productionSwitchProofPacket
+          : null;
+  const switchProofCounts = switchProofPacket?.proofCounts
+    && typeof switchProofPacket.proofCounts === "object"
+      ? switchProofPacket.proofCounts
+      : null;
+  const launchEvidencePendingCount = launchEvidenceGate
+    ? Number(launchEvidenceGate.pendingEvidenceCount ?? 0)
+    : null;
+  const launchEvidenceTotalCount = launchEvidenceGate
+    ? Number(launchEvidenceGate.evidenceCount ?? 0)
+    : null;
+  const launchEvidenceBlockerCount = launchEvidenceGate
+    ? Number(launchEvidenceGate.blockerCount ?? 0)
+    : null;
+  const switchProofReadyCount = switchProofCounts
+    ? Number(switchProofCounts.ready ?? 0)
+    : null;
+  const switchProofTotalCount = switchProofCounts
+    ? Number(switchProofCounts.total ?? 0)
+    : null;
+  const switchProofBlockedCount = switchProofCounts
+    ? Number(switchProofCounts.blocked ?? 0)
+    : null;
+  const launchCutoverTriageReady = Boolean(
+    launchEvidenceGate
+    && switchProofPacket
+    && launchEvidencePendingCount === 0
+    && launchEvidenceBlockerCount === 0
+    && switchProofTotalCount > 0
+    && switchProofReadyCount === switchProofTotalCount
+    && switchProofBlockedCount === 0
+    && switchProofPacket.status === "ready_for_production_switch_review"
+  );
+  const launchCutoverTriageStatus = launchEvidenceGate || switchProofPacket
+    ? launchCutoverTriageReady
+      ? "ready_for_cutover_watch"
+      : "hold_for_launch_evidence"
+    : null;
   return {
     mode: "developer-ops-launch-operations-operator-queue-checkpoint/v1",
     status: stableTransition?.status
@@ -53061,6 +53111,18 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       || steadyStateHandoff?.launchDutyRecordIndexPath
       || action?.launchDutyRecordIndexPath
       || null,
+    launchEvidenceStatus: launchEvidenceGate?.status || null,
+    launchEvidenceCurrentKey: launchEvidenceGate?.currentEvidenceKey || null,
+    launchEvidenceCurrentStatus: launchEvidenceGate?.currentEvidenceStatus || null,
+    launchEvidencePendingCount,
+    launchEvidenceTotalCount,
+    launchEvidenceBlockerCount,
+    productionSwitchProofStatus: switchProofPacket?.status || null,
+    productionSwitchProofCurrentActionKey: switchProofPacket?.currentActionKey || null,
+    productionSwitchProofReadyCount: switchProofReadyCount,
+    productionSwitchProofTotalCount: switchProofTotalCount,
+    productionSwitchProofBlockedCount: switchProofBlockedCount,
+    launchCutoverTriageStatus,
     steadyStateHandoffStatus: steadyStateHandoff?.status || null,
     steadyStateHandoffActionKey: steadyStateHandoff?.actionKey || null,
     steadyStateHandoffFormat: steadyStateHandoff?.format || null,
@@ -53766,7 +53828,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     currentAction,
     launchDutyStableOperationsTransitionAction,
     launchDutySteadyStateHandoffLanding,
-    firstOperatingResultExecutionSummary: launchOperationsOverviewStatus?.firstOperatingResultExecutionSummary || null
+    firstOperatingResultExecutionSummary: launchOperationsOverviewStatus?.firstOperatingResultExecutionSummary || null,
+    launchEvidenceReadinessGate,
+    productionSwitchProofPacket: launchEvidenceReadinessGate?.productionSwitchProofPacket || null
   });
   const launchExecutionPhasePlan = launchEvidenceReadinessGate?.launchExecutionPhasePlan
     || launchEvidenceReadinessGate?.productionSwitchProofPacket?.launchExecutionPhasePlan
@@ -65975,6 +66039,20 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
   );
   lines.push(`- currentCommand=${checkpoint.currentCommand || "-"}`);
   lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
+  lines.push(
+    `- launchEvidence=${checkpoint.launchEvidenceStatus || "-"}`
+    + ` | current=${checkpoint.launchEvidenceCurrentKey || "-"}`
+    + ` | currentStatus=${checkpoint.launchEvidenceCurrentStatus || "-"}`
+    + ` | pending=${checkpoint.launchEvidencePendingCount ?? "-"}/${checkpoint.launchEvidenceTotalCount ?? "-"}`
+    + ` | blockers=${checkpoint.launchEvidenceBlockerCount ?? "-"}`
+  );
+  lines.push(
+    `- productionSwitchProof=${checkpoint.productionSwitchProofStatus || "-"}`
+    + ` | ready=${checkpoint.productionSwitchProofReadyCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
+    + ` | blocked=${checkpoint.productionSwitchProofBlockedCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
+    + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
+  );
+  lines.push(`- launchCutoverTriage=${checkpoint.launchCutoverTriageStatus || "-"}`);
   lines.push(
     `- steadyStateHandoff=${checkpoint.steadyStateHandoffStatus || "-"}`
     + ` | action=${checkpoint.steadyStateHandoffActionKey || "-"}`

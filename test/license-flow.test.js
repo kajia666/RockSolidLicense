@@ -23224,6 +23224,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOperatorEntry.receiptVisibilityStatus, launchOperationsOverviewStatus.receiptVisibilityStatus);
     assert.equal(launchOperationsOperatorEntry.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
     assert.ok(launchOperationsOverviewStatus.firstOperatingResultExecutionSummary);
+    const launchEvidenceReadinessGate = launchOperationsOperatorEntry.launchEvidenceReadinessGate;
+    const productionSwitchProofPacket = launchOperationsOperatorEntry.productionSwitchProofPacket;
     assert.deepEqual(
       launchOperationsOperatorEntry.operatorQueueCheckpoint,
       {
@@ -23250,6 +23252,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           || launchOperationsOperatorEntry.currentAction?.href
           || null,
         launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        launchEvidenceStatus: launchEvidenceReadinessGate?.status || null,
+        launchEvidenceCurrentKey: launchEvidenceReadinessGate?.currentEvidenceKey || null,
+        launchEvidenceCurrentStatus: launchEvidenceReadinessGate?.currentEvidenceStatus || null,
+        launchEvidencePendingCount: launchEvidenceReadinessGate?.pendingEvidenceCount ?? null,
+        launchEvidenceTotalCount: launchEvidenceReadinessGate?.evidenceCount ?? null,
+        launchEvidenceBlockerCount: launchEvidenceReadinessGate?.blockerCount ?? null,
+        productionSwitchProofStatus: productionSwitchProofPacket?.status || null,
+        productionSwitchProofCurrentActionKey: productionSwitchProofPacket?.currentActionKey || null,
+        productionSwitchProofReadyCount: productionSwitchProofPacket?.proofCounts?.ready ?? null,
+        productionSwitchProofTotalCount: productionSwitchProofPacket?.proofCounts?.total ?? null,
+        productionSwitchProofBlockedCount: productionSwitchProofPacket?.proofCounts?.blocked ?? null,
+        launchCutoverTriageStatus: "hold_for_launch_evidence",
         steadyStateHandoffStatus: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.status || null,
         steadyStateHandoffActionKey: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey || null,
         steadyStateHandoffFormat: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.format || null,
@@ -23293,7 +23307,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*firstOperatingResultExecution=/
     );
-    const launchEvidenceReadinessGate = launchOperationsOperatorEntry.launchEvidenceReadinessGate;
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*launchEvidence=/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*productionSwitchProof=/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/
+    );
     assert.deepEqual(
       {
         version: launchEvidenceReadinessGate.version,
@@ -26666,6 +26691,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*steadyStateHandoff=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*steadyStateDutyReceiptReview=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*firstOperatingResultExecution=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*launchEvidence=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*productionSwitchProof=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*currentEvidence=route_map_gate_result/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*fullTest=npm\.cmd test/);
@@ -28642,6 +28670,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsLaunchExecutionPhasePlanDownload.body,
       /Operator Queue Checkpoint:[\s\S]*firstOperatingResultExecution=[^\n]*\| lane=[^\n]*\| ready=(yes|no)[^\n]*\| current=[^\n]*\| readback=[^\n]*\| continuation=[^\n]*\| nextDownload=launch-operations-overview-status \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchOperationsLaunchExecutionPhasePlanDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*productionSwitchProof=blocked_until_real_environment_evidence[^\n]*\| ready=1\/8[^\n]*\| blocked=7\/8[^\n]*\| current=backfill_closeout_evidence/
+    );
+    assert.match(
+      launchOperationsLaunchExecutionPhasePlanDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/
     );
 
     const launchOperationsPreStagingSelfCheckDownload = await getText(
@@ -31258,6 +31294,32 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyCloseoutRecordedOperatorEntry.productionSwitchProofPacket,
       launchDutyCloseoutRecordedGate.productionSwitchProofPacket
     );
+    assert.deepEqual(
+      {
+        launchEvidenceStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchEvidenceStatus,
+        launchEvidenceCurrentKey: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchEvidenceCurrentKey,
+        launchEvidencePendingCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchEvidencePendingCount,
+        launchEvidenceTotalCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchEvidenceTotalCount,
+        launchEvidenceBlockerCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchEvidenceBlockerCount,
+        productionSwitchProofStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofStatus,
+        productionSwitchProofReadyCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofReadyCount,
+        productionSwitchProofTotalCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofTotalCount,
+        productionSwitchProofBlockedCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofBlockedCount,
+        launchCutoverTriageStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchCutoverTriageStatus
+      },
+      {
+        launchEvidenceStatus: "ready_for_stabilization_handoff",
+        launchEvidenceCurrentKey: "first_wave_closeout",
+        launchEvidencePendingCount: 0,
+        launchEvidenceTotalCount: 12,
+        launchEvidenceBlockerCount: 0,
+        productionSwitchProofStatus: "ready_for_production_switch_review",
+        productionSwitchProofReadyCount: 8,
+        productionSwitchProofTotalCount: 8,
+        productionSwitchProofBlockedCount: 0,
+        launchCutoverTriageStatus: "ready_for_cutover_watch"
+      }
+    );
     const expectedLaunchExecutionPhasePlanSummary = {
       mode: "developer-ops-launch-execution-phase-plan",
       status: "awaiting_stable_operations_handoff",
@@ -31290,6 +31352,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.deepEqual(
       launchDutyCloseoutRecordedOperatorEntry.launchExecutionPhasePlan,
       launchDutyCloseoutRecordedGate.launchExecutionPhasePlan
+    );
+    assert.equal(
+      launchDutyCloseoutRecordedOperatorEntry.launchExecutionPhasePlan?.operatorQueueCheckpoint?.launchCutoverTriageStatus,
+      "ready_for_cutover_watch"
     );
     assert.deepEqual(
       launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchExecutionPhasePlan,
@@ -31848,6 +31914,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Launch Duty Stable Operations Transition Action:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*productionSwitchProof=ready_for_production_switch_review[^\n]*\| ready=8\/8[^\n]*\| blocked=0\/8[^\n]*\| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,

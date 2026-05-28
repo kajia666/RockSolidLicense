@@ -13849,7 +13849,9 @@ function buildDeveloperLaunchReviewSummaryPayload({
         ? {
             kind: "download",
             label: "Review Cutover Triage",
-            recommendedDownload: reviewProductionSwitchProofPacketDownload
+            recommendedDownload: reviewProductionSwitchProofPacketDownload,
+            proofExecutionEntrypoint: launchCutoverTriageCheckpoint.proofExecutionEntrypoint || null,
+            context: buildLaunchCutoverTriageActionContext(launchCutoverTriageCheckpoint)
           }
         : null,
       {
@@ -16274,7 +16276,9 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         ? {
             kind: "download",
             label: "Review Cutover Triage",
-            recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload
+            recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload,
+            proofExecutionEntrypoint: launchCutoverTriageCheckpoint.proofExecutionEntrypoint || null,
+            context: buildLaunchCutoverTriageActionContext(launchCutoverTriageCheckpoint)
           }
         : null,
       {
@@ -59539,11 +59543,90 @@ function getOperatorQueueCheckpointFromInitialLaunchOpsReadiness(initialLaunchOp
   return proofPlanCheckpoint || null;
 }
 
-function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(checkpoint = null) {
+function buildLaunchCutoverTriageProofExecutionEntrypoint({
+  checkpoint = null,
+  productionSwitchProofPacket = null
+} = {}) {
   if (!checkpoint || typeof checkpoint !== "object") {
     return null;
   }
+  const proofPacket = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : null;
   const status = checkpoint.launchCutoverTriageStatus || null;
+  const proofStatus = checkpoint.productionSwitchProofStatus || proofPacket?.status || null;
+  const actionKey = checkpoint.productionSwitchProofCurrentActionKey || proofPacket?.currentActionKey || null;
+  const command = proofPacket?.currentCommand
+    || proofPacket?.launchExecutionPhasePlan?.currentCommand
+    || null;
+  const launchDutyRecordIndexPath = checkpoint.launchDutyRecordIndexPath
+    || proofPacket?.launchDutyRecordIndexFile
+    || null;
+  return {
+    mode: "production-switch-proof-execution-entrypoint/v1",
+    status: proofStatus,
+    actionKey,
+    command,
+    launchDutyRecordIndexPath,
+    readyForCutoverWatch: status === "ready_for_cutover_watch",
+    recommendedDownloadFormat: "production-switch-proof-packet",
+    nextAction: status === "ready_for_cutover_watch"
+      ? "Refresh readiness status from the shared launch-duty record index, then continue cutover watch."
+      : "Run the current production-switch proof command, then refresh Launch Review and Launch Smoke."
+  };
+}
+
+function buildLaunchCutoverTriageActionContext(checkpoint = null) {
+  if (!checkpoint || typeof checkpoint !== "object") {
+    return null;
+  }
+  return {
+    launchCutoverTriageStatus: checkpoint.status || null,
+    launchEvidenceStatus: checkpoint.launchEvidenceStatus || null,
+    launchEvidenceCurrentKey: checkpoint.launchEvidenceCurrentKey || null,
+    launchEvidenceCurrentStatus: checkpoint.launchEvidenceCurrentStatus || null,
+    launchEvidencePendingCount: checkpoint.launchEvidencePendingCount ?? null,
+    launchEvidenceTotalCount: checkpoint.launchEvidenceTotalCount ?? null,
+    launchEvidenceBlockerCount: checkpoint.launchEvidenceBlockerCount ?? null,
+    productionSwitchProofStatus: checkpoint.productionSwitchProofStatus || null,
+    productionSwitchProofCurrentActionKey: checkpoint.productionSwitchProofCurrentActionKey || null,
+    productionSwitchProofCurrentCommand: checkpoint.productionSwitchProofCurrentCommand || null,
+    productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? null,
+    productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? null,
+    productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? null,
+    launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
+    proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
+      ? { ...checkpoint.proofExecutionEntrypoint }
+      : null
+  };
+}
+
+function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
+  checkpoint = null,
+  { productionSwitchProofPacket = null } = {}
+) {
+  if (!checkpoint || typeof checkpoint !== "object") {
+    return null;
+  }
+  const proofPacket = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : null;
+  const status = checkpoint.launchCutoverTriageStatus || null;
+  const proofStatus = checkpoint.productionSwitchProofStatus || proofPacket?.status || null;
+  const proofActionKey = checkpoint.productionSwitchProofCurrentActionKey || proofPacket?.currentActionKey || null;
+  const proofCounts = proofPacket?.proofCounts && typeof proofPacket.proofCounts === "object"
+    ? proofPacket.proofCounts
+    : {};
+  const productionSwitchProofCurrentCommand = proofPacket?.currentCommand
+    || proofPacket?.launchExecutionPhasePlan?.currentCommand
+    || null;
+  const launchDutyRecordIndexPath = checkpoint.launchDutyRecordIndexPath
+    || proofPacket?.launchDutyRecordIndexFile
+    || null;
+  const proofExecutionEntrypoint = buildLaunchCutoverTriageProofExecutionEntrypoint({
+    checkpoint,
+    productionSwitchProofPacket: proofPacket
+  });
   return {
     mode: "launch-surface-cutover-triage-checkpoint/v1",
     sourceMode: checkpoint.mode || null,
@@ -59554,12 +59637,14 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(checkpoin
     launchEvidencePendingCount: checkpoint.launchEvidencePendingCount ?? null,
     launchEvidenceTotalCount: checkpoint.launchEvidenceTotalCount ?? null,
     launchEvidenceBlockerCount: checkpoint.launchEvidenceBlockerCount ?? null,
-    productionSwitchProofStatus: checkpoint.productionSwitchProofStatus || null,
-    productionSwitchProofCurrentActionKey: checkpoint.productionSwitchProofCurrentActionKey || null,
-    productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? null,
-    productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? null,
-    productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? null,
-    launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
+    productionSwitchProofStatus: proofStatus,
+    productionSwitchProofCurrentActionKey: proofActionKey,
+    productionSwitchProofCurrentCommand,
+    productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? proofCounts.ready ?? null,
+    productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? proofCounts.total ?? null,
+    productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? proofCounts.blocked ?? null,
+    launchDutyRecordIndexPath,
+    proofExecutionEntrypoint,
     nextAction: status === "ready_for_cutover_watch"
       ? "Production switch proof is ready; continue cutover watch from the shared launch-duty record index."
       : checkpoint.nextAction || "Complete launch evidence and refresh production switch proof before cutover watch."
@@ -59567,8 +59652,10 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(checkpoin
 }
 
 function getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {
+  const productionSwitchProofPacket = getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness);
   return buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
-    getOperatorQueueCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness)
+    getOperatorQueueCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness),
+    { productionSwitchProofPacket }
   );
 }
 
@@ -59589,6 +59676,7 @@ function buildLaunchCutoverTriageActionPlanStep({
   const summary = readyForCutoverWatch
     ? `${surfaceName} cutover triage is ready_for_cutover_watch; continue cutover watch from the shared launch-duty record index.`
     : `${surfaceName} cutover triage is ${checkpoint.status || "unknown"}: launch evidence pending ${evidencePending}, proof blocked ${proofBlocked}.`;
+  const context = buildLaunchCutoverTriageActionContext(checkpoint);
   return createLaunchWorkflowActionPlanStep({
     key,
     title: title || "Review cutover triage checkpoint",
@@ -59596,7 +59684,8 @@ function buildLaunchCutoverTriageActionPlanStep({
     status: readyForCutoverWatch ? "pass" : "review",
     priority: readyForCutoverWatch ? "secondary" : "primary",
     workspaceAction,
-    recommendedDownload
+    recommendedDownload,
+    context
   });
 }
 
@@ -59695,6 +59784,7 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
     + ` | ready=${checkpoint.productionSwitchProofReadyCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
     + ` | blocked=${checkpoint.productionSwitchProofBlockedCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
+    + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
   lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
   lines.push(`- cutoverTriageNextAction=${checkpoint.nextAction || "-"}`);

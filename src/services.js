@@ -51448,6 +51448,256 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
               ? "Refresh staging readiness and reload rehearsal for stable-operations handoff."
               : "Clear the current launch-duty blocker before continuing cutover execution."
   };
+  const launchDutyExecutionCurrentLane = !ready
+    ? "preflight"
+    : postSignoffArchiveReady
+      ? "post_signoff_archive"
+      : readyForFirstReceiptWrite
+        ? "launch_day_watch_receipt_write"
+        : readyForNextReceiptWrite
+          ? "receipt_visibility_snapshot_write"
+          : currentStabilizationReceiptWriteReady
+            ? "stabilization_receipt_write"
+            : stabilizationHandoffComplete
+              ? "stable_operations_handoff"
+              : "blocked";
+  const launchDutyExecutionCurrentPacket = postSignoffArchiveReady
+    ? postSignoffArchiveHandoffPacket
+    : readyForFirstReceiptWrite
+      ? firstReceiptWritePacket
+      : readyForNextReceiptWrite
+        ? nextReceiptWritePacket
+        : currentStabilizationReceiptWriteReady
+          ? currentStabilizationReceiptWritePacket
+          : stabilizationHandoffComplete
+            ? currentStableOperationsHandoffPacket
+            : null;
+  const launchDutyExecutionCurrentActionKey = postSignoffArchiveReady
+    ? postSignoffArchiveHandoffPacket?.archiveActionKey || archivePhaseForPacket?.actionKey || "archive_production_signoff_packet"
+    : launchDutyExecutionCurrentPacket?.actionKey || launchDutyCurrentActionKey || null;
+  const launchDutyExecutionCurrentRecordKey = postSignoffArchiveReady
+    ? null
+    : launchDutyExecutionCurrentPacket?.recordKey
+      || launchDutyExecutionCurrentPacket?.sourceRecordKey
+      || null;
+  const launchDutyExecutionCurrentPhaseKey = postSignoffArchiveReady
+    ? postSignoffArchiveHandoffPacket?.archivePhaseKey || archivePhaseForPacket?.key || null
+    : readyForFirstReceiptWrite
+      ? firstReceiptWritePacket?.phaseKey || firstReceiptWritePhase?.key || null
+      : readyForNextReceiptWrite
+        ? nextReceiptWriteRecord?.key || null
+        : currentStabilizationReceiptWriteReady
+          ? "collect_stabilization_evidence"
+          : stabilizationHandoffComplete
+            ? "stable_operations_handoff"
+            : preflightNextActionTemplate?.phaseKey || null;
+  const launchDutyExecutionCurrentArtifact = postSignoffArchiveReady
+    ? postSignoffArchiveHandoffPacket?.productionSignoffPacket || archivePhaseForPacket?.artifact || null
+    : launchDutyExecutionCurrentPacket?.artifact
+      || launchDutyExecutionCurrentPacket?.firstWaveCloseoutArtifactPath
+      || null;
+  const launchDutyExecutionCurrentCommand = postSignoffArchiveReady
+    ? archivePhaseForPacket?.command || null
+    : launchDutyExecutionCurrentPacket?.command || null;
+  const launchDutyExecutionCurrentReceiptOperations = Array.isArray(launchDutyExecutionCurrentPacket?.receiptOperations)
+    ? launchDutyExecutionCurrentPacket.receiptOperations
+    : [];
+  const launchDutyExecutionCurrentPacketStatus = postSignoffArchiveReady
+    ? postSignoffArchiveHandoffPacket?.status || null
+    : launchDutyExecutionCurrentPacket?.status || null;
+  const launchDutyExecutionStatus = launchDutyExecutionCurrentLane === "stabilization_receipt_write"
+    || launchDutyExecutionCurrentLane === "stable_operations_handoff"
+      ? launchDutyStabilizationExecutionAction.status
+      : launchDutyExecutionCurrentLane === "preflight"
+        ? preflightStatus
+        : launchDutyExecutionCurrentLane === "blocked"
+          ? cutoverExecutionStatus || stabilizationExecutionStatus || preflightStatus
+          : launchDutyCutoverExecutionAction.status;
+  const launchDutyExecutionReady = launchDutyExecutionCurrentLane === "stabilization_receipt_write"
+    || launchDutyExecutionCurrentLane === "stable_operations_handoff"
+      ? launchDutyStabilizationExecutionAction.ready === true
+      : launchDutyExecutionCurrentLane === "preflight"
+        ? preflightReadyForPostSignoffArchive
+        : launchDutyExecutionCurrentLane === "blocked"
+          ? false
+          : launchDutyCutoverExecutionAction.ready === true;
+  const launchDutyExecutionRawNextTemplate = postSignoffArchiveReady
+    ? postSignoffArchiveHandoffPacket?.nextActionTemplate || launchDutyCutoverExecutionAction.nextActionTemplate || null
+    : launchDutyExecutionCurrentLane === "stabilization_receipt_write"
+      || launchDutyExecutionCurrentLane === "stable_operations_handoff"
+        ? launchDutyStabilizationExecutionAction.nextActionTemplate || null
+        : launchDutyCutoverExecutionAction.nextActionTemplate || null;
+  const launchDutyExecutionNextTemplate = launchDutyExecutionRawNextTemplate
+    ? {
+        ...launchDutyExecutionRawNextTemplate,
+        afterActionKey: launchDutyExecutionRawNextTemplate.afterActionKey
+          || launchDutyExecutionRawNextTemplate.afterArchiveActionKey
+          || null,
+        afterRecordKey: launchDutyExecutionRawNextTemplate.afterRecordKey
+          || launchDutyExecutionRawNextTemplate.afterArchiveRecordKey
+          || null,
+        afterCommand: launchDutyExecutionRawNextTemplate.afterCommand
+          || launchDutyExecutionRawNextTemplate.afterArchiveCommand
+          || null
+      }
+    : null;
+  const launchDutyExecutionPostCommandReadback = (() => {
+    const refresh = {
+      method: "GET",
+      href: refreshAction?.href || packet?.overviewRefreshHref || null,
+      confirmationAuditLogId: packet?.confirmationAuditLogId || queue.confirmationReceipt?.auditLogId || null
+    };
+    if (postSignoffArchiveReady) {
+      return {
+        ...refresh,
+        expectedCurrentActionKey: firstReceiptWritePacket?.actionKey || firstReceiptWritePhase?.actionKey || "record_launch_day_watch_summary",
+        expectedRecordKey: firstReceiptWritePacket?.recordKey || firstReceiptWriteRecord?.key || "launch_day_watch_summary",
+        expectedPacketStatus: "ready_for_receipt_write",
+        expectedReadbackStatus: "ready_for_launch_day_watch_summary_write",
+        expectedArchiveReceiptVisible: true
+      };
+    }
+    if (readyForFirstReceiptWrite) {
+      return {
+        ...refresh,
+        expectedCurrentActionKey: nextReceiptWritePacket?.actionKey || nextReceiptWriteRecord?.actionKey || "record_receipt_visibility_snapshot",
+        expectedRecordKey: nextReceiptWritePacket?.recordKey || nextReceiptWriteRecord?.key || "receipt_visibility_snapshot",
+        expectedPacketStatus: "ready_for_receipt_write",
+        expectedReadbackStatus: "ready_for_receipt_visibility_snapshot_write",
+        expectedRecordedRecordKey: firstReceiptWritePacket?.recordKey || firstReceiptWriteRecord?.key || "launch_day_watch_summary"
+      };
+    }
+    if (readyForNextReceiptWrite) {
+      return {
+        ...refresh,
+        expectedCurrentActionKey: currentStabilizationReceiptWritePacket?.actionKey || currentStabilizationRecord?.actionKey || "record_first_wave_incident_log",
+        expectedRecordKey: currentStabilizationReceiptWritePacket?.recordKey || currentStabilizationRecord?.recordKey || "first_wave_incident_log",
+        expectedPacketStatus: "ready_for_receipt_write",
+        expectedReadbackStatus: "ready_for_first_wave_incident_log_write",
+        expectedRecordedRecordKey: nextReceiptWritePacket?.recordKey || nextReceiptWriteRecord?.key || "receipt_visibility_snapshot"
+      };
+    }
+    if (currentStabilizationReceiptWriteReady) {
+      return {
+        ...refresh,
+        expectedCurrentActionKey: stabilizationExecutionNextRecordTemplate?.actionKey
+          || (currentStabilizationRecord?.recordKey === stabilizationCloseoutRecord?.recordKey
+            ? "refresh_staging_readiness_after_first_wave_closeout"
+            : currentStabilizationReceiptWritePacket?.actionKey || currentStabilizationRecord?.actionKey || null),
+        expectedRecordKey: stabilizationExecutionNextRecordTemplate?.recordKey
+          || currentStabilizationReceiptWritePacket?.recordKey
+          || currentStabilizationRecord?.recordKey
+          || null,
+        expectedPacketStatus: stabilizationExecutionNextRecordTemplate ? "ready_for_receipt_write" : "ready_for_stable_operations_handoff",
+        expectedReadbackStatus: currentStabilizationRecord?.recordKey === stabilizationCloseoutRecord?.recordKey
+          ? "first_wave_closeout_recorded"
+          : "stabilization_record_recorded",
+        expectedRecordedRecordKey: currentStabilizationReceiptWritePacket?.recordKey || currentStabilizationRecord?.recordKey || null
+      };
+    }
+    if (stabilizationHandoffComplete) {
+      return {
+        ...refresh,
+        expectedCurrentActionKey: currentStableOperationsHandoffPacket?.nextActionKey || "reload_staging_rehearsal_for_stable_operations",
+        expectedRecordKey: currentStableOperationsHandoffPacket?.sourceRecordKey || stabilizationCloseoutRecord?.recordKey || null,
+        expectedPacketStatus: "awaiting_readiness_and_rehearsal_readback",
+        expectedReadbackStatus: stableOperationsReadinessReloadReadbackPacket?.status || "awaiting_readiness_and_rehearsal_readback",
+        expectedRecordedRecordKey: currentStableOperationsHandoffPacket?.sourceRecordKey || stabilizationCloseoutRecord?.recordKey || null
+      };
+    }
+    return {
+      ...refresh,
+      expectedCurrentActionKey: preflightNextActionTemplate?.actionKey || launchDutyCurrentActionKey || null,
+      expectedRecordKey: null,
+      expectedPacketStatus: postSignoffArchiveHandoffPacket?.status || null,
+      expectedReadbackStatus: preflightStatus
+    };
+  })();
+  const launchDutyExecutionHandoffContinuation = (() => {
+    if (postSignoffArchiveReady) {
+      return {
+        actionKey: firstReceiptWritePacket?.actionKey || firstReceiptWritePhase?.actionKey || "record_launch_day_watch_summary",
+        recordKey: firstReceiptWritePacket?.recordKey || firstReceiptWriteRecord?.key || "launch_day_watch_summary",
+        artifact: firstReceiptWritePacket?.artifact || firstReceiptWritePhase?.artifact || null,
+        command: firstReceiptWritePacket?.command || firstReceiptWritePhase?.command || null,
+        packetStatus: firstReceiptWritePacket?.status || null,
+        expectedPacketStatusAfterReadback: "ready_for_receipt_write",
+        receiptOperations: firstReceiptWriteOperations
+      };
+    }
+    if (readyForFirstReceiptWrite) {
+      return {
+        actionKey: nextReceiptWritePacket?.actionKey || nextReceiptWriteRecord?.actionKey || "record_receipt_visibility_snapshot",
+        recordKey: nextReceiptWritePacket?.recordKey || nextReceiptWriteRecord?.key || "receipt_visibility_snapshot",
+        artifact: nextReceiptWritePacket?.artifact || nextReceiptWriteRecord?.artifact || null,
+        command: nextReceiptWritePacket?.command || nextReceiptWriteRecord?.command || null,
+        packetStatus: nextReceiptWritePacket?.status || null,
+        expectedPacketStatusAfterReadback: "ready_for_receipt_write",
+        receiptOperations: nextReceiptWriteOperations
+      };
+    }
+    if (readyForNextReceiptWrite) {
+      return {
+        actionKey: currentStabilizationReceiptWritePacket?.actionKey || currentStabilizationRecord?.actionKey || "record_first_wave_incident_log",
+        recordKey: currentStabilizationReceiptWritePacket?.recordKey || currentStabilizationRecord?.recordKey || "first_wave_incident_log",
+        artifact: currentStabilizationReceiptWritePacket?.artifact || currentStabilizationRecord?.artifact || null,
+        command: currentStabilizationReceiptWritePacket?.command || currentStabilizationRecord?.command || null,
+        packetStatus: currentStabilizationReceiptWritePacket?.status || null,
+        expectedPacketStatusAfterReadback: "ready_for_receipt_write",
+        receiptOperations: currentStabilizationReceiptWritePacket?.receiptOperations || []
+      };
+    }
+    if (currentStabilizationReceiptWriteReady) {
+      return {
+        actionKey: stabilizationExecutionNextRecordTemplate?.actionKey
+          || (currentStabilizationRecord?.recordKey === stabilizationCloseoutRecord?.recordKey
+            ? "refresh_staging_readiness_after_first_wave_closeout"
+            : null),
+        recordKey: stabilizationExecutionNextRecordTemplate?.recordKey
+          || currentStabilizationRecord?.recordKey
+          || null,
+        artifact: stabilizationExecutionNextRecordTemplate?.artifact || currentStableOperationsHandoffPacket?.firstWaveCloseoutArtifactPath || null,
+        command: stabilizationExecutionNextRecordTemplate?.command || currentStableOperationsHandoffPacket?.command || null,
+        packetStatus: stabilizationExecutionNextRecordTemplate ? "blocked_until_previous_record" : currentStableOperationsHandoffPacket?.status || null,
+        expectedPacketStatusAfterReadback: stabilizationExecutionNextRecordTemplate ? "ready_for_receipt_write" : "ready_for_stable_operations_handoff",
+        receiptOperations: stabilizationExecutionNextRecordTemplate?.receiptOperations || []
+      };
+    }
+    if (stabilizationHandoffComplete) {
+      return {
+        actionKey: currentStableOperationsHandoffPacket?.nextActionKey || "reload_staging_rehearsal_for_stable_operations",
+        recordKey: currentStableOperationsHandoffPacket?.sourceRecordKey || stabilizationCloseoutRecord?.recordKey || null,
+        artifact: currentStableOperationsHandoffPacket?.firstWaveCloseoutArtifactPath || null,
+        command: currentStableOperationsHandoffPacket?.nextCommand || null,
+        packetStatus: stableOperationsReadinessReloadReadbackPacket?.status || null,
+        expectedPacketStatusAfterReadback: "ready_for_stable_operations_handoff",
+        receiptOperations: []
+      };
+    }
+    return null;
+  })();
+  const launchDutyOperatorExecutionSummary = {
+    version: "developer-ops-launch-operations-operator-launch-duty-execution-summary/v1",
+    status: launchDutyExecutionStatus,
+    currentLane: launchDutyExecutionCurrentLane,
+    ready: launchDutyExecutionReady,
+    currentActionKey: launchDutyExecutionCurrentActionKey,
+    currentPhaseKey: launchDutyExecutionCurrentPhaseKey,
+    currentRecordKey: launchDutyExecutionCurrentRecordKey,
+    currentArtifact: launchDutyExecutionCurrentArtifact,
+    currentCommand: launchDutyExecutionCurrentCommand,
+    currentPacketStatus: launchDutyExecutionCurrentPacketStatus,
+    currentReceiptOperations: launchDutyExecutionCurrentReceiptOperations,
+    nextActionTemplate: launchDutyExecutionNextTemplate,
+    postCommandReadback: launchDutyExecutionPostCommandReadback,
+    handoffContinuation: launchDutyExecutionHandoffContinuation,
+    launchDutyRecordIndexPath: launchDutyRecordIndexPath || packet?.launchDutyRecordIndexPath || queue.launchDutyRecordIndexPath || null,
+    confirmationAuditLogId: packet?.confirmationAuditLogId || queue.confirmationReceipt?.auditLogId || null,
+    archiveReceiptAuditLogId: postSignoffArchiveHandoffPacket?.archiveReceiptAuditLogId || null,
+    failureHintKeys: launchDutyExecutionReady
+      ? []
+      : preflightBlockingReasonKeys
+  };
   return {
     version: "developer-ops-launch-operations-operator-launch-duty-handoff-action/v1",
     status,
@@ -51485,6 +51735,7 @@ function buildDeveloperOpsLaunchOperationsOperatorLaunchDutyHandoffAction({
     nextReceiptWritePacket,
     launchDutyCutoverExecutionAction,
     launchDutyStabilizationExecutionAction,
+    operatorExecutionSummary: launchDutyOperatorExecutionSummary,
     launchDayWatchSummaryRecordReadback,
     receiptVisibilitySnapshotRecordReadback,
     firstWaveIncidentLogRecordReadback,
@@ -60633,6 +60884,7 @@ function buildDeveloperOpsSummaryText(payload = {}) {
         const postSignoffArchivePacket = launchDutyHandoffAction.postSignoffArchiveHandoffPacket || null;
         const cutoverExecutionAction = launchDutyHandoffAction.launchDutyCutoverExecutionAction || null;
         const stabilizationExecutionAction = launchDutyHandoffAction.launchDutyStabilizationExecutionAction || null;
+        const operatorExecutionSummary = launchDutyHandoffAction.operatorExecutionSummary || null;
         const postArchiveWatchReadback = postSignoffArchivePacket?.postArchiveLaunchDayWatchReadback || null;
         const nextReceiptWritePacket = launchDutyHandoffAction.nextReceiptWritePacket || null;
         const watchSummaryReadback = launchDutyHandoffAction.launchDayWatchSummaryRecordReadback || null;
@@ -60666,6 +60918,13 @@ function buildDeveloperOpsSummaryText(payload = {}) {
           + ` | launchDutyCutoverAction=${cutoverExecutionAction?.status || "-"}`
           + ` | launchDutyCutoverCurrent=${cutoverExecutionAction?.currentActionKey || "-"}`
           + ` | launchDutyCutoverRecord=${cutoverExecutionAction?.currentRecordKey || "-"}`
+          + ` | launchDutyOperatorSummary=${operatorExecutionSummary?.status || "-"}`
+          + ` | launchDutyOperatorSummaryLane=${operatorExecutionSummary?.currentLane || "-"}`
+          + ` | launchDutyOperatorSummaryCurrent=${operatorExecutionSummary?.currentActionKey || "-"}`
+          + ` | launchDutyOperatorSummaryRecord=${operatorExecutionSummary?.currentRecordKey || "-"}`
+          + ` | launchDutyOperatorSummaryPacket=${operatorExecutionSummary?.currentPacketStatus || "-"}`
+          + ` | launchDutyOperatorSummaryReadback=${operatorExecutionSummary?.postCommandReadback?.expectedCurrentActionKey || "-"}`
+          + ` | launchDutyOperatorSummaryContinuation=${operatorExecutionSummary?.handoffContinuation?.actionKey || "-"}`
           + ` | launchDutyStabilizationAction=${stabilizationExecutionAction?.status || "-"}`
           + ` | launchDutyStabilizationActionCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
           + ` | launchDutyStabilizationActionRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
@@ -61641,6 +61900,7 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
       const postSignoffArchivePacket = launchDutyHandoffAction.postSignoffArchiveHandoffPacket || null;
       const cutoverExecutionAction = launchDutyHandoffAction.launchDutyCutoverExecutionAction || null;
       const stabilizationExecutionAction = launchDutyHandoffAction.launchDutyStabilizationExecutionAction || null;
+      const operatorExecutionSummary = launchDutyHandoffAction.operatorExecutionSummary || null;
       const postArchiveWatchReadback = postSignoffArchivePacket?.postArchiveLaunchDayWatchReadback || null;
       const nextReceiptWritePacket = launchDutyHandoffAction.nextReceiptWritePacket || null;
       const watchSummaryReadback = launchDutyHandoffAction.launchDayWatchSummaryRecordReadback || null;
@@ -61671,6 +61931,13 @@ function buildDeveloperOpsInitialLaunchOpsReadinessText(payload = {}) {
         + ` | cutover=${cutoverExecutionAction?.status || "-"}`
         + ` | cutoverCurrent=${cutoverExecutionAction?.currentActionKey || "-"}`
         + ` | cutoverRecord=${cutoverExecutionAction?.currentRecordKey || "-"}`
+        + ` | operatorSummary=${operatorExecutionSummary?.status || "-"}`
+        + ` | operatorSummaryLane=${operatorExecutionSummary?.currentLane || "-"}`
+        + ` | operatorSummaryCurrent=${operatorExecutionSummary?.currentActionKey || "-"}`
+        + ` | operatorSummaryRecord=${operatorExecutionSummary?.currentRecordKey || "-"}`
+        + ` | operatorSummaryPacket=${operatorExecutionSummary?.currentPacketStatus || "-"}`
+        + ` | operatorSummaryReadback=${operatorExecutionSummary?.postCommandReadback?.expectedCurrentActionKey || "-"}`
+        + ` | operatorSummaryContinuation=${operatorExecutionSummary?.handoffContinuation?.actionKey || "-"}`
         + ` | stabilizationAction=${stabilizationExecutionAction?.status || "-"}`
         + ` | stabilizationActionCurrent=${stabilizationExecutionAction?.currentActionKey || "-"}`
         + ` | stabilizationActionRecord=${stabilizationExecutionAction?.currentRecordKey || "-"}`
@@ -64100,6 +64367,7 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
   const launchDutyFirstReceiptWritePacket = launchDutyHandoffAction?.firstReceiptWritePacket || null;
   const launchDutyCutoverExecutionAction = launchDutyHandoffAction?.launchDutyCutoverExecutionAction || null;
   const launchDutyStabilizationExecutionAction = launchDutyHandoffAction?.launchDutyStabilizationExecutionAction || null;
+  const launchDutyOperatorExecutionSummary = launchDutyHandoffAction?.operatorExecutionSummary || null;
   const launchDutyNextReceiptWritePacket = launchDutyHandoffAction?.nextReceiptWritePacket || null;
   const launchDutyStabilizationReceiptQueue = launchDutyHandoffAction?.stabilizationReceiptWriteQueue || null;
   const launchDutyStabilizationCompletionState = launchDutyStabilizationReceiptQueue?.completionState || null;
@@ -64288,6 +64556,13 @@ function buildDeveloperOpsHandoffIndexText(payload = {}) {
       + ` | launchDutyCutoverAction=${launchDutyCutoverExecutionAction?.status || "-"}`
       + ` | launchDutyCutoverCurrent=${launchDutyCutoverExecutionAction?.currentActionKey || "-"}`
       + ` | launchDutyCutoverRecord=${launchDutyCutoverExecutionAction?.currentRecordKey || "-"}`
+      + ` | launchDutyOperatorSummary=${launchDutyOperatorExecutionSummary?.status || "-"}`
+      + ` | launchDutyOperatorSummaryLane=${launchDutyOperatorExecutionSummary?.currentLane || "-"}`
+      + ` | launchDutyOperatorSummaryCurrent=${launchDutyOperatorExecutionSummary?.currentActionKey || "-"}`
+      + ` | launchDutyOperatorSummaryRecord=${launchDutyOperatorExecutionSummary?.currentRecordKey || "-"}`
+      + ` | launchDutyOperatorSummaryPacket=${launchDutyOperatorExecutionSummary?.currentPacketStatus || "-"}`
+      + ` | launchDutyOperatorSummaryReadback=${launchDutyOperatorExecutionSummary?.postCommandReadback?.expectedCurrentActionKey || "-"}`
+      + ` | launchDutyOperatorSummaryContinuation=${launchDutyOperatorExecutionSummary?.handoffContinuation?.actionKey || "-"}`
       + ` | launchDutyStabilizationAction=${launchDutyStabilizationExecutionAction?.status || "-"}`
       + ` | launchDutyStabilizationActionCurrent=${launchDutyStabilizationExecutionAction?.currentActionKey || "-"}`
       + ` | launchDutyStabilizationActionRecord=${launchDutyStabilizationExecutionAction?.currentRecordKey || "-"}`
@@ -66390,6 +66665,7 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
     const postSignoffArchivePacket = launchDutyHandoffAction.postSignoffArchiveHandoffPacket || null;
     const cutoverExecutionAction = launchDutyHandoffAction.launchDutyCutoverExecutionAction || null;
     const stabilizationExecutionAction = launchDutyHandoffAction.launchDutyStabilizationExecutionAction || null;
+    const operatorExecutionSummary = launchDutyHandoffAction.operatorExecutionSummary || null;
     const postArchiveWatchReadback = postSignoffArchivePacket?.postArchiveLaunchDayWatchReadback || null;
     const watchSummaryReadback = launchDutyHandoffAction.launchDayWatchSummaryRecordReadback || null;
     const receiptVisibilitySnapshotReadback = launchDutyHandoffAction.receiptVisibilitySnapshotRecordReadback || null;
@@ -66435,6 +66711,50 @@ function buildDeveloperOpsLaunchOperationsOperatorEntryText(payload = {}) {
       lines.push(
         `Preflight Checks: ${checks.map((item) => `${item.key || "-"}=${item.ready === true ? "ready" : (item.status || "pending")}`).join("; ") || "-"}`
       );
+    }
+    if (operatorExecutionSummary) {
+      const receiptOperations = Array.isArray(operatorExecutionSummary.currentReceiptOperations)
+        ? operatorExecutionSummary.currentReceiptOperations.join(",")
+        : "";
+      const readback = operatorExecutionSummary.postCommandReadback || {};
+      const continuation = operatorExecutionSummary.handoffContinuation || {};
+      const continuationReceipts = Array.isArray(continuation.receiptOperations)
+        ? continuation.receiptOperations.join(",")
+        : "";
+      lines.push("Launch Duty Operator Execution Summary:");
+      lines.push(
+        `- status=${operatorExecutionSummary.status || "-"}`
+        + ` | lane=${operatorExecutionSummary.currentLane || "-"}`
+        + ` | ready=${operatorExecutionSummary.ready === true ? "yes" : "no"}`
+        + ` | current=${operatorExecutionSummary.currentActionKey || "-"}`
+        + ` | record=${operatorExecutionSummary.currentRecordKey || "-"}`
+        + ` | phase=${operatorExecutionSummary.currentPhaseKey || "-"}`
+        + ` | packet=${operatorExecutionSummary.currentPacketStatus || "-"}`
+      );
+      lines.push(
+        `- artifact=${operatorExecutionSummary.currentArtifact || "-"}`
+        + ` | command=${operatorExecutionSummary.currentCommand || "-"}`
+        + ` | receipts=${receiptOperations || "-"}`
+        + ` | recordIndex=${operatorExecutionSummary.launchDutyRecordIndexPath || "-"}`
+      );
+      lines.push(
+        `Launch Duty Operator Execution Readback: method=${readback.method || "-"} ${readback.href || "-"}`
+        + ` | expectedCurrent=${readback.expectedCurrentActionKey || "-"}`
+        + ` | expectedRecord=${readback.expectedRecordKey || "-"}`
+        + ` | expectedPacket=${readback.expectedPacketStatus || "-"}`
+        + ` | expectedReadback=${readback.expectedReadbackStatus || "-"}`
+      );
+      lines.push(
+        `Launch Duty Operator Execution Continuation: action=${continuation.actionKey || "-"}`
+        + ` | record=${continuation.recordKey || "-"}`
+        + ` | packet=${continuation.packetStatus || "-"}`
+        + ` | expectedPacket=${continuation.expectedPacketStatusAfterReadback || "-"}`
+        + ` | artifact=${continuation.artifact || "-"}`
+        + ` | receipts=${continuationReceipts || "-"}`
+      );
+      if (continuation.command) {
+        lines.push(`- continuationCommand=${continuation.command}`);
+      }
     }
     if (cutoverExecutionAction) {
       const nextActionTemplate = cutoverExecutionAction.nextActionTemplate || {};

@@ -23538,6 +23538,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.ok(launchOperationsOverviewStatus.firstOperatingResultExecutionSummary);
     const launchEvidenceReadinessGate = launchOperationsOperatorEntry.launchEvidenceReadinessGate;
     const productionSwitchProofPacket = launchOperationsOperatorEntry.productionSwitchProofPacket;
+    const expectedCutoverStableHandoffHref =
+      "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief";
+    const expectedCutoverStableActionKey = launchEvidenceReadinessGate?.stableOperationsHandoff?.currentActionKey
+      || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey
+      || null;
+    const expectedCutoverStableCommand = launchEvidenceReadinessGate?.stableOperationsHandoff?.currentCommand
+      || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentCommand
+      || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.operatorAction?.command
+      || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
+      || null;
     assert.deepEqual(
       launchOperationsOperatorEntry.operatorQueueCheckpoint,
       {
@@ -23713,14 +23723,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             readyForCutoverWatch: false,
             currentProofItemKey: "backup_restore_drill",
             remainingProofCount: 5,
-            stableTransitionActionKey: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey || null,
-            stableTransitionCommand: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentCommand
-              || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.operatorAction?.command
-              || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
-              || null,
+            stableTransitionActionKey: expectedCutoverStableActionKey,
+            stableTransitionCommand: expectedCutoverStableCommand,
             steadyStateHandoffActionKey: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey || "open_steady_state_handoff_brief",
             steadyStateHandoffHref: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.href
-              || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
+              || expectedCutoverStableHandoffHref
               || null,
             launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
             fixedActions: [
@@ -23734,18 +23741,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
               {
                 order: 2,
                 key: "refresh_stable_operations_gate",
-                actionKey: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey || null,
-                command: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.currentCommand
-                  || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.operatorAction?.command
-                  || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
-                  || null
+                actionKey: expectedCutoverStableActionKey,
+                command: expectedCutoverStableCommand
               },
               {
                 order: 3,
                 key: "open_steady_state_handoff",
                 actionKey: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey || "open_steady_state_handoff_brief",
                 href: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.href
-                  || launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref
+                  || expectedCutoverStableHandoffHref
                   || null
               }
             ],
@@ -31879,10 +31883,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         proofExecutionEntrypointRunbookNextCompletionQueueKey: null,
         proofExecutionEntrypointRunbookRemainingCount: 1,
         proofExecutionEntrypointCutoverStableRunbookStatus: "ready_for_stable_operations_handoff_transition",
-        proofExecutionEntrypointCutoverStableRunbookStableAction:
-          launchDutyCloseoutRecordedOperatorEntry.launchDutyStableOperationsTransitionAction?.currentActionKey || null,
+        proofExecutionEntrypointCutoverStableRunbookStableAction: "refresh_staging_readiness_after_first_wave_closeout",
         proofExecutionEntrypointCutoverStableRunbookSteadyStateHref:
-          launchDutyCloseoutRecordedOperatorEntry.launchDutyStableOperationsTransitionAction?.nextDownloadHref || null,
+          "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief",
         proofExecutionEntrypointReadyForCutoverWatch: true,
         launchCutoverTriageStatus: "ready_for_cutover_watch"
       }
@@ -32602,6 +32605,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ],
         operatorOrder: ["Review the launch-duty packet results, then refresh Developer Ops."],
         launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        cutoverStableOperationsRunbook:
+          launchMainlineCloseoutRecordedReadback.mainlineSummary.operatorQueueCheckpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook,
         packetReviewBridge: launchDutyCloseoutStableOpsTransition.packetReviewBridge,
         nextAction: "Complete packet result review before opening the steady-state handoff brief."
       }
@@ -32666,6 +32671,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ],
         operatorOrder: ["Review the launch-duty packet results, then refresh Developer Ops."],
         launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        cutoverStableOperationsRunbook:
+          launchMainlineCloseoutRecordedReadback.mainlineSummary.operatorQueueCheckpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook,
         packetReviewBridge: launchDutyCloseoutStableOpsTransition.packetReviewBridge,
         nextAction: "Complete packet result review before opening the steady-state handoff brief."
       }
@@ -33263,6 +33270,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Handoff Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition \| readyForCutoverWatch=yes \| stableAction=refresh_staging_readiness_after_first_wave_closeout \| steadyStateHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Handoff Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*fixedActions=1\.complete_current_proof_queue -> 2\.refresh_stable_operations_gate -> 3\.open_steady_state_handoff/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Stable Operations Transition Shortcut:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
     );
     assert.match(
@@ -33276,6 +33291,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Stable Operations Transition Review:[\s\S]*checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Stable Operations Transition Review:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition \| readyForCutoverWatch=yes \| stableAction=refresh_staging_readiness_after_first_wave_closeout \| steadyStateHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
     const launchMainlineCloseoutRecordedRoutesDownload = await getText(
       baseUrl,
@@ -33308,11 +33327,19 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
+      /Stable Operations Handoff Execution Route:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition \| readyForCutoverWatch=yes \| stableAction=refresh_staging_readiness_after_first_wave_closeout/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
       /stable-operations-handoff-execution: [^\n]*file=stable-operations-handoff-execution\.txt[^\n]*format=stable-operations-handoff-execution[^\n]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
       /Stable Operations Transition Review Route:[\s\S]*status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedRoutesDownload.body,
+      /Stable Operations Transition Review Route:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*fixedActions=1\.complete_current_proof_queue -> 2\.refresh_stable_operations_gate -> 3\.open_steady_state_handoff/
     );
     assert.match(
       launchMainlineCloseoutRecordedRoutesDownload.body,
@@ -33472,6 +33499,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedIndexDownload.body,
+      /Launch Mainline Stable Operations Handoff Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*proof=launch_day_watch_and_stabilization \| remainingProof=1 \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedIndexDownload.body,
       /Included Handoff Files:[\s\S]*Stable operations handoff: ops\/stable-operations-handoff-execution\.txt/
     );
     assert.match(
@@ -33579,6 +33610,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedZipText,
+      /Stable Operations Handoff Execution:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition \| readyForCutoverWatch=yes \| stableAction=refresh_staging_readiness_after_first_wave_closeout/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
       /ops\/stable-operations-transition-review\.txt/
     );
     assert.match(
@@ -33588,6 +33623,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedZipText,
       /Stable Operations Transition Review Checks:[\s\S]*checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedZipText,
+      /Stable Operations Transition Review:[\s\S]*Cutover Stable Operations Runbook:[\s\S]*fixedActions=1\.complete_current_proof_queue -> 2\.refresh_stable_operations_gate -> 3\.open_steady_state_handoff/
     );
     assert.match(
       launchMainlineCloseoutRecordedZipText,
@@ -33647,6 +33686,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
       /Stable Operations Handoff Rehearsal Expectations:[\s\S]*rehearsalStatus=ready_for_stable_operations_handoff \| rehearsalCurrent=stable_operations_handoff \| confirmationPoints=launch_duty_record_index,first_wave_closeout/
     );
+    assert.match(
+      launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
+      /Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition \| readyForCutoverWatch=yes \| stableAction=refresh_staging_readiness_after_first_wave_closeout \| steadyStateHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
+      /Cutover Stable Operations Runbook:[\s\S]*nextAction=Run the stable-operations readiness refresh, confirm the gate\/readback state, then open the steady-state handoff brief\./
+    );
     const launchMainlineStableOperationsTransitionReviewDirectDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=stable-operations-transition-review",
@@ -33667,6 +33714,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineStableOperationsTransitionReviewDirectDownload.body,
       /Stable Operations Transition Review Checks:[\s\S]*checks=readiness_gate_stable_operations_handoff,rehearsal_ready_for_stable_operations_handoff,packet_result_review_complete,record_index_complete/
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionReviewDirectDownload.body,
+      /Cutover Stable Operations Runbook:[\s\S]*status=ready_for_stable_operations_handoff_transition \| readyForCutoverWatch=yes \| stableAction=refresh_staging_readiness_after_first_wave_closeout/
+    );
+    assert.match(
+      launchMainlineStableOperationsTransitionReviewDirectDownload.body,
+      /Cutover Stable Operations Runbook:[\s\S]*fixedActions=1\.complete_current_proof_queue -> 2\.refresh_stable_operations_gate -> 3\.open_steady_state_handoff/
     );
     const launchMainlineCloseoutStableOperationsTransitionShortcutDirectDownload = await getText(
       baseUrl,
@@ -34294,6 +34349,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         ],
         operatorOrder: expectedSteadyStateHandoffOperatorOrder,
         launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+        cutoverStableOperationsRunbook:
+          launchMainlineSteadyStateHandoff.mainlineSummary.operatorQueueCheckpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook,
         nextAction: "Open the steady-state handoff brief and complete stable-operations handoff."
       }
     );

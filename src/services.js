@@ -24365,6 +24365,9 @@ function normalizeStableOperationsTransitionShortcut(shortcut = null) {
     requiredChecks,
     operatorOrder,
     launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    ...(source.cutoverStableOperationsRunbook && typeof source.cutoverStableOperationsRunbook === "object"
+      ? { cutoverStableOperationsRunbook: source.cutoverStableOperationsRunbook }
+      : {}),
     ...(packetReviewBridge ? { packetReviewBridge } : {}),
     nextAction: source.nextAction || operatorAction?.nextAction || null
   };
@@ -24388,6 +24391,10 @@ function getStableOperationsTransitionShortcutFromOperatorEntry(launchOperations
   const landing = entry?.launchDutySteadyStateHandoffLanding
     && typeof entry.launchDutySteadyStateHandoffLanding === "object"
       ? entry.launchDutySteadyStateHandoffLanding
+      : null;
+  const cutoverStableOperationsRunbook = entry?.operatorQueueCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook
+    && typeof entry.operatorQueueCheckpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook === "object"
+      ? entry.operatorQueueCheckpoint.proofExecutionEntrypoint.cutoverStableOperationsRunbook
       : null;
   return normalizeStableOperationsTransitionShortcut({
     status: transitionAction.status || null,
@@ -24415,9 +24422,21 @@ function getStableOperationsTransitionShortcutFromOperatorEntry(launchOperations
     requiredChecks: Array.isArray(transitionAction.requiredChecks) ? transitionAction.requiredChecks.slice() : [],
     operatorOrder: Array.isArray(transitionAction.operatorOrder) ? transitionAction.operatorOrder.slice() : [],
     launchDutyRecordIndexPath: transitionAction.launchDutyRecordIndexPath || entry?.launchDutyRecordIndexPath || null,
+    cutoverStableOperationsRunbook,
     packetReviewBridge: transitionAction.packetReviewBridge || null,
     nextAction: transitionAction.nextAction || operatorAction?.nextAction || null
   });
+}
+
+function getLaunchMainlineCutoverStableOperationsRunbook(payload = {}) {
+  const candidates = [
+    payload.mainlineSummary?.operatorQueueCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook,
+    payload.mainlineSummary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+      ?.operatorQueueCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook,
+    payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
+      ?.operatorQueueCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook
+  ];
+  return candidates.find((item) => item && typeof item === "object") || null;
 }
 
 function appendStableOperationsTransitionShortcutLines(lines = [], shortcut = null, {
@@ -24500,6 +24519,9 @@ function appendStableOperationsTransitionShortcutLines(lines = [], shortcut = nu
       title: packetReviewBridgeTitle
     });
   }
+  if (item.cutoverStableOperationsRunbook && typeof item.cutoverStableOperationsRunbook === "object") {
+    appendCutoverStableOperationsRunbookLines(lines, item.cutoverStableOperationsRunbook);
+  }
   lines.push(`- checks=${requiredChecks || "-"}`);
   lines.push(`Stable Operations Transition Shortcut Next: ${item.nextAction || "-"}`);
   if (Array.isArray(item.operatorOrder) && item.operatorOrder.length) {
@@ -24528,7 +24550,49 @@ function getDeveloperLaunchMainlineStableOperationsTransitionReview(payload = {}
       : getStableOperationsTransitionShortcutFromOperatorEntry(
           payload.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry
         );
-  return normalizeStableOperationsTransitionReview(shortcut);
+  const review = normalizeStableOperationsTransitionReview(shortcut);
+  const cutoverStableOperationsRunbook = getLaunchMainlineCutoverStableOperationsRunbook(payload);
+  return review && cutoverStableOperationsRunbook
+    ? {
+        ...review,
+        cutoverStableOperationsRunbook
+      }
+    : review;
+}
+
+function appendCutoverStableOperationsRunbookLines(lines = [], runbook = null, {
+  title = "Cutover Stable Operations Runbook:"
+} = {}) {
+  if (!Array.isArray(lines) || !runbook || typeof runbook !== "object") {
+    return false;
+  }
+  const fixedActions = Array.isArray(runbook.fixedActions)
+    ? runbook.fixedActions
+        .filter((item) => item && typeof item === "object")
+        .map((item) => `${item.order || "-"}.${item.key || "-"}`)
+        .join(" -> ")
+    : "";
+  const proofAction = Array.isArray(runbook.fixedActions) ? runbook.fixedActions[0] || null : null;
+  const stableAction = Array.isArray(runbook.fixedActions) ? runbook.fixedActions[1] || null : null;
+  lines.push(title);
+  lines.push(
+    `- status=${runbook.status || "-"}`
+    + ` | readyForCutoverWatch=${runbook.readyForCutoverWatch === true ? "yes" : "no"}`
+    + ` | stableAction=${runbook.stableTransitionActionKey || stableAction?.actionKey || "-"}`
+    + ` | steadyStateHref=${runbook.steadyStateHandoffHref || "-"}`
+  );
+  lines.push(
+    `- proof=${runbook.currentProofItemKey || "-"}`
+    + ` | remainingProof=${runbook.remainingProofCount ?? "-"}`
+    + ` | recordIndex=${runbook.launchDutyRecordIndexPath || "-"}`
+  );
+  lines.push(`- fixedActions=${fixedActions || "-"}`);
+  lines.push(
+    `- commands=proof=${proofAction?.command || "-"}`
+    + ` | stable=${runbook.stableTransitionCommand || stableAction?.command || "-"}`
+  );
+  lines.push(`- nextAction=${runbook.nextAction || "-"}`);
+  return true;
 }
 
 function appendStableOperationsTransitionReviewLines(lines = [], review = null, {
@@ -24589,6 +24653,9 @@ function appendStableOperationsTransitionReviewLines(lines = [], review = null, 
         "Stable Operations Packet Review Bridge:"
       )
     });
+  }
+  if (item.cutoverStableOperationsRunbook && typeof item.cutoverStableOperationsRunbook === "object") {
+    appendCutoverStableOperationsRunbookLines(lines, item.cutoverStableOperationsRunbook);
   }
   lines.push(`Stable Operations Transition Review Checks: checks=${requiredChecks || "-"}`);
   lines.push(`Stable Operations Transition Review Next: ${item.nextAction || "-"}`);
@@ -29539,6 +29606,7 @@ function getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload = {}
     || tail.recordIndexFile
     || firstWaveCloseoutReadback?.launchDutyRecordIndexPath
     || null;
+  const cutoverStableOperationsRunbook = getLaunchMainlineCutoverStableOperationsRunbook(payload);
   return {
     mode: "developer-launch-mainline-stable-operations-handoff-execution",
     status: tail.status || firstWaveCloseoutReadback?.status || null,
@@ -29585,6 +29653,7 @@ function getDeveloperLaunchMainlineStableOperationsHandoffExecution(payload = {}
     requiredConfirmationPoints,
     handoffArtifacts,
     actions,
+    ...(cutoverStableOperationsRunbook ? { cutoverStableOperationsRunbook } : {}),
     refreshAfterHandoff: currentPacket?.refreshAfterHandoff || firstWaveCloseoutReadback?.refreshAfterWrite || null,
     nextAction: readbackPacket?.nextAction || tail.nextAction || firstWaveCloseoutReadback?.nextAction || null
   };
@@ -29658,6 +29727,9 @@ function appendStableOperationsHandoffExecutionLines(lines = [], execution = nul
     + ` | status=${execution.refreshAfterHandoff?.status || "-"}`
     + ` | audit=${execution.refreshAfterHandoff?.confirmationAuditLogId || "-"}`
   );
+  if (execution.cutoverStableOperationsRunbook && typeof execution.cutoverStableOperationsRunbook === "object") {
+    appendCutoverStableOperationsRunbookLines(lines, execution.cutoverStableOperationsRunbook);
+  }
   lines.push(`Stable Operations Handoff Execution Next: ${execution.nextAction || "-"}`);
   return true;
 }
@@ -53100,6 +53172,7 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
   currentAction = null,
   launchDutyStableOperationsTransitionAction = null,
   launchDutySteadyStateHandoffLanding = null,
+  steadyStateHandoffFallbackHref = null,
   firstOperatingResultExecutionSummary = null,
   launchEvidenceReadinessGate = null,
   productionSwitchProofPacket = null
@@ -53124,6 +53197,10 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
   const launchEvidenceGate = launchEvidenceReadinessGate
     && typeof launchEvidenceReadinessGate === "object"
       ? launchEvidenceReadinessGate
+      : null;
+  const stableOperationsHandoff = launchEvidenceGate?.stableOperationsHandoff
+    && typeof launchEvidenceGate.stableOperationsHandoff === "object"
+      ? launchEvidenceGate.stableOperationsHandoff
       : null;
   const switchProofPacket = productionSwitchProofPacket
     && typeof productionSwitchProofPacket === "object"
@@ -53198,13 +53275,22 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
         || action?.executionPlan?.receiptPlan?.route
         || action?.href
         || null,
-      stableTransitionActionKey: stableTransition?.currentActionKey || null,
-      stableTransitionCommand: stableTransition?.currentCommand
+      stableTransitionActionKey: stableOperationsHandoff?.currentActionKey
+        || stableTransition?.currentActionKey
+        || null,
+      stableTransitionCommand: stableOperationsHandoff?.currentCommand
+        || stableTransition?.currentCommand
         || stableTransition?.operatorAction?.command
         || null,
       stableTransitionNextDownloadHref: stableTransition?.nextDownloadHref || null,
       steadyStateHandoffActionKey: steadyStateHandoff?.actionKey || null,
-      steadyStateHandoffHref: steadyStateHandoff?.href || null,
+      steadyStateHandoffHref: steadyStateHandoff?.href
+        || stableTransition?.landingHref
+        || (stableTransition?.nextDownloadFormat === "steady-state-handoff-brief"
+          ? stableTransition.nextDownloadHref
+          : null)
+        || steadyStateHandoffFallbackHref
+        || null,
       nextAction: stableTransition?.nextAction
         || steadyStateHandoff?.nextAction
         || receiptReview?.nextAction
@@ -53960,6 +54046,15 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     currentAction,
     launchDutyStableOperationsTransitionAction,
     launchDutySteadyStateHandoffLanding,
+    steadyStateHandoffFallbackHref: buildLaunchWorkflowDownloadHref(
+      "developer-ops",
+      "steady-state-handoff-brief",
+      {
+        productCode,
+        channel,
+        limit: 80
+      }
+    ),
     firstOperatingResultExecutionSummary: launchOperationsOverviewStatus?.firstOperatingResultExecutionSummary || null,
     launchEvidenceReadinessGate,
     productionSwitchProofPacket: launchEvidenceReadinessGate?.productionSwitchProofPacket || null

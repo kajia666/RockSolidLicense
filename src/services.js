@@ -49293,7 +49293,10 @@ function buildDeveloperOpsOperatorRequestTemplate({
 function buildLaunchSurfaceReviewCloseoutOperatorExecutionSummary({
   status = "unknown",
   currentActionKey = null,
-  actions = []
+  actions = [],
+  readbackAction = null,
+  readbackExpected = [],
+  failureHintKeys = []
 } = {}) {
   const queue = Array.isArray(actions)
     ? actions.filter((item) => item && typeof item === "object" && item.key)
@@ -49328,6 +49331,17 @@ function buildLaunchSurfaceReviewCloseoutOperatorExecutionSummary({
     requestTemplate?.bearerTokenEnv || null
   ].filter(Boolean);
   const readyActionCount = queue.filter((item) => isReadyOrClosed(item)).length;
+  const readback = readbackAction && typeof readbackAction === "object"
+    ? {
+        key: "refresh_developer_ops_overview_after_current_action",
+        afterActionKey: currentAction?.key || null,
+        method: readbackAction.method || readbackAction.requestTemplate?.method || "GET",
+        route: readbackAction.route || readbackAction.requestTemplate?.route || null,
+        href: readbackAction.href || readbackAction.requestTemplate?.href || null,
+        command: readbackAction.command || readbackAction.requestTemplate?.powershell || null,
+        expected: Array.isArray(readbackExpected) ? readbackExpected.filter(Boolean) : []
+      }
+    : null;
   return {
     version: "developer-ops-launch-operations-surface-closeout-operator-execution-summary/v1",
     status,
@@ -49342,6 +49356,8 @@ function buildLaunchSurfaceReviewCloseoutOperatorExecutionSummary({
     completedActionKeys,
     blockedActionKeys,
     nextBlockedActionKey: blockedActionKeys[0] || null,
+    postCommandReadback: readback,
+    failureHintKeys: Array.isArray(failureHintKeys) ? failureHintKeys.filter(Boolean) : [],
     launchDutyRecordIndexPath: currentAction?.launchDutyRecordIndexPath || null,
     nextAction: blockedActionKeys.length
       ? `Run ${currentAction?.key || "the current action"} before continuing to ${blockedActionKeys[0]}.`
@@ -49775,7 +49791,20 @@ function buildDeveloperOpsLaunchOperationsOperatorReceiptVisibilityConfirmationQ
   const launchSurfaceReviewCloseoutOperatorExecutionSummary = buildLaunchSurfaceReviewCloseoutOperatorExecutionSummary({
     status: queueStatus,
     currentActionKey: closeoutCurrentActionKey,
-    actions: launchSurfaceReviewCloseoutOperatorNextActions
+    actions: launchSurfaceReviewCloseoutOperatorNextActions,
+    readbackAction: launchSurfaceReviewCloseoutOperatorNextActions.find((item) => item.key === "refresh_developer_ops_overview"),
+    readbackExpected: [
+      "handoffConfirmed=true",
+      "manualCheckpointProgress=2/2",
+      "queueStatus=ready_for_launch_duty_handoff",
+      "currentActionKey=handoff_launch_duty_to_post_signoff"
+    ],
+    failureHintKeys: [
+      "receipt_visibility_parity",
+      "support_inspection_confirmation",
+      "first_wave_handoff_confirmation",
+      "developer_ops_overview_refresh"
+    ]
   });
   const launchSurfaceReviewCloseoutAction = {
     version: "developer-ops-launch-operations-launch-surface-review-closeout-action/v1",
@@ -65324,6 +65353,27 @@ function appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(lines = [], ac
       + ` | nextBlocked=${summary.nextBlockedActionKey || "-"}`
       + ` | launchDutyRecordIndex=${summary.launchDutyRecordIndexPath || "-"}`
     );
+    const readback = summary.postCommandReadback && typeof summary.postCommandReadback === "object"
+      ? summary.postCommandReadback
+      : null;
+    if (readback) {
+      const readbackTitle = summaryTitle.replace(/Operator Execution Summary:?$/u, "Operator Readback:");
+      lines.push(readbackTitle);
+      lines.push(
+        `- after=${readback.afterActionKey || summary.currentActionKey || "-"}`
+        + ` | method=${readback.method || "-"}`
+        + ` | href=${readback.href || readback.route || "-"}`
+      );
+      lines.push(
+        `- command=${readback.command || "-"}`
+        + ` | expects=${Array.isArray(readback.expected) && readback.expected.length
+          ? readback.expected.join(",")
+          : "-"}`
+        + ` | failureHints=${Array.isArray(summary.failureHintKeys) && summary.failureHintKeys.length
+          ? summary.failureHintKeys.join(",")
+          : "-"}`
+      );
+    }
   }
 }
 

@@ -33864,6 +33864,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateHandoff.summaryText,
       /Launch Mainline Surface Review Closeout:[\s\S]*Review Downloads:[\s\S]*launch_review_summary[^\n]*launch-review\.txt[\s\S]*launch_smoke_summary[^\n]*launch-smoke-kit\.txt/
     );
+    assert.match(launchMainlineSteadyStateHandoff.summaryText, /Launch Mainline Surface Review Closeout Operator Next Actions:/);
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout Operator Next Actions:[\s\S]*1\. review_launch_review_summary \| kind=download \| status=aligned \| ready=yes \| target=.*\/api\/developer\/launch-review\/download\?.*format=summary/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout Operator Next Actions:[\s\S]*2\. review_launch_smoke_summary \| kind=download \| status=aligned \| ready=yes \| target=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout Operator Next Actions:[\s\S]*3\. confirm_first_wave_handoff \| kind=api \| status=[^|]+ \| ready=(yes|no) \| target=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout Operator Next Actions:[\s\S]*4\. refresh_developer_ops_overview \| kind=api \| status=[^|]+ \| ready=(yes|no) \| target=GET \/api\/developer\/ops\/export\?productCode=EXPORT_CLOSEOUT_READY&channel=stable/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout Operator Next Actions:[\s\S]*5\. handoff_launch_duty_to_post_signoff \| kind=handoff \| status=[^|]+ \| ready=(yes|no)/
+    );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
       /Mainline Action Plan:[\s\S]*Open steady-state handoff brief[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
@@ -34496,6 +34517,27 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       primaryRouteReviewDownload.body,
       /Surface Review Closeout Bridge:[\s\S]*stableTransitionReceiptReviewFile=[^\n]*\| stableTransitionReceiptReviewHref=[^\n]*\| stableTransitionReceiptReviewVisibility=[^\n]*\| stableTransitionReceiptReviewNext=[^\n]*/
+    );
+    assert.match(primaryRouteReviewDownload.body, /Surface Review Closeout Bridge Operator Next Actions:/);
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge Operator Next Actions:[\s\S]*1\. review_launch_review_summary \| kind=download \| status=aligned \| ready=yes \| target=.*\/api\/developer\/launch-review\/download\?.*format=summary/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge Operator Next Actions:[\s\S]*2\. review_launch_smoke_summary \| kind=download \| status=aligned \| ready=yes \| target=.*\/api\/developer\/launch-smoke-kit\/download\?.*format=summary/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge Operator Next Actions:[\s\S]*3\. confirm_first_wave_handoff \| kind=api \| status=[^|]+ \| ready=(yes|no) \| target=POST \/api\/developer\/ops\/first-wave\/recommendations\/confirm/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge Operator Next Actions:[\s\S]*4\. refresh_developer_ops_overview \| kind=api \| status=[^|]+ \| ready=(yes|no) \| target=GET \/api\/developer\/ops\/export\?productCode=EXPORT_ALPHA&channel=(beta|stable)/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge Operator Next Actions:[\s\S]*5\. handoff_launch_duty_to_post_signoff \| kind=handoff \| status=[^|]+ \| ready=(yes|no)/
     );
 
     const nextRouteReviewDownload = await getText(

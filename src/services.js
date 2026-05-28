@@ -25396,6 +25396,11 @@ function buildDeveloperLaunchMainlineSummaryText(payload = {}) {
         );
       }
     }
+    appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(
+      lines,
+      launchSurfaceReviewCloseoutAction.operatorNextActions,
+      { title: "Launch Mainline Surface Review Closeout Operator Next Actions:" }
+    );
     if (operatorOrder.length) {
       lines.push("Operator Order:");
       for (const item of operatorOrder) {
@@ -67601,6 +67606,11 @@ function appendRouteReviewSurfaceCloseoutBridgeText(lines = [], payload = {}) {
       );
     }
   }
+  appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(
+    lines,
+    launchSurfaceReviewCloseoutAction.operatorNextActions,
+    { title: "Surface Review Closeout Bridge Operator Next Actions:" }
+  );
   if (operatorOrder.length) {
     lines.push("Surface Review Closeout Operator Order:");
     for (const item of operatorOrder) {

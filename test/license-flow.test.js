@@ -12425,6 +12425,20 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemReadinessRefreshCommand || "",
       /npm\.cmd run staging:readiness:status/
     );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemCompletionSequence?.map((item) => [
+        item.proofItemKey,
+        item.completionTargetKey,
+        item.completionQueueKey
+      ]),
+      [
+        ["backup_restore_drill", "backup_restore_drill_result", "backup_restore_drill_result_backfill"],
+        ["live_write_smoke", "live_write_smoke_result", "live_write_smoke_result_backfill"],
+        ["full_test_window", "full_test_window_passed", "full_test_window_passed_backfill"],
+        ["production_signoff_and_receipts", "production_signoff_packet", "production_signoff_packet_backfill"],
+        ["launch_day_watch_and_stabilization", "first_wave_closeout", "first_wave_closeout_record"]
+      ]
+    );
     const runtimeEvidenceReviewCutoverTriageAction = runtimeEvidenceLaunchReview.reviewSummary.actionPlan.find((item) =>
       item.key === "launch_review_cutover_triage_checkpoint"
     );
@@ -12728,6 +12742,20 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemReadinessRefreshCommand || "",
       /npm\.cmd run staging:readiness:status/
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.proofItemCompletionSequence?.map((item) => [
+        item.proofItemKey,
+        item.completionTargetKey,
+        item.completionQueueKey
+      ]),
+      [
+        ["backup_restore_drill", "backup_restore_drill_result", "backup_restore_drill_result_backfill"],
+        ["live_write_smoke", "live_write_smoke_result", "live_write_smoke_result_backfill"],
+        ["full_test_window", "full_test_window_passed", "full_test_window_passed_backfill"],
+        ["production_signoff_and_receipts", "production_signoff_packet", "production_signoff_packet_backfill"],
+        ["launch_day_watch_and_stabilization", "first_wave_closeout", "first_wave_closeout_record"]
+      ]
     );
     const runtimeEvidenceSmokeCutoverTriageAction = runtimeEvidenceLaunchSmoke.smokeSummary.actionPlan.find((item) =>
       item.key === "launch_smoke_cutover_triage_checkpoint"
@@ -23467,6 +23495,58 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           proofItemCompletionCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
           proofItemReadinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
           proofItemRehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+          proofItemCompletionSequence: [
+            {
+              order: 1,
+              proofItemKey: "backup_restore_drill",
+              proofItemStatus: "blocked_after_readiness_status",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt",
+              completionTargetKey: "backup_restore_drill_result",
+              completionQueueKey: "backup_restore_drill_result_backfill",
+              completionCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 2,
+              proofItemKey: "live_write_smoke",
+              proofItemStatus: "blocked_after_route_map_gate",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json",
+              completionTargetKey: "live_write_smoke_result",
+              completionQueueKey: "live_write_smoke_result_backfill",
+              completionCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key live_write_smoke_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json --receipt-id <record_launch_rehearsal_run-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 3,
+              proofItemKey: "full_test_window",
+              proofItemStatus: "ready_local_baseline_available",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt",
+              completionTargetKey: "full_test_window_passed",
+              completionQueueKey: "full_test_window_passed_backfill",
+              completionCommand: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt --decision ready-for-production-signoff --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 4,
+              proofItemKey: "production_signoff_and_receipts",
+              proofItemStatus: "blocked_after_full_test_signoff_backfill",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+              completionTargetKey: "production_signoff_packet",
+              completionQueueKey: "production_signoff_packet_backfill",
+              completionCommand: null,
+              readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            },
+            {
+              order: 5,
+              proofItemKey: "launch_day_watch_and_stabilization",
+              proofItemStatus: "blocked_after_production_signoff_readiness",
+              artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md",
+              completionTargetKey: "first_wave_closeout",
+              completionQueueKey: "first_wave_closeout_record",
+              completionCommand: "npm.cmd run staging:launch-duty:record -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key launch_day_watch_summary --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-duty-record-index.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+              readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md"
+            }
+          ],
           readyForCutoverWatch: false,
           recommendedDownloadFormat: "production-switch-proof-packet",
           nextAction: "Run the current production-switch proof command, then refresh Launch Review and Launch Smoke."

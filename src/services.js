@@ -59597,57 +59597,113 @@ function selectProductionSwitchProofExecutionItem(proofPacket = null, {
   ) || proofItems.find((item) => !isProductionSwitchProofItemReady(item)) || proofItems[0] || null;
 }
 
-function buildProductionSwitchProofItemCompletionTarget(proofItem = null, proofPacket = null) {
-  if (!proofItem || typeof proofItem !== "object") {
-    return null;
-  }
+function getProductionSwitchProofItemCompletionSpec(proofItemKey = "") {
   const completionSpecs = {
     backup_restore_drill: {
       targetKey: "backup_restore_drill_result",
       queueKey: "backup_restore_drill_result_backfill",
+      commandMode: "closeout_backfill",
       receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"]
     },
     live_write_smoke: {
       targetKey: "live_write_smoke_result",
       queueKey: "live_write_smoke_result_backfill",
+      commandMode: "closeout_backfill",
       receiptOperations: ["<record_launch_rehearsal_run-receipt-id>"]
     },
     full_test_window: {
       targetKey: "full_test_window_passed",
       queueKey: "full_test_window_passed_backfill",
-      receiptOperations: ["<full-test-window-receipt-id>"]
+      commandMode: "signoff_backfill",
+      decision: "ready-for-production-signoff"
     },
     production_signoff_and_receipts: {
       targetKey: "production_signoff_packet",
       queueKey: "production_signoff_packet_backfill",
-      receiptOperations: ["<production-signoff-receipt-id>"]
+      commandMode: "reuse_proof_item_command"
     },
     launch_day_watch_and_stabilization: {
       targetKey: "first_wave_closeout",
       queueKey: "first_wave_closeout_record",
-      receiptOperations: ["<first-wave-closeout-receipt-id>"]
+      commandMode: "launch_duty_record",
+      launchDutyRecordKey: "launch_day_watch_summary",
+      receiptOperations: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
     }
   };
-  const spec = completionSpecs[proofItem.key] || null;
-  if (!spec) {
-    return null;
-  }
+  return completionSpecs[proofItemKey] || null;
+}
+
+function buildProductionSwitchProofItemCompletionContext(proofPacket = null) {
   const closeoutInputFile = proofPacket?.closeoutInputFile || extractCommandOptionValue(proofPacket?.currentCommand, "input-file") || null;
   const readinessActionQueueFile = proofPacket?.readinessActionQueueFile
     || extractCommandOptionValue(proofPacket?.currentCommand, "actions-file")
     || null;
+  const launchDutyRecordIndexFile = proofPacket?.launchDutyRecordIndexFile || null;
+  return {
+    closeoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexFile
+  };
+}
+
+function buildProductionSwitchProofItemCompletionCommand({
+  proofItem = null,
+  spec = null,
+  completionContext = null
+} = {}) {
+  if (!proofItem || typeof proofItem !== "object" || !spec || typeof spec !== "object") {
+    return proofItem?.command || null;
+  }
+  const context = completionContext && typeof completionContext === "object"
+    ? completionContext
+    : {};
+  const closeoutInputFile = context.closeoutInputFile || null;
+  const readinessActionQueueFile = context.readinessActionQueueFile || null;
+  const launchDutyRecordIndexFile = context.launchDutyRecordIndexFile || null;
   const artifactPath = proofItem.artifactPath || null;
   const receiptArgs = Array.isArray(spec.receiptOperations) && spec.receiptOperations.length
     ? spec.receiptOperations.map((receiptId) => ` --receipt-id ${receiptId}`).join("")
     : "";
-  const completionCommand = spec.targetKey && closeoutInputFile && readinessActionQueueFile && artifactPath
-    ? `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key ${spec.targetKey} --value-json <redacted-json> --artifact-path ${artifactPath}${receiptArgs} --actions-file ${readinessActionQueueFile}`
-    : proofItem.command || null;
-  const readinessRefreshCommand = closeoutInputFile && readinessActionQueueFile
-    ? `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${readinessActionQueueFile}`
+  if (spec.commandMode === "closeout_backfill") {
+    if (spec.targetKey && closeoutInputFile && readinessActionQueueFile && artifactPath) {
+      return `npm.cmd run staging:closeout:backfill -- --input-file ${closeoutInputFile} --key ${spec.targetKey} --value-json <redacted-json> --artifact-path ${artifactPath}${receiptArgs} --actions-file ${readinessActionQueueFile}`;
+    }
+    return proofItem.command || null;
+  }
+  if (spec.commandMode === "signoff_backfill") {
+    if (spec.targetKey && closeoutInputFile && readinessActionQueueFile && artifactPath) {
+      return `npm.cmd run staging:signoff:backfill -- --input-file ${closeoutInputFile} --condition-key ${spec.targetKey} --value-json <redacted-json> --artifact-path ${artifactPath} --decision ${spec.decision || "ready-for-production-signoff"} --actions-file ${readinessActionQueueFile}`;
+    }
+    return proofItem.command || null;
+  }
+  if (spec.commandMode === "launch_duty_record") {
+    if (spec.launchDutyRecordKey && closeoutInputFile && readinessActionQueueFile && launchDutyRecordIndexFile && artifactPath) {
+      return `npm.cmd run staging:launch-duty:record -- --closeout-input-file ${closeoutInputFile} --key ${spec.launchDutyRecordKey} --artifact-path ${artifactPath} --value-json <redacted-json>${receiptArgs} --record-index-file ${launchDutyRecordIndexFile} --actions-file ${readinessActionQueueFile}`;
+    }
+    return proofItem.command || null;
+  }
+  return proofItem.command || null;
+}
+
+function buildProductionSwitchProofItemCompletionTarget(proofItem = null, proofPacket = null) {
+  if (!proofItem || typeof proofItem !== "object") {
+    return null;
+  }
+  const spec = getProductionSwitchProofItemCompletionSpec(proofItem.key);
+  if (!spec) {
+    return null;
+  }
+  const completionContext = buildProductionSwitchProofItemCompletionContext(proofPacket);
+  const completionCommand = buildProductionSwitchProofItemCompletionCommand({
+    proofItem,
+    spec,
+    completionContext
+  });
+  const readinessRefreshCommand = completionContext.closeoutInputFile && completionContext.readinessActionQueueFile
+    ? `npm.cmd run staging:readiness:status -- --input-file ${completionContext.closeoutInputFile} --actions-file ${completionContext.readinessActionQueueFile}`
     : proofPacket?.currentCommand || null;
-  const rehearsalReloadCommand = closeoutInputFile
-    ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`
+  const rehearsalReloadCommand = completionContext.closeoutInputFile
+    ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${completionContext.closeoutInputFile}`
     : proofItem.command || null;
   return {
     targetKey: spec.targetKey,
@@ -59656,6 +59712,39 @@ function buildProductionSwitchProofItemCompletionTarget(proofItem = null, proofP
     readinessRefreshCommand,
     rehearsalReloadCommand
   };
+}
+
+function buildProductionSwitchProofItemCompletionSequence(proofPacket = null) {
+  const proofItems = Array.isArray(proofPacket?.proofItems) ? proofPacket.proofItems : [];
+  if (!proofItems.length) {
+    return [];
+  }
+  const completionContext = buildProductionSwitchProofItemCompletionContext(proofPacket);
+  const readinessRefreshCommand = completionContext.closeoutInputFile && completionContext.readinessActionQueueFile
+    ? `npm.cmd run staging:readiness:status -- --input-file ${completionContext.closeoutInputFile} --actions-file ${completionContext.readinessActionQueueFile}`
+    : proofPacket?.currentCommand || null;
+  const sequence = [];
+  for (const item of proofItems) {
+    const spec = getProductionSwitchProofItemCompletionSpec(item?.key || "");
+    if (!spec) {
+      continue;
+    }
+    sequence.push({
+      order: sequence.length + 1,
+      proofItemKey: item?.key || null,
+      proofItemStatus: item?.status || null,
+      artifactPath: item?.artifactPath || null,
+      completionTargetKey: spec.targetKey || null,
+      completionQueueKey: spec.queueKey || null,
+      completionCommand: buildProductionSwitchProofItemCompletionCommand({
+        proofItem: item,
+        spec,
+        completionContext
+      }),
+      readinessRefreshCommand
+    });
+  }
+  return sequence;
 }
 
 function buildLaunchCutoverTriageProofExecutionEntrypoint({
@@ -59683,6 +59772,7 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     readyForCutoverWatch
   });
   const proofItemCompletionTarget = buildProductionSwitchProofItemCompletionTarget(proofItem, proofPacket);
+  const proofItemCompletionSequence = buildProductionSwitchProofItemCompletionSequence(proofPacket);
   return {
     mode: "production-switch-proof-execution-entrypoint/v1",
     status: proofStatus,
@@ -59700,6 +59790,7 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
     proofItemCompletionCommand: proofItemCompletionTarget?.command || null,
     proofItemReadinessRefreshCommand: proofItemCompletionTarget?.readinessRefreshCommand || null,
     proofItemRehearsalReloadCommand: proofItemCompletionTarget?.rehearsalReloadCommand || null,
+    proofItemCompletionSequence: proofItemCompletionSequence.length ? proofItemCompletionSequence : null,
     readyForCutoverWatch,
     recommendedDownloadFormat: "production-switch-proof-packet",
     nextAction: readyForCutoverWatch
@@ -59923,6 +60014,16 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
     + ` | proofStatus=${checkpoint.proofExecutionEntrypoint?.proofItemStatus || "-"}`
     + ` | proofArtifact=${checkpoint.proofExecutionEntrypoint?.proofItemArtifactPath || "-"}`
     + ` | proofCommand=${checkpoint.proofExecutionEntrypoint?.proofItemCommand || "-"}`
+  );
+  const proofCompletionSequence = Array.isArray(checkpoint.proofExecutionEntrypoint?.proofItemCompletionSequence)
+    ? checkpoint.proofExecutionEntrypoint.proofItemCompletionSequence
+    : [];
+  lines.push(
+    `- proofItemCompletionSequence=${proofCompletionSequence.length
+      ? proofCompletionSequence.map((item) =>
+        `${item.order || "-"}:${item.proofItemKey || "-"}=>${item.completionQueueKey || "-"}`
+      ).join("; ")
+      : "-"}`
   );
   lines.push(`- launchDutyRecordIndex=${checkpoint.launchDutyRecordIndexPath || "-"}`);
   lines.push(`- cutoverTriageNextAction=${checkpoint.nextAction || "-"}`);
@@ -66497,6 +66598,16 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | proofStatus=${checkpoint.proofExecutionEntrypoint?.proofItemStatus || "-"}`
     + ` | proofArtifact=${checkpoint.proofExecutionEntrypoint?.proofItemArtifactPath || "-"}`
     + ` | proofCommand=${checkpoint.proofExecutionEntrypoint?.proofItemCommand || "-"}`
+  );
+  const proofCompletionSequence = Array.isArray(checkpoint.proofExecutionEntrypoint?.proofItemCompletionSequence)
+    ? checkpoint.proofExecutionEntrypoint.proofItemCompletionSequence
+    : [];
+  lines.push(
+    `- proofItemCompletionSequence=${proofCompletionSequence.length
+      ? proofCompletionSequence.map((item) =>
+        `${item.order || "-"}:${item.proofItemKey || "-"}=>${item.completionQueueKey || "-"}`
+      ).join("; ")
+      : "-"}`
   );
   lines.push(`- launchCutoverTriage=${checkpoint.launchCutoverTriageStatus || "-"}`);
   lines.push(

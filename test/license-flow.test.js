@@ -23223,6 +23223,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(launchOperationsOperatorEntry.status, launchOperationsOverviewStatus.status);
     assert.equal(launchOperationsOperatorEntry.receiptVisibilityStatus, launchOperationsOverviewStatus.receiptVisibilityStatus);
     assert.equal(launchOperationsOperatorEntry.launchDutyRecordIndexPath, expectedSteadyStateLaunchDutyRecordIndexPath);
+    assert.ok(launchOperationsOverviewStatus.firstOperatingResultExecutionSummary);
     assert.deepEqual(
       launchOperationsOperatorEntry.operatorQueueCheckpoint,
       {
@@ -23258,6 +23259,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         steadyStateDutyReceiptReviewAction: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.action || null,
         steadyStateDutyReceiptReviewFormat: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.format || null,
         steadyStateDutyReceiptReviewHref: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.href || null,
+        firstOperatingResultExecutionStatus: launchOperationsOverviewStatus.firstOperatingResultExecutionSummary?.status || null,
+        firstOperatingResultExecutionLane: launchOperationsOverviewStatus.firstOperatingResultExecutionSummary?.currentLane || null,
+        firstOperatingResultExecutionReady: launchOperationsOverviewStatus.firstOperatingResultExecutionSummary?.ready === true,
+        firstOperatingResultExecutionCurrentActionKey: launchOperationsOverviewStatus.firstOperatingResultExecutionSummary?.currentActionKey || null,
+        firstOperatingResultExecutionReadbackActionKey:
+          launchOperationsOverviewStatus.firstOperatingResultExecutionSummary?.postCommandReadback?.expectedCurrentActionKey || null,
+        firstOperatingResultExecutionContinuationActionKey:
+          launchOperationsOverviewStatus.firstOperatingResultExecutionSummary?.handoffContinuation?.actionKey || null,
+        firstOperatingResultExecutionNextDownloadFormat:
+          launchOperationsOverviewStatus.firstOperatingResultExecutionSummary?.nextDownloadFormat || null,
+        firstOperatingResultExecutionLaunchDutyRecordIndexPath:
+          launchOperationsOverviewStatus.firstOperatingResultExecutionSummary?.launchDutyRecordIndexPath || null,
         nextAction: launchOperationsOperatorEntry.launchDutyStableOperationsTransitionAction?.nextAction
           || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.nextAction
           || launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.steadyStateDutyReceiptReviewAction?.nextAction
@@ -23275,6 +23288,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*steadyStateDutyReceiptReview=/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*firstOperatingResultExecution=/
     );
     const launchEvidenceReadinessGate = launchOperationsOperatorEntry.launchEvidenceReadinessGate;
     assert.deepEqual(
@@ -26648,6 +26665,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*currentPhase=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*steadyStateHandoff=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*steadyStateDutyReceiptReview=/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*firstOperatingResultExecution=/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*currentEvidence=route_map_gate_result/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:[\s\S]*fullTest=npm\.cmd test/);

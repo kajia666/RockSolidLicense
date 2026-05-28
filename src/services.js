@@ -53009,7 +53009,8 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
   launchDutyRecordIndexPath = null,
   currentAction = null,
   launchDutyStableOperationsTransitionAction = null,
-  launchDutySteadyStateHandoffLanding = null
+  launchDutySteadyStateHandoffLanding = null,
+  firstOperatingResultExecutionSummary = null
 } = {}) {
   const stableTransition = launchDutyStableOperationsTransitionAction
     && typeof launchDutyStableOperationsTransitionAction === "object"
@@ -53024,6 +53025,10 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       ? steadyStateHandoff.steadyStateDutyReceiptReviewAction
       : null;
   const action = currentAction && typeof currentAction === "object" ? currentAction : null;
+  const firstOperatingResultExecution = firstOperatingResultExecutionSummary
+    && typeof firstOperatingResultExecutionSummary === "object"
+      ? firstOperatingResultExecutionSummary
+      : null;
   return {
     mode: "developer-ops-launch-operations-operator-queue-checkpoint/v1",
     status: stableTransition?.status
@@ -53065,6 +53070,20 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     steadyStateDutyReceiptReviewAction: receiptReview?.action || null,
     steadyStateDutyReceiptReviewFormat: receiptReview?.format || null,
     steadyStateDutyReceiptReviewHref: receiptReview?.href || null,
+    firstOperatingResultExecutionStatus: firstOperatingResultExecution?.status || null,
+    firstOperatingResultExecutionLane: firstOperatingResultExecution?.currentLane || null,
+    firstOperatingResultExecutionReady: firstOperatingResultExecution
+      ? firstOperatingResultExecution.ready === true
+      : null,
+    firstOperatingResultExecutionCurrentActionKey: firstOperatingResultExecution?.currentActionKey || null,
+    firstOperatingResultExecutionReadbackActionKey:
+      firstOperatingResultExecution?.postCommandReadback?.expectedCurrentActionKey || null,
+    firstOperatingResultExecutionContinuationActionKey:
+      firstOperatingResultExecution?.handoffContinuation?.actionKey || null,
+    firstOperatingResultExecutionNextDownloadFormat:
+      firstOperatingResultExecution?.nextDownloadFormat || null,
+    firstOperatingResultExecutionLaunchDutyRecordIndexPath:
+      firstOperatingResultExecution?.launchDutyRecordIndexPath || null,
     nextAction: stableTransition?.nextAction
       || steadyStateHandoff?.nextAction
       || receiptReview?.nextAction
@@ -53746,7 +53765,8 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchDutyRecordIndexPath,
     currentAction,
     launchDutyStableOperationsTransitionAction,
-    launchDutySteadyStateHandoffLanding
+    launchDutySteadyStateHandoffLanding,
+    firstOperatingResultExecutionSummary: launchOperationsOverviewStatus?.firstOperatingResultExecutionSummary || null
   });
   return {
     version: "developer-ops-launch-operations-operator-entry/v1",
@@ -65939,6 +65959,16 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | action=${checkpoint.steadyStateDutyReceiptReviewAction || "-"}`
     + ` | format=${checkpoint.steadyStateDutyReceiptReviewFormat || "-"}`
     + ` | href=${checkpoint.steadyStateDutyReceiptReviewHref || "-"}`
+  );
+  lines.push(
+    `- firstOperatingResultExecution=${checkpoint.firstOperatingResultExecutionStatus || "-"}`
+    + ` | lane=${checkpoint.firstOperatingResultExecutionLane || "-"}`
+    + ` | ready=${checkpoint.firstOperatingResultExecutionReady === true ? "yes" : checkpoint.firstOperatingResultExecutionReady === false ? "no" : "-"}`
+    + ` | current=${checkpoint.firstOperatingResultExecutionCurrentActionKey || "-"}`
+    + ` | readback=${checkpoint.firstOperatingResultExecutionReadbackActionKey || "-"}`
+    + ` | continuation=${checkpoint.firstOperatingResultExecutionContinuationActionKey || "-"}`
+    + ` | nextDownload=${checkpoint.firstOperatingResultExecutionNextDownloadFormat || "-"}`
+    + ` | launchDutyRecordIndex=${checkpoint.firstOperatingResultExecutionLaunchDutyRecordIndexPath || checkpoint.launchDutyRecordIndexPath || "-"}`
   );
   lines.push(`- nextAction=${checkpoint.nextAction || "-"}`);
   return true;

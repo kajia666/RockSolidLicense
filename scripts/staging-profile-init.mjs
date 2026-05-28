@@ -842,6 +842,142 @@ function buildOperatorQueueCheckpoint({
   };
 }
 
+const LAUNCH_EXECUTION_PHASES = [
+  {
+    key: "profile_and_closeout",
+    label: "Profile rehearsal and closeout init",
+    commandKeys: ["profile_rehearsal", "closeout_init", "readiness_status"]
+  },
+  {
+    key: "recovery_and_route_gate",
+    label: "Recovery drill and route-map gate",
+    commandKeys: [
+      "recovery_preflight",
+      "route_map_gate_dry_run",
+      "route_map_gate",
+      "route_map_gate_result_backfill",
+      "post_route_map_readiness_status"
+    ]
+  },
+  {
+    key: "live_write_smoke",
+    label: "No-write preflight, live-write smoke, and post-smoke closeout",
+    commandKeys: [
+      "staging_smoke_preflight",
+      "run_launch_smoke_staging",
+      "backfill_post_smoke_live_write_smoke_result",
+      "backfill_post_smoke_launch_smoke_handoff",
+      "backfill_post_smoke_launch_mainline_evidence_receipts",
+      "backfill_post_smoke_receipt_visibility_review",
+      "post_smoke_readiness_status"
+    ]
+  },
+  {
+    key: "full_test_window",
+    label: "Full-test window and local go-live baseline",
+    commandKeys: ["run_full_test_window", "backfill_full_test_window_passed", "post_full_test_readiness_status"]
+  },
+  {
+    key: "production_signoff_and_receipts",
+    label: "Production sign-off and receipt visibility",
+    commandKeys: [
+      "backfill_production_signoff_staging_artifacts_archived",
+      "backfill_production_signoff_launch_mainline_receipts_visible",
+      "backfill_production_signoff_launch_ops_overview_status_visible",
+      "backfill_production_signoff_backup_restore_drill_passed",
+      "backfill_production_signoff_rollback_path_confirmed",
+      "backfill_production_signoff_operator_signoff_recorded",
+      "backfill_receipt_visibility_launchMainline",
+      "backfill_receipt_visibility_launchReview",
+      "backfill_receipt_visibility_launchSmoke",
+      "backfill_receipt_visibility_developerOps",
+      "backfill_receipt_visibility_launchOpsOverviewStatus",
+      "post_production_signoff_readiness_status"
+    ]
+  },
+  {
+    key: "launch_day_watch_and_stabilization",
+    label: "Launch-day watch and stabilization records",
+    commandKeys: [
+      "record_launch_day_watch_summary",
+      "record_stabilization_receipt_visibility_snapshot",
+      "record_stabilization_first_wave_incident_log",
+      "record_stabilization_rollback_signal_review",
+      "record_stabilization_stabilization_owner_handoff",
+      "record_stabilization_first_wave_closeout"
+    ]
+  },
+  {
+    key: "stable_operations_handoff",
+    label: "Stable-operations handoff",
+    commandKeys: [
+      "post_first_wave_closeout_readiness_status",
+      "post_first_wave_closeout_rehearsal_reload",
+      "handoff_stable_operations"
+    ]
+  }
+];
+
+function buildLaunchExecutionPhasePlan({ operatorNextCommands }) {
+  const commandsByKey = new Map((operatorNextCommands || []).map((item) => [item.key, item]));
+  const phases = LAUNCH_EXECUTION_PHASES.map((definition, index) => {
+    const commands = definition.commandKeys
+      .map((key) => commandsByKey.get(key))
+      .filter(Boolean);
+    const currentCommand = commands.find((item) => item.status === "current") || null;
+    const firstBlockedCommand = commands.find((item) => item.status !== "current") || null;
+    const firstCommand = commands[0] || null;
+    const finalCommand = commands.at(-1) || null;
+    const currentCommandCount = commands.filter((item) => item.status === "current").length;
+    const blockedCommandCount = Math.max(commands.length - currentCommandCount, 0);
+    const nextCommand = currentCommand || firstBlockedCommand || firstCommand || {};
+
+    return {
+      order: index + 1,
+      key: definition.key,
+      label: definition.label,
+      status: currentCommand ? "current" : "blocked",
+      totalCommandCount: commands.length,
+      currentCommandCount,
+      blockedCommandCount,
+      commandKeys: commands.map((item) => item.key),
+      firstActionKey: firstCommand?.key || null,
+      currentActionKey: currentCommand?.key || null,
+      firstBlockedActionKey: firstBlockedCommand?.key || null,
+      currentCommand: currentCommand?.command || null,
+      nextCommand: nextCommand.command || null,
+      finalActionKey: finalCommand?.key || null,
+      nextAction: nextCommand.nextAction || null
+    };
+  });
+  const currentPhase = phases.find((phase) => phase.status === "current") || phases[0] || null;
+  const nextBlockedPhase = currentPhase
+    ? phases.find((phase) => phase.order > currentPhase.order && phase.status === "blocked")
+    : phases.find((phase) => phase.status === "blocked");
+  const currentCommand = currentPhase?.currentCommand
+    ? (operatorNextCommands || []).find((item) => item.command === currentPhase.currentCommand) || null
+    : null;
+  const currentPhaseCount = phases.filter((phase) => phase.status === "current").length;
+  const totalCommandCount = phases.reduce((sum, phase) => sum + phase.totalCommandCount, 0);
+
+  return {
+    mode: "staging-profile-launch-execution-phase-plan",
+    status: currentCommand?.key === "profile_rehearsal" ? "awaiting_profile_rehearsal" : "awaiting_operator_queue",
+    currentPhaseKey: currentPhase?.key || null,
+    currentActionKey: currentCommand?.key || null,
+    currentCommand: currentCommand?.command || null,
+    totalPhaseCount: phases.length,
+    currentPhaseCount,
+    blockedPhaseCount: Math.max(phases.length - currentPhaseCount, 0),
+    totalCommandCount,
+    nextBlockedPhaseKey: nextBlockedPhase?.key || null,
+    nextAction: currentPhase && nextBlockedPhase
+      ? `Complete the current ${currentPhase.key} phase, then continue with ${nextBlockedPhase.key}.`
+      : "Continue the current launch execution phase until the next generated command is unblocked.",
+    phases
+  };
+}
+
 function buildLaunchEvidenceItem({
   order,
   key,
@@ -1209,8 +1345,8 @@ function buildProductionSwitchProofPacket({
     launchDutyRecordIndexFile,
     localFullSuiteBaseline: {
       command: fullTestCommand,
-      status: "available_from_2026-05-27_full_suite_pass",
-      testCount: 192,
+      status: "available_from_2026-05-28_full_suite_pass",
+      testCount: 198,
       failureCount: 0,
       outputArtifact: fullTestOutputFile,
       nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
@@ -1243,6 +1379,25 @@ function writeOperatorQueueCheckpointPlain(checkpoint) {
       + `, stableOps=${checkpoint.queueCounts?.stableOperationsCommandCount ?? "-"}`
   );
   console.log(`Operator queue next milestone: ${checkpoint.nextMilestoneKey || "-"} -> ${checkpoint.nextMilestoneCommand || "-"}`);
+}
+
+function writeLaunchExecutionPhasePlanPlain(plan) {
+  if (!plan) {
+    return;
+  }
+  console.log(
+    `Launch execution phase plan: ${plan.status || "-"}`
+      + ` (current=${plan.currentPhaseKey || "-"}, phases=${plan.totalPhaseCount ?? "-"}`
+      + `, blocked=${plan.blockedPhaseCount ?? "-"}, commands=${plan.totalCommandCount ?? "-"})`
+  );
+  (plan.phases || []).forEach((phase) => {
+    console.log(
+      `Launch execution phase ${phase.order}. ${phase.key}: ${phase.status}`
+        + ` (commands=${phase.totalCommandCount ?? "-"}, blocked=${phase.blockedCommandCount ?? "-"}`
+        + `, current=${phase.currentActionKey || "-"}, next=${phase.currentActionKey || phase.firstBlockedActionKey || "-"})`
+    );
+  });
+  console.log(`Launch execution next action: ${plan.nextAction || "-"}`);
 }
 
 function writeLaunchEvidenceReadinessGatePlain(gate) {
@@ -1312,6 +1467,7 @@ function writeResult(result, json) {
       console.log(`Launch lane record index: ${files.launchDutyRecordIndexFile}`);
     }
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
+    writeLaunchExecutionPhasePlanPlain(result.launchExecutionPhasePlan);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     const currentCommand = result.operatorNextCommands?.find((item) => item.status === "current");
@@ -1646,6 +1802,9 @@ function main() {
       receiptVisibilityBackfillCommands,
       stabilizationRecordCommands
     });
+    const launchExecutionPhasePlan = buildLaunchExecutionPhasePlan({
+      operatorNextCommands
+    });
     const launchEvidenceReadinessGate = buildProfileLaunchEvidenceReadinessGate({
       nextCommand,
       closeoutInputFile,
@@ -1723,6 +1882,7 @@ function main() {
       postFirstWaveCloseoutRehearsalReloadCommand,
       stableOperationsHandoff: toPublicStableOperationsHandoff(stableOperationsHandoff),
       operatorQueueCheckpoint,
+      launchExecutionPhasePlan,
       launchEvidenceReadinessGate,
       productionSwitchProofPacket,
       launchDayWatchRecordCommand,

@@ -1549,8 +1549,8 @@ function buildStagingProductionSwitchProofPacket({
     launchDutyRecordIndexFile: launchDutyCompletionHandoff?.recordIndexFile || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
     localFullSuiteBaseline: {
       command: "npm.cmd test",
-      status: "available_from_2026-05-27_full_suite_pass",
-      testCount: 192,
+      status: "available_from_2026-05-28_full_suite_pass",
+      testCount: 198,
       failureCount: 0,
       outputArtifact: fullTestArtifact,
       nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."

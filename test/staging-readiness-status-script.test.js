@@ -600,8 +600,8 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.equal(output.productionSwitchProofPacket.launchDutyRecordIndexFile, "artifacts/staging/<productCode>/<channel>/launch-duty-record-index.json");
     assert.deepEqual(output.productionSwitchProofPacket.localFullSuiteBaseline, {
       command: "npm.cmd test",
-      status: "available_from_2026-05-27_full_suite_pass",
-      testCount: 192,
+      status: "available_from_2026-05-28_full_suite_pass",
+      testCount: 198,
       failureCount: 0,
       outputArtifact: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
       nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
@@ -745,7 +745,7 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(plain.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/<productCode>\/<channel>\/first-wave-closeout\.md/);
     assert.match(plain.stdout, /Launch evidence next action: Run command with real redacted evidence, then statusCommand to continue production sign-off\./);
     assert.match(plain.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=backfill_production_signoff\)/);
-    assert.match(plain.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt \(available_from_2026-05-27_full_suite_pass, tests=192, failures=0\)/);
+    assert.match(plain.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt \(available_from_2026-05-28_full_suite_pass, tests=198, failures=0\)/);
     assert.match(plain.stdout, /Production switch proof 4\. backup_restore_drill: ready_evidence_attached -> artifacts\/staging\/<productCode>\/<channel>\/backup-restore-drill\.txt/);
     assert.match(plain.stdout, /Production switch proof 7\. production_signoff_and_receipts: blocked_after_full_test_signoff_backfill -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
 

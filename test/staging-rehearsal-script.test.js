@@ -2516,8 +2516,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.productionSwitchProofPacket.launchDutyRecordIndexFile, "artifacts/staging/PROFILE_PRODUCT/stable/launch-duty-record-index.json");
     assert.deepEqual(output.productionSwitchProofPacket.localFullSuiteBaseline, {
       command: "npm.cmd test",
-      status: "available_from_2026-05-27_full_suite_pass",
-      testCount: 192,
+      status: "available_from_2026-05-28_full_suite_pass",
+      testCount: 198,
       failureCount: 0,
       outputArtifact: "artifacts/staging/PROFILE_PRODUCT/stable/full-test-output.txt",
       nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
@@ -2974,7 +2974,7 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Output archive entrypoint: launch_duty_archive_index \(written\) -> .*profile-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Output write next action: Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff\./);
     assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=set_required_secret_env\)/);
-    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/full-test-output\.txt \(available_from_2026-05-27_full_suite_pass, tests=192, failures=0\)/);
+    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/full-test-output\.txt \(available_from_2026-05-28_full_suite_pass, tests=198, failures=0\)/);
     assert.match(result.stdout, /Production switch proof 1\. public_https_entrypoint: ready_from_profile -> https:\/\/profile-staging\.example\.com/);
     assert.match(result.stdout, /Production switch proof 2\. non_default_secret_env: blocked_until_secret_env_loaded -> npm\.cmd run staging:rehearsal -- --profile-file [^\n]*staging-profile\.json/);
     assert.match(result.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: blocked_after_production_signoff_readiness -> artifacts\/staging\/PROFILE_PRODUCT\/stable\/launch-day-watch-summary\.md/);

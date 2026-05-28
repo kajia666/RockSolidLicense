@@ -1272,8 +1272,8 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     launchDutyRecordIndexFile,
     localFullSuiteBaseline: {
       command: result.fullTestWindowReadiness?.command || "npm.cmd test",
-      status: "available_from_2026-05-27_full_suite_pass",
-      testCount: 192,
+      status: "available_from_2026-05-28_full_suite_pass",
+      testCount: 198,
       failureCount: 0,
       outputArtifact: path.posix.join(archiveRoot, "full-test-output.txt"),
       nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."

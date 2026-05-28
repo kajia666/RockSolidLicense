@@ -51112,8 +51112,8 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
       || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
     localFullSuiteBaseline: {
       command: gate.fullTestCommand || "npm.cmd test",
-      status: "available_from_2026-05-27_full_suite_pass",
-      testCount: 192,
+      status: "available_from_2026-05-28_full_suite_pass",
+      testCount: 198,
       failureCount: 0,
       outputArtifact: normalizeDeveloperOpsLaunchEvidencePath(gate.fullTestOutputArtifact)
         || path.posix.join(archiveRoot, "full-test-output.txt"),

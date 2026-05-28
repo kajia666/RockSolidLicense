@@ -488,8 +488,8 @@ function buildExpectedProductionSwitchProofPacket({
     launchDutyRecordIndexFile: `${archiveRoot}/launch-duty-record-index.json`,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
-      status: "available_from_2026-05-27_full_suite_pass",
-      testCount: 192,
+      status: "available_from_2026-05-28_full_suite_pass",
+      testCount: 198,
       failureCount: 0,
       outputArtifact: `${archiveRoot}/full-test-output.txt`,
       nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
@@ -948,7 +948,7 @@ test("staging signoff backfill prints ordered next commands in plain output", ()
     assert.match(result.stdout, /Launch evidence production signoff packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json/);
     assert.match(result.stdout, /Launch evidence next action: Run readinessStatusCommand, verify the backfilled sign-off or receipt evidence is reflected, then continue the next launch evidence command\./);
     assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=backfill_production_signoff\)/);
-    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt \(available_from_2026-05-27_full_suite_pass, tests=192, failures=0\)/);
+    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/stable\/full-test-output\.txt \(available_from_2026-05-28_full_suite_pass, tests=198, failures=0\)/);
     assert.match(result.stdout, /Production switch proof 7\. production_signoff_and_receipts: blocked_after_full_test_signoff_backfill -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/staging-artifacts-archive\.txt --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Production switch next action: Continue the current sign-off evidence command, rerun staging:readiness:status, then use this packet as the production switch proof checklist\./);
     assert.match(result.stdout, /Backfilled status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);

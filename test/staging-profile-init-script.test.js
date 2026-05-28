@@ -443,8 +443,8 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       launchDutyRecordIndexFile,
       localFullSuiteBaseline: {
         command: "npm.cmd test",
-        status: "available_from_2026-05-27_full_suite_pass",
-        testCount: 192,
+        status: "available_from_2026-05-28_full_suite_pass",
+        testCount: 198,
         failureCount: 0,
         outputArtifact: fullTestOutputFile,
         nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
@@ -568,6 +568,166 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       nextMilestoneCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       nextAction: "Run the current profile rehearsal command, then follow closeout_init and readiness_status before recovery preflight."
     });
+    const launchExecutionPhasePlan = {
+      mode: "staging-profile-launch-execution-phase-plan",
+      status: "awaiting_profile_rehearsal",
+      currentPhaseKey: "profile_and_closeout",
+      currentActionKey: "profile_rehearsal",
+      currentCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+      totalPhaseCount: 7,
+      currentPhaseCount: 1,
+      blockedPhaseCount: 6,
+      totalCommandCount: 39,
+      nextBlockedPhaseKey: "recovery_and_route_gate",
+      nextAction: "Complete the current profile_and_closeout phase, then continue with recovery_and_route_gate.",
+      phases: [
+        {
+          order: 1,
+          key: "profile_and_closeout",
+          label: "Profile rehearsal and closeout init",
+          status: "current",
+          totalCommandCount: 3,
+          currentCommandCount: 1,
+          blockedCommandCount: 2,
+          commandKeys: ["profile_rehearsal", "closeout_init", "readiness_status"],
+          firstActionKey: "profile_rehearsal",
+          currentActionKey: "profile_rehearsal",
+          firstBlockedActionKey: "closeout_init",
+          currentCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+          nextCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
+          finalActionKey: "readiness_status",
+          nextAction: "Run the profile-driven rehearsal to write launch-duty artifacts and the closeout draft."
+        },
+        {
+          order: 2,
+          key: "recovery_and_route_gate",
+          label: "Recovery drill and route-map gate",
+          status: "blocked",
+          totalCommandCount: 5,
+          currentCommandCount: 0,
+          blockedCommandCount: 5,
+          commandKeys: [
+            "recovery_preflight",
+            "route_map_gate_dry_run",
+            "route_map_gate",
+            "route_map_gate_result_backfill",
+            "post_route_map_readiness_status"
+          ],
+          firstActionKey: "recovery_preflight",
+          currentActionKey: null,
+          firstBlockedActionKey: "recovery_preflight",
+          currentCommand: null,
+          nextCommand: recoveryPreflightCommand,
+          finalActionKey: "post_route_map_readiness_status",
+          nextAction: "Run recovery preflight to print backup/restore commands and the backup_restore_drill_result closeout backfill handoff."
+        },
+        {
+          order: 3,
+          key: "live_write_smoke",
+          label: "No-write preflight, live-write smoke, and post-smoke closeout",
+          status: "blocked",
+          totalCommandCount: 7,
+          currentCommandCount: 0,
+          blockedCommandCount: 7,
+          commandKeys: [
+            "staging_smoke_preflight",
+            "run_launch_smoke_staging",
+            "backfill_post_smoke_live_write_smoke_result",
+            "backfill_post_smoke_launch_smoke_handoff",
+            "backfill_post_smoke_launch_mainline_evidence_receipts",
+            "backfill_post_smoke_receipt_visibility_review",
+            "post_smoke_readiness_status"
+          ],
+          firstActionKey: "staging_smoke_preflight",
+          currentActionKey: null,
+          firstBlockedActionKey: "staging_smoke_preflight",
+          currentCommand: null,
+          nextCommand: smokePreflightCommand,
+          finalActionKey: "post_smoke_readiness_status",
+          nextAction: "Run no-write smoke preflight before any launch:smoke:staging live-write command."
+        },
+        {
+          order: 4,
+          key: "full_test_window",
+          label: "Full-test window and local go-live baseline",
+          status: "blocked",
+          totalCommandCount: 3,
+          currentCommandCount: 0,
+          blockedCommandCount: 3,
+          commandKeys: ["run_full_test_window", "backfill_full_test_window_passed", "post_full_test_readiness_status"],
+          firstActionKey: "run_full_test_window",
+          currentActionKey: null,
+          firstBlockedActionKey: "run_full_test_window",
+          currentCommand: null,
+          nextCommand: fullTestCommand,
+          finalActionKey: "post_full_test_readiness_status",
+          nextAction: "Run the deferred full-test window only after post-smoke closeout evidence is backfilled."
+        },
+        {
+          order: 5,
+          key: "production_signoff_and_receipts",
+          label: "Production sign-off and receipt visibility",
+          status: "blocked",
+          totalCommandCount: 12,
+          currentCommandCount: 0,
+          blockedCommandCount: 12,
+          commandKeys: [
+            ...productionSignoffBackfillCommands.map((item) => `backfill_production_signoff_${item.key}`),
+            ...receiptVisibilityBackfillCommands.map((item) => `backfill_receipt_visibility_${item.key}`),
+            "post_production_signoff_readiness_status"
+          ],
+          firstActionKey: "backfill_production_signoff_staging_artifacts_archived",
+          currentActionKey: null,
+          firstBlockedActionKey: "backfill_production_signoff_staging_artifacts_archived",
+          currentCommand: null,
+          nextCommand: productionSignoffBackfillCommands[0].command,
+          finalActionKey: "post_production_signoff_readiness_status",
+          nextAction: "Backfill this production sign-off condition, refresh readiness, then continue the sign-off and receipt visibility queue."
+        },
+        {
+          order: 6,
+          key: "launch_day_watch_and_stabilization",
+          label: "Launch-day watch and stabilization records",
+          status: "blocked",
+          totalCommandCount: 6,
+          currentCommandCount: 0,
+          blockedCommandCount: 6,
+          commandKeys: [
+            "record_launch_day_watch_summary",
+            ...stabilizationRecordCommands.map((item) => `record_stabilization_${item.key}`)
+          ],
+          firstActionKey: "record_launch_day_watch_summary",
+          currentActionKey: null,
+          firstBlockedActionKey: "record_launch_day_watch_summary",
+          currentCommand: null,
+          nextCommand: launchDayWatchRecordCommand,
+          finalActionKey: "record_stabilization_first_wave_closeout",
+          nextAction: "Record launch-day watch summary after production sign-off readiness refresh clears."
+        },
+        {
+          order: 7,
+          key: "stable_operations_handoff",
+          label: "Stable-operations handoff",
+          status: "blocked",
+          totalCommandCount: 3,
+          currentCommandCount: 0,
+          blockedCommandCount: 3,
+          commandKeys: [
+            "post_first_wave_closeout_readiness_status",
+            "post_first_wave_closeout_rehearsal_reload",
+            "handoff_stable_operations"
+          ],
+          firstActionKey: "post_first_wave_closeout_readiness_status",
+          currentActionKey: null,
+          firstBlockedActionKey: "post_first_wave_closeout_readiness_status",
+          currentCommand: null,
+          nextCommand: postFirstWaveCloseoutReadinessStatusCommand,
+          finalActionKey: "handoff_stable_operations",
+          nextAction: "Refresh readiness after first_wave_closeout so the completed launch-duty record index is recognized as stable_operations_handoff."
+        }
+      ]
+    };
+    assert.deepEqual(output.launchExecutionPhasePlan, launchExecutionPhasePlan);
     assert.deepEqual(output, {
       status: "written",
       mode: "staging-profile-init",
@@ -662,6 +822,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         nextMilestoneCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
         nextAction: "Run the current profile rehearsal command, then follow closeout_init and readiness_status before recovery preflight."
       },
+      launchExecutionPhasePlan,
       launchEvidenceReadinessGate,
       productionSwitchProofPacket,
       launchDayWatchRecordCommand,
@@ -1029,6 +1190,10 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Operator queue readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Operator queue counts: postSmoke=4, signoff=6, receipts=5, launchDutyRecords=6, stableOps=3/);
     assert.match(result.stdout, /Operator queue next milestone: closeout_init -> npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch execution phase plan: awaiting_profile_rehearsal \(current=profile_and_closeout, phases=7, blocked=6, commands=39\)/);
+    assert.match(result.stdout, /Launch execution phase 1\. profile_and_closeout: current \(commands=3, blocked=2, current=profile_rehearsal, next=profile_rehearsal\)/);
+    assert.match(result.stdout, /Launch execution phase 5\. production_signoff_and_receipts: blocked \(commands=12, blocked=12, current=-, next=backfill_production_signoff_staging_artifacts_archived\)/);
+    assert.match(result.stdout, /Launch execution next action: Complete the current profile_and_closeout phase, then continue with recovery_and_route_gate\./);
     assert.match(result.stdout, /Launch evidence gate: blocked_until_real_launch_evidence_attached \(current=route_map_gate_result, pending=21\/21\)/);
     assert.match(result.stdout, /Launch evidence setup: profile_rehearsal -> npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
     assert.match(result.stdout, /Launch evidence current: closeout_evidence\/route_map_gate_result -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
@@ -1040,7 +1205,7 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch evidence next action: Run the current setup command and closeout init, then attach route_map_gate_result as the first real launch evidence item before continuing through readiness refresh, smoke, full-test, signoff, receipt visibility, launch-day watch, and first-wave closeout\./);
     assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=profile_rehearsal\)/);
-    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/beta\/full-test-output\.txt \(available_from_2026-05-27_full_suite_pass, tests=192, failures=0\)/);
+    assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/beta\/full-test-output\.txt \(available_from_2026-05-28_full_suite_pass, tests=198, failures=0\)/);
     assert.match(result.stdout, /Production switch proof 1\. public_https_entrypoint: ready_from_profile -> https:\/\/staging\.example\.com/);
     assert.match(result.stdout, /Production switch proof 4\. backup_restore_drill: blocked_after_readiness_status -> npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file \/etc\/rocksolidlicense\/staging\.env --app-backup-dir \/var\/lib\/rocksolid\/backups --postgres-backup-dir \/var\/lib\/rocksolid\/postgres-backups --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: blocked_after_production_signoff_readiness -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/launch-day-watch-summary\.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);

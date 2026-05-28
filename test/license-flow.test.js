@@ -24696,6 +24696,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.failureHintKeys,
       ["receipt_visibility_parity", "support_inspection_confirmation", "first_wave_handoff_confirmation", "developer_ops_overview_refresh"]
     );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.handoffContinuation?.status,
+      "blocked_until_post_command_readback"
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.handoffContinuation?.ready,
+      false
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.handoffContinuation?.actionKey,
+      "handoff_launch_duty_to_post_signoff"
+    );
+    assert.equal(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.handoffContinuation?.requiresReadbackKey,
+      "refresh_developer_ops_overview_after_current_action"
+    );
+    assert.deepEqual(
+      receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.operatorExecutionSummary?.handoffContinuation?.blockedBy,
+      ["post_command_readback"]
+    );
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.status, "ready_to_submit");
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.ready, true);
     assert.equal(receiptVisibilityConfirmationQueue.launchSurfaceReviewCloseoutAction.confirmationSubmission.method, "POST");
@@ -26751,6 +26771,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Readback:[\s\S]*after=confirm_first_wave_handoff \| method=GET \| href=\/api\/developer\/ops\/export\?productCode=EXPORT_CLOSEOUT_READY&channel=stable/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Readback:[\s\S]*expects=handoffConfirmed=true,manualCheckpointProgress=2\/2,queueStatus=ready_for_launch_duty_handoff,currentActionKey=handoff_launch_duty_to_post_signoff/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Operator Readback:[\s\S]*failureHints=receipt_visibility_parity,support_inspection_confirmation,first_wave_handoff_confirmation,developer_ops_overview_refresh/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Handoff Continuation:/);
+    assert.match(launchOperationsOperatorEntryDownload.body, /Launch Surface Review Closeout Handoff Continuation:[\s\S]*status=blocked_until_post_command_readback \| ready=no \| action=handoff_launch_duty_to_post_signoff \| requiresReadback=refresh_developer_ops_overview_after_current_action/);
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Launch Surface Review Closeout Action:[\s\S]*stableTransitionStatus=[^\n]*\| stableTransitionReady=(yes|no)[^\n]*\| stableTransitionCurrent=[^\n]*\| stableTransitionNextDownload=[^\n]*\| stableTransitionNextHref=[^\n]*/
@@ -28560,6 +28582,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(confirmedReceiptVisibilityQueue.operatorHandoffPacket?.currentActionKey, "handoff_launch_duty_to_post_signoff");
     assert.equal(confirmedReceiptVisibilityQueue.operatorHandoffPacket?.confirmationAuditLogId, exportCloseoutHandoffConfirmation.auditLogId);
     assert.equal(confirmedReceiptVisibilityQueue.operatorHandoffPacket?.overviewRefreshHref, confirmedReceiptVisibilityQueue.overviewRefreshAction?.href);
+    assert.equal(
+      confirmedReceiptVisibilityQueue.launchSurfaceReviewCloseoutAction?.operatorExecutionSummary?.handoffContinuation?.status,
+      "ready_for_launch_duty_handoff"
+    );
+    assert.equal(
+      confirmedReceiptVisibilityQueue.launchSurfaceReviewCloseoutAction?.operatorExecutionSummary?.handoffContinuation?.ready,
+      true
+    );
+    assert.deepEqual(
+      confirmedReceiptVisibilityQueue.launchSurfaceReviewCloseoutAction?.operatorExecutionSummary?.handoffContinuation?.blockedBy,
+      []
+    );
+    assert.equal(
+      confirmedReceiptVisibilityQueue.launchSurfaceReviewCloseoutAction?.operatorExecutionSummary?.handoffContinuation?.confirmationAuditLogId,
+      exportCloseoutHandoffConfirmation.auditLogId
+    );
     assert.equal(confirmedReceiptVisibilityQueue.confirmationSubmissionPacket?.status, "already_confirmed");
     assert.equal(confirmedReceiptVisibilityQueue.confirmationSubmissionPacket?.ready, false);
     assert.equal(
@@ -33987,6 +34025,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateHandoff.summaryText,
+      /Launch Mainline Surface Review Closeout Handoff Continuation:[\s\S]*action=handoff_launch_duty_to_post_signoff/
+    );
+    assert.match(
+      launchMainlineSteadyStateHandoff.summaryText,
       /Mainline Action Plan:[\s\S]*Open steady-state handoff brief[\s\S]*Operator Order:[\s\S]*Open the steady-state handoff brief from the operator entry and transfer launch duty into stable operations\./
     );
     assert.match(
@@ -34650,6 +34692,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       primaryRouteReviewDownload.body,
       /Surface Review Closeout Bridge Operator Readback:[\s\S]*failureHints=receipt_visibility_parity,support_inspection_confirmation,first_wave_handoff_confirmation,developer_ops_overview_refresh/
+    );
+    assert.match(
+      primaryRouteReviewDownload.body,
+      /Surface Review Closeout Bridge Handoff Continuation:[\s\S]*action=handoff_launch_duty_to_post_signoff/
     );
 
     const nextRouteReviewDownload = await getText(

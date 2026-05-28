@@ -49342,6 +49342,27 @@ function buildLaunchSurfaceReviewCloseoutOperatorExecutionSummary({
         expected: Array.isArray(readbackExpected) ? readbackExpected.filter(Boolean) : []
       }
     : null;
+  const handoffAction = queue.find((item) => item.key === "handoff_launch_duty_to_post_signoff")
+    || queue.at(-1)
+    || null;
+  const handoffReady = handoffAction?.ready === true || String(handoffAction?.status || "").trim().toLowerCase() === "ready_for_launch_duty_handoff";
+  const handoffContinuation = handoffAction
+    ? {
+        key: "continue_surface_closeout_handoff",
+        status: handoffReady ? "ready_for_launch_duty_handoff" : "blocked_until_post_command_readback",
+        ready: handoffReady,
+        actionKey: handoffAction.key || "handoff_launch_duty_to_post_signoff",
+        actionStatus: handoffAction.status || null,
+        command: handoffAction.command || null,
+        requiresReadbackKey: readback?.key || null,
+        blockedBy: handoffReady ? [] : ["post_command_readback"],
+        confirmationAuditLogId: handoffAction.confirmationAuditLogId || null,
+        launchDutyRecordIndexPath: handoffAction.launchDutyRecordIndexPath || currentAction?.launchDutyRecordIndexPath || null,
+        nextAction: handoffReady
+          ? "Continue launch duty to post-signoff archive from the same record index."
+          : "Run the current command, verify the Developer Ops readback, then continue launch duty handoff."
+      }
+    : null;
   return {
     version: "developer-ops-launch-operations-surface-closeout-operator-execution-summary/v1",
     status,
@@ -49358,6 +49379,7 @@ function buildLaunchSurfaceReviewCloseoutOperatorExecutionSummary({
     nextBlockedActionKey: blockedActionKeys[0] || null,
     postCommandReadback: readback,
     failureHintKeys: Array.isArray(failureHintKeys) ? failureHintKeys.filter(Boolean) : [],
+    handoffContinuation,
     launchDutyRecordIndexPath: currentAction?.launchDutyRecordIndexPath || null,
     nextAction: blockedActionKeys.length
       ? `Run ${currentAction?.key || "the current action"} before continuing to ${blockedActionKeys[0]}.`
@@ -65372,6 +65394,25 @@ function appendLaunchSurfaceReviewCloseoutOperatorNextActionLines(lines = [], ac
         + ` | failureHints=${Array.isArray(summary.failureHintKeys) && summary.failureHintKeys.length
           ? summary.failureHintKeys.join(",")
           : "-"}`
+      );
+    }
+    const handoff = summary.handoffContinuation && typeof summary.handoffContinuation === "object"
+      ? summary.handoffContinuation
+      : null;
+    if (handoff) {
+      const handoffTitle = summaryTitle.replace(/Operator Execution Summary:?$/u, "Handoff Continuation:");
+      lines.push(handoffTitle);
+      lines.push(
+        `- status=${handoff.status || "-"}`
+        + ` | ready=${handoff.ready === true ? "yes" : "no"}`
+        + ` | action=${handoff.actionKey || "-"}`
+        + ` | requiresReadback=${handoff.requiresReadbackKey || "-"}`
+        + ` | blockedBy=${Array.isArray(handoff.blockedBy) && handoff.blockedBy.length ? handoff.blockedBy.join(",") : "-"}`
+      );
+      lines.push(
+        `- command=${handoff.command || "-"}`
+        + ` | confirmationAudit=${handoff.confirmationAuditLogId || "-"}`
+        + ` | launchDutyRecordIndex=${handoff.launchDutyRecordIndexPath || "-"}`
       );
     }
   }

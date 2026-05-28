@@ -53768,6 +53768,28 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchDutySteadyStateHandoffLanding,
     firstOperatingResultExecutionSummary: launchOperationsOverviewStatus?.firstOperatingResultExecutionSummary || null
   });
+  const launchExecutionPhasePlan = launchEvidenceReadinessGate?.launchExecutionPhasePlan
+    || launchEvidenceReadinessGate?.productionSwitchProofPacket?.launchExecutionPhasePlan
+    || null;
+  const launchExecutionPhasePlanWithCheckpoint = launchExecutionPhasePlan
+    ? {
+        ...launchExecutionPhasePlan,
+        operatorQueueCheckpoint
+      }
+    : null;
+  const productionSwitchProofPacketWithCheckpoint = launchEvidenceReadinessGate?.productionSwitchProofPacket
+    ? {
+        ...launchEvidenceReadinessGate.productionSwitchProofPacket,
+        launchExecutionPhasePlan: launchExecutionPhasePlanWithCheckpoint
+      }
+    : null;
+  const launchEvidenceReadinessGateWithCheckpoint = launchEvidenceReadinessGate
+    ? {
+        ...launchEvidenceReadinessGate,
+        launchExecutionPhasePlan: launchExecutionPhasePlanWithCheckpoint,
+        productionSwitchProofPacket: productionSwitchProofPacketWithCheckpoint
+      }
+    : null;
   return {
     version: "developer-ops-launch-operations-operator-entry/v1",
     productCode,
@@ -53775,11 +53797,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     status: checklist?.status || launchOperationsOverviewStatus?.status || "review",
     receiptVisibilityStatus: checklist?.receiptVisibilityStatus || launchOperationsOverviewStatus?.receiptVisibilityStatus || null,
     launchDutyRecordIndexPath,
-    launchEvidenceReadinessGate,
-    productionSwitchProofPacket: launchEvidenceReadinessGate?.productionSwitchProofPacket || null,
-    launchExecutionPhasePlan: launchEvidenceReadinessGate?.launchExecutionPhasePlan
-      || launchEvidenceReadinessGate?.productionSwitchProofPacket?.launchExecutionPhasePlan
-      || null,
+    launchEvidenceReadinessGate: launchEvidenceReadinessGateWithCheckpoint,
+    productionSwitchProofPacket: productionSwitchProofPacketWithCheckpoint,
+    launchExecutionPhasePlan: launchExecutionPhasePlanWithCheckpoint,
     operatorQueueCheckpoint,
     checklistCurrentStepKey: checklist?.currentStepKey || null,
     checklistStepCount: Number(checklist?.stepCount ?? (Array.isArray(checklist?.steps) ? checklist.steps.length : 0)),
@@ -59393,6 +59413,14 @@ function appendDeveloperOpsLaunchExecutionPhasePlanLines(lines = [], phasePlan =
       + ` | current=${phase.currentActionKey || "-"}`
       + ` | next=${phase.firstBlockedActionKey || phase.currentActionKey || "-"}`
     );
+  }
+  const operatorQueueCheckpoint = phasePlan.operatorQueueCheckpoint
+    && typeof phasePlan.operatorQueueCheckpoint === "object"
+      ? phasePlan.operatorQueueCheckpoint
+      : null;
+  if (operatorQueueCheckpoint) {
+    lines.push("");
+    appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines, operatorQueueCheckpoint);
   }
   lines.push(`- launchExecutionNextAction=${phasePlan.nextAction || "-"}`);
   return true;

@@ -28639,6 +28639,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchOperationsLaunchExecutionPhasePlanDownload.body,
       /currentAction=backfill_closeout_evidence \| currentCommand=npm\.cmd run staging:closeout:backfill/
     );
+    assert.match(
+      launchOperationsLaunchExecutionPhasePlanDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*firstOperatingResultExecution=[^\n]*\| lane=[^\n]*\| ready=(yes|no)[^\n]*\| current=[^\n]*\| readback=[^\n]*\| continuation=[^\n]*\| nextDownload=launch-operations-overview-status \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
 
     const launchOperationsPreStagingSelfCheckDownload = await getText(
       baseUrl,

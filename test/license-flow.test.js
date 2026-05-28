@@ -30731,6 +30731,62 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchDutyCloseoutRecordedOperatorEntry.productionSwitchProofPacket,
       launchDutyCloseoutRecordedGate.productionSwitchProofPacket
     );
+    const expectedLaunchExecutionPhasePlanSummary = {
+      mode: "developer-ops-launch-execution-phase-plan",
+      status: "awaiting_stable_operations_handoff",
+      currentPhaseKey: "stable_operations_handoff",
+      currentActionKey: "refresh_staging_readiness_after_first_wave_closeout",
+      currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+      totalPhaseCount: 7,
+      readyPhaseCount: 6,
+      currentPhaseCount: 1,
+      blockedPhaseCount: 0,
+      totalCommandCount: 39,
+      nextBlockedPhaseKey: null
+    };
+    assert.deepEqual(
+      {
+        mode: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.mode,
+        status: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.status,
+        currentPhaseKey: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.currentPhaseKey,
+        currentActionKey: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.currentActionKey,
+        currentCommand: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.currentCommand,
+        totalPhaseCount: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.totalPhaseCount,
+        readyPhaseCount: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.readyPhaseCount,
+        currentPhaseCount: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.currentPhaseCount,
+        blockedPhaseCount: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.blockedPhaseCount,
+        totalCommandCount: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.totalCommandCount,
+        nextBlockedPhaseKey: launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.nextBlockedPhaseKey
+      },
+      expectedLaunchExecutionPhasePlanSummary
+    );
+    assert.deepEqual(
+      launchDutyCloseoutRecordedOperatorEntry.launchExecutionPhasePlan,
+      launchDutyCloseoutRecordedGate.launchExecutionPhasePlan
+    );
+    assert.deepEqual(
+      launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchExecutionPhasePlan,
+      launchDutyCloseoutRecordedGate.launchExecutionPhasePlan
+    );
+    assert.deepEqual(
+      launchDutyCloseoutRecordedGate.launchExecutionPhasePlan?.phases?.map((item) => [
+        item.order,
+        item.key,
+        item.status,
+        item.totalCommandCount,
+        item.currentActionKey,
+        item.firstBlockedActionKey
+      ]),
+      [
+        [1, "profile_and_closeout", "ready", 3, null, null],
+        [2, "recovery_and_route_gate", "ready", 5, null, null],
+        [3, "live_write_smoke", "ready", 7, null, null],
+        [4, "full_test_window", "ready", 3, null, null],
+        [5, "production_signoff_and_receipts", "ready", 12, null, null],
+        [6, "launch_day_watch_and_stabilization", "ready", 6, null, null],
+        [7, "stable_operations_handoff", "current", 3, "refresh_staging_readiness_after_first_wave_closeout", "refresh_staging_readiness_after_first_wave_closeout"]
+      ]
+    );
     assert.equal(
       launchDutyCloseoutRecordedGate.evidenceItems.find((item) => item.key === "first_wave_closeout")?.status,
       "recorded"
@@ -31138,6 +31194,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Execution Phase Plan:[\s\S]*phase 7\. stable_operations_handoff \| status=current \| commands=3 \| current=refresh_staging_readiness_after_first_wave_closeout \| next=refresh_staging_readiness_after_first_wave_closeout/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Launch Evidence Readiness Gate:[\s\S]*proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
     const launchDutyCloseoutRecordedOpsProofPacketDownload = await getText(
@@ -31152,6 +31216,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsProofPacketDownload.body,
+      /Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
     );
     assert.match(
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,
@@ -31266,6 +31334,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.equal(
       launchMainlineCloseoutRecordedReadback.mainlineSummary.firstWaveCloseoutRecordReadback.launchDutyRecordIndexPath,
       expectedSteadyStateLaunchDutyRecordIndexPath
+    );
+    assert.deepEqual(
+      {
+        mode: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.mode,
+        status: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.status,
+        currentPhaseKey: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.currentPhaseKey,
+        currentActionKey: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.currentActionKey,
+        currentCommand: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.currentCommand,
+        totalPhaseCount: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.totalPhaseCount,
+        readyPhaseCount: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.readyPhaseCount,
+        currentPhaseCount: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.currentPhaseCount,
+        blockedPhaseCount: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.blockedPhaseCount,
+        totalCommandCount: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.totalCommandCount,
+        nextBlockedPhaseKey: launchMainlineCloseoutRecordedReadback.mainlineSummary.launchExecutionPhasePlan?.nextBlockedPhaseKey
+      },
+      expectedLaunchExecutionPhasePlanSummary
     );
     assert.deepEqual(
       launchMainlineCloseoutRecordedReadback.mainlineSummary.firstWaveCloseoutStableOperationsShortcut,
@@ -31481,6 +31565,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
     const launchMainlineCloseoutRecordedProofPacketDownload = await getText(
@@ -31495,6 +31583,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedProofPacketDownload.body,
+      /Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
     );
     assert.match(
       launchMainlineCloseoutRecordedProofPacketDownload.body,

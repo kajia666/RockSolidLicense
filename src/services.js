@@ -17153,6 +17153,16 @@ function buildDeveloperLaunchMainlineSummaryPayload({
       && typeof launchEvidenceReadinessGate.productionSwitchProofPacket === "object"
         ? launchEvidenceReadinessGate.productionSwitchProofPacket
         : null;
+  const launchExecutionPhasePlan = launchOperationsOperatorEntry?.launchExecutionPhasePlan
+    && typeof launchOperationsOperatorEntry.launchExecutionPhasePlan === "object"
+      ? launchOperationsOperatorEntry.launchExecutionPhasePlan
+      : launchEvidenceReadinessGate?.launchExecutionPhasePlan
+      && typeof launchEvidenceReadinessGate.launchExecutionPhasePlan === "object"
+        ? launchEvidenceReadinessGate.launchExecutionPhasePlan
+        : productionSwitchProofPacket?.launchExecutionPhasePlan
+        && typeof productionSwitchProofPacket.launchExecutionPhasePlan === "object"
+          ? productionSwitchProofPacket.launchExecutionPhasePlan
+          : null;
   const launchCandidateFullVerificationGate = launchOperationsOperatorEntry?.launchCandidateFullVerificationGate
     && typeof launchOperationsOperatorEntry.launchCandidateFullVerificationGate === "object"
       ? launchOperationsOperatorEntry.launchCandidateFullVerificationGate
@@ -21747,6 +21757,7 @@ function buildDeveloperLaunchMainlineSummaryPayload({
     launchDutyActionOrder,
     launchEvidenceReadinessGate,
     productionSwitchProofPacket,
+    launchExecutionPhasePlan,
     operatorQueueCheckpoint,
     mirroredLaunchSurfaceFreeze,
     preStagingReadinessSelfCheck,
@@ -50946,6 +50957,277 @@ function inferDeveloperOpsLaunchEvidenceArchiveRoot(gate = null, {
   return `artifacts/staging/${productCode || "<productCode>"}/${channel || "<channel>"}`;
 }
 
+const DEVELOPER_OPS_LAUNCH_EXECUTION_PHASES = [
+  {
+    key: "profile_and_closeout",
+    label: "Profile rehearsal and closeout init",
+    commandKeys: ["profile_rehearsal", "closeout_init", "readiness_status"]
+  },
+  {
+    key: "recovery_and_route_gate",
+    label: "Recovery drill and route-map gate",
+    commandKeys: [
+      "recovery_preflight",
+      "route_map_gate_dry_run",
+      "route_map_gate",
+      "route_map_gate_result_backfill",
+      "post_route_map_readiness_status"
+    ]
+  },
+  {
+    key: "live_write_smoke",
+    label: "No-write preflight, live-write smoke, and post-smoke closeout",
+    commandKeys: [
+      "staging_smoke_preflight",
+      "run_launch_smoke_staging",
+      "backfill_post_smoke_live_write_smoke_result",
+      "backfill_post_smoke_launch_smoke_handoff",
+      "backfill_post_smoke_launch_mainline_evidence_receipts",
+      "backfill_post_smoke_receipt_visibility_review",
+      "post_smoke_readiness_status"
+    ]
+  },
+  {
+    key: "full_test_window",
+    label: "Full-test window and local go-live baseline",
+    commandKeys: ["run_full_test_window", "backfill_full_test_window_passed", "post_full_test_readiness_status"]
+  },
+  {
+    key: "production_signoff_and_receipts",
+    label: "Production sign-off and receipt visibility",
+    commandKeys: [
+      "backfill_production_signoff_staging_artifacts_archived",
+      "backfill_production_signoff_launch_mainline_receipts_visible",
+      "backfill_production_signoff_launch_ops_overview_status_visible",
+      "backfill_production_signoff_backup_restore_drill_passed",
+      "backfill_production_signoff_rollback_path_confirmed",
+      "backfill_production_signoff_operator_signoff_recorded",
+      "backfill_receipt_visibility_launchMainline",
+      "backfill_receipt_visibility_launchReview",
+      "backfill_receipt_visibility_launchSmoke",
+      "backfill_receipt_visibility_developerOps",
+      "backfill_receipt_visibility_launchOpsOverviewStatus",
+      "post_production_signoff_readiness_status"
+    ]
+  },
+  {
+    key: "launch_day_watch_and_stabilization",
+    label: "Launch-day watch and stabilization records",
+    commandKeys: [
+      "record_launch_day_watch_summary",
+      "record_stabilization_receipt_visibility_snapshot",
+      "record_stabilization_first_wave_incident_log",
+      "record_stabilization_rollback_signal_review",
+      "record_stabilization_stabilization_owner_handoff",
+      "record_stabilization_first_wave_closeout"
+    ]
+  },
+  {
+    key: "stable_operations_handoff",
+    label: "Stable-operations handoff",
+    commandKeys: [
+      "post_first_wave_closeout_readiness_status",
+      "post_first_wave_closeout_rehearsal_reload",
+      "handoff_stable_operations"
+    ]
+  }
+];
+
+function getDeveloperOpsLaunchExecutionPhaseDefinition(phaseKey = "") {
+  return DEVELOPER_OPS_LAUNCH_EXECUTION_PHASES.find((phase) => phase.key === phaseKey)
+    || DEVELOPER_OPS_LAUNCH_EXECUTION_PHASES[0];
+}
+
+function inferDeveloperOpsLaunchExecutionPhaseKey({
+  launchEvidenceReadinessGate = null,
+  productionSwitchProofPacket = null
+} = {}) {
+  const gate = launchEvidenceReadinessGate && typeof launchEvidenceReadinessGate === "object"
+    ? launchEvidenceReadinessGate
+    : {};
+  const proof = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : {};
+  const stableOperationsHandoff = gate.stableOperationsHandoff && typeof gate.stableOperationsHandoff === "object"
+    ? gate.stableOperationsHandoff
+    : null;
+  const currentEvidenceType = String(gate.currentEvidenceType || "").trim();
+  const currentEvidenceKey = String(gate.currentEvidenceKey || "").trim();
+  const proofCurrentActionKey = String(proof.currentActionKey || "").trim();
+  if (
+    stableOperationsHandoff?.ready === true
+    || stableOperationsHandoff?.status === "ready_for_stable_operations_handoff"
+  ) {
+    return "stable_operations_handoff";
+  }
+  if (
+    currentEvidenceType === "launch_duty_record"
+    || [
+      "launch_day_watch_summary",
+      "receipt_visibility_snapshot",
+      "first_wave_incident_log",
+      "rollback_signal_review",
+      "stabilization_owner_handoff",
+      "first_wave_closeout"
+    ].includes(currentEvidenceKey)
+  ) {
+    return "launch_day_watch_and_stabilization";
+  }
+  if (
+    currentEvidenceType === "production_signoff_condition"
+    || currentEvidenceType === "receipt_visibility_lane"
+    || currentEvidenceKey === "production_signoff_packet"
+    || proofCurrentActionKey === "backfill_production_signoff"
+  ) {
+    return "production_signoff_and_receipts";
+  }
+  if (
+    currentEvidenceKey === "full_test_window_passed"
+    || currentEvidenceKey === "operator_go_no_go"
+    || proofCurrentActionKey === "run_full_test_window"
+  ) {
+    return "full_test_window";
+  }
+  if (["route_map_gate_result", "backup_restore_drill_result"].includes(currentEvidenceKey)) {
+    return "recovery_and_route_gate";
+  }
+  if (currentEvidenceType === "closeout_evidence") {
+    return "live_write_smoke";
+  }
+  return "profile_and_closeout";
+}
+
+function inferDeveloperOpsLaunchExecutionActionKey({
+  phaseDefinition = null,
+  launchEvidenceReadinessGate = null,
+  productionSwitchProofPacket = null
+} = {}) {
+  const gate = launchEvidenceReadinessGate && typeof launchEvidenceReadinessGate === "object"
+    ? launchEvidenceReadinessGate
+    : {};
+  const proof = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : {};
+  const stableOperationsHandoff = gate.stableOperationsHandoff && typeof gate.stableOperationsHandoff === "object"
+    ? gate.stableOperationsHandoff
+    : null;
+  if (phaseDefinition?.key === "stable_operations_handoff") {
+    return stableOperationsHandoff?.currentActionKey
+      || proof.currentActionKey
+      || phaseDefinition.commandKeys?.[0]
+      || null;
+  }
+  const currentEvidenceKey = String(gate.currentEvidenceKey || "").trim();
+  const launchDutyActionByRecordKey = {
+    launch_day_watch_summary: "record_launch_day_watch_summary",
+    receipt_visibility_snapshot: "record_stabilization_receipt_visibility_snapshot",
+    first_wave_incident_log: "record_stabilization_first_wave_incident_log",
+    rollback_signal_review: "record_stabilization_rollback_signal_review",
+    stabilization_owner_handoff: "record_stabilization_stabilization_owner_handoff",
+    first_wave_closeout: "record_stabilization_first_wave_closeout"
+  };
+  if (phaseDefinition?.key === "launch_day_watch_and_stabilization" && launchDutyActionByRecordKey[currentEvidenceKey]) {
+    return launchDutyActionByRecordKey[currentEvidenceKey];
+  }
+  return proof.currentActionKey
+    || phaseDefinition?.commandKeys?.[0]
+    || null;
+}
+
+function inferDeveloperOpsLaunchExecutionCommand({
+  phaseDefinition = null,
+  launchEvidenceReadinessGate = null,
+  productionSwitchProofPacket = null
+} = {}) {
+  const gate = launchEvidenceReadinessGate && typeof launchEvidenceReadinessGate === "object"
+    ? launchEvidenceReadinessGate
+    : {};
+  const proof = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : {};
+  const stableOperationsHandoff = gate.stableOperationsHandoff && typeof gate.stableOperationsHandoff === "object"
+    ? gate.stableOperationsHandoff
+    : null;
+  if (phaseDefinition?.key === "stable_operations_handoff") {
+    return stableOperationsHandoff?.currentCommand
+      || gate.currentCommand
+      || proof.currentCommand
+      || null;
+  }
+  return gate.currentCommand || proof.currentCommand || null;
+}
+
+function buildDeveloperOpsLaunchExecutionPhasePlan({
+  launchEvidenceReadinessGate = null,
+  productionSwitchProofPacket = null
+} = {}) {
+  const currentPhaseKey = inferDeveloperOpsLaunchExecutionPhaseKey({
+    launchEvidenceReadinessGate,
+    productionSwitchProofPacket
+  });
+  const currentDefinition = getDeveloperOpsLaunchExecutionPhaseDefinition(currentPhaseKey);
+  const currentDefinitionOrder = Math.max(
+    DEVELOPER_OPS_LAUNCH_EXECUTION_PHASES.findIndex((phase) => phase.key === currentDefinition.key) + 1,
+    1
+  );
+  const currentActionKey = inferDeveloperOpsLaunchExecutionActionKey({
+    phaseDefinition: currentDefinition,
+    launchEvidenceReadinessGate,
+    productionSwitchProofPacket
+  });
+  const currentCommand = inferDeveloperOpsLaunchExecutionCommand({
+    phaseDefinition: currentDefinition,
+    launchEvidenceReadinessGate,
+    productionSwitchProofPacket
+  });
+  const phases = DEVELOPER_OPS_LAUNCH_EXECUTION_PHASES.map((definition, index) => {
+    const isReady = index + 1 < currentDefinitionOrder;
+    const isCurrent = definition.key === currentDefinition.key;
+    const status = isReady ? "ready" : isCurrent ? "current" : "blocked";
+    const commandKeys = Array.isArray(definition.commandKeys) ? definition.commandKeys.slice() : [];
+    return {
+      order: index + 1,
+      key: definition.key,
+      label: definition.label,
+      status,
+      totalCommandCount: commandKeys.length,
+      currentCommandCount: isCurrent ? 1 : 0,
+      blockedCommandCount: isReady ? 0 : isCurrent ? Math.max(commandKeys.length - 1, 0) : commandKeys.length,
+      commandKeys,
+      firstActionKey: commandKeys[0] || null,
+      currentActionKey: isCurrent ? currentActionKey : null,
+      firstBlockedActionKey: isReady ? null : isCurrent ? currentActionKey : commandKeys[0] || null,
+      currentCommand: isCurrent ? currentCommand : null,
+      nextCommand: isCurrent ? currentCommand : null,
+      finalActionKey: commandKeys.at(-1) || null,
+      nextAction: isCurrent
+        ? launchEvidenceReadinessGate?.nextAction || productionSwitchProofPacket?.nextAction || null
+        : null
+    };
+  });
+  const readyPhaseCount = phases.filter((phase) => phase.status === "ready").length;
+  const currentPhaseCount = phases.filter((phase) => phase.status === "current").length;
+  const blockedPhaseCount = phases.filter((phase) => phase.status === "blocked").length;
+  const nextBlockedPhase = phases.find((phase) => phase.order > currentDefinitionOrder && phase.status === "blocked") || null;
+  return {
+    mode: "developer-ops-launch-execution-phase-plan",
+    status: `awaiting_${currentDefinition.key}`,
+    currentPhaseKey: currentDefinition.key,
+    currentActionKey,
+    currentCommand,
+    totalPhaseCount: phases.length,
+    readyPhaseCount,
+    currentPhaseCount,
+    blockedPhaseCount,
+    totalCommandCount: phases.reduce((sum, phase) => sum + phase.totalCommandCount, 0),
+    nextBlockedPhaseKey: nextBlockedPhase?.key || null,
+    nextAction: nextBlockedPhase
+      ? `Complete the current ${currentDefinition.key} phase, then continue with ${nextBlockedPhase.key}.`
+      : "Complete the current launch execution phase and hand off to stable operations.",
+    phases
+  };
+}
+
 function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
   productCode = null,
   channel = null,
@@ -51435,13 +51717,24 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
       || watchBridge?.nextAction
       || "Attach real staging, closeout, full-test, sign-off, and launch-day watch evidence before launch switch."
   };
+  const productionSwitchProofPacket = buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
+    productCode,
+    channel,
+    gate: gatePayload
+  });
+  const launchExecutionPhasePlan = buildDeveloperOpsLaunchExecutionPhasePlan({
+    launchEvidenceReadinessGate: gatePayload,
+    productionSwitchProofPacket
+  });
   return {
     ...gatePayload,
-    productionSwitchProofPacket: buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
-      productCode,
-      channel,
-      gate: gatePayload
-    })
+    launchExecutionPhasePlan,
+    productionSwitchProofPacket: productionSwitchProofPacket
+      ? {
+          ...productionSwitchProofPacket,
+          launchExecutionPhasePlan
+        }
+      : null
   };
 }
 
@@ -52192,6 +52485,9 @@ function buildDeveloperOpsLaunchOperationsOperatorEntry({
     launchDutyRecordIndexPath,
     launchEvidenceReadinessGate,
     productionSwitchProofPacket: launchEvidenceReadinessGate?.productionSwitchProofPacket || null,
+    launchExecutionPhasePlan: launchEvidenceReadinessGate?.launchExecutionPhasePlan
+      || launchEvidenceReadinessGate?.productionSwitchProofPacket?.launchExecutionPhasePlan
+      || null,
     operatorQueueCheckpoint,
     checklistCurrentStepKey: checklist?.currentStepKey || null,
     checklistStepCount: Number(checklist?.stepCount ?? (Array.isArray(checklist?.steps) ? checklist.steps.length : 0)),
@@ -57746,6 +58042,42 @@ function getProductionSwitchProofPacketFromInitialLaunchOpsReadiness(initialLaun
   return gatePacket || null;
 }
 
+function appendDeveloperOpsLaunchExecutionPhasePlanLines(lines = [], phasePlan = null, {
+  leadingBlank = false,
+  heading = "Launch Execution Phase Plan:"
+} = {}) {
+  if (!Array.isArray(lines) || !phasePlan || typeof phasePlan !== "object") {
+    return false;
+  }
+  if (leadingBlank) {
+    lines.push("");
+  }
+  lines.push(heading);
+  lines.push(
+    `- launchExecutionPhase=${phasePlan.status || "-"}`
+    + ` | current=${phasePlan.currentPhaseKey || "-"}`
+    + ` | ready=${phasePlan.readyPhaseCount ?? "-"}/${phasePlan.totalPhaseCount ?? "-"}`
+    + ` | blocked=${phasePlan.blockedPhaseCount ?? "-"}/${phasePlan.totalPhaseCount ?? "-"}`
+    + ` | commands=${phasePlan.totalCommandCount ?? "-"}`
+  );
+  lines.push(
+    `- currentAction=${phasePlan.currentActionKey || "-"}`
+    + ` | currentCommand=${phasePlan.currentCommand || "-"}`
+    + ` | nextBlocked=${phasePlan.nextBlockedPhaseKey || "-"}`
+  );
+  for (const phase of Array.isArray(phasePlan.phases) ? phasePlan.phases : []) {
+    lines.push(
+      `phase ${phase.order || "-"}. ${phase.key || "-"}`
+      + ` | status=${phase.status || "-"}`
+      + ` | commands=${phase.totalCommandCount ?? "-"}`
+      + ` | current=${phase.currentActionKey || "-"}`
+      + ` | next=${phase.firstBlockedActionKey || phase.currentActionKey || "-"}`
+    );
+  }
+  lines.push(`- launchExecutionNextAction=${phasePlan.nextAction || "-"}`);
+  return true;
+}
+
 function appendProductionSwitchProofPacketLines(lines = [], proofPacket = null, {
   leadingBlank = true,
   heading = "Production Switch Proof Packet:"
@@ -57775,6 +58107,9 @@ function appendProductionSwitchProofPacketLines(lines = [], proofPacket = null, 
     + ` | tests=${baseline.testCount ?? "-"}`
     + ` | failures=${baseline.failureCount ?? "-"}`
   );
+  appendDeveloperOpsLaunchExecutionPhasePlanLines(lines, proofPacket.launchExecutionPhasePlan, {
+    leadingBlank: false
+  });
   for (const item of Array.isArray(proofPacket.proofItems) ? proofPacket.proofItems : []) {
     lines.push(
       `proof ${item.order || "-"}. ${item.key || "-"}`
@@ -64311,7 +64646,19 @@ function appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines = [], gate = n
     `- launchDayWatch=${gate.launchDayWatchArtifact || "-"}`
     + ` | firstWaveCloseout=${gate.firstWaveCloseoutArtifact || "-"}`
   );
-  appendProductionSwitchProofPacketLines(lines, gate.productionSwitchProofPacket, {
+  const productionSwitchProofPacket = gate.productionSwitchProofPacket
+    && typeof gate.productionSwitchProofPacket === "object"
+      ? gate.productionSwitchProofPacket
+      : null;
+  const proofPacketWithPhasePlan = productionSwitchProofPacket
+    && !productionSwitchProofPacket.launchExecutionPhasePlan
+    && gate.launchExecutionPhasePlan
+    ? {
+        ...productionSwitchProofPacket,
+        launchExecutionPhasePlan: gate.launchExecutionPhasePlan
+      }
+    : productionSwitchProofPacket;
+  appendProductionSwitchProofPacketLines(lines, proofPacketWithPhasePlan, {
     leadingBlank: false,
     heading: "Production Switch Proof Packet:"
   });

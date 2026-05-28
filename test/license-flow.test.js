@@ -12389,6 +12389,18 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.launchEvidenceCurrentKey,
       runtimeEvidenceReviewOpsCheckpoint?.launchEvidenceCurrentKey
     );
+    const runtimeEvidenceReviewCutoverTriageAction = runtimeEvidenceLaunchReview.reviewSummary.actionPlan.find((item) =>
+      item.key === "launch_review_cutover_triage_checkpoint"
+    );
+    assert.ok(runtimeEvidenceReviewCutoverTriageAction);
+    assert.equal(runtimeEvidenceReviewCutoverTriageAction.status, "review");
+    assert.equal(runtimeEvidenceReviewCutoverTriageAction.priority, "primary");
+    assert.match(runtimeEvidenceReviewCutoverTriageAction.summary || "", /hold_for_launch_evidence/);
+    assert.equal(runtimeEvidenceReviewCutoverTriageAction.recommendedDownload?.key, "launch_review_production_switch_proof_packet");
+    assert.ok(runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.some((item) =>
+      item?.label === "Review Cutover Triage"
+      && item?.recommendedDownload?.key === "launch_review_production_switch_proof_packet"
+    ));
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /productionSwitchProof=/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Cutover Triage Checkpoint:/);
@@ -12624,6 +12636,18 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.launchEvidenceCurrentKey,
       runtimeEvidenceSmokeOpsCheckpoint?.launchEvidenceCurrentKey
     );
+    const runtimeEvidenceSmokeCutoverTriageAction = runtimeEvidenceLaunchSmoke.smokeSummary.actionPlan.find((item) =>
+      item.key === "launch_smoke_cutover_triage_checkpoint"
+    );
+    assert.ok(runtimeEvidenceSmokeCutoverTriageAction);
+    assert.equal(runtimeEvidenceSmokeCutoverTriageAction.status, "review");
+    assert.equal(runtimeEvidenceSmokeCutoverTriageAction.priority, "primary");
+    assert.match(runtimeEvidenceSmokeCutoverTriageAction.summary || "", /hold_for_launch_evidence/);
+    assert.equal(runtimeEvidenceSmokeCutoverTriageAction.recommendedDownload?.key, "launch_smoke_production_switch_proof_packet");
+    assert.ok(runtimeEvidenceLaunchSmoke.smokeSummary.routeFocus?.controls?.some((item) =>
+      item?.label === "Review Cutover Triage"
+      && item?.recommendedDownload?.key === "launch_smoke_production_switch_proof_packet"
+    ));
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /Launch Smoke Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /productionSwitchProof=/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /Launch Smoke Cutover Triage Checkpoint:/);
@@ -32261,6 +32285,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineCloseoutRecordedProofPacketDownload.body,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
+    const launchReviewCloseoutRecorded = await getJson(
+      baseUrl,
+      "/api/developer/launch-review?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched",
+      ownerSession.token
+    );
+    assert.equal(
+      launchReviewCloseoutRecorded.reviewSummary.launchCutoverTriageCheckpoint?.status,
+      "ready_for_cutover_watch"
+    );
+    const launchReviewCloseoutRecordedCutoverTriageAction = launchReviewCloseoutRecorded.reviewSummary.actionPlan.find((item) =>
+      item.key === "launch_review_cutover_triage_checkpoint"
+    );
+    assert.ok(launchReviewCloseoutRecordedCutoverTriageAction);
+    assert.equal(launchReviewCloseoutRecordedCutoverTriageAction.status, "pass");
+    assert.equal(launchReviewCloseoutRecordedCutoverTriageAction.priority, "secondary");
+    assert.equal(launchReviewCloseoutRecordedCutoverTriageAction.recommendedDownload?.key, "launch_review_production_switch_proof_packet");
+    assert.ok(launchReviewCloseoutRecorded.reviewSummary.routeFocus?.controls?.some((item) =>
+      item?.label === "Review Cutover Triage"
+      && item?.recommendedDownload?.key === "launch_review_production_switch_proof_packet"
+    ));
     const launchMainlineCloseoutRecordedPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-mainline/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&reviewMode=matched&format=launch-execution-phase-plan",
@@ -32386,6 +32430,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
+    const launchSmokeCloseoutRecorded = await getJson(
+      baseUrl,
+      "/api/developer/launch-smoke-kit?productCode=EXPORT_CLOSEOUT_READY&channel=stable",
+      ownerSession.token
+    );
+    assert.equal(
+      launchSmokeCloseoutRecorded.smokeSummary.launchCutoverTriageCheckpoint?.status,
+      "ready_for_cutover_watch"
+    );
+    const launchSmokeCloseoutRecordedCutoverTriageAction = launchSmokeCloseoutRecorded.smokeSummary.actionPlan.find((item) =>
+      item.key === "launch_smoke_cutover_triage_checkpoint"
+    );
+    assert.ok(launchSmokeCloseoutRecordedCutoverTriageAction);
+    assert.equal(launchSmokeCloseoutRecordedCutoverTriageAction.status, "pass");
+    assert.equal(launchSmokeCloseoutRecordedCutoverTriageAction.priority, "secondary");
+    assert.equal(launchSmokeCloseoutRecordedCutoverTriageAction.recommendedDownload?.key, "launch_smoke_production_switch_proof_packet");
+    assert.ok(launchSmokeCloseoutRecorded.smokeSummary.routeFocus?.controls?.some((item) =>
+      item?.label === "Review Cutover Triage"
+      && item?.recommendedDownload?.key === "launch_smoke_production_switch_proof_packet"
+    ));
     const launchSmokeCloseoutRecordedPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&format=launch-execution-phase-plan",

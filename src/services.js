@@ -13521,6 +13521,16 @@ function buildDeveloperLaunchReviewSummaryPayload({
       recommendedDownload: reviewProductionSwitchProofPacketDownload
     }));
   }
+  if (launchCutoverTriageCheckpoint) {
+    pushActionPlan(buildLaunchCutoverTriageActionPlanStep({
+      key: "launch_review_cutover_triage_checkpoint",
+      title: "Review cutover triage checkpoint",
+      surfaceName: "Launch Review",
+      checkpoint: launchCutoverTriageCheckpoint,
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: reviewProductionSwitchProofPacketDownload
+    }));
+  }
   if (firstWaveRuntimeEvidenceSource) {
     const firstWaveRuntimeEvidenceReady = firstWaveRuntimeEvidence?.ready === true
       || firstWaveSupportInspectionConfirmation?.allTargetsConfirmed === true
@@ -13835,6 +13845,13 @@ function buildDeveloperLaunchReviewSummaryPayload({
         label: "Download Production Switch Proof",
         recommendedDownload: reviewProductionSwitchProofPacketDownload
       },
+      launchCutoverTriageCheckpoint
+        ? {
+            kind: "download",
+            label: "Review Cutover Triage",
+            recommendedDownload: reviewProductionSwitchProofPacketDownload
+          }
+        : null,
       {
         kind: "download",
         label: "Download Launch Execution Phase Plan",
@@ -16060,6 +16077,14 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
       workspaceAction: opsWorkspaceAction,
       recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload
     } : null,
+    launchCutoverTriageCheckpoint ? buildLaunchCutoverTriageActionPlanStep({
+      key: "launch_smoke_cutover_triage_checkpoint",
+      title: "Review cutover triage checkpoint",
+      surfaceName: "Launch Smoke",
+      checkpoint: launchCutoverTriageCheckpoint,
+      workspaceAction: opsWorkspaceAction,
+      recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload
+    }) : null,
     {
       key: "launch_mainline_overview",
       title: "Review the unified launch mainline handoff",
@@ -16245,6 +16270,13 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
         label: "Download Production Switch Proof",
         recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload
       },
+      launchCutoverTriageCheckpoint
+        ? {
+            kind: "download",
+            label: "Review Cutover Triage",
+            recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload
+          }
+        : null,
       {
         kind: "download",
         label: "Download Launch Execution Phase Plan",
@@ -59538,6 +59570,34 @@ function getLaunchCutoverTriageCheckpointFromInitialLaunchOpsReadiness(initialLa
   return buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     getOperatorQueueCheckpointFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness)
   );
+}
+
+function buildLaunchCutoverTriageActionPlanStep({
+  key = "",
+  title = "",
+  surfaceName = "Launch surface",
+  checkpoint = null,
+  workspaceAction = null,
+  recommendedDownload = null
+} = {}) {
+  if (!key || !checkpoint || typeof checkpoint !== "object") {
+    return null;
+  }
+  const readyForCutoverWatch = checkpoint.status === "ready_for_cutover_watch";
+  const evidencePending = `${checkpoint.launchEvidencePendingCount ?? "-"}/${checkpoint.launchEvidenceTotalCount ?? "-"}`;
+  const proofBlocked = `${checkpoint.productionSwitchProofBlockedCount ?? "-"}/${checkpoint.productionSwitchProofTotalCount ?? "-"}`;
+  const summary = readyForCutoverWatch
+    ? `${surfaceName} cutover triage is ready_for_cutover_watch; continue cutover watch from the shared launch-duty record index.`
+    : `${surfaceName} cutover triage is ${checkpoint.status || "unknown"}: launch evidence pending ${evidencePending}, proof blocked ${proofBlocked}.`;
+  return createLaunchWorkflowActionPlanStep({
+    key,
+    title: title || "Review cutover triage checkpoint",
+    summary,
+    status: readyForCutoverWatch ? "pass" : "review",
+    priority: readyForCutoverWatch ? "secondary" : "primary",
+    workspaceAction,
+    recommendedDownload
+  });
 }
 
 function getLaunchExecutionPhasePlanFromInitialLaunchOpsReadiness(initialLaunchOpsReadiness = null) {

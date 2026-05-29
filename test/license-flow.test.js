@@ -12529,6 +12529,52 @@ test("developer license quickstart first-batch setup can create recommended laun
         recommendedDownloadFormat: "production-switch-proof-packet"
       }
     );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint,
+      runtimeEvidenceReviewOpsCheckpoint?.stagingRehearsalExecutionEntrypoint
+    );
+    assert.deepEqual(
+      {
+        mode:
+          runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.mode,
+        status:
+          runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.status,
+        readyForExecution:
+          runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.readyForExecution,
+        currentActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.currentActionKey,
+        currentCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.currentCommand,
+        closeoutInputFile:
+          runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.closeoutInputFile,
+        readinessActionQueueFile:
+          runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.readinessActionQueueFile,
+        launchDutyRecordIndexPath:
+          runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.launchDutyRecordIndexPath
+      },
+      {
+        mode: "launch-staging-rehearsal-execution-entrypoint/v1",
+        status: "blocked_until_real_environment_proof",
+        readyForExecution: false,
+        currentActionKey: "set_public_https_entrypoint",
+        currentCommand: null,
+        closeoutInputFile: "artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json",
+        readinessActionQueueFile: "artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
+      }
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.profileDrivenDryRunCommand || "",
+      /npm\.cmd run staging:rehearsal -- --profile-file/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.readinessStatusCommand || "",
+      /npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.stagingRehearsalExecutionEntrypoint?.rehearsalReloadCommand || "",
+      /npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json/
+    );
     assert.equal(
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.proofExecutionEntrypoint?.actionKey,
       runtimeEvidenceReviewOpsCheckpoint?.productionSwitchProofCurrentActionKey
@@ -12667,6 +12713,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchReview.summaryText, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /stagingRehearsalEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint/
+    );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
@@ -12756,6 +12806,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /storageProfileProof=pending_real_environment_value \| profile=-/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/);
+    assert.match(
+      runtimeEvidenceReviewProductionSwitchProofPacketDownload.body,
+      /stagingRehearsalEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint[\s\S]*readiness=npm\.cmd run staging:readiness:status/
+    );
     const runtimeEvidenceReviewLaunchExecutionPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=launch-execution-phase-plan",
@@ -23980,6 +24034,23 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           recommendedDownloadFormat: "production-switch-proof-packet",
           nextAction: "Run the current production-switch proof command, then refresh Launch Review and Launch Smoke."
         },
+        stagingRehearsalExecutionEntrypoint: {
+          mode: "launch-staging-rehearsal-execution-entrypoint/v1",
+          status: "blocked_until_real_environment_proof",
+          readyForExecution: false,
+          currentActionKey: "set_public_https_entrypoint",
+          currentCommand: null,
+          profileDrivenDryRunCommand: productionSwitchProofPacket?.profileDrivenDryRunCommand || null,
+          readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+          closeoutInputFile: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+          readinessActionQueueFile: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
+          realEnvironmentProofStatus: "blocked_until_real_environment_proof",
+          productionSwitchProofStatus: productionSwitchProofPacket?.status || null,
+          cutoverOperatorDecisionStatus: "hold_for_real_environment_proof",
+          nextAction: "Set a public HTTPS base URL before continuing production switch proof."
+        },
         launchCutoverTriageStatus: "hold_for_launch_evidence",
         steadyStateHandoffStatus: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.status || null,
         steadyStateHandoffActionKey: launchOperationsOperatorEntry.launchDutySteadyStateHandoffLanding?.actionKey || null,
@@ -32316,6 +32387,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.cutoverStableOperationsRunbook?.steadyStateHandoffHref,
         proofExecutionEntrypointReadyForCutoverWatch:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.readyForCutoverWatch,
+        stagingRehearsalEntrypointStatus:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.stagingRehearsalExecutionEntrypoint?.status,
+        stagingRehearsalEntrypointReady:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.stagingRehearsalExecutionEntrypoint?.readyForExecution,
+        stagingRehearsalEntrypointCurrentActionKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.stagingRehearsalExecutionEntrypoint?.currentActionKey,
+        stagingRehearsalEntrypointCurrentCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.stagingRehearsalExecutionEntrypoint?.currentCommand,
+        stagingRehearsalEntrypointReadinessStatusCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.stagingRehearsalExecutionEntrypoint?.readinessStatusCommand,
+        stagingRehearsalEntrypointRehearsalReloadCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.stagingRehearsalExecutionEntrypoint?.rehearsalReloadCommand,
+        stagingRehearsalEntrypointLaunchDutyRecordIndexPath:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.stagingRehearsalExecutionEntrypoint?.launchDutyRecordIndexPath,
         launchCutoverTriageStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchCutoverTriageStatus
       },
       {
@@ -32361,6 +32446,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         proofExecutionEntrypointCutoverStableRunbookSteadyStateHref:
           "/api/developer/ops/export/download?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief",
         proofExecutionEntrypointReadyForCutoverWatch: true,
+        stagingRehearsalEntrypointStatus: "ready_for_rehearsal_reload",
+        stagingRehearsalEntrypointReady: true,
+        stagingRehearsalEntrypointCurrentActionKey: "reload_staging_rehearsal_for_stable_operations",
+        stagingRehearsalEntrypointCurrentCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+        stagingRehearsalEntrypointReadinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        stagingRehearsalEntrypointRehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+        stagingRehearsalEntrypointLaunchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath,
         launchCutoverTriageStatus: "ready_for_cutover_watch"
       }
     );
@@ -32839,6 +32931,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*stagingRehearsalEntrypoint=ready_for_rehearsal_reload \| ready=yes \| current=reload_staging_rehearsal_for_stable_operations[\s\S]*rehearsal=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Launch Evidence Readiness Gate:[\s\S]*Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
     );
     assert.match(
@@ -32869,6 +32965,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,
       /cutoverOperatorDecision=ready_for_cutover_watch \| ready=yes \| gate=ready_for_cutover_watch \| evidence=ready_for_stabilization_handoff \| realEnv=ready_for_real_environment_review \| proof=ready_for_production_switch_review \| current=refresh_readiness_status \| command=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsProofPacketDownload.body,
+      /stagingRehearsalEntrypoint=ready_for_rehearsal_reload \| ready=yes \| current=reload_staging_rehearsal_for_stable_operations[\s\S]*launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,
@@ -33404,6 +33504,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchReviewCloseoutRecordedCutoverTriageAction.context?.proofExecutionEntrypoint?.command || "",
       /npm\.cmd run staging:readiness:status/
     );
+    assert.deepEqual(
+      {
+        status:
+          launchReviewCloseoutRecordedCutoverTriageAction.context?.stagingRehearsalExecutionEntrypoint?.status,
+        readyForExecution:
+          launchReviewCloseoutRecordedCutoverTriageAction.context?.stagingRehearsalExecutionEntrypoint?.readyForExecution,
+        currentActionKey:
+          launchReviewCloseoutRecordedCutoverTriageAction.context?.stagingRehearsalExecutionEntrypoint?.currentActionKey,
+        launchDutyRecordIndexPath:
+          launchReviewCloseoutRecordedCutoverTriageAction.context?.stagingRehearsalExecutionEntrypoint?.launchDutyRecordIndexPath
+      },
+      {
+        status: "ready_for_rehearsal_reload",
+        readyForExecution: true,
+        currentActionKey: "reload_staging_rehearsal_for_stable_operations",
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath
+      }
+    );
     const launchReviewCloseoutRecordedCutoverTriageControl = launchReviewCloseoutRecorded.reviewSummary.routeFocus?.controls?.find((item) =>
       item?.label === "Review Cutover Triage"
     ) || null;
@@ -33460,6 +33578,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
       /currentCommand=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
+      /stagingRehearsalEntrypoint=ready_for_rehearsal_reload \| ready=yes \| current=reload_staging_rehearsal_for_stable_operations[\s\S]*readiness=npm\.cmd run staging:readiness:status/
     );
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
@@ -33585,6 +33707,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /stagingRehearsalEntrypoint=ready_for_rehearsal_reload \| ready=yes \| current=reload_staging_rehearsal_for_stable_operations[\s\S]*rehearsal=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/filled-closeout-input\.json/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
     const launchSmokeCloseoutRecorded = await getJson(
@@ -33685,6 +33811,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchSmokeCloseoutRecordedCutoverTriageAction.context?.proofExecutionEntrypoint?.command || "",
       /npm\.cmd run staging:readiness:status/
+    );
+    assert.deepEqual(
+      {
+        status:
+          launchSmokeCloseoutRecordedCutoverTriageAction.context?.stagingRehearsalExecutionEntrypoint?.status,
+        readyForExecution:
+          launchSmokeCloseoutRecordedCutoverTriageAction.context?.stagingRehearsalExecutionEntrypoint?.readyForExecution,
+        currentActionKey:
+          launchSmokeCloseoutRecordedCutoverTriageAction.context?.stagingRehearsalExecutionEntrypoint?.currentActionKey,
+        launchDutyRecordIndexPath:
+          launchSmokeCloseoutRecordedCutoverTriageAction.context?.stagingRehearsalExecutionEntrypoint?.launchDutyRecordIndexPath
+      },
+      {
+        status: "ready_for_rehearsal_reload",
+        readyForExecution: true,
+        currentActionKey: "reload_staging_rehearsal_for_stable_operations",
+        launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath
+      }
     );
     const launchSmokeCloseoutRecordedCutoverTriageControl = launchSmokeCloseoutRecorded.smokeSummary.routeFocus?.controls?.find((item) =>
       item?.label === "Review Cutover Triage"

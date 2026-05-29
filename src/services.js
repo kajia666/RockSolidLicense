@@ -53025,6 +53025,12 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
   const readinessActionQueueFile = extractCommandOptionValue(currentCommand, "actions-file")
     || extractCommandOptionValue(gate.readinessStatusCommand, "actions-file")
     || null;
+  const readinessStatusCommand = gate.readinessStatusCommand
+    || (String(currentCommand || "").includes("staging:readiness:status") ? currentCommand : null);
+  const rehearsalReloadCommand = gate.rehearsalReloadCommand
+    || (closeoutInputFile
+      ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`
+      : null);
   const launchDutyRecordIndexFile = normalizeDeveloperOpsLaunchEvidencePath(gate.launchDutyRecordIndexPath)
     || path.posix.join(archiveRoot, "launch-duty-record-index.json");
   const backupRestoreProofItem = proofItems.find((item) => item?.key === "backup_restore_drill") || null;
@@ -53066,11 +53072,14 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     storageProfileProof,
     backupRestoreDrillProof
   });
-  return {
+  const proofPacket = {
     version: "developer-ops-launch-evidence-production-switch-proof-packet/v1",
     status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
     currentActionKey,
     currentCommand,
+    profileDrivenDryRunCommand,
+    readinessStatusCommand,
+    rehearsalReloadCommand,
     baseUrl: publicHttpsProof.baseUrl || null,
     productCode: productCode || "<productCode>",
     channel: channel || "<channel>",
@@ -53102,6 +53111,12 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     proofItems,
     nextAction: "Continue the current launch evidence command, rerun the launch operations export, then use this packet as the production switch proof checklist."
   };
+  proofPacket.stagingRehearsalExecutionEntrypoint = buildLaunchStagingRehearsalExecutionEntrypoint({
+    launchEvidenceReadinessGate: gate,
+    productionSwitchProofPacket: proofPacket,
+    realEnvironmentProofSummary
+  });
+  return proofPacket;
 }
 
 function buildDeveloperOpsLaunchEvidenceReadinessGate({
@@ -53422,6 +53437,7 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
   });
   return {
     ...gatePayload,
+    stagingRehearsalExecutionEntrypoint: productionSwitchProofPacket?.stagingRehearsalExecutionEntrypoint || null,
     launchExecutionPhasePlan,
     productionSwitchProofPacket: productionSwitchProofPacket
       ? {
@@ -53583,6 +53599,14 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       || receiptReview?.nextAction
       || null
   });
+  const stagingRehearsalExecutionEntrypoint = buildLaunchStagingRehearsalExecutionEntrypoint({
+    launchEvidenceReadinessGate: launchEvidenceGate,
+    productionSwitchProofPacket: switchProofPacket,
+    realEnvironmentProofSummary,
+    cutoverOperatorDecision,
+    proofExecutionEntrypoint,
+    launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath
+  });
   return {
     mode: "developer-ops-launch-operations-operator-queue-checkpoint/v1",
     status: stableTransition?.status
@@ -53642,6 +53666,7 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     realEnvironmentProofSummary,
     cutoverOperatorDecision,
     proofExecutionEntrypoint,
+    stagingRehearsalExecutionEntrypoint,
     launchCutoverTriageStatus,
     steadyStateHandoffStatus: steadyStateHandoff?.status || null,
     steadyStateHandoffActionKey: steadyStateHandoff?.actionKey || null,
@@ -60368,6 +60393,145 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
   };
 }
 
+function cloneLaunchStagingRehearsalExecutionEntrypoint(entrypoint = null) {
+  return entrypoint && typeof entrypoint === "object" ? { ...entrypoint } : null;
+}
+
+function buildLaunchStagingRehearsalExecutionEntrypoint({
+  launchEvidenceReadinessGate = null,
+  productionSwitchProofPacket = null,
+  realEnvironmentProofSummary = null,
+  cutoverOperatorDecision = null,
+  proofExecutionEntrypoint = null,
+  launchDutyRecordIndexPath = null
+} = {}) {
+  const gate = launchEvidenceReadinessGate && typeof launchEvidenceReadinessGate === "object"
+    ? launchEvidenceReadinessGate
+    : null;
+  const proofPacket = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : null;
+  if (!gate && !proofPacket) {
+    return null;
+  }
+  const proofEntrypoint = proofExecutionEntrypoint && typeof proofExecutionEntrypoint === "object"
+    ? proofExecutionEntrypoint
+    : null;
+  const decision = cutoverOperatorDecision && typeof cutoverOperatorDecision === "object"
+    ? cutoverOperatorDecision
+    : null;
+  const realEnvironmentSummary = realEnvironmentProofSummary && typeof realEnvironmentProofSummary === "object"
+    ? realEnvironmentProofSummary
+    : proofPacket?.realEnvironmentProofSummary && typeof proofPacket.realEnvironmentProofSummary === "object"
+      ? proofPacket.realEnvironmentProofSummary
+      : null;
+  const profileDrivenDryRunCommand = proofPacket?.profileDrivenDryRunCommand
+    || gate?.profileDrivenDryRunCommand
+    || null;
+  const packetCurrentCommand = proofPacket?.currentCommand
+    || proofPacket?.launchExecutionPhasePlan?.currentCommand
+    || gate?.currentCommand
+    || null;
+  const readinessStatusCommand = proofPacket?.readinessStatusCommand
+    || gate?.readinessStatusCommand
+    || proofEntrypoint?.proofItemReadinessRefreshCommand
+    || (String(packetCurrentCommand || "").includes("staging:readiness:status") ? packetCurrentCommand : null);
+  const rehearsalReloadFromCommand = proofPacket?.closeoutInputFile
+    || extractCommandOptionValue(readinessStatusCommand, "input-file")
+    || extractCommandOptionValue(packetCurrentCommand, "input-file")
+    || extractCommandOptionValue(packetCurrentCommand, "closeout-input-file")
+    || null;
+  const rehearsalReloadCommand = proofPacket?.rehearsalReloadCommand
+    || gate?.rehearsalReloadCommand
+    || proofEntrypoint?.proofItemRehearsalReloadCommand
+    || (rehearsalReloadFromCommand
+      ? `npm.cmd run staging:rehearsal -- --closeout-input-file ${rehearsalReloadFromCommand}`
+      : null);
+  const closeoutInputFile = proofPacket?.closeoutInputFile
+    || extractCommandOptionValue(readinessStatusCommand, "input-file")
+    || extractCommandOptionValue(rehearsalReloadCommand, "closeout-input-file")
+    || extractCommandOptionValue(packetCurrentCommand, "input-file")
+    || null;
+  const readinessActionQueueFile = proofPacket?.readinessActionQueueFile
+    || extractCommandOptionValue(readinessStatusCommand, "actions-file")
+    || extractCommandOptionValue(packetCurrentCommand, "actions-file")
+    || null;
+  const resolvedLaunchDutyRecordIndexPath = launchDutyRecordIndexPath
+    || proofPacket?.launchDutyRecordIndexPath
+    || proofPacket?.launchDutyRecordIndexFile
+    || gate?.launchDutyRecordIndexPath
+    || proofEntrypoint?.launchDutyRecordIndexPath
+    || null;
+  const realEnvironmentBlocked = Number(realEnvironmentSummary?.blocked ?? 0) > 0
+    || realEnvironmentSummary?.status === "blocked_until_real_environment_proof";
+  const proofCounts = proofPacket?.proofCounts && typeof proofPacket.proofCounts === "object"
+    ? proofPacket.proofCounts
+    : {};
+  const proofReady = proofPacket?.status === "ready_for_production_switch_review"
+    && Number(proofCounts.total ?? 0) > 0
+    && Number(proofCounts.ready ?? 0) === Number(proofCounts.total ?? 0)
+    && Number(proofCounts.blocked ?? 0) === 0;
+  const launchEvidenceReady = gate?.status === "ready_for_stabilization_handoff"
+    || gate?.status === "ready_for_launch_switch"
+    || Number(gate?.pendingEvidenceCount ?? 1) === 0;
+  const readyForCutoverWatch = decision?.readyForCutoverWatch === true
+    || proofEntrypoint?.readyForCutoverWatch === true
+    || (proofReady && launchEvidenceReady);
+  let status = "ready_for_current_production_switch_proof";
+  let readyForExecution = Boolean(proofEntrypoint?.proofItemCompletionCommand || proofEntrypoint?.command || packetCurrentCommand);
+  let currentActionKey = proofEntrypoint?.proofItemCompletionQueueKey
+    || proofEntrypoint?.actionKey
+    || proofPacket?.currentActionKey
+    || null;
+  let currentCommand = proofEntrypoint?.proofItemCompletionCommand
+    || proofEntrypoint?.command
+    || packetCurrentCommand
+    || null;
+  let nextAction = proofEntrypoint?.nextAction
+    || proofPacket?.nextAction
+    || gate?.nextAction
+    || null;
+  if (realEnvironmentBlocked) {
+    status = "blocked_until_real_environment_proof";
+    readyForExecution = false;
+    currentActionKey = realEnvironmentSummary?.currentActionKey
+      || decision?.currentActionKey
+      || currentActionKey;
+    currentCommand = null;
+    nextAction = realEnvironmentSummary?.nextAction
+      || "Complete the real-environment proof before running the staging rehearsal execution entrypoint.";
+  } else if (readyForCutoverWatch) {
+    status = "ready_for_rehearsal_reload";
+    readyForExecution = Boolean(rehearsalReloadCommand);
+    currentActionKey = "reload_staging_rehearsal_for_stable_operations";
+    currentCommand = rehearsalReloadCommand || readinessStatusCommand || packetCurrentCommand || null;
+    nextAction = "Run readiness status if needed, reload staging rehearsal, then refresh Developer Ops before stable-operations handoff.";
+  } else if (proofReady) {
+    status = "ready_for_readiness_refresh";
+    readyForExecution = Boolean(readinessStatusCommand);
+    currentActionKey = "refresh_readiness_status";
+    currentCommand = readinessStatusCommand || packetCurrentCommand || null;
+    nextAction = "Refresh staging readiness before deciding cutover watch.";
+  }
+  return {
+    mode: "launch-staging-rehearsal-execution-entrypoint/v1",
+    status,
+    readyForExecution,
+    currentActionKey,
+    currentCommand,
+    profileDrivenDryRunCommand,
+    readinessStatusCommand,
+    rehearsalReloadCommand,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
+    realEnvironmentProofStatus: realEnvironmentSummary?.status || null,
+    productionSwitchProofStatus: proofPacket?.status || null,
+    cutoverOperatorDecisionStatus: decision?.status || null,
+    nextAction
+  };
+}
+
 function formatLaunchCutoverDecisionProgress(ready = null, total = null) {
   const hasReady = ready !== null && ready !== undefined && ready !== "";
   const hasTotal = total !== null && total !== undefined && total !== "";
@@ -60505,7 +60669,9 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
     launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
     proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
       ? { ...checkpoint.proofExecutionEntrypoint }
-      : null
+      : null,
+    stagingRehearsalExecutionEntrypoint:
+      cloneLaunchStagingRehearsalExecutionEntrypoint(checkpoint.stagingRehearsalExecutionEntrypoint)
   };
 }
 
@@ -60586,6 +60752,15 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
       proofExecutionEntrypoint,
       nextAction: checkpoint.nextAction || null
     });
+  const stagingRehearsalExecutionEntrypoint =
+    cloneLaunchStagingRehearsalExecutionEntrypoint(checkpoint.stagingRehearsalExecutionEntrypoint)
+    || buildLaunchStagingRehearsalExecutionEntrypoint({
+      productionSwitchProofPacket: proofPacket,
+      realEnvironmentProofSummary,
+      cutoverOperatorDecision,
+      proofExecutionEntrypoint,
+      launchDutyRecordIndexPath
+    });
   return {
     mode: "launch-surface-cutover-triage-checkpoint/v1",
     sourceMode: checkpoint.mode || null,
@@ -60610,6 +60785,7 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     cutoverOperatorDecision,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
+    stagingRehearsalExecutionEntrypoint,
     nextAction: status === "ready_for_cutover_watch"
       ? "Production switch proof is ready; continue cutover watch from the shared launch-duty record index."
       : checkpoint.nextAction || "Complete launch evidence and refresh production switch proof before cutover watch."
@@ -60808,6 +60984,29 @@ function appendLaunchCutoverOperatorDecisionLine(lines = [], checkpoint = null) 
   return true;
 }
 
+function appendLaunchStagingRehearsalExecutionEntrypointLine(lines = [], source = null) {
+  if (!Array.isArray(lines) || !source || typeof source !== "object") {
+    return false;
+  }
+  const entrypoint = source.stagingRehearsalExecutionEntrypoint
+    && typeof source.stagingRehearsalExecutionEntrypoint === "object"
+    ? source.stagingRehearsalExecutionEntrypoint
+    : null;
+  if (!entrypoint) {
+    return false;
+  }
+  lines.push(
+    `- stagingRehearsalEntrypoint=${entrypoint.status || "-"}`
+    + ` | ready=${entrypoint.readyForExecution === true ? "yes" : "no"}`
+    + ` | current=${entrypoint.currentActionKey || "-"}`
+    + ` | profile=${entrypoint.profileDrivenDryRunCommand || "-"}`
+    + ` | readiness=${entrypoint.readinessStatusCommand || "-"}`
+    + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
+    + ` | launchDutyRecordIndex=${entrypoint.launchDutyRecordIndexPath || "-"}`
+  );
+  return true;
+}
+
 function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null, {
   leadingBlank = true,
   heading = "Launch Cutover Triage Checkpoint:"
@@ -60836,6 +61035,7 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
   );
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
+  appendLaunchStagingRehearsalExecutionEntrypointLine(lines, checkpoint);
   const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof
     && typeof checkpoint.backupRestoreDrillProof === "object"
     ? checkpoint.backupRestoreDrillProof
@@ -60954,6 +61154,7 @@ function appendProductionSwitchProofPacketLines(lines = [], proofPacket = null, 
     + ` | tests=${baseline.testCount ?? "-"}`
     + ` | failures=${baseline.failureCount ?? "-"}`
   );
+  appendLaunchStagingRehearsalExecutionEntrypointLine(lines, proofPacket);
   appendDeveloperOpsLaunchExecutionPhasePlanLines(lines, proofPacket.launchExecutionPhasePlan, {
     leadingBlank: false
   });
@@ -67498,6 +67699,7 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
   );
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
+  appendLaunchStagingRehearsalExecutionEntrypointLine(lines, checkpoint);
   const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof
     && typeof checkpoint.backupRestoreDrillProof === "object"
     ? checkpoint.backupRestoreDrillProof

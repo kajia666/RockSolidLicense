@@ -48,10 +48,14 @@ function runCloseoutInit(args, env = {}) {
   });
 }
 
-function runCloseoutInitPlain(args) {
+function runCloseoutInitPlain(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-closeout-init.mjs", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env
+    },
     timeout: 120_000
   });
 }
@@ -203,6 +207,18 @@ function buildExpectedProductionSwitchProofPacket({
     closeoutInputFile: outputFile,
     readinessActionQueueFile: actionsFile,
     launchDutyRecordIndexFile: `${archiveRoot}/launch-duty-record-index.json`,
+    secretEnvProof: {
+      status: "pending_real_environment_confirmation",
+      requiredKeys: [],
+      presentKeys: [],
+      missingKeys: [],
+      requiredCount: 0,
+      missingCount: 0,
+      currentMissingKey: null,
+      targetEnvFile: null,
+      currentActionKey: "bind_required_secret_env",
+      nextAction: "Bind the required secret environment variable names before continuing production switch proof."
+    },
     localFullSuiteBaseline: {
       command: "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -555,12 +571,74 @@ test("staging closeout init marks bound non-default secret env ready when requir
         ["storage_profile_selected", "ready_from_closeout_input", "postgres-preview"]
       ]
     );
+    assert.deepEqual(output.productionSwitchProofPacket.secretEnvProof, {
+      status: "ready_secret_env_loaded",
+      requiredKeys: [
+        "RSL_SMOKE_ADMIN_PASSWORD",
+        "RSL_SMOKE_DEVELOPER_PASSWORD",
+        "RSL_DEVELOPER_BEARER_TOKEN"
+      ],
+      presentKeys: [
+        "RSL_SMOKE_ADMIN_PASSWORD",
+        "RSL_SMOKE_DEVELOPER_PASSWORD",
+        "RSL_DEVELOPER_BEARER_TOKEN"
+      ],
+      missingKeys: [],
+      requiredCount: 3,
+      missingCount: 0,
+      currentMissingKey: null,
+      targetEnvFile: "/etc/rocksolidlicense/staging.env",
+      currentActionKey: "confirm_secret_env_loaded",
+      nextAction: "Required secret environment variables are loaded; continue production switch proof."
+    });
     assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
       total: 8,
       ready: 4,
       blocked: 4
     });
     assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging closeout init prints secret env proof in plain output without secret values", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-closeout-init-secret-env-plain-"));
+  try {
+    const draftFile = join(tempDir, "filled-closeout-input.draft.json");
+    const outputFile = join(tempDir, "filled-closeout-input.json");
+    const actionsFile = join(tempDir, "readiness-action-queue.md");
+    writeDraft(draftFile, outputFile, {
+      stagingEnvironmentBinding: {
+        environment: {
+          targetEnvFile: "/etc/rocksolidlicense/staging.env"
+        },
+        credentialEnv: {
+          adminPassword: "RSL_SMOKE_ADMIN_PASSWORD",
+          developerPassword: "RSL_SMOKE_DEVELOPER_PASSWORD",
+          developerBearerToken: "RSL_DEVELOPER_BEARER_TOKEN"
+        }
+      }
+    });
+
+    const result = runCloseoutInitPlain([
+      "--draft-file",
+      draftFile,
+      "--output-file",
+      outputFile,
+      "--actions-file",
+      actionsFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "RealAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "RealDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: ""
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
+    assert.match(result.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
+    assert.match(result.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);
+    assert.doesNotMatch(result.stdout, /RealAdminSecret123!|RealDeveloperSecret123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
+import { buildProductionSwitchSecretEnvProof } from "./staging-proof-utils.mjs";
 
 const OPTION_FLAGS = {
   "--draft-file": "draftFile",
@@ -584,7 +584,7 @@ function buildCloseoutInitProductionSwitchProofPacket({
   const targetEnvFile = closeoutInput?.targetEnvFile || closeoutInput?.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
   const baseUrl = closeoutInput?.baseUrl || closeoutInput?.summary?.baseUrl || null;
   const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
-  const secretEnvProof = buildBoundSecretEnvProof(closeoutInput);
+  const secretEnvProof = buildProductionSwitchSecretEnvProof(closeoutInput, targetEnvFile);
   const backupRestoreField = closeoutFields.get("backup_restore_drill_result");
   const backupRestoreArtifactPath = backupRestoreField?.artifactPath || path.posix.join(archiveRoot, "backup_restore_drill_result.txt");
   const backupRestoreReady = isFilledValue(backupRestoreField?.value);
@@ -696,6 +696,7 @@ function buildCloseoutInitProductionSwitchProofPacket({
     closeoutInputFile: outputFile,
     readinessActionQueueFile: actionsFile || null,
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -725,6 +726,17 @@ function writeProductionSwitchProofPacketPlain(packet) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const secretEnvProof = packet.secretEnvProof || {};
+  if (secretEnvProof.status) {
+    console.log(
+      `Production switch secret env proof: ${secretEnvProof.status || "-"}`
+        + ` (required=${secretEnvProof.requiredCount ?? "-"}`
+        + `, missing=${secretEnvProof.missingCount ?? "-"}`
+        + `, current=${secretEnvProof.currentMissingKey || "-"})`
+    );
+    console.log(`Production switch secret env required: ${(secretEnvProof.requiredKeys || []).join(", ") || "-"}`);
+    console.log(`Production switch secret env missing: ${(secretEnvProof.missingKeys || []).join(", ") || "-"}`);
+  }
   const baseline = packet.localFullSuiteBaseline || {};
   console.log(
     `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`

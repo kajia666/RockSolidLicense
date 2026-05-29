@@ -12511,6 +12511,50 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofExecutionEntrypoint?.currentCommand || "",
       /npm\.cmd run staging:rehearsal -- --profile-file/
     );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint?.liveWriteSmokeExecutionEntrypoint,
+      runtimeEvidenceReviewOpsCheckpoint?.liveWriteSmokeExecutionEntrypoint
+    );
+    assert.deepEqual(
+      {
+        mode: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.mode,
+        status: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.status,
+        readyForExecution: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.readyForExecution,
+        currentActionKey: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.currentActionKey,
+        currentCommand: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.currentCommand,
+        resultTargetKey: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.resultTargetKey,
+        resultQueueKey: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.resultQueueKey,
+        liveWriteSmokeOutputArtifact: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.liveWriteSmokeOutputArtifact,
+        closeoutInputFile: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.closeoutInputFile,
+        readinessActionQueueFile: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.readinessActionQueueFile,
+        launchDutyRecordIndexPath: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.launchDutyRecordIndexPath
+      },
+      {
+        mode: "launch-live-write-smoke-execution-entrypoint/v1",
+        status: "blocked_until_real_environment_proof",
+        readyForExecution: false,
+        currentActionKey: "set_public_https_entrypoint",
+        currentCommand: null,
+        resultTargetKey: "live_write_smoke_result",
+        resultQueueKey: "live_write_smoke_result_backfill",
+        liveWriteSmokeOutputArtifact: "artifacts/staging/FIRSTBATCH/stable/live-write-smoke-output.json",
+        closeoutInputFile: "artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json",
+        readinessActionQueueFile: "artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
+      }
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.smokePreflightCommand || "",
+      /npm\.cmd run staging:preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.launchSmokeCommand || "",
+      /npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes --product-code FIRSTBATCH --channel stable --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.resultBackfillCommand || "",
+      /npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key live_write_smoke_result/
+    );
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
     assert.equal(
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.status,
@@ -12733,6 +12777,10 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewCutoverTriageAction.context?.realEnvironmentProofExecutionEntrypoint,
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.realEnvironmentProofExecutionEntrypoint
     );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageAction.context?.liveWriteSmokeExecutionEntrypoint,
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.liveWriteSmokeExecutionEntrypoint
+    );
     const runtimeEvidenceReviewCutoverTriageControl = runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.find((item) =>
       item?.label === "Review Cutover Triage"
     ) || null;
@@ -12765,6 +12813,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /realEnvironmentProofEntrypoint=blocked_until_real_environment_proof \| ready=yes \| current=public_https_entrypoint \| action=set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /liveWriteSmokeEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -23900,6 +23952,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         realEnvironmentProofSummary: productionSwitchProofPacket?.realEnvironmentProofSummary || null,
         realEnvironmentProofExecutionEntrypoint:
           productionSwitchProofPacket?.realEnvironmentProofExecutionEntrypoint || null,
+        liveWriteSmokeExecutionEntrypoint:
+          productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint || null,
         cutoverOperatorDecision: {
           mode: "launch-cutover-operator-decision/v1",
           status: "hold_for_real_environment_proof",
@@ -24292,6 +24346,35 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                   ])
               }
             : null,
+        liveWriteSmokeExecutionEntrypoint:
+          launchEvidenceReadinessGate.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint
+            ? {
+                mode: launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.mode,
+                status: launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.status,
+                readyForExecution:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.readyForExecution,
+                currentActionKey:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.currentActionKey,
+                currentCommand:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.currentCommand,
+                smokePreflightCommand:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.smokePreflightCommand,
+                launchSmokeCommand:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.launchSmokeCommand,
+                resultTargetKey:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.resultTargetKey,
+                resultQueueKey:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.resultQueueKey,
+                resultBackfillCommand:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.resultBackfillCommand,
+                readinessRefreshCommand:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.readinessRefreshCommand,
+                liveWriteSmokeOutputArtifact:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.liveWriteSmokeOutputArtifact,
+                launchDutyRecordIndexPath:
+                  launchEvidenceReadinessGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.launchDutyRecordIndexPath
+              }
+            : null,
         proofCounts: launchEvidenceReadinessGate.productionSwitchProofPacket?.proofCounts,
         localFullSuiteBaseline: launchEvidenceReadinessGate.productionSwitchProofPacket?.localFullSuiteBaseline
       },
@@ -24429,6 +24512,21 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             ]
           ]
         },
+        liveWriteSmokeExecutionEntrypoint: {
+          mode: "launch-live-write-smoke-execution-entrypoint/v1",
+          status: "blocked_until_real_environment_proof",
+          readyForExecution: false,
+          currentActionKey: "set_public_https_entrypoint",
+          currentCommand: null,
+          smokePreflightCommand: "npm.cmd run staging:preflight -- --base-url <public-https-base-url> --product-code EXPORT_CLOSEOUT_READY --channel stable",
+          launchSmokeCommand: "npm.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes --product-code EXPORT_CLOSEOUT_READY --channel stable --closeout-input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          resultTargetKey: "live_write_smoke_result",
+          resultQueueKey: "live_write_smoke_result_backfill",
+          resultBackfillCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key live_write_smoke_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json --receipt-id <record_launch_rehearsal_run-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          liveWriteSmokeOutputArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json",
+          launchDutyRecordIndexPath: expectedSteadyStateLaunchDutyRecordIndexPath
+        },
         proofCounts: {
           total: 8,
           ready: 1,
@@ -24523,6 +24621,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*realEnvironmentProofEntrypoint=blocked_until_real_environment_proof \| ready=yes \| current=public_https_entrypoint \| action=set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*liveWriteSmokeEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>/
     );
     assert.equal(launchOperationsOperatorEntry.checklistStepCount, 14);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
@@ -32368,6 +32470,24 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                   ])
               }
             : null,
+        liveWriteSmokeExecutionEntrypoint:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint
+            ? {
+                status: launchDutyCloseoutRecordedGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.status,
+                readyForExecution:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.readyForExecution,
+                currentActionKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.currentActionKey,
+                currentCommand:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.currentCommand,
+                resultTargetKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.resultTargetKey,
+                resultQueueKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.resultQueueKey,
+                liveWriteSmokeOutputArtifact:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.liveWriteSmokeOutputArtifact
+              }
+            : null,
         proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
       },
       {
@@ -32467,6 +32587,15 @@ test("developer ops export bundles scoped data and downloadable assets", async (
             ["backup_restore_drill", "ready_evidence_attached", "confirm_backup_restore_drill_evidence"]
           ]
         },
+        liveWriteSmokeExecutionEntrypoint: {
+          status: "ready_live_write_smoke_evidence_attached",
+          readyForExecution: true,
+          currentActionKey: "confirm_live_write_smoke_evidence",
+          currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          resultTargetKey: "live_write_smoke_result",
+          resultQueueKey: "live_write_smoke_result_backfill",
+          liveWriteSmokeOutputArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json"
+        },
         proofCounts: {
           total: 8,
           ready: 8,
@@ -32532,6 +32661,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.realEnvironmentProofExecutionEntrypoint?.currentActionKey,
         realEnvironmentProofEntrypointCurrentCommand:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.realEnvironmentProofExecutionEntrypoint?.currentCommand,
+        liveWriteSmokeEntrypointStatus:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.liveWriteSmokeExecutionEntrypoint?.status,
+        liveWriteSmokeEntrypointReady:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.liveWriteSmokeExecutionEntrypoint?.readyForExecution,
+        liveWriteSmokeEntrypointCurrentActionKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.liveWriteSmokeExecutionEntrypoint?.currentActionKey,
+        liveWriteSmokeEntrypointCurrentCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.liveWriteSmokeExecutionEntrypoint?.currentCommand,
         cutoverDecisionStatus:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.cutoverOperatorDecision?.status,
         cutoverDecisionReadyForCutoverWatch:
@@ -32618,6 +32755,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         realEnvironmentProofEntrypointCurrentProofKey: null,
         realEnvironmentProofEntrypointCurrentActionKey: "confirm_real_environment_proof_review",
         realEnvironmentProofEntrypointCurrentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        liveWriteSmokeEntrypointStatus: "ready_live_write_smoke_evidence_attached",
+        liveWriteSmokeEntrypointReady: true,
+        liveWriteSmokeEntrypointCurrentActionKey: "confirm_live_write_smoke_evidence",
+        liveWriteSmokeEntrypointCurrentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
         cutoverDecisionStatus: "ready_for_cutover_watch",
         cutoverDecisionReadyForCutoverWatch: true,
         cutoverDecisionLaunchEvidenceProgress: "12/12",

@@ -52698,6 +52698,155 @@ function buildDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoin
   };
 }
 
+function cloneLaunchLiveWriteSmokeExecutionEntrypoint(entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  return {
+    ...entrypoint,
+    receiptOperations: Array.isArray(entrypoint.receiptOperations)
+      ? entrypoint.receiptOperations.slice()
+      : []
+  };
+}
+
+function buildLaunchLiveWriteSmokeExecutionEntrypoint({
+  productionSwitchProofPacket = null,
+  realEnvironmentProofSummary = null,
+  proofExecutionEntrypoint = null,
+  launchDutyRecordIndexPath = null
+} = {}) {
+  const proofPacket = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : null;
+  if (!proofPacket) {
+    return null;
+  }
+  const proofEntrypoint = proofExecutionEntrypoint && typeof proofExecutionEntrypoint === "object"
+    ? proofExecutionEntrypoint
+    : null;
+  const realEnvironmentSummary = realEnvironmentProofSummary && typeof realEnvironmentProofSummary === "object"
+    ? realEnvironmentProofSummary
+    : proofPacket.realEnvironmentProofSummary && typeof proofPacket.realEnvironmentProofSummary === "object"
+      ? proofPacket.realEnvironmentProofSummary
+      : null;
+  const proofItems = Array.isArray(proofPacket.proofItems) ? proofPacket.proofItems : [];
+  const backupRestoreProofItem = proofItems.find((item) => item?.key === "backup_restore_drill") || null;
+  const liveWriteProofItem = proofItems.find((item) => item?.key === "live_write_smoke") || null;
+  const completionSequence = Array.isArray(proofEntrypoint?.proofItemCompletionSequence)
+    ? proofEntrypoint.proofItemCompletionSequence
+    : buildProductionSwitchProofItemCompletionSequence(proofPacket);
+  const liveWriteCompletion = completionSequence.find((item) => item?.proofItemKey === "live_write_smoke") || null;
+  const liveWriteCompletionTarget = liveWriteCompletion
+    ? null
+    : buildProductionSwitchProofItemCompletionTarget(liveWriteProofItem, proofPacket);
+  const closeoutInputFile = proofPacket.closeoutInputFile
+    || extractCommandOptionValue(proofPacket.currentCommand, "input-file")
+    || null;
+  const readinessActionQueueFile = proofPacket.readinessActionQueueFile
+    || extractCommandOptionValue(proofPacket.currentCommand, "actions-file")
+    || null;
+  const resolvedLaunchDutyRecordIndexPath = launchDutyRecordIndexPath
+    || proofPacket.launchDutyRecordIndexPath
+    || proofPacket.launchDutyRecordIndexFile
+    || proofEntrypoint?.launchDutyRecordIndexPath
+    || null;
+  const productCode = proofPacket.productCode || "<productCode>";
+  const channel = proofPacket.channel || "<channel>";
+  const baseUrl = proofPacket.baseUrl
+    || extractCommandOptionValue(proofPacket.profileDrivenDryRunCommand, "base-url")
+    || "<public-https-base-url>";
+  const smokePreflightCommand = [
+    "npm.cmd run staging:preflight --",
+    "--base-url",
+    baseUrl,
+    "--product-code",
+    productCode,
+    "--channel",
+    channel
+  ].join(" ");
+  const launchSmokeCommand = [
+    "npm.cmd run launch:smoke:staging --",
+    "--base-url",
+    baseUrl,
+    "--allow-live-writes",
+    "--product-code",
+    productCode,
+    "--channel",
+    channel,
+    "--closeout-input-file",
+    closeoutInputFile,
+    "--actions-file",
+    readinessActionQueueFile
+  ].filter(Boolean).join(" ");
+  const resultBackfillCommand = liveWriteCompletion?.completionCommand
+    || liveWriteCompletionTarget?.command
+    || null;
+  const readinessRefreshCommand = liveWriteCompletion?.readinessRefreshCommand
+    || liveWriteCompletionTarget?.readinessRefreshCommand
+    || proofPacket.readinessStatusCommand
+    || null;
+  const rehearsalReloadCommand = liveWriteCompletionTarget?.rehearsalReloadCommand
+    || proofPacket.rehearsalReloadCommand
+    || null;
+  const liveWriteSmokeOutputArtifact = liveWriteCompletion?.artifactPath
+    || liveWriteProofItem?.artifactPath
+    || (proofPacket.archiveRoot ? path.posix.join(proofPacket.archiveRoot, "live-write-smoke-output.json") : null);
+  const realEnvironmentBlocked = Number(realEnvironmentSummary?.blocked ?? 0) > 0
+    || realEnvironmentSummary?.status === "blocked_until_real_environment_proof";
+  const backupRestoreReady = isProductionSwitchProofItemReady(backupRestoreProofItem);
+  const liveWriteReady = isProductionSwitchProofItemReady(liveWriteProofItem);
+  let status = "ready_for_launch_smoke_staging";
+  let readyForExecution = Boolean(launchSmokeCommand);
+  let currentActionKey = "run_launch_smoke_staging";
+  let currentCommand = launchSmokeCommand || null;
+  let nextAction = "Run staging:preflight, then launch:smoke:staging, backfill live_write_smoke_result, and refresh staging readiness.";
+  if (realEnvironmentBlocked) {
+    status = "blocked_until_real_environment_proof";
+    readyForExecution = false;
+    currentActionKey = realEnvironmentSummary?.currentActionKey || "confirm_real_environment_proof_review";
+    currentCommand = null;
+    nextAction = realEnvironmentSummary?.nextAction
+      || "Complete the real-environment proof before running launch:smoke:staging.";
+  } else if (liveWriteReady) {
+    status = "ready_live_write_smoke_evidence_attached";
+    readyForExecution = Boolean(readinessRefreshCommand);
+    currentActionKey = "confirm_live_write_smoke_evidence";
+    currentCommand = readinessRefreshCommand || rehearsalReloadCommand || null;
+    nextAction = "Live-write smoke evidence is attached; refresh readiness and continue production sign-off or cutover watch.";
+  } else if (!backupRestoreReady) {
+    status = "blocked_until_backup_restore_drill";
+    readyForExecution = false;
+    currentActionKey = backupRestoreProofItem?.currentActionKey
+      || proofEntrypoint?.proofItemCompletionQueueKey
+      || "backfill_backup_restore_drill_evidence";
+    currentCommand = proofEntrypoint?.proofItemKey === "backup_restore_drill"
+      ? proofEntrypoint?.proofItemCompletionCommand || null
+      : null;
+    nextAction = "Attach backup/restore drill evidence before running live-write smoke.";
+  }
+  return {
+    mode: "launch-live-write-smoke-execution-entrypoint/v1",
+    status,
+    readyForExecution,
+    currentActionKey,
+    currentCommand,
+    smokePreflightCommand,
+    launchSmokeCommand,
+    resultTargetKey: liveWriteCompletion?.completionTargetKey || liveWriteCompletionTarget?.targetKey || "live_write_smoke_result",
+    resultQueueKey: liveWriteCompletion?.completionQueueKey || liveWriteCompletionTarget?.queueKey || "live_write_smoke_result_backfill",
+    resultBackfillCommand,
+    readinessRefreshCommand,
+    rehearsalReloadCommand,
+    liveWriteSmokeOutputArtifact,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
+    receiptOperations: ["<record_launch_rehearsal_run-receipt-id>"],
+    nextAction
+  };
+}
+
 const DEVELOPER_OPS_LAUNCH_EXECUTION_PHASES = [
   {
     key: "profile_and_closeout",
@@ -53232,6 +53381,10 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     proofItems,
     nextAction: "Continue the current launch evidence command, rerun the launch operations export, then use this packet as the production switch proof checklist."
   };
+  proofPacket.liveWriteSmokeExecutionEntrypoint = buildLaunchLiveWriteSmokeExecutionEntrypoint({
+    productionSwitchProofPacket: proofPacket,
+    realEnvironmentProofSummary
+  });
   proofPacket.stagingRehearsalExecutionEntrypoint = buildLaunchStagingRehearsalExecutionEntrypoint({
     launchEvidenceReadinessGate: gate,
     productionSwitchProofPacket: proofPacket,
@@ -53665,6 +53818,10 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     cloneDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint(
       switchProofPacket?.realEnvironmentProofExecutionEntrypoint
     );
+  const liveWriteSmokeExecutionEntrypoint =
+    cloneLaunchLiveWriteSmokeExecutionEntrypoint(
+      switchProofPacket?.liveWriteSmokeExecutionEntrypoint
+    );
   const proofExecutionEntrypoint = buildLaunchCutoverTriageProofExecutionEntrypoint({
     checkpoint: {
       launchCutoverTriageStatus,
@@ -53790,6 +53947,7 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       : null,
     realEnvironmentProofSummary,
     realEnvironmentProofExecutionEntrypoint,
+    liveWriteSmokeExecutionEntrypoint,
     cutoverOperatorDecision,
     proofExecutionEntrypoint,
     stagingRehearsalExecutionEntrypoint,
@@ -60795,6 +60953,8 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
       cloneDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint(
         checkpoint.realEnvironmentProofExecutionEntrypoint
       ),
+    liveWriteSmokeExecutionEntrypoint:
+      cloneLaunchLiveWriteSmokeExecutionEntrypoint(checkpoint.liveWriteSmokeExecutionEntrypoint),
     cutoverOperatorDecision: cloneLaunchCutoverOperatorDecision(checkpoint.cutoverOperatorDecision),
     launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
     proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
@@ -60884,6 +61044,15 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
       readinessActionQueueFile: proofPacket?.readinessActionQueueFile || null,
       launchDutyRecordIndexPath
     });
+  const liveWriteSmokeExecutionEntrypoint =
+    cloneLaunchLiveWriteSmokeExecutionEntrypoint(checkpoint.liveWriteSmokeExecutionEntrypoint)
+    || cloneLaunchLiveWriteSmokeExecutionEntrypoint(proofPacket?.liveWriteSmokeExecutionEntrypoint)
+    || buildLaunchLiveWriteSmokeExecutionEntrypoint({
+      productionSwitchProofPacket: proofPacket,
+      realEnvironmentProofSummary,
+      proofExecutionEntrypoint,
+      launchDutyRecordIndexPath
+    });
   const productionSwitchProofReadyCount = checkpoint.productionSwitchProofReadyCount ?? proofCounts.ready ?? null;
   const productionSwitchProofTotalCount = checkpoint.productionSwitchProofTotalCount ?? proofCounts.total ?? null;
   const productionSwitchProofBlockedCount = checkpoint.productionSwitchProofBlockedCount ?? proofCounts.blocked ?? null;
@@ -60933,6 +61102,7 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     backupRestoreDrillProof: backupRestoreDrillProof ? { ...backupRestoreDrillProof } : null,
     realEnvironmentProofSummary,
     realEnvironmentProofExecutionEntrypoint,
+    liveWriteSmokeExecutionEntrypoint,
     cutoverOperatorDecision,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
@@ -61122,6 +61292,20 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | command=${realEnvironmentProofExecutionEntrypoint.currentCommand || "-"}`
       + ` | readiness=${realEnvironmentProofExecutionEntrypoint.readinessStatusCommand || "-"}`
       + ` | launchDutyRecordIndex=${realEnvironmentProofExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
+    );
+  }
+  const liveWriteSmokeExecutionEntrypoint =
+    cloneLaunchLiveWriteSmokeExecutionEntrypoint(proofSource.liveWriteSmokeExecutionEntrypoint);
+  if (liveWriteSmokeExecutionEntrypoint) {
+    lines.push(
+      `- liveWriteSmokeEntrypoint=${liveWriteSmokeExecutionEntrypoint.status || "-"}`
+      + ` | ready=${liveWriteSmokeExecutionEntrypoint.readyForExecution === true ? "yes" : "no"}`
+      + ` | current=${liveWriteSmokeExecutionEntrypoint.currentActionKey || "-"}`
+      + ` | smoke=${liveWriteSmokeExecutionEntrypoint.launchSmokeCommand || "-"}`
+      + ` | backfill=${liveWriteSmokeExecutionEntrypoint.resultBackfillCommand || "-"}`
+      + ` | readiness=${liveWriteSmokeExecutionEntrypoint.readinessRefreshCommand || "-"}`
+      + ` | artifact=${liveWriteSmokeExecutionEntrypoint.liveWriteSmokeOutputArtifact || "-"}`
+      + ` | launchDutyRecordIndex=${liveWriteSmokeExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
   }
   return Boolean(publicHttpsProof || storageProfileProof || secretEnvProof || realEnvironmentProofSummary);

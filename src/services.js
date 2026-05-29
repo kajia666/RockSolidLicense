@@ -53522,6 +53522,8 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
   const productionSwitchProofCurrentCommand = switchProofPacket?.currentCommand
     || switchProofPacket?.launchExecutionPhasePlan?.currentCommand
     || null;
+  const realEnvironmentProofSummary =
+    cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(switchProofPacket?.realEnvironmentProofSummary);
   const proofExecutionEntrypoint = buildLaunchCutoverTriageProofExecutionEntrypoint({
     checkpoint: {
       launchCutoverTriageStatus,
@@ -53564,6 +53566,22 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath
     },
     productionSwitchProofPacket: switchProofPacket
+  });
+  const cutoverOperatorDecision = buildLaunchCutoverOperatorDecision({
+    launchCutoverTriageStatus,
+    launchEvidenceStatus: launchEvidenceGate?.status || null,
+    launchEvidencePendingCount,
+    launchEvidenceTotalCount,
+    productionSwitchProofStatus: switchProofPacket?.status || null,
+    productionSwitchProofReadyCount: switchProofReadyCount,
+    productionSwitchProofTotalCount: switchProofTotalCount,
+    productionSwitchProofBlockedCount: switchProofBlockedCount,
+    realEnvironmentProofSummary,
+    proofExecutionEntrypoint,
+    nextAction: stableTransition?.nextAction
+      || steadyStateHandoff?.nextAction
+      || receiptReview?.nextAction
+      || null
   });
   return {
     mode: "developer-ops-launch-operations-operator-queue-checkpoint/v1",
@@ -53621,8 +53639,8 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       && typeof switchProofPacket.backupRestoreDrillProof === "object"
       ? { ...switchProofPacket.backupRestoreDrillProof }
       : null,
-    realEnvironmentProofSummary:
-      cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(switchProofPacket?.realEnvironmentProofSummary),
+    realEnvironmentProofSummary,
+    cutoverOperatorDecision,
     proofExecutionEntrypoint,
     launchCutoverTriageStatus,
     steadyStateHandoffStatus: steadyStateHandoff?.status || null,
@@ -60350,6 +60368,107 @@ function buildLaunchCutoverTriageProofExecutionEntrypoint({
   };
 }
 
+function formatLaunchCutoverDecisionProgress(ready = null, total = null) {
+  const hasReady = ready !== null && ready !== undefined && ready !== "";
+  const hasTotal = total !== null && total !== undefined && total !== "";
+  const normalizedReady = hasReady && Number.isFinite(Number(ready)) ? Number(ready) : null;
+  const normalizedTotal = hasTotal && Number.isFinite(Number(total)) ? Number(total) : null;
+  if (normalizedReady == null || normalizedTotal == null) {
+    return null;
+  }
+  return `${normalizedReady}/${normalizedTotal}`;
+}
+
+function buildLaunchCutoverOperatorDecision({
+  launchCutoverTriageStatus = null,
+  launchEvidenceStatus = null,
+  launchEvidencePendingCount = null,
+  launchEvidenceTotalCount = null,
+  productionSwitchProofStatus = null,
+  productionSwitchProofReadyCount = null,
+  productionSwitchProofTotalCount = null,
+  productionSwitchProofBlockedCount = null,
+  realEnvironmentProofSummary = null,
+  proofExecutionEntrypoint = null,
+  nextAction = null
+} = {}) {
+  const realEnvironmentSummary = realEnvironmentProofSummary && typeof realEnvironmentProofSummary === "object"
+    ? realEnvironmentProofSummary
+    : null;
+  const proofEntrypoint = proofExecutionEntrypoint && typeof proofExecutionEntrypoint === "object"
+    ? proofExecutionEntrypoint
+    : null;
+  const readyForCutoverWatch = launchCutoverTriageStatus === "ready_for_cutover_watch";
+  const launchEvidenceTotal = launchEvidenceTotalCount !== null
+    && launchEvidenceTotalCount !== undefined
+    && launchEvidenceTotalCount !== ""
+    && Number.isFinite(Number(launchEvidenceTotalCount))
+    ? Number(launchEvidenceTotalCount)
+    : null;
+  const launchEvidencePending = launchEvidencePendingCount !== null
+    && launchEvidencePendingCount !== undefined
+    && launchEvidencePendingCount !== ""
+    && Number.isFinite(Number(launchEvidencePendingCount))
+    ? Number(launchEvidencePendingCount)
+    : null;
+  const launchEvidenceReady = launchEvidenceTotal == null || launchEvidencePending == null
+    ? null
+    : Math.max(launchEvidenceTotal - launchEvidencePending, 0);
+  const launchEvidenceProgress = formatLaunchCutoverDecisionProgress(launchEvidenceReady, launchEvidenceTotal);
+  const productionSwitchProofProgress = formatLaunchCutoverDecisionProgress(
+    productionSwitchProofReadyCount,
+    productionSwitchProofTotalCount
+  );
+  const realEnvironmentProofProgress = formatLaunchCutoverDecisionProgress(
+    realEnvironmentSummary?.ready,
+    realEnvironmentSummary?.total
+  );
+  const realEnvironmentBlocked = Number(realEnvironmentSummary?.blocked ?? 0) > 0;
+  const proofBlocked = Number(productionSwitchProofBlockedCount ?? 0) > 0
+    || (productionSwitchProofStatus && productionSwitchProofStatus !== "ready_for_production_switch_review");
+  let status = "hold_for_cutover_review";
+  let currentProofKey = proofEntrypoint?.proofItemKey || null;
+  let currentActionKey = proofEntrypoint?.actionKey || null;
+  let currentCommand = proofEntrypoint?.command || null;
+  let resolvedNextAction = nextAction || proofEntrypoint?.nextAction || null;
+  if (readyForCutoverWatch) {
+    status = "ready_for_cutover_watch";
+  } else if (realEnvironmentBlocked) {
+    status = "hold_for_real_environment_proof";
+    currentProofKey = realEnvironmentSummary?.currentProofKey || currentProofKey;
+    currentActionKey = realEnvironmentSummary?.currentActionKey || currentActionKey;
+    currentCommand = null;
+    resolvedNextAction = realEnvironmentSummary?.nextAction || resolvedNextAction;
+  } else if (proofBlocked) {
+    status = "hold_for_production_switch_proof";
+    currentActionKey = proofEntrypoint?.proofItemCompletionQueueKey || currentActionKey;
+    currentCommand = proofEntrypoint?.proofItemCompletionCommand || currentCommand;
+  } else if (launchCutoverTriageStatus) {
+    status = "hold_for_launch_evidence";
+  }
+  return {
+    mode: "launch-cutover-operator-decision/v1",
+    status,
+    readyForCutoverWatch,
+    launchCutoverTriageStatus: launchCutoverTriageStatus || null,
+    launchEvidenceStatus: launchEvidenceStatus || null,
+    launchEvidenceProgress,
+    realEnvironmentProofStatus: realEnvironmentSummary?.status || null,
+    realEnvironmentProofProgress,
+    productionSwitchProofStatus: productionSwitchProofStatus || null,
+    productionSwitchProofProgress,
+    currentProofKey,
+    currentActionKey,
+    currentCommand,
+    recommendedDownloadFormat: proofEntrypoint?.recommendedDownloadFormat || "production-switch-proof-packet",
+    nextAction: resolvedNextAction
+  };
+}
+
+function cloneLaunchCutoverOperatorDecision(decision = null) {
+  return decision && typeof decision === "object" ? { ...decision } : null;
+}
+
 function buildLaunchCutoverTriageActionContext(checkpoint = null) {
   if (!checkpoint || typeof checkpoint !== "object") {
     return null;
@@ -60382,6 +60501,7 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
       : null,
     realEnvironmentProofSummary:
       cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(checkpoint.realEnvironmentProofSummary),
+    cutoverOperatorDecision: cloneLaunchCutoverOperatorDecision(checkpoint.cutoverOperatorDecision),
     launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
     proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
       ? { ...checkpoint.proofExecutionEntrypoint }
@@ -60448,6 +60568,24 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
       storageProfileProof,
       backupRestoreDrillProof
     });
+  const productionSwitchProofReadyCount = checkpoint.productionSwitchProofReadyCount ?? proofCounts.ready ?? null;
+  const productionSwitchProofTotalCount = checkpoint.productionSwitchProofTotalCount ?? proofCounts.total ?? null;
+  const productionSwitchProofBlockedCount = checkpoint.productionSwitchProofBlockedCount ?? proofCounts.blocked ?? null;
+  const cutoverOperatorDecision =
+    cloneLaunchCutoverOperatorDecision(checkpoint.cutoverOperatorDecision)
+    || buildLaunchCutoverOperatorDecision({
+      launchCutoverTriageStatus: status,
+      launchEvidenceStatus: checkpoint.launchEvidenceStatus || null,
+      launchEvidencePendingCount: checkpoint.launchEvidencePendingCount ?? null,
+      launchEvidenceTotalCount: checkpoint.launchEvidenceTotalCount ?? null,
+      productionSwitchProofStatus: proofStatus,
+      productionSwitchProofReadyCount,
+      productionSwitchProofTotalCount,
+      productionSwitchProofBlockedCount,
+      realEnvironmentProofSummary,
+      proofExecutionEntrypoint,
+      nextAction: checkpoint.nextAction || null
+    });
   return {
     mode: "launch-surface-cutover-triage-checkpoint/v1",
     sourceMode: checkpoint.mode || null,
@@ -60461,14 +60599,15 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     productionSwitchProofStatus: proofStatus,
     productionSwitchProofCurrentActionKey: proofActionKey,
     productionSwitchProofCurrentCommand,
-    productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? proofCounts.ready ?? null,
-    productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? proofCounts.total ?? null,
-    productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? proofCounts.blocked ?? null,
+    productionSwitchProofReadyCount,
+    productionSwitchProofTotalCount,
+    productionSwitchProofBlockedCount,
     publicHttpsProof: publicHttpsProof ? { ...publicHttpsProof } : null,
     storageProfileProof: storageProfileProof ? { ...storageProfileProof } : null,
     secretEnvProof: secretEnvProof ? { ...secretEnvProof } : null,
     backupRestoreDrillProof: backupRestoreDrillProof ? { ...backupRestoreDrillProof } : null,
     realEnvironmentProofSummary,
+    cutoverOperatorDecision,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
     nextAction: status === "ready_for_cutover_watch"
@@ -60646,6 +60785,29 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
   return Boolean(publicHttpsProof || storageProfileProof || secretEnvProof || realEnvironmentProofSummary);
 }
 
+function appendLaunchCutoverOperatorDecisionLine(lines = [], checkpoint = null) {
+  if (!Array.isArray(lines) || !checkpoint || typeof checkpoint !== "object") {
+    return false;
+  }
+  const decision = checkpoint.cutoverOperatorDecision && typeof checkpoint.cutoverOperatorDecision === "object"
+    ? checkpoint.cutoverOperatorDecision
+    : null;
+  if (!decision) {
+    return false;
+  }
+  lines.push(
+    `- cutoverOperatorDecision=${decision.status || "-"}`
+    + ` | ready=${decision.readyForCutoverWatch ? "yes" : "no"}`
+    + ` | gate=${decision.launchCutoverTriageStatus || "-"}`
+    + ` | evidence=${decision.launchEvidenceStatus || "-"}`
+    + ` | realEnv=${decision.realEnvironmentProofStatus || "-"}`
+    + ` | proof=${decision.productionSwitchProofStatus || "-"}`
+    + ` | current=${decision.currentActionKey || "-"}`
+    + ` | command=${decision.currentCommand || "-"}`
+  );
+  return true;
+}
+
 function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null, {
   leadingBlank = true,
   heading = "Launch Cutover Triage Checkpoint:"
@@ -60673,6 +60835,7 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
+  appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
   const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof
     && typeof checkpoint.backupRestoreDrillProof === "object"
     ? checkpoint.backupRestoreDrillProof
@@ -67334,6 +67497,7 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
+  appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
   const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof
     && typeof checkpoint.backupRestoreDrillProof === "object"
     ? checkpoint.backupRestoreDrillProof

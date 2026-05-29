@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
+import { buildProductionSwitchSecretEnvProof } from "./staging-proof-utils.mjs";
 
 const ADMIN_PASSWORD_ENV = "RSL_SMOKE_ADMIN_PASSWORD";
 const DEVELOPER_PASSWORD_ENV = "RSL_SMOKE_DEVELOPER_PASSWORD";
@@ -1250,7 +1250,7 @@ function buildProductionSwitchProofPacket({
   launchDutyRecordIndexFile
 }) {
   const httpsReady = /^https:\/\//i.test(String(options.baseUrl || ""));
-  const secretEnvProof = buildBoundSecretEnvProof({
+  const secretEnvProof = buildProductionSwitchSecretEnvProof({
     stagingEnvironmentBinding: {
       credentialEnv: {
         adminPassword: ADMIN_PASSWORD_ENV,
@@ -1258,7 +1258,7 @@ function buildProductionSwitchProofPacket({
         developerBearerToken: DEVELOPER_BEARER_TOKEN_ENV
       }
     }
-  });
+  }, options.targetEnvFile);
   const secretEnvStatus = secretEnvProof.status === "ready_secret_env_loaded"
     ? "ready_secret_env_loaded"
     : "blocked_until_secret_env_loaded";
@@ -1343,6 +1343,7 @@ function buildProductionSwitchProofPacket({
     closeoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexFile,
+    secretEnvProof,
     localFullSuiteBaseline: {
       command: fullTestCommand,
       status: "available_from_2026-05-28_full_suite_pass",
@@ -1435,6 +1436,17 @@ function writeProductionSwitchProofPacketPlain(packet) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const secretEnvProof = packet.secretEnvProof || {};
+  if (secretEnvProof.status) {
+    console.log(
+      `Production switch secret env proof: ${secretEnvProof.status || "-"}`
+        + ` (required=${secretEnvProof.requiredCount ?? "-"}`
+        + `, missing=${secretEnvProof.missingCount ?? "-"}`
+        + `, current=${secretEnvProof.currentMissingKey || "-"})`
+    );
+    console.log(`Production switch secret env required: ${(secretEnvProof.requiredKeys || []).join(", ") || "-"}`);
+    console.log(`Production switch secret env missing: ${(secretEnvProof.missingKeys || []).join(", ") || "-"}`);
+  }
   const baseline = packet.localFullSuiteBaseline || {};
   console.log(
     `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`

@@ -441,6 +441,26 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
       readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       launchDutyRecordIndexFile,
+      secretEnvProof: {
+        status: "pending_real_environment_confirmation",
+        requiredKeys: [
+          "RSL_SMOKE_ADMIN_PASSWORD",
+          "RSL_SMOKE_DEVELOPER_PASSWORD",
+          "RSL_DEVELOPER_BEARER_TOKEN"
+        ],
+        presentKeys: [],
+        missingKeys: [
+          "RSL_SMOKE_ADMIN_PASSWORD",
+          "RSL_SMOKE_DEVELOPER_PASSWORD",
+          "RSL_DEVELOPER_BEARER_TOKEN"
+        ],
+        requiredCount: 3,
+        missingCount: 3,
+        currentMissingKey: "RSL_SMOKE_ADMIN_PASSWORD",
+        targetEnvFile: "/etc/rocksolidlicense/staging.env",
+        currentActionKey: "set_required_secret_env",
+        nextAction: "Set RSL_SMOKE_ADMIN_PASSWORD in the target shell before continuing production switch proof."
+      },
       localFullSuiteBaseline: {
         command: "npm.cmd test",
         status: "available_from_2026-05-28_full_suite_pass",
@@ -1205,6 +1225,9 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch evidence next action: Run the current setup command and closeout init, then attach route_map_gate_result as the first real launch evidence item before continuing through readiness refresh, smoke, full-test, signoff, receipt visibility, launch-day watch, and first-wave closeout\./);
     assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=profile_rehearsal\)/);
+    assert.match(result.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=3, current=RSL_SMOKE_ADMIN_PASSWORD\)/);
+    assert.match(result.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
+    assert.match(result.stdout, /Production switch secret env missing: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(result.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/PILOT_ALPHA\/beta\/full-test-output\.txt \(available_from_2026-05-28_full_suite_pass, tests=198, failures=0\)/);
     assert.match(result.stdout, /Production switch proof 1\. public_https_entrypoint: ready_from_profile -> https:\/\/staging\.example\.com/);
     assert.match(result.stdout, /Production switch proof 4\. backup_restore_drill: blocked_after_readiness_status -> npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file \/etc\/rocksolidlicense\/staging\.env --app-backup-dir \/var\/lib\/rocksolid\/backups --postgres-backup-dir \/var\/lib\/rocksolid\/postgres-backups --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
@@ -1287,12 +1310,75 @@ test("staging profile init marks non-default secret env ready when required env 
         ["storage_profile_selected", "ready_from_profile", "postgres-preview"]
       ]
     );
+    assert.deepEqual(output.productionSwitchProofPacket.secretEnvProof, {
+      status: "ready_secret_env_loaded",
+      requiredKeys: [
+        "RSL_SMOKE_ADMIN_PASSWORD",
+        "RSL_SMOKE_DEVELOPER_PASSWORD",
+        "RSL_DEVELOPER_BEARER_TOKEN"
+      ],
+      presentKeys: [
+        "RSL_SMOKE_ADMIN_PASSWORD",
+        "RSL_SMOKE_DEVELOPER_PASSWORD",
+        "RSL_DEVELOPER_BEARER_TOKEN"
+      ],
+      missingKeys: [],
+      requiredCount: 3,
+      missingCount: 0,
+      currentMissingKey: null,
+      targetEnvFile: "/etc/rocksolidlicense/staging.env",
+      currentActionKey: "confirm_secret_env_loaded",
+      nextAction: "Required secret environment variables are loaded; continue production switch proof."
+    });
     assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
       total: 8,
       ready: 4,
       blocked: 4
     });
     assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging profile init prints secret env proof in plain output without secret values", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-profile-init-secret-env-plain-"));
+  try {
+    const outputFile = join(tempDir, "staging-profile.json");
+    const result = runProfileInitPlain([
+      "--base-url",
+      "https://staging.example.com",
+      "--product-code",
+      "PILOT_ALPHA",
+      "--channel",
+      "beta",
+      "--admin-username",
+      "admin@example.com",
+      "--developer-username",
+      "launch.smoke.owner",
+      "--target-os",
+      "linux",
+      "--storage-profile",
+      "postgres-preview",
+      "--target-env-file",
+      "/etc/rocksolidlicense/staging.env",
+      "--app-backup-dir",
+      "/var/lib/rocksolid/backups",
+      "--postgres-backup-dir",
+      "/var/lib/rocksolid/postgres-backups",
+      "--output-file",
+      outputFile
+    ], {
+      RSL_SMOKE_ADMIN_PASSWORD: "RealAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "RealDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: ""
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
+    assert.match(result.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
+    assert.match(result.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);
+    assert.doesNotMatch(result.stdout, /RealAdminSecret123!|RealDeveloperSecret123!/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

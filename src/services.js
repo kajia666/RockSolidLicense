@@ -52515,6 +52515,83 @@ function buildDeveloperOpsProductionSwitchSecretEnvProof({
   };
 }
 
+function isDeveloperOpsProductionSwitchRealEnvironmentProofReady(proof = null) {
+  return Boolean(
+    proof
+    && typeof proof === "object"
+    && String(proof.status || "").startsWith("ready_")
+  );
+}
+
+function buildDeveloperOpsProductionSwitchRealEnvironmentProofSummary({
+  publicHttpsProof = null,
+  secretEnvProof = null,
+  storageProfileProof = null,
+  backupRestoreDrillProof = null
+} = {}) {
+  const proofStatuses = [
+    {
+      key: "public_https_entrypoint",
+      proof: publicHttpsProof && typeof publicHttpsProof === "object" ? publicHttpsProof : null
+    },
+    {
+      key: "non_default_secret_env",
+      proof: secretEnvProof && typeof secretEnvProof === "object" ? secretEnvProof : null
+    },
+    {
+      key: "storage_profile_selected",
+      proof: storageProfileProof && typeof storageProfileProof === "object" ? storageProfileProof : null
+    },
+    {
+      key: "backup_restore_drill",
+      proof: backupRestoreDrillProof && typeof backupRestoreDrillProof === "object" ? backupRestoreDrillProof : null
+    }
+  ].map((item) => ({
+    key: item.key,
+    status: item.proof?.status || "missing_real_environment_proof",
+    currentActionKey: item.proof?.currentActionKey || null
+  }));
+  const ready = proofStatuses.filter((item) =>
+    isDeveloperOpsProductionSwitchRealEnvironmentProofReady(item)
+  ).length;
+  const total = proofStatuses.length;
+  const firstBlocked = proofStatuses.find((item) =>
+    !isDeveloperOpsProductionSwitchRealEnvironmentProofReady(item)
+  ) || null;
+  const currentProof = firstBlocked
+    ? [publicHttpsProof, secretEnvProof, storageProfileProof, backupRestoreDrillProof]
+      .find((proof, index) => proofStatuses[index]?.key === firstBlocked.key)
+    : null;
+  return {
+    mode: "production-switch-real-environment-proof-summary/v1",
+    status: firstBlocked ? "blocked_until_real_environment_proof" : "ready_for_real_environment_review",
+    ready,
+    total,
+    blocked: total - ready,
+    currentProofKey: firstBlocked?.key || null,
+    currentStatus: firstBlocked?.status || null,
+    currentActionKey: firstBlocked?.currentActionKey || "confirm_real_environment_proof_review",
+    proofStatuses,
+    nextAction: firstBlocked
+      ? currentProof?.nextAction || "Complete the current real-environment proof before continuing production switch review."
+      : "Real environment proofs are ready; keep them visible while continuing production switch review and cutover watch."
+  };
+}
+
+function cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(summary = null) {
+  if (!summary || typeof summary !== "object") {
+    return null;
+  }
+  return {
+    ...summary,
+    proofStatuses: Array.isArray(summary.proofStatuses)
+      ? summary.proofStatuses
+        .filter((item) => item && typeof item === "object")
+        .map((item) => ({ ...item }))
+      : []
+  };
+}
+
 const DEVELOPER_OPS_LAUNCH_EXECUTION_PHASES = [
   {
     key: "profile_and_closeout",
@@ -52969,6 +53046,26 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
       .map((receiptId) => String(receiptId || "").trim())
       .filter(Boolean))]
     : [];
+  const backupRestoreDrillProof = {
+    status: backupRestoreProofStatus,
+    closeoutKey: "backup_restore_drill_result",
+    closeoutInputFile,
+    artifactPath: backupRestoreProofItem?.artifactPath || null,
+    command: backupRestoreProofCommand || null,
+    receiptOperations: backupRestoreProofReceipts,
+    currentActionKey: backupRestoreProofReady
+      ? "confirm_backup_restore_drill_evidence"
+      : "backfill_backup_restore_drill_evidence",
+    nextAction: backupRestoreProofReady
+      ? "Backup/restore drill evidence is attached; keep receipt links visible through production sign-off and launch-duty review."
+      : "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+  };
+  const realEnvironmentProofSummary = buildDeveloperOpsProductionSwitchRealEnvironmentProofSummary({
+    publicHttpsProof,
+    secretEnvProof,
+    storageProfileProof,
+    backupRestoreDrillProof
+  });
   return {
     version: "developer-ops-launch-evidence-production-switch-proof-packet/v1",
     status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
@@ -52986,20 +53083,8 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     publicHttpsProof,
     storageProfileProof,
     secretEnvProof,
-    backupRestoreDrillProof: {
-      status: backupRestoreProofStatus,
-      closeoutKey: "backup_restore_drill_result",
-      closeoutInputFile,
-      artifactPath: backupRestoreProofItem?.artifactPath || null,
-      command: backupRestoreProofCommand || null,
-      receiptOperations: backupRestoreProofReceipts,
-      currentActionKey: backupRestoreProofReady
-        ? "confirm_backup_restore_drill_evidence"
-        : "backfill_backup_restore_drill_evidence",
-      nextAction: backupRestoreProofReady
-        ? "Backup/restore drill evidence is attached; keep receipt links visible through production sign-off and launch-duty review."
-        : "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
-    },
+    backupRestoreDrillProof,
+    realEnvironmentProofSummary,
     localFullSuiteBaseline: {
       command: gate.fullTestCommand || "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -53536,6 +53621,8 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       && typeof switchProofPacket.backupRestoreDrillProof === "object"
       ? { ...switchProofPacket.backupRestoreDrillProof }
       : null,
+    realEnvironmentProofSummary:
+      cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(switchProofPacket?.realEnvironmentProofSummary),
     proofExecutionEntrypoint,
     launchCutoverTriageStatus,
     steadyStateHandoffStatus: steadyStateHandoff?.status || null,
@@ -60293,6 +60380,8 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
     backupRestoreDrillProof: checkpoint.backupRestoreDrillProof && typeof checkpoint.backupRestoreDrillProof === "object"
       ? { ...checkpoint.backupRestoreDrillProof }
       : null,
+    realEnvironmentProofSummary:
+      cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(checkpoint.realEnvironmentProofSummary),
     launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
     proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
       ? { ...checkpoint.proofExecutionEntrypoint }
@@ -60350,6 +60439,15 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
       && typeof proofPacket.backupRestoreDrillProof === "object"
       ? proofPacket.backupRestoreDrillProof
       : null;
+  const realEnvironmentProofSummary =
+    cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(checkpoint.realEnvironmentProofSummary)
+    || cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(proofPacket?.realEnvironmentProofSummary)
+    || buildDeveloperOpsProductionSwitchRealEnvironmentProofSummary({
+      publicHttpsProof,
+      secretEnvProof,
+      storageProfileProof,
+      backupRestoreDrillProof
+    });
   return {
     mode: "launch-surface-cutover-triage-checkpoint/v1",
     sourceMode: checkpoint.mode || null,
@@ -60370,6 +60468,7 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     storageProfileProof: storageProfileProof ? { ...storageProfileProof } : null,
     secretEnvProof: secretEnvProof ? { ...secretEnvProof } : null,
     backupRestoreDrillProof: backupRestoreDrillProof ? { ...backupRestoreDrillProof } : null,
+    realEnvironmentProofSummary,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
     nextAction: status === "ready_for_cutover_watch"
@@ -60521,7 +60620,30 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | current=${secretEnvProof.currentMissingKey || "-"}`
     );
   }
-  return Boolean(publicHttpsProof || storageProfileProof || secretEnvProof);
+  const backupRestoreDrillProof = proofSource.backupRestoreDrillProof
+    && typeof proofSource.backupRestoreDrillProof === "object"
+    ? proofSource.backupRestoreDrillProof
+    : null;
+  const realEnvironmentProofSummary =
+    cloneDeveloperOpsProductionSwitchRealEnvironmentProofSummary(proofSource.realEnvironmentProofSummary)
+    || (publicHttpsProof || storageProfileProof || secretEnvProof || backupRestoreDrillProof
+      ? buildDeveloperOpsProductionSwitchRealEnvironmentProofSummary({
+          publicHttpsProof,
+          secretEnvProof,
+          storageProfileProof,
+          backupRestoreDrillProof
+        })
+      : null);
+  if (realEnvironmentProofSummary) {
+    lines.push(
+      `- realEnvironmentProof=${realEnvironmentProofSummary.status || "-"}`
+      + ` | ready=${realEnvironmentProofSummary.ready ?? "-"}/${realEnvironmentProofSummary.total ?? "-"}`
+      + ` | blocked=${realEnvironmentProofSummary.blocked ?? "-"}/${realEnvironmentProofSummary.total ?? "-"}`
+      + ` | current=${realEnvironmentProofSummary.currentProofKey || "-"}`
+      + ` | action=${realEnvironmentProofSummary.currentActionKey || "-"}`
+    );
+  }
+  return Boolean(publicHttpsProof || storageProfileProof || secretEnvProof || realEnvironmentProofSummary);
 }
 
 function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null, {

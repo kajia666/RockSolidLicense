@@ -12430,6 +12430,39 @@ test("developer license quickstart first-batch setup can create recommended laun
         }
       }
     );
+    assert.deepEqual(
+      {
+        mode: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.mode,
+        status: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.status,
+        ready: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.ready,
+        total: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.total,
+        blocked: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.blocked,
+        currentProofKey: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.currentProofKey,
+        currentStatus: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.currentStatus,
+        currentActionKey: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.currentActionKey,
+        proofStatuses: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofSummary?.proofStatuses?.map((item) => [
+          item.key,
+          item.status,
+          item.currentActionKey
+        ])
+      },
+      {
+        mode: "production-switch-real-environment-proof-summary/v1",
+        status: "blocked_until_real_environment_proof",
+        ready: 0,
+        total: 4,
+        blocked: 4,
+        currentProofKey: "public_https_entrypoint",
+        currentStatus: "pending_real_environment_value",
+        currentActionKey: "set_public_https_entrypoint",
+        proofStatuses: [
+          ["public_https_entrypoint", "pending_real_environment_value", "set_public_https_entrypoint"],
+          ["non_default_secret_env", "pending_real_environment_confirmation", "set_required_secret_env"],
+          ["storage_profile_selected", "pending_real_environment_value", "select_storage_profile"],
+          ["backup_restore_drill", "blocked_after_readiness_status", "backfill_backup_restore_drill_evidence"]
+        ]
+      }
+    );
     const runtimeEvidenceReviewOpsCheckpoint = runtimeEvidenceLaunchReview.opsSnapshot?.summary?.initialLaunchOpsReadiness
       ?.launchOperationsOperatorEntry?.operatorQueueCheckpoint;
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
@@ -12586,6 +12619,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchReview.summaryText, /publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /storageProfileProof=pending_real_environment_value \| profile=-/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
@@ -12674,6 +12708,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /storageProfileProof=pending_real_environment_value \| profile=-/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/);
     const runtimeEvidenceReviewLaunchExecutionPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=launch-execution-phase-plan",
@@ -12984,6 +13019,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /storageProfileProof=pending_real_environment_value \| profile=-/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
@@ -13072,6 +13108,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /storageProfileProof=pending_real_environment_value \| profile=-/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/);
     const runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=launch-execution-phase-plan",
@@ -23704,6 +23741,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         storageProfileProof: productionSwitchProofPacket?.storageProfileProof || null,
         secretEnvProof: productionSwitchProofPacket?.secretEnvProof || null,
         backupRestoreDrillProof: productionSwitchProofPacket?.backupRestoreDrillProof || null,
+        realEnvironmentProofSummary: productionSwitchProofPacket?.realEnvironmentProofSummary || null,
         proofExecutionEntrypoint: {
           mode: "production-switch-proof-execution-entrypoint/v1",
           status: productionSwitchProofPacket?.status || null,
@@ -24023,6 +24061,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         storageProfileProof: launchEvidenceReadinessGate.productionSwitchProofPacket?.storageProfileProof,
         secretEnvProof: launchEvidenceReadinessGate.productionSwitchProofPacket?.secretEnvProof,
         backupRestoreDrillProof: launchEvidenceReadinessGate.productionSwitchProofPacket?.backupRestoreDrillProof,
+        realEnvironmentProofSummary: launchEvidenceReadinessGate.productionSwitchProofPacket?.realEnvironmentProofSummary,
         proofCounts: launchEvidenceReadinessGate.productionSwitchProofPacket?.proofCounts,
         localFullSuiteBaseline: launchEvidenceReadinessGate.productionSwitchProofPacket?.localFullSuiteBaseline
       },
@@ -24077,6 +24116,39 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"],
           currentActionKey: "backfill_backup_restore_drill_evidence",
           nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+        },
+        realEnvironmentProofSummary: {
+          mode: "production-switch-real-environment-proof-summary/v1",
+          status: "blocked_until_real_environment_proof",
+          ready: 0,
+          total: 4,
+          blocked: 4,
+          currentProofKey: "public_https_entrypoint",
+          currentStatus: "pending_real_environment_value",
+          currentActionKey: "set_public_https_entrypoint",
+          proofStatuses: [
+            {
+              key: "public_https_entrypoint",
+              status: "pending_real_environment_value",
+              currentActionKey: "set_public_https_entrypoint"
+            },
+            {
+              key: "non_default_secret_env",
+              status: "pending_real_environment_confirmation",
+              currentActionKey: "set_required_secret_env"
+            },
+            {
+              key: "storage_profile_selected",
+              status: "pending_real_environment_value",
+              currentActionKey: "select_storage_profile"
+            },
+            {
+              key: "backup_restore_drill",
+              status: "blocked_after_readiness_status",
+              currentActionKey: "backfill_backup_restore_drill_evidence"
+            }
+          ],
+          nextAction: "Set a public HTTPS base URL before continuing production switch proof."
         },
         proofCounts: {
           total: 8,
@@ -24164,6 +24236,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchProof=blocked_until_real_environment_evidence \| ready=1\/8 \| blocked=7\/8 \| current=backfill_closeout_evidence/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/
     );
     assert.equal(launchOperationsOperatorEntry.checklistStepCount, 14);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
@@ -29365,6 +29441,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsProductionSwitchProofPacketDownload.body,
+      /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/
+    );
+    assert.match(
+      launchOperationsProductionSwitchProofPacketDownload.body,
       /6\. full_test_window \| status=ready_local_baseline_available \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/full-test-output\.txt \| command=npm\.cmd test/
     );
     const launchOperationsLaunchExecutionPhasePlanDownload = await getText(
@@ -29397,6 +29477,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsLaunchExecutionPhasePlanDownload.body,
       /Operator Queue Checkpoint:[\s\S]*productionSwitchProof=blocked_until_real_environment_evidence[^\n]*\| ready=1\/8[^\n]*\| blocked=7\/8[^\n]*\| current=backfill_closeout_evidence/
+    );
+    assert.match(
+      launchOperationsLaunchExecutionPhasePlanDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/
     );
     assert.match(
       launchOperationsLaunchExecutionPhasePlanDownload.body,
@@ -31978,6 +32062,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         storageProfileProof: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.storageProfileProof,
         secretEnvProof: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.secretEnvProof,
         backupRestoreDrillProof: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.backupRestoreDrillProof,
+        realEnvironmentProofSummary: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.realEnvironmentProofSummary,
         proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
       },
       {
@@ -32030,6 +32115,39 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           currentActionKey: "confirm_backup_restore_drill_evidence",
           nextAction: "Backup/restore drill evidence is attached; keep receipt links visible through production sign-off and launch-duty review."
         },
+        realEnvironmentProofSummary: {
+          mode: "production-switch-real-environment-proof-summary/v1",
+          status: "ready_for_real_environment_review",
+          ready: 4,
+          total: 4,
+          blocked: 0,
+          currentProofKey: null,
+          currentStatus: null,
+          currentActionKey: "confirm_real_environment_proof_review",
+          proofStatuses: [
+            {
+              key: "public_https_entrypoint",
+              status: "ready_confirmed_by_launch_gate",
+              currentActionKey: "confirm_public_https_entrypoint"
+            },
+            {
+              key: "non_default_secret_env",
+              status: "ready_confirmed_by_launch_gate",
+              currentActionKey: "confirm_secret_env_loaded"
+            },
+            {
+              key: "storage_profile_selected",
+              status: "ready_confirmed_by_launch_gate",
+              currentActionKey: "confirm_storage_profile_selected"
+            },
+            {
+              key: "backup_restore_drill",
+              status: "ready_evidence_attached",
+              currentActionKey: "confirm_backup_restore_drill_evidence"
+            }
+          ],
+          nextAction: "Real environment proofs are ready; keep them visible while continuing production switch review and cutover watch."
+        },
         proofCounts: {
           total: 8,
           ready: 8,
@@ -32079,6 +32197,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         productionSwitchProofReadyCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofReadyCount,
         productionSwitchProofTotalCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofTotalCount,
         productionSwitchProofBlockedCount: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchProofBlockedCount,
+        realEnvironmentProofStatus: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.realEnvironmentProofSummary?.status,
+        realEnvironmentProofReady: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.realEnvironmentProofSummary?.ready,
+        realEnvironmentProofTotal: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.realEnvironmentProofSummary?.total,
+        realEnvironmentProofBlocked: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.realEnvironmentProofSummary?.blocked,
+        realEnvironmentProofCurrentActionKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.realEnvironmentProofSummary?.currentActionKey,
         proofExecutionEntrypointActionKey: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.actionKey,
         proofExecutionEntrypointCommand: launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.proofExecutionEntrypoint?.command,
         proofExecutionEntrypointProofItemKey:
@@ -32125,6 +32249,11 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         productionSwitchProofReadyCount: 8,
         productionSwitchProofTotalCount: 8,
         productionSwitchProofBlockedCount: 0,
+        realEnvironmentProofStatus: "ready_for_real_environment_review",
+        realEnvironmentProofReady: 4,
+        realEnvironmentProofTotal: 4,
+        realEnvironmentProofBlocked: 0,
+        realEnvironmentProofCurrentActionKey: "confirm_real_environment_proof_review",
         proofExecutionEntrypointActionKey: "refresh_readiness_status",
         proofExecutionEntrypointCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
         proofExecutionEntrypointProofItemKey: "launch_day_watch_and_stabilization",
@@ -32613,6 +32742,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Launch Evidence Readiness Gate:[\s\S]*realEnvironmentProof=ready_for_real_environment_review \| ready=4\/4 \| blocked=0\/4 \| current=- \| action=confirm_real_environment_proof_review/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Launch Evidence Readiness Gate:[\s\S]*Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
     );
     assert.match(
@@ -32635,6 +32768,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsProofPacketDownload.body,
+      /realEnvironmentProof=ready_for_real_environment_review \| ready=4\/4 \| blocked=0\/4 \| current=- \| action=confirm_real_environment_proof_review/
     );
     assert.match(
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,
@@ -33032,6 +33169,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*realEnvironmentProof=ready_for_real_environment_review \| ready=4\/4 \| blocked=0\/4 \| current=- \| action=confirm_real_environment_proof_review/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
     );
     assert.match(
@@ -33058,6 +33199,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchMainlineCloseoutRecordedProofPacketDownload.body, /publicHttpsProof=ready_confirmed_by_launch_gate \| scheme=- \| url=-/);
     assert.match(launchMainlineCloseoutRecordedProofPacketDownload.body, /storageProfileProof=ready_confirmed_by_launch_gate \| profile=-/);
     assert.match(launchMainlineCloseoutRecordedProofPacketDownload.body, /secretEnvProof=ready_confirmed_by_launch_gate \| required=3 \| missing=0 \| current=-/);
+    assert.match(launchMainlineCloseoutRecordedProofPacketDownload.body, /realEnvironmentProof=ready_for_real_environment_review \| ready=4\/4 \| blocked=0\/4 \| current=- \| action=confirm_real_environment_proof_review/);
     assert.match(
       launchMainlineCloseoutRecordedProofPacketDownload.body,
       /Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/

@@ -52815,6 +52815,27 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
   const readinessActionQueueFile = extractCommandOptionValue(currentCommand, "actions-file")
     || extractCommandOptionValue(gate.readinessStatusCommand, "actions-file")
     || null;
+  const launchDutyRecordIndexFile = normalizeDeveloperOpsLaunchEvidencePath(gate.launchDutyRecordIndexPath)
+    || path.posix.join(archiveRoot, "launch-duty-record-index.json");
+  const backupRestoreProofItem = proofItems.find((item) => item?.key === "backup_restore_drill") || null;
+  const backupRestoreCompletionSpec = getProductionSwitchProofItemCompletionSpec("backup_restore_drill");
+  const backupRestoreCompletionContext = {
+    closeoutInputFile,
+    readinessActionQueueFile,
+    launchDutyRecordIndexFile
+  };
+  const backupRestoreProofCommand = buildProductionSwitchProofItemCompletionCommand({
+    proofItem: backupRestoreProofItem,
+    spec: backupRestoreCompletionSpec,
+    completionContext: backupRestoreCompletionContext
+  });
+  const backupRestoreProofStatus = String(backupRestoreProofItem?.status || "").trim() || "blocked_after_readiness_status";
+  const backupRestoreProofReady = backupRestoreProofStatus.startsWith("ready_");
+  const backupRestoreProofReceipts = Array.isArray(backupRestoreCompletionSpec?.receiptOperations)
+    ? [...new Set(backupRestoreCompletionSpec.receiptOperations
+      .map((receiptId) => String(receiptId || "").trim())
+      .filter(Boolean))]
+    : [];
   return {
     version: "developer-ops-launch-evidence-production-switch-proof-packet/v1",
     status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
@@ -52828,8 +52849,21 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     archiveRoot,
     closeoutInputFile,
     readinessActionQueueFile,
-    launchDutyRecordIndexFile: normalizeDeveloperOpsLaunchEvidencePath(gate.launchDutyRecordIndexPath)
-      || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    launchDutyRecordIndexFile,
+    backupRestoreDrillProof: {
+      status: backupRestoreProofStatus,
+      closeoutKey: "backup_restore_drill_result",
+      closeoutInputFile,
+      artifactPath: backupRestoreProofItem?.artifactPath || null,
+      command: backupRestoreProofCommand || null,
+      receiptOperations: backupRestoreProofReceipts,
+      currentActionKey: backupRestoreProofReady
+        ? "confirm_backup_restore_drill_evidence"
+        : "backfill_backup_restore_drill_evidence",
+      nextAction: backupRestoreProofReady
+        ? "Backup/restore drill evidence is attached; keep receipt links visible through production sign-off and launch-duty review."
+        : "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+    },
     localFullSuiteBaseline: {
       command: gate.fullTestCommand || "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -53349,6 +53383,10 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     productionSwitchProofReadyCount: switchProofReadyCount,
     productionSwitchProofTotalCount: switchProofTotalCount,
     productionSwitchProofBlockedCount: switchProofBlockedCount,
+    backupRestoreDrillProof: switchProofPacket?.backupRestoreDrillProof
+      && typeof switchProofPacket.backupRestoreDrillProof === "object"
+      ? { ...switchProofPacket.backupRestoreDrillProof }
+      : null,
     proofExecutionEntrypoint,
     launchCutoverTriageStatus,
     steadyStateHandoffStatus: steadyStateHandoff?.status || null,
@@ -60094,6 +60132,9 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
     productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? null,
     productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? null,
     productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? null,
+    backupRestoreDrillProof: checkpoint.backupRestoreDrillProof && typeof checkpoint.backupRestoreDrillProof === "object"
+      ? { ...checkpoint.backupRestoreDrillProof }
+      : null,
     launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
     proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
       ? { ...checkpoint.proofExecutionEntrypoint }
@@ -60127,6 +60168,12 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     checkpoint,
     productionSwitchProofPacket: proofPacket
   });
+  const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof && typeof checkpoint.backupRestoreDrillProof === "object"
+    ? checkpoint.backupRestoreDrillProof
+    : proofPacket?.backupRestoreDrillProof
+      && typeof proofPacket.backupRestoreDrillProof === "object"
+      ? proofPacket.backupRestoreDrillProof
+      : null;
   return {
     mode: "launch-surface-cutover-triage-checkpoint/v1",
     sourceMode: checkpoint.mode || null,
@@ -60143,6 +60190,7 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? proofCounts.ready ?? null,
     productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? proofCounts.total ?? null,
     productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? proofCounts.blocked ?? null,
+    backupRestoreDrillProof: backupRestoreDrillProof ? { ...backupRestoreDrillProof } : null,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
     nextAction: status === "ready_for_cutover_watch"
@@ -60286,6 +60334,23 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
+  const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof
+    && typeof checkpoint.backupRestoreDrillProof === "object"
+    ? checkpoint.backupRestoreDrillProof
+    : null;
+  if (backupRestoreDrillProof) {
+    const receiptOperations = Array.isArray(backupRestoreDrillProof.receiptOperations)
+      ? backupRestoreDrillProof.receiptOperations
+        .map((receiptId) => String(receiptId || "").trim())
+        .filter(Boolean)
+      : [];
+    lines.push(
+      `- backupRestoreDrillProof=${backupRestoreDrillProof.status || "-"}`
+      + ` | key=${backupRestoreDrillProof.closeoutKey || "backup_restore_drill_result"}`
+      + ` | artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+      + ` | receipts=${receiptOperations.length ? receiptOperations.join(",") : "-"}`
+    );
+  }
   lines.push(
     `- proofItem=${checkpoint.proofExecutionEntrypoint?.proofItemKey || "-"}`
     + ` | proofStatus=${checkpoint.proofExecutionEntrypoint?.proofItemStatus || "-"}`
@@ -60362,6 +60427,22 @@ function appendProductionSwitchProofPacketLines(lines = [], proofPacket = null, 
     + ` | blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
     + ` | current=${proofPacket.currentActionKey || "-"}`
   );
+  const backupRestoreDrillProof = proofPacket.backupRestoreDrillProof && typeof proofPacket.backupRestoreDrillProof === "object"
+    ? proofPacket.backupRestoreDrillProof
+    : null;
+  if (backupRestoreDrillProof) {
+    const receiptOperations = Array.isArray(backupRestoreDrillProof.receiptOperations)
+      ? backupRestoreDrillProof.receiptOperations
+        .map((receiptId) => String(receiptId || "").trim())
+        .filter(Boolean)
+      : [];
+    lines.push(
+      `- backupRestoreDrillProof=${backupRestoreDrillProof.status || "-"}`
+      + ` | key=${backupRestoreDrillProof.closeoutKey || "backup_restore_drill_result"}`
+      + ` | artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+      + ` | receipts=${receiptOperations.length ? receiptOperations.join(",") : "-"}`
+    );
+  }
   const baseline = proofPacket.localFullSuiteBaseline || {};
   lines.push(
     `- productionSwitchBaseline=${baseline.command || "-"}`
@@ -66912,6 +66993,23 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
+  const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof
+    && typeof checkpoint.backupRestoreDrillProof === "object"
+    ? checkpoint.backupRestoreDrillProof
+    : null;
+  if (backupRestoreDrillProof) {
+    const receiptOperations = Array.isArray(backupRestoreDrillProof.receiptOperations)
+      ? backupRestoreDrillProof.receiptOperations
+        .map((receiptId) => String(receiptId || "").trim())
+        .filter(Boolean)
+      : [];
+    lines.push(
+      `- backupRestoreDrillProof=${backupRestoreDrillProof.status || "-"}`
+      + ` | key=${backupRestoreDrillProof.closeoutKey || "backup_restore_drill_result"}`
+      + ` | artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+      + ` | receipts=${receiptOperations.length ? receiptOperations.join(",") : "-"}`
+    );
+  }
   lines.push(
     `- proofItem=${checkpoint.proofExecutionEntrypoint?.proofItemKey || "-"}`
     + ` | proofStatus=${checkpoint.proofExecutionEntrypoint?.proofItemStatus || "-"}`

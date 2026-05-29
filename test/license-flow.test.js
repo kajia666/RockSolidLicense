@@ -12373,6 +12373,19 @@ test("developer license quickstart first-batch setup can create recommended laun
         || runtimeEvidenceLaunchReview.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.productionSwitchProofPacket
         || null
     );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.backupRestoreDrillProof,
+      {
+        status: "blocked_after_readiness_status",
+        closeoutKey: "backup_restore_drill_result",
+        closeoutInputFile: "artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json",
+        artifactPath: "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"],
+        currentActionKey: "backfill_backup_restore_drill_evidence",
+        nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+      }
+    );
     const runtimeEvidenceReviewOpsCheckpoint = runtimeEvidenceLaunchReview.opsSnapshot?.summary?.initialLaunchOpsReadiness
       ?.launchOperationsOperatorEntry?.operatorQueueCheckpoint;
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
@@ -12522,6 +12535,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /currentCommand=npm\.cmd run staging:/);
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
@@ -12603,6 +12620,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /productionSwitchProof=/);
+    assert.match(
+      runtimeEvidenceReviewProductionSwitchProofPacketDownload.body,
+      /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
     const runtimeEvidenceReviewLaunchExecutionPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=launch-execution-phase-plan",
@@ -12683,6 +12704,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewZipText, /Launch Surface Review Closeout:/);
     assert.match(runtimeEvidenceReviewZipText, /Launch Review Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceReviewZipText, /launchCutoverTriage=hold_for_launch_evidence/);
+    assert.match(
+      runtimeEvidenceReviewZipText,
+      /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
     assert.match(runtimeEvidenceReviewZipText, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceReviewZipText, /Launch Execution Phase Plan:/);
     assert.match(runtimeEvidenceReviewZipText, /First-Wave Runtime Evidence:/);
@@ -12739,6 +12764,19 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchSmoke.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.productionSwitchProofPacket
         || runtimeEvidenceLaunchSmoke.opsSnapshot?.summary?.initialLaunchOpsReadiness?.launchOperationsOperatorEntry?.launchEvidenceReadinessGate?.productionSwitchProofPacket
         || null
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchSmoke.smokeSummary.productionSwitchProofPacket?.backupRestoreDrillProof,
+      {
+        status: "blocked_after_readiness_status",
+        closeoutKey: "backup_restore_drill_result",
+        closeoutInputFile: "artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json",
+        artifactPath: "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"],
+        currentActionKey: "backfill_backup_restore_drill_evidence",
+        nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+      }
     );
     const runtimeEvidenceSmokeOpsCheckpoint = runtimeEvidenceLaunchSmoke.opsSnapshot?.summary?.initialLaunchOpsReadiness
       ?.launchOperationsOperatorEntry?.operatorQueueCheckpoint;
@@ -12889,6 +12927,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /Launch Smoke Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /currentCommand=npm\.cmd run staging:/);
+    assert.match(
+      runtimeEvidenceLaunchSmoke.summaryText,
+      /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
@@ -12970,6 +13012,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /productionSwitchProof=/);
+    assert.match(
+      runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body,
+      /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
     const runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=launch-execution-phase-plan",
@@ -13051,6 +13097,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeZipText, /Launch Surface Review Closeout:/);
     assert.match(runtimeEvidenceSmokeZipText, /Launch Smoke Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceSmokeZipText, /launchCutoverTriage=hold_for_launch_evidence/);
+    assert.match(
+      runtimeEvidenceSmokeZipText,
+      /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
     assert.match(runtimeEvidenceSmokeZipText, /Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceSmokeZipText, /Launch Execution Phase Plan:/);
     assert.match(runtimeEvidenceSmokeZipText, /First-Wave Runtime Evidence:/);
@@ -23594,6 +23644,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         productionSwitchProofReadyCount: productionSwitchProofPacket?.proofCounts?.ready ?? null,
         productionSwitchProofTotalCount: productionSwitchProofPacket?.proofCounts?.total ?? null,
         productionSwitchProofBlockedCount: productionSwitchProofPacket?.proofCounts?.blocked ?? null,
+        backupRestoreDrillProof: productionSwitchProofPacket?.backupRestoreDrillProof || null,
         proofExecutionEntrypoint: {
           mode: "production-switch-proof-execution-entrypoint/v1",
           status: productionSwitchProofPacket?.status || null,
@@ -23821,6 +23872,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/
     );
     assert.match(
@@ -23893,6 +23948,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         currentCommand: launchEvidenceReadinessGate.productionSwitchProofPacket?.currentCommand,
         archiveRoot: launchEvidenceReadinessGate.productionSwitchProofPacket?.archiveRoot,
         launchDutyRecordIndexFile: launchEvidenceReadinessGate.productionSwitchProofPacket?.launchDutyRecordIndexFile,
+        backupRestoreDrillProof: launchEvidenceReadinessGate.productionSwitchProofPacket?.backupRestoreDrillProof,
         proofCounts: launchEvidenceReadinessGate.productionSwitchProofPacket?.proofCounts,
         localFullSuiteBaseline: launchEvidenceReadinessGate.productionSwitchProofPacket?.localFullSuiteBaseline
       },
@@ -23903,6 +23959,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         currentCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
         archiveRoot: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable",
         launchDutyRecordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+        backupRestoreDrillProof: {
+          status: "blocked_after_readiness_status",
+          closeoutKey: "backup_restore_drill_result",
+          closeoutInputFile: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+          artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt",
+          command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"],
+          currentActionKey: "backfill_backup_restore_drill_evidence",
+          nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+        },
         proofCounts: {
           total: 8,
           ready: 1,
@@ -31799,6 +31865,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         status: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.status,
         currentActionKey: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.currentActionKey,
         currentCommand: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.currentCommand,
+        backupRestoreDrillProof: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.backupRestoreDrillProof,
         proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
       },
       {
@@ -31806,6 +31873,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         status: "ready_for_production_switch_review",
         currentActionKey: "refresh_readiness_status",
         currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        backupRestoreDrillProof: {
+          status: "ready_evidence_attached",
+          closeoutKey: "backup_restore_drill_result",
+          closeoutInputFile: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json",
+          artifactPath: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt",
+          command: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/backup-restore-drill.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          receiptOperations: ["<recovery-drill-receipt-id>", "<backup-verification-receipt-id>"],
+          currentActionKey: "confirm_backup_restore_drill_evidence",
+          nextAction: "Backup/restore drill evidence is attached; keep receipt links visible through production sign-off and launch-duty review."
+        },
         proofCounts: {
           total: 8,
           ready: 8,
@@ -32792,6 +32869,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
     );
     assert.match(
@@ -32810,6 +32891,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedProofPacketDownload.body,
+      /backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
     assert.match(
       launchMainlineCloseoutRecordedProofPacketDownload.body,
@@ -32966,6 +33051,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
+      /backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
       /currentCommand=npm\.cmd run staging:readiness:status/
     );
     assert.match(
@@ -33048,6 +33137,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedZipText,
+      /backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedZipText,
       /proof 8\. launch_day_watch_and_stabilization \| status=ready_evidence_attached \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| command=npm\.cmd run staging:rehearsal/
     );
     const launchSmokeCloseoutRecordedProofPacketDownload = await getText(
@@ -33066,6 +33159,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
@@ -33255,6 +33352,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchSmokeCloseoutRecordedZipText,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedZipText,
+      /backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
     assert.match(
       launchSmokeCloseoutRecordedZipText,

@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { buildProductionSwitchSecretEnvProof } from "./staging-proof-utils.mjs";
+import {
+  buildProductionSwitchPublicHttpsProof,
+  buildProductionSwitchSecretEnvProof
+} from "./staging-proof-utils.mjs";
 
 const OPTION_FLAGS = {
   "--draft-file": "draftFile",
@@ -584,6 +587,7 @@ function buildCloseoutInitProductionSwitchProofPacket({
   const targetEnvFile = closeoutInput?.targetEnvFile || closeoutInput?.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
   const baseUrl = closeoutInput?.baseUrl || closeoutInput?.summary?.baseUrl || null;
   const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
+  const publicHttpsProof = buildProductionSwitchPublicHttpsProof(baseUrl);
   const secretEnvProof = buildProductionSwitchSecretEnvProof(closeoutInput, targetEnvFile);
   const backupRestoreField = closeoutFields.get("backup_restore_drill_result");
   const backupRestoreArtifactPath = backupRestoreField?.artifactPath || path.posix.join(archiveRoot, "backup_restore_drill_result.txt");
@@ -696,6 +700,7 @@ function buildCloseoutInitProductionSwitchProofPacket({
     closeoutInputFile: outputFile,
     readinessActionQueueFile: actionsFile || null,
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    publicHttpsProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -726,6 +731,13 @@ function writeProductionSwitchProofPacketPlain(packet) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const publicHttpsProof = packet.publicHttpsProof || {};
+  if (publicHttpsProof.status) {
+    console.log(
+      `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
+        + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
   const secretEnvProof = packet.secretEnvProof || {};
   if (secretEnvProof.status) {
     console.log(

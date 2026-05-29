@@ -207,6 +207,14 @@ function buildExpectedProductionSwitchProofPacket({
     closeoutInputFile: outputFile,
     readinessActionQueueFile: actionsFile,
     launchDutyRecordIndexFile: `${archiveRoot}/launch-duty-record-index.json`,
+    publicHttpsProof: {
+      status: "pending_real_environment_value",
+      baseUrl: null,
+      scheme: null,
+      isHttps: false,
+      currentActionKey: "set_public_https_entrypoint",
+      nextAction: "Set a public HTTPS base URL before continuing production switch proof."
+    },
     secretEnvProof: {
       status: "pending_real_environment_confirmation",
       requiredKeys: [],

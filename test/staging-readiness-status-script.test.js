@@ -204,6 +204,14 @@ test("staging readiness status marks bound non-default secret env ready when req
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.productionSwitchProofPacket.publicHttpsProof, {
+      status: "ready_public_https_entrypoint",
+      baseUrl: "https://staging.example.com",
+      scheme: "https",
+      isHttps: true,
+      currentActionKey: "confirm_public_https_entrypoint",
+      nextAction: "Public HTTPS entrypoint is configured; keep live-write smoke and launch switch checks on this URL."
+    });
     assert.deepEqual(output.productionSwitchProofPacket.secretEnvProof, {
       status: "ready_secret_env_loaded",
       requiredKeys: [
@@ -658,6 +666,14 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.equal(output.productionSwitchProofPacket.closeoutInputFile, inputFile);
     assert.equal(output.productionSwitchProofPacket.readinessActionQueueFile, actionsFile);
     assert.equal(output.productionSwitchProofPacket.launchDutyRecordIndexFile, "artifacts/staging/<productCode>/<channel>/launch-duty-record-index.json");
+    assert.deepEqual(output.productionSwitchProofPacket.publicHttpsProof, {
+      status: "pending_real_environment_value",
+      baseUrl: null,
+      scheme: null,
+      isHttps: false,
+      currentActionKey: "set_public_https_entrypoint",
+      nextAction: "Set a public HTTPS base URL before continuing production switch proof."
+    });
     assert.deepEqual(output.productionSwitchProofPacket.localFullSuiteBaseline, {
       command: "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -854,6 +870,7 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(plain.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/<productCode>\/<channel>\/first-wave-closeout\.md/);
     assert.match(plain.stdout, /Launch evidence next action: Run command with real redacted evidence, then statusCommand to continue production sign-off\./);
     assert.match(plain.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=backfill_production_signoff\)/);
+    assert.match(plain.stdout, /Production switch public HTTPS proof: pending_real_environment_value \(scheme=-, url=-\)/);
     assert.match(plain.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
     assert.match(plain.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(plain.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);
@@ -871,6 +888,7 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(markdown, /- 6\. `launch_day_watch_and_stabilization` \[blocked\] commands `6` current `-` next `record_launch_day_watch_summary`/);
     assert.match(markdown, /## Production Switch Proof Packet/);
     assert.match(markdown, /Production switch proof packet: `blocked_until_real_environment_evidence` \(ready `3\/8`, blocked `5\/8`, current `backfill_production_signoff`\)/);
+    assert.match(markdown, /Production switch public HTTPS proof: `pending_real_environment_value` \(scheme `-`, url `-`\)/);
     assert.match(markdown, /Production switch secret env proof: `pending_real_environment_confirmation` \(required `3`, missing `1`, current `RSL_DEVELOPER_BEARER_TOKEN`\)/);
     assert.match(markdown, /Production switch secret env required: `RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN`/);
     assert.match(markdown, /Production switch secret env missing: `RSL_DEVELOPER_BEARER_TOKEN`/);

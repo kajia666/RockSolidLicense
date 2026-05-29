@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
+import {
+  buildBoundSecretEnvProof,
+  buildProductionSwitchPublicHttpsProof
+} from "./staging-proof-utils.mjs";
 
 const REQUIRED_CLOSEOUT_KEYS = [
   "route_map_gate_result",
@@ -1470,6 +1473,7 @@ function buildStagingProductionSwitchProofPacket({
   const baseUrl = payload.baseUrl || payload.summary?.baseUrl || null;
   const storageProfile = payload.storageProfile || payload.summary?.storageProfile || null;
   const targetEnvFile = payload.targetEnvFile || payload.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
+  const publicHttpsProof = buildProductionSwitchPublicHttpsProof(baseUrl);
   const secretEnvProof = buildProductionSwitchSecretEnvProof(payload, targetEnvFile);
   const fullTestArtifact = path.posix.join(archiveRoot, "full-test-output.txt");
   const backupRestoreEvidence = evidenceForCloseoutKey("backup_restore_drill_result", artifactPathRoot);
@@ -1576,6 +1580,7 @@ function buildStagingProductionSwitchProofPacket({
     closeoutInputFile: inputFile,
     readinessActionQueueFile: actionsFile || null,
     launchDutyRecordIndexFile: launchDutyCompletionHandoff?.recordIndexFile || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    publicHttpsProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -1968,6 +1973,12 @@ function renderProductionSwitchProofPacketMarkdown(result) {
     `Production switch local baseline: \`${baseline.command || "-"}\` -> \`${baseline.outputArtifact || "-"}\` (\`${baseline.status || "-"}\`, tests \`${baseline.testCount ?? "-"}\`, failures \`${baseline.failureCount ?? "-"}\`)`,
     `Production switch record index: \`${packet.launchDutyRecordIndexFile || "-"}\``
   ];
+  const publicHttpsProof = packet.publicHttpsProof || {};
+  if (publicHttpsProof.status) {
+    lines.push(
+      `Production switch public HTTPS proof: \`${publicHttpsProof.status || "-"}\` (scheme \`${publicHttpsProof.scheme || "-"}\`, url \`${publicHttpsProof.baseUrl || "-"}\`)`
+    );
+  }
   const secretEnvProof = packet.secretEnvProof || {};
   if (secretEnvProof.status) {
     lines.push(
@@ -2548,6 +2559,13 @@ function writeProductionSwitchProofPacketPlain(packet) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const publicHttpsProof = packet.publicHttpsProof || {};
+  if (publicHttpsProof.status) {
+    console.log(
+      `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
+        + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
   const secretEnvProof = packet.secretEnvProof || {};
   if (secretEnvProof.status) {
     console.log(

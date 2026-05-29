@@ -3,7 +3,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
+import {
+  buildBoundSecretEnvProof,
+  buildProductionSwitchPublicHttpsProof
+} from "./staging-proof-utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
@@ -1181,7 +1184,8 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     : result.operatorExecutionPlan?.realStagingRunFocus?.currentAction?.key
     || goLiveExecutionEntry.currentActionKey
     || "profile_rehearsal";
-  const httpsReady = /^https:\/\//i.test(String(summary.baseUrl || ""));
+  const publicHttpsProof = buildProductionSwitchPublicHttpsProof(summary.baseUrl || null);
+  const httpsReady = publicHttpsProof.isHttps;
   const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv)
     ? profilePreflight.missingSecretEnv
     : [];
@@ -1294,6 +1298,7 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     closeoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexFile,
+    publicHttpsProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: result.fullTestWindowReadiness?.command || "npm.cmd test",
@@ -9864,6 +9869,13 @@ function writeProductionSwitchProofPacketPlain(packet = null) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const publicHttpsProof = packet.publicHttpsProof || {};
+  if (publicHttpsProof.status) {
+    console.log(
+      `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
+        + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
   const secretEnvProof = packet.secretEnvProof || {};
   if (secretEnvProof.status) {
     console.log(

@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { buildProductionSwitchSecretEnvProof } from "./staging-proof-utils.mjs";
+import {
+  buildProductionSwitchPublicHttpsProof,
+  buildProductionSwitchSecretEnvProof
+} from "./staging-proof-utils.mjs";
 
 const ADMIN_PASSWORD_ENV = "RSL_SMOKE_ADMIN_PASSWORD";
 const DEVELOPER_PASSWORD_ENV = "RSL_SMOKE_DEVELOPER_PASSWORD";
@@ -1249,7 +1252,8 @@ function buildProductionSwitchProofPacket({
   launchDayWatchSummaryFile,
   launchDutyRecordIndexFile
 }) {
-  const httpsReady = /^https:\/\//i.test(String(options.baseUrl || ""));
+  const publicHttpsProof = buildProductionSwitchPublicHttpsProof(options.baseUrl);
+  const httpsReady = publicHttpsProof.isHttps;
   const secretEnvProof = buildProductionSwitchSecretEnvProof({
     stagingEnvironmentBinding: {
       credentialEnv: {
@@ -1343,6 +1347,7 @@ function buildProductionSwitchProofPacket({
     closeoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexFile,
+    publicHttpsProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: fullTestCommand,
@@ -1436,6 +1441,13 @@ function writeProductionSwitchProofPacketPlain(packet) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const publicHttpsProof = packet.publicHttpsProof || {};
+  if (publicHttpsProof.status) {
+    console.log(
+      `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
+        + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
   const secretEnvProof = packet.secretEnvProof || {};
   if (secretEnvProof.status) {
     console.log(

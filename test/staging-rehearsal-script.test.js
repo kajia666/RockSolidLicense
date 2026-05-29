@@ -2514,6 +2514,14 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.productionSwitchProofPacket.closeoutInputFile, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
     assert.equal(output.productionSwitchProofPacket.readinessActionQueueFile, readinessActionQueueFile);
     assert.equal(output.productionSwitchProofPacket.launchDutyRecordIndexFile, "artifacts/staging/PROFILE_PRODUCT/stable/launch-duty-record-index.json");
+    assert.deepEqual(output.productionSwitchProofPacket.publicHttpsProof, {
+      status: "ready_public_https_entrypoint",
+      baseUrl: "https://profile-staging.example.com",
+      scheme: "https",
+      isHttps: true,
+      currentActionKey: "confirm_public_https_entrypoint",
+      nextAction: "Public HTTPS entrypoint is configured; keep live-write smoke and launch switch checks on this URL."
+    });
     assert.deepEqual(output.productionSwitchProofPacket.secretEnvProof, {
       status: "pending_real_environment_confirmation",
       requiredKeys: [
@@ -3042,6 +3050,7 @@ test("staging rehearsal plain output labels the real staging launch-duty chain f
     assert.match(result.stdout, /Output archive entrypoint: launch_duty_archive_index \(written\) -> .*profile-launch-duty-archive-index\.json/);
     assert.match(result.stdout, /Output write next action: Open the launch-duty archive index, then continue closeout reload and launch-duty packet focus from the generated handoff\./);
     assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=set_required_secret_env\)/);
+    assert.match(result.stdout, /Production switch public HTTPS proof: ready_public_https_entrypoint \(scheme=https, url=https:\/\/profile-staging\.example\.com\)/);
     assert.match(result.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
     assert.match(result.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(result.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);

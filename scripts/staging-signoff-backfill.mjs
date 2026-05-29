@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { buildProductionSwitchSecretEnvProof } from "./staging-proof-utils.mjs";
+import {
+  buildProductionSwitchPublicHttpsProof,
+  buildProductionSwitchSecretEnvProof
+} from "./staging-proof-utils.mjs";
 
 const RECEIPT_VISIBILITY_KEYS = [
   "launchMainline",
@@ -818,6 +821,7 @@ function buildSignoffBackfillProductionSwitchProofPacket({
   const targetEnvFile = closeoutInput?.targetEnvFile || closeoutInput?.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
   const baseUrl = closeoutInput?.baseUrl || closeoutInput?.summary?.baseUrl || null;
   const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
+  const publicHttpsProof = buildProductionSwitchPublicHttpsProof(baseUrl);
   const secretEnvProof = buildProductionSwitchSecretEnvProof(closeoutInput, targetEnvFile);
   const proofItems = [
     {
@@ -905,6 +909,7 @@ function buildSignoffBackfillProductionSwitchProofPacket({
     closeoutInputFile: outputFile,
     readinessActionQueueFile: actionsFile || null,
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    publicHttpsProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -1023,6 +1028,13 @@ function writeProductionSwitchProofPacketPlain(packet) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const publicHttpsProof = packet.publicHttpsProof || {};
+  if (publicHttpsProof.status) {
+    console.log(
+      `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
+        + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
   const secretEnvProof = packet.secretEnvProof || {};
   if (secretEnvProof.status) {
     console.log(

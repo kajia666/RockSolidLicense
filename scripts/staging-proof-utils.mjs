@@ -49,3 +49,36 @@ export function buildProductionSwitchSecretEnvProof(source = {}, targetEnvFile =
         : "Bind the required secret environment variable names before continuing production switch proof."
   };
 }
+
+export function buildProductionSwitchPublicHttpsProof(baseUrl = null) {
+  const normalizedBaseUrl = typeof baseUrl === "string"
+    ? baseUrl.trim()
+    : baseUrl == null ? "" : String(baseUrl).trim();
+  let scheme = null;
+  if (normalizedBaseUrl) {
+    try {
+      scheme = new URL(normalizedBaseUrl).protocol.replace(/:$/, "").toLowerCase() || null;
+    } catch {
+      const schemeMatch = normalizedBaseUrl.match(/^([a-z][a-z0-9+.-]*):\/\//i);
+      scheme = schemeMatch ? schemeMatch[1].toLowerCase() : null;
+    }
+  }
+  const isHttps = scheme === "https";
+  const status = !normalizedBaseUrl
+    ? "pending_real_environment_value"
+    : isHttps ? "ready_public_https_entrypoint" : "blocked_until_public_https";
+  return {
+    status,
+    baseUrl: normalizedBaseUrl || null,
+    scheme,
+    isHttps,
+    currentActionKey: !normalizedBaseUrl
+      ? "set_public_https_entrypoint"
+      : isHttps ? "confirm_public_https_entrypoint" : "replace_public_base_url_with_https",
+    nextAction: !normalizedBaseUrl
+      ? "Set a public HTTPS base URL before continuing production switch proof."
+      : isHttps
+        ? "Public HTTPS entrypoint is configured; keep live-write smoke and launch switch checks on this URL."
+        : "Replace the staging base URL with a public HTTPS endpoint before live-write smoke or production switch review."
+  };
+}

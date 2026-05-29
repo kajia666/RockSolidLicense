@@ -52395,6 +52395,126 @@ function inferDeveloperOpsLaunchEvidenceArchiveRoot(gate = null, {
   return `artifacts/staging/${productCode || "<productCode>"}/${channel || "<channel>"}`;
 }
 
+const DEVELOPER_OPS_PRODUCTION_SWITCH_SECRET_ENV_KEYS = [
+  "RSL_SMOKE_ADMIN_PASSWORD",
+  "RSL_SMOKE_DEVELOPER_PASSWORD",
+  "RSL_DEVELOPER_BEARER_TOKEN"
+];
+
+function normalizeDeveloperOpsProductionSwitchValue(value = null) {
+  return typeof value === "string"
+    ? value.trim() || null
+    : value == null ? null : String(value).trim() || null;
+}
+
+function inferDeveloperOpsProductionSwitchUrlScheme(baseUrl = null) {
+  const normalizedBaseUrl = normalizeDeveloperOpsProductionSwitchValue(baseUrl);
+  if (!normalizedBaseUrl) {
+    return null;
+  }
+  try {
+    return new URL(normalizedBaseUrl).protocol.replace(/:$/, "").toLowerCase() || null;
+  } catch {
+    const schemeMatch = normalizedBaseUrl.match(/^([a-z][a-z0-9+.-]*):\/\//i);
+    return schemeMatch ? schemeMatch[1].toLowerCase() : null;
+  }
+}
+
+function buildDeveloperOpsProductionSwitchPublicHttpsProof({
+  baseUrl = null,
+  readyForStabilization = false
+} = {}) {
+  const normalizedBaseUrl = normalizeDeveloperOpsProductionSwitchValue(baseUrl);
+  const scheme = inferDeveloperOpsProductionSwitchUrlScheme(normalizedBaseUrl);
+  const isHttps = scheme === "https";
+  if (readyForStabilization && !normalizedBaseUrl) {
+    return {
+      status: "ready_confirmed_by_launch_gate",
+      baseUrl: null,
+      scheme: null,
+      isHttps: true,
+      currentActionKey: "confirm_public_https_entrypoint",
+      nextAction: "Public HTTPS entrypoint is confirmed by launch gate; keep live-write smoke and launch switch checks on this URL."
+    };
+  }
+  return {
+    status: !normalizedBaseUrl
+      ? "pending_real_environment_value"
+      : isHttps ? "ready_public_https_entrypoint" : "blocked_until_public_https",
+    baseUrl: normalizedBaseUrl,
+    scheme,
+    isHttps,
+    currentActionKey: !normalizedBaseUrl
+      ? "set_public_https_entrypoint"
+      : isHttps ? "confirm_public_https_entrypoint" : "replace_public_base_url_with_https",
+    nextAction: !normalizedBaseUrl
+      ? "Set a public HTTPS base URL before continuing production switch proof."
+      : isHttps
+        ? "Public HTTPS entrypoint is configured; keep live-write smoke and launch switch checks on this URL."
+        : "Replace the staging base URL with a public HTTPS endpoint before live-write smoke or production switch review."
+  };
+}
+
+function buildDeveloperOpsProductionSwitchStorageProfileProof({
+  storageProfile = null,
+  readyForStabilization = false
+} = {}) {
+  const normalizedStorageProfile = normalizeDeveloperOpsProductionSwitchValue(storageProfile);
+  if (readyForStabilization && !normalizedStorageProfile) {
+    return {
+      status: "ready_confirmed_by_launch_gate",
+      storageProfile: null,
+      isSelected: true,
+      currentActionKey: "confirm_storage_profile_selected",
+      nextAction: "Storage profile is confirmed by launch gate; keep backup and recovery proof aligned to this profile."
+    };
+  }
+  return {
+    status: normalizedStorageProfile ? "ready_storage_profile_selected" : "pending_real_environment_value",
+    storageProfile: normalizedStorageProfile,
+    isSelected: Boolean(normalizedStorageProfile),
+    currentActionKey: normalizedStorageProfile ? "confirm_storage_profile_selected" : "select_storage_profile",
+    nextAction: normalizedStorageProfile
+      ? "Storage profile is selected; keep backup and recovery proof aligned to this profile."
+      : "Select the storage profile before continuing production switch proof."
+  };
+}
+
+function buildDeveloperOpsProductionSwitchSecretEnvProof({
+  requiredKeys = DEVELOPER_OPS_PRODUCTION_SWITCH_SECRET_ENV_KEYS,
+  targetEnvFile = null,
+  readyForStabilization = false
+} = {}) {
+  const normalizedRequiredKeys = Array.isArray(requiredKeys)
+    ? [...new Set(requiredKeys
+      .map((key) => normalizeDeveloperOpsProductionSwitchValue(key))
+      .filter(Boolean))]
+    : DEVELOPER_OPS_PRODUCTION_SWITCH_SECRET_ENV_KEYS.slice();
+  const presentKeys = readyForStabilization ? normalizedRequiredKeys.slice() : [];
+  const missingKeys = readyForStabilization ? [] : normalizedRequiredKeys.slice();
+  const currentMissingKey = missingKeys[0] || null;
+  return {
+    status: readyForStabilization
+      ? "ready_confirmed_by_launch_gate"
+      : missingKeys.length ? "pending_real_environment_confirmation" : "ready_secret_env_loaded",
+    requiredKeys: normalizedRequiredKeys,
+    presentKeys,
+    missingKeys,
+    requiredCount: normalizedRequiredKeys.length,
+    missingCount: missingKeys.length,
+    currentMissingKey,
+    targetEnvFile: normalizeDeveloperOpsProductionSwitchValue(targetEnvFile),
+    currentActionKey: currentMissingKey
+      ? "set_required_secret_env"
+      : normalizedRequiredKeys.length ? "confirm_secret_env_loaded" : "bind_required_secret_env",
+    nextAction: currentMissingKey
+      ? `Set ${currentMissingKey} in the target shell before continuing production switch proof.`
+      : readyForStabilization
+        ? "Required secret environment variables are confirmed by launch gate; continue production switch proof."
+        : "Required secret environment variables are loaded; continue production switch proof."
+  };
+}
+
 const DEVELOPER_OPS_LAUNCH_EXECUTION_PHASES = [
   {
     key: "profile_and_closeout",
@@ -52809,6 +52929,19 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
   ];
   const ready = proofItems.filter((item) => String(item.status || "").startsWith("ready_")).length;
   const currentCommand = gate.currentCommand || gate.readinessStatusCommand || null;
+  const profileDrivenDryRunCommand = gate.profileDrivenDryRunCommand || null;
+  const publicHttpsProof = buildDeveloperOpsProductionSwitchPublicHttpsProof({
+    baseUrl: gate.baseUrl || extractCommandOptionValue(profileDrivenDryRunCommand, "base-url") || null,
+    readyForStabilization
+  });
+  const storageProfileProof = buildDeveloperOpsProductionSwitchStorageProfileProof({
+    storageProfile: gate.storageProfile || extractCommandOptionValue(profileDrivenDryRunCommand, "storage-profile") || null,
+    readyForStabilization
+  });
+  const secretEnvProof = buildDeveloperOpsProductionSwitchSecretEnvProof({
+    targetEnvFile: gate.targetEnvFile || extractCommandOptionValue(profileDrivenDryRunCommand, "target-env-file") || null,
+    readyForStabilization
+  });
   const closeoutInputFile = extractCommandOptionValue(currentCommand, "input-file")
     || extractCommandOptionValue(gate.readinessStatusCommand, "input-file")
     || null;
@@ -52841,15 +52974,18 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     status: ready === proofItems.length ? "ready_for_production_switch_review" : "blocked_until_real_environment_evidence",
     currentActionKey,
     currentCommand,
-    baseUrl: null,
+    baseUrl: publicHttpsProof.baseUrl || null,
     productCode: productCode || "<productCode>",
     channel: channel || "<channel>",
     targetOs: null,
-    storageProfile: null,
+    storageProfile: storageProfileProof.storageProfile || null,
     archiveRoot,
     closeoutInputFile,
     readinessActionQueueFile,
     launchDutyRecordIndexFile,
+    publicHttpsProof,
+    storageProfileProof,
+    secretEnvProof,
     backupRestoreDrillProof: {
       status: backupRestoreProofStatus,
       closeoutKey: "backup_restore_drill_result",
@@ -53158,6 +53294,7 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
     completedEvidenceCount,
     pendingEvidenceCount,
     blockerCount,
+    profileDrivenDryRunCommand: bridge?.profileDrivenDryRunCommand || null,
     readinessStatusCommand: closeoutEvidenceHandoff?.readinessStatusCommand
       || bridge?.readinessStatusCommand
       || null,
@@ -53383,6 +53520,18 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     productionSwitchProofReadyCount: switchProofReadyCount,
     productionSwitchProofTotalCount: switchProofTotalCount,
     productionSwitchProofBlockedCount: switchProofBlockedCount,
+    publicHttpsProof: switchProofPacket?.publicHttpsProof
+      && typeof switchProofPacket.publicHttpsProof === "object"
+      ? { ...switchProofPacket.publicHttpsProof }
+      : null,
+    storageProfileProof: switchProofPacket?.storageProfileProof
+      && typeof switchProofPacket.storageProfileProof === "object"
+      ? { ...switchProofPacket.storageProfileProof }
+      : null,
+    secretEnvProof: switchProofPacket?.secretEnvProof
+      && typeof switchProofPacket.secretEnvProof === "object"
+      ? { ...switchProofPacket.secretEnvProof }
+      : null,
     backupRestoreDrillProof: switchProofPacket?.backupRestoreDrillProof
       && typeof switchProofPacket.backupRestoreDrillProof === "object"
       ? { ...switchProofPacket.backupRestoreDrillProof }
@@ -60132,6 +60281,15 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
     productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? null,
     productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? null,
     productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? null,
+    publicHttpsProof: checkpoint.publicHttpsProof && typeof checkpoint.publicHttpsProof === "object"
+      ? { ...checkpoint.publicHttpsProof }
+      : null,
+    storageProfileProof: checkpoint.storageProfileProof && typeof checkpoint.storageProfileProof === "object"
+      ? { ...checkpoint.storageProfileProof }
+      : null,
+    secretEnvProof: checkpoint.secretEnvProof && typeof checkpoint.secretEnvProof === "object"
+      ? { ...checkpoint.secretEnvProof }
+      : null,
     backupRestoreDrillProof: checkpoint.backupRestoreDrillProof && typeof checkpoint.backupRestoreDrillProof === "object"
       ? { ...checkpoint.backupRestoreDrillProof }
       : null,
@@ -60168,6 +60326,24 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     checkpoint,
     productionSwitchProofPacket: proofPacket
   });
+  const publicHttpsProof = checkpoint.publicHttpsProof && typeof checkpoint.publicHttpsProof === "object"
+    ? checkpoint.publicHttpsProof
+    : proofPacket?.publicHttpsProof
+      && typeof proofPacket.publicHttpsProof === "object"
+      ? proofPacket.publicHttpsProof
+      : null;
+  const storageProfileProof = checkpoint.storageProfileProof && typeof checkpoint.storageProfileProof === "object"
+    ? checkpoint.storageProfileProof
+    : proofPacket?.storageProfileProof
+      && typeof proofPacket.storageProfileProof === "object"
+      ? proofPacket.storageProfileProof
+      : null;
+  const secretEnvProof = checkpoint.secretEnvProof && typeof checkpoint.secretEnvProof === "object"
+    ? checkpoint.secretEnvProof
+    : proofPacket?.secretEnvProof
+      && typeof proofPacket.secretEnvProof === "object"
+      ? proofPacket.secretEnvProof
+      : null;
   const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof && typeof checkpoint.backupRestoreDrillProof === "object"
     ? checkpoint.backupRestoreDrillProof
     : proofPacket?.backupRestoreDrillProof
@@ -60190,6 +60366,9 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     productionSwitchProofReadyCount: checkpoint.productionSwitchProofReadyCount ?? proofCounts.ready ?? null,
     productionSwitchProofTotalCount: checkpoint.productionSwitchProofTotalCount ?? proofCounts.total ?? null,
     productionSwitchProofBlockedCount: checkpoint.productionSwitchProofBlockedCount ?? proofCounts.blocked ?? null,
+    publicHttpsProof: publicHttpsProof ? { ...publicHttpsProof } : null,
+    storageProfileProof: storageProfileProof ? { ...storageProfileProof } : null,
+    secretEnvProof: secretEnvProof ? { ...secretEnvProof } : null,
     backupRestoreDrillProof: backupRestoreDrillProof ? { ...backupRestoreDrillProof } : null,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
@@ -60308,6 +60487,43 @@ function appendDeveloperOpsLaunchExecutionPhasePlanLines(lines = [], phasePlan =
   return true;
 }
 
+function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = null) {
+  if (!Array.isArray(lines) || !proofSource || typeof proofSource !== "object") {
+    return false;
+  }
+  const publicHttpsProof = proofSource.publicHttpsProof && typeof proofSource.publicHttpsProof === "object"
+    ? proofSource.publicHttpsProof
+    : null;
+  if (publicHttpsProof) {
+    lines.push(
+      `- publicHttpsProof=${publicHttpsProof.status || "-"}`
+      + ` | scheme=${publicHttpsProof.scheme || "-"}`
+      + ` | url=${publicHttpsProof.baseUrl || "-"}`
+    );
+  }
+  const storageProfileProof = proofSource.storageProfileProof && typeof proofSource.storageProfileProof === "object"
+    ? proofSource.storageProfileProof
+    : null;
+  if (storageProfileProof) {
+    lines.push(
+      `- storageProfileProof=${storageProfileProof.status || "-"}`
+      + ` | profile=${storageProfileProof.storageProfile || "-"}`
+    );
+  }
+  const secretEnvProof = proofSource.secretEnvProof && typeof proofSource.secretEnvProof === "object"
+    ? proofSource.secretEnvProof
+    : null;
+  if (secretEnvProof) {
+    lines.push(
+      `- secretEnvProof=${secretEnvProof.status || "-"}`
+      + ` | required=${secretEnvProof.requiredCount ?? "-"}`
+      + ` | missing=${secretEnvProof.missingCount ?? "-"}`
+      + ` | current=${secretEnvProof.currentMissingKey || "-"}`
+    );
+  }
+  return Boolean(publicHttpsProof || storageProfileProof || secretEnvProof);
+}
+
 function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null, {
   leadingBlank = true,
   heading = "Launch Cutover Triage Checkpoint:"
@@ -60334,6 +60550,7 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
+  appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof
     && typeof checkpoint.backupRestoreDrillProof === "object"
     ? checkpoint.backupRestoreDrillProof
@@ -60427,6 +60644,7 @@ function appendProductionSwitchProofPacketLines(lines = [], proofPacket = null, 
     + ` | blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
     + ` | current=${proofPacket.currentActionKey || "-"}`
   );
+  appendProductionSwitchEnvironmentProofLines(lines, proofPacket);
   const backupRestoreDrillProof = proofPacket.backupRestoreDrillProof && typeof proofPacket.backupRestoreDrillProof === "object"
     ? proofPacket.backupRestoreDrillProof
     : null;
@@ -66993,6 +67211,7 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
+  appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   const backupRestoreDrillProof = checkpoint.backupRestoreDrillProof
     && typeof checkpoint.backupRestoreDrillProof === "object"
     ? checkpoint.backupRestoreDrillProof

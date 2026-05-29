@@ -12386,6 +12386,50 @@ test("developer license quickstart first-batch setup can create recommended laun
         nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
       }
     );
+    assert.deepEqual(
+      {
+        publicHttpsProof: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.publicHttpsProof,
+        storageProfileProof: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.storageProfileProof,
+        secretEnvProof: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.secretEnvProof
+      },
+      {
+        publicHttpsProof: {
+          status: "pending_real_environment_value",
+          baseUrl: null,
+          scheme: null,
+          isHttps: false,
+          currentActionKey: "set_public_https_entrypoint",
+          nextAction: "Set a public HTTPS base URL before continuing production switch proof."
+        },
+        storageProfileProof: {
+          status: "pending_real_environment_value",
+          storageProfile: null,
+          isSelected: false,
+          currentActionKey: "select_storage_profile",
+          nextAction: "Select the storage profile before continuing production switch proof."
+        },
+        secretEnvProof: {
+          status: "pending_real_environment_confirmation",
+          requiredKeys: [
+            "RSL_SMOKE_ADMIN_PASSWORD",
+            "RSL_SMOKE_DEVELOPER_PASSWORD",
+            "RSL_DEVELOPER_BEARER_TOKEN"
+          ],
+          presentKeys: [],
+          missingKeys: [
+            "RSL_SMOKE_ADMIN_PASSWORD",
+            "RSL_SMOKE_DEVELOPER_PASSWORD",
+            "RSL_DEVELOPER_BEARER_TOKEN"
+          ],
+          requiredCount: 3,
+          missingCount: 3,
+          currentMissingKey: "RSL_SMOKE_ADMIN_PASSWORD",
+          targetEnvFile: null,
+          currentActionKey: "set_required_secret_env",
+          nextAction: "Set RSL_SMOKE_ADMIN_PASSWORD in the target shell before continuing production switch proof."
+        }
+      }
+    );
     const runtimeEvidenceReviewOpsCheckpoint = runtimeEvidenceLaunchReview.opsSnapshot?.summary?.initialLaunchOpsReadiness
       ?.launchOperationsOperatorEntry?.operatorQueueCheckpoint;
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
@@ -12539,6 +12583,9 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.summaryText,
       /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/);
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /storageProfileProof=pending_real_environment_value \| profile=-/);
+    assert.match(runtimeEvidenceLaunchReview.summaryText, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
@@ -12624,6 +12671,9 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewProductionSwitchProofPacketDownload.body,
       /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /storageProfileProof=pending_real_environment_value \| profile=-/);
+    assert.match(runtimeEvidenceReviewProductionSwitchProofPacketDownload.body, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
     const runtimeEvidenceReviewLaunchExecutionPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-review/download?productCode=FIRSTBATCH&channel=stable&reviewMode=matched&format=launch-execution-phase-plan",
@@ -12931,6 +12981,9 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchSmoke.summaryText,
       /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /storageProfileProof=pending_real_environment_value \| profile=-/);
+    assert.match(runtimeEvidenceLaunchSmoke.summaryText, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverStableRunbook=status=blocked_until_cutover_watch \| stableAction=.* \| steadyStateHref=.*/);
@@ -13016,6 +13069,9 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body,
       /backupRestoreDrillProof=blocked_after_readiness_status \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /storageProfileProof=pending_real_environment_value \| profile=-/);
+    assert.match(runtimeEvidenceSmokeProductionSwitchProofPacketDownload.body, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
     const runtimeEvidenceSmokeLaunchExecutionPhasePlanDownload = await getText(
       baseUrl,
       "/api/developer/launch-smoke-kit/download?productCode=FIRSTBATCH&channel=stable&format=launch-execution-phase-plan",
@@ -23644,6 +23700,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         productionSwitchProofReadyCount: productionSwitchProofPacket?.proofCounts?.ready ?? null,
         productionSwitchProofTotalCount: productionSwitchProofPacket?.proofCounts?.total ?? null,
         productionSwitchProofBlockedCount: productionSwitchProofPacket?.proofCounts?.blocked ?? null,
+        publicHttpsProof: productionSwitchProofPacket?.publicHttpsProof || null,
+        storageProfileProof: productionSwitchProofPacket?.storageProfileProof || null,
+        secretEnvProof: productionSwitchProofPacket?.secretEnvProof || null,
         backupRestoreDrillProof: productionSwitchProofPacket?.backupRestoreDrillProof || null,
         proofExecutionEntrypoint: {
           mode: "production-switch-proof-execution-entrypoint/v1",
@@ -23892,6 +23951,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*publicHttpsProof=pending_real_environment_value \| scheme=- \| url=-/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*storageProfileProof=pending_real_environment_value \| profile=-/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*proofItem=backup_restore_drill[^\n]*proofArtifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt/
     );
     assert.match(
@@ -23948,6 +24019,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         currentCommand: launchEvidenceReadinessGate.productionSwitchProofPacket?.currentCommand,
         archiveRoot: launchEvidenceReadinessGate.productionSwitchProofPacket?.archiveRoot,
         launchDutyRecordIndexFile: launchEvidenceReadinessGate.productionSwitchProofPacket?.launchDutyRecordIndexFile,
+        publicHttpsProof: launchEvidenceReadinessGate.productionSwitchProofPacket?.publicHttpsProof,
+        storageProfileProof: launchEvidenceReadinessGate.productionSwitchProofPacket?.storageProfileProof,
+        secretEnvProof: launchEvidenceReadinessGate.productionSwitchProofPacket?.secretEnvProof,
         backupRestoreDrillProof: launchEvidenceReadinessGate.productionSwitchProofPacket?.backupRestoreDrillProof,
         proofCounts: launchEvidenceReadinessGate.productionSwitchProofPacket?.proofCounts,
         localFullSuiteBaseline: launchEvidenceReadinessGate.productionSwitchProofPacket?.localFullSuiteBaseline
@@ -23959,6 +24033,41 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         currentCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
         archiveRoot: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable",
         launchDutyRecordIndexFile: expectedSteadyStateLaunchDutyRecordIndexPath,
+        publicHttpsProof: {
+          status: "pending_real_environment_value",
+          baseUrl: null,
+          scheme: null,
+          isHttps: false,
+          currentActionKey: "set_public_https_entrypoint",
+          nextAction: "Set a public HTTPS base URL before continuing production switch proof."
+        },
+        storageProfileProof: {
+          status: "pending_real_environment_value",
+          storageProfile: null,
+          isSelected: false,
+          currentActionKey: "select_storage_profile",
+          nextAction: "Select the storage profile before continuing production switch proof."
+        },
+        secretEnvProof: {
+          status: "pending_real_environment_confirmation",
+          requiredKeys: [
+            "RSL_SMOKE_ADMIN_PASSWORD",
+            "RSL_SMOKE_DEVELOPER_PASSWORD",
+            "RSL_DEVELOPER_BEARER_TOKEN"
+          ],
+          presentKeys: [],
+          missingKeys: [
+            "RSL_SMOKE_ADMIN_PASSWORD",
+            "RSL_SMOKE_DEVELOPER_PASSWORD",
+            "RSL_DEVELOPER_BEARER_TOKEN"
+          ],
+          requiredCount: 3,
+          missingCount: 3,
+          currentMissingKey: "RSL_SMOKE_ADMIN_PASSWORD",
+          targetEnvFile: null,
+          currentActionKey: "set_required_secret_env",
+          nextAction: "Set RSL_SMOKE_ADMIN_PASSWORD in the target shell before continuing production switch proof."
+        },
         backupRestoreDrillProof: {
           status: "blocked_after_readiness_status",
           closeoutKey: "backup_restore_drill_result",
@@ -31865,6 +31974,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         status: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.status,
         currentActionKey: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.currentActionKey,
         currentCommand: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.currentCommand,
+        publicHttpsProof: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.publicHttpsProof,
+        storageProfileProof: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.storageProfileProof,
+        secretEnvProof: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.secretEnvProof,
         backupRestoreDrillProof: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.backupRestoreDrillProof,
         proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
       },
@@ -31873,6 +31985,41 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         status: "ready_for_production_switch_review",
         currentActionKey: "refresh_readiness_status",
         currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        publicHttpsProof: {
+          status: "ready_confirmed_by_launch_gate",
+          baseUrl: null,
+          scheme: null,
+          isHttps: true,
+          currentActionKey: "confirm_public_https_entrypoint",
+          nextAction: "Public HTTPS entrypoint is confirmed by launch gate; keep live-write smoke and launch switch checks on this URL."
+        },
+        storageProfileProof: {
+          status: "ready_confirmed_by_launch_gate",
+          storageProfile: null,
+          isSelected: true,
+          currentActionKey: "confirm_storage_profile_selected",
+          nextAction: "Storage profile is confirmed by launch gate; keep backup and recovery proof aligned to this profile."
+        },
+        secretEnvProof: {
+          status: "ready_confirmed_by_launch_gate",
+          requiredKeys: [
+            "RSL_SMOKE_ADMIN_PASSWORD",
+            "RSL_SMOKE_DEVELOPER_PASSWORD",
+            "RSL_DEVELOPER_BEARER_TOKEN"
+          ],
+          presentKeys: [
+            "RSL_SMOKE_ADMIN_PASSWORD",
+            "RSL_SMOKE_DEVELOPER_PASSWORD",
+            "RSL_DEVELOPER_BEARER_TOKEN"
+          ],
+          missingKeys: [],
+          requiredCount: 3,
+          missingCount: 0,
+          currentMissingKey: null,
+          targetEnvFile: null,
+          currentActionKey: "confirm_secret_env_loaded",
+          nextAction: "Required secret environment variables are confirmed by launch gate; continue production switch proof."
+        },
         backupRestoreDrillProof: {
           status: "ready_evidence_attached",
           closeoutKey: "backup_restore_drill_result",
@@ -32873,6 +33020,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*publicHttpsProof=ready_confirmed_by_launch_gate \| scheme=- \| url=-/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*storageProfileProof=ready_confirmed_by_launch_gate \| profile=-/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*secretEnvProof=ready_confirmed_by_launch_gate \| required=3 \| missing=0 \| current=-/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
     );
     assert.match(
@@ -32896,6 +33055,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineCloseoutRecordedProofPacketDownload.body,
       /backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
+    assert.match(launchMainlineCloseoutRecordedProofPacketDownload.body, /publicHttpsProof=ready_confirmed_by_launch_gate \| scheme=- \| url=-/);
+    assert.match(launchMainlineCloseoutRecordedProofPacketDownload.body, /storageProfileProof=ready_confirmed_by_launch_gate \| profile=-/);
+    assert.match(launchMainlineCloseoutRecordedProofPacketDownload.body, /secretEnvProof=ready_confirmed_by_launch_gate \| required=3 \| missing=0 \| current=-/);
     assert.match(
       launchMainlineCloseoutRecordedProofPacketDownload.body,
       /Launch Execution Phase Plan:[\s\S]*launchExecutionPhase=awaiting_stable_operations_handoff \| current=stable_operations_handoff \| ready=6\/7 \| blocked=0\/7 \| commands=39/
@@ -33053,6 +33215,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchReviewCloseoutRecordedProofPacketDownload.body,
       /backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
+    assert.match(launchReviewCloseoutRecordedProofPacketDownload.body, /publicHttpsProof=ready_confirmed_by_launch_gate \| scheme=- \| url=-/);
+    assert.match(launchReviewCloseoutRecordedProofPacketDownload.body, /storageProfileProof=ready_confirmed_by_launch_gate \| profile=-/);
+    assert.match(launchReviewCloseoutRecordedProofPacketDownload.body, /secretEnvProof=ready_confirmed_by_launch_gate \| required=3 \| missing=0 \| current=-/);
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
       /currentCommand=npm\.cmd run staging:readiness:status/
@@ -33164,6 +33329,9 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /backupRestoreDrillProof=ready_evidence_attached \| key=backup_restore_drill_result \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| receipts=<recovery-drill-receipt-id>,<backup-verification-receipt-id>/
     );
+    assert.match(launchSmokeCloseoutRecordedProofPacketDownload.body, /publicHttpsProof=ready_confirmed_by_launch_gate \| scheme=- \| url=-/);
+    assert.match(launchSmokeCloseoutRecordedProofPacketDownload.body, /storageProfileProof=ready_confirmed_by_launch_gate \| profile=-/);
+    assert.match(launchSmokeCloseoutRecordedProofPacketDownload.body, /secretEnvProof=ready_confirmed_by_launch_gate \| required=3 \| missing=0 \| current=-/);
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /proofItemContinuation=current=launch_day_watch_and_stabilization \| remaining=1 \| next=- \| nextQueue=-/

@@ -49,10 +49,14 @@ function runStatus(args, env = {}) {
   });
 }
 
-function runStatusPlain(args) {
+function runStatusPlain(args, env = {}) {
   return spawnSync(process.execPath, ["scripts/staging-readiness-status.mjs", ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env
+    },
     timeout: 120_000
   });
 }
@@ -200,6 +204,26 @@ test("staging readiness status marks bound non-default secret env ready when req
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.productionSwitchProofPacket.secretEnvProof, {
+      status: "ready_secret_env_loaded",
+      requiredKeys: [
+        "RSL_SMOKE_ADMIN_PASSWORD",
+        "RSL_SMOKE_DEVELOPER_PASSWORD",
+        "RSL_DEVELOPER_BEARER_TOKEN"
+      ],
+      presentKeys: [
+        "RSL_SMOKE_ADMIN_PASSWORD",
+        "RSL_SMOKE_DEVELOPER_PASSWORD",
+        "RSL_DEVELOPER_BEARER_TOKEN"
+      ],
+      missingKeys: [],
+      requiredCount: 3,
+      missingCount: 0,
+      currentMissingKey: null,
+      targetEnvFile: "/etc/rocksolidlicense/staging.env",
+      currentActionKey: "confirm_secret_env_loaded",
+      nextAction: "Required secret environment variables are loaded; continue production switch proof."
+    });
     assert.deepEqual(
       output.productionSwitchProofPacket.proofItems.slice(0, 3).map((item) => [item.key, item.status, item.artifactPath]),
       [
@@ -577,14 +601,50 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
       decision: "ready-for-full-test-window",
       productionDecision: "ready-for-production-signoff",
       filledSignoffKeys: ["full_test_window_passed"],
-      visibleReceiptLanes: ["launchMainline"]
+      visibleReceiptLanes: ["launchMainline"],
+      extra: {
+        stagingEnvironmentBinding: {
+          environment: {
+            targetEnvFile: "/etc/rocksolidlicense/staging.env"
+          },
+          credentialEnv: {
+            adminPassword: "RSL_SMOKE_ADMIN_PASSWORD",
+            developerPassword: "RSL_SMOKE_DEVELOPER_PASSWORD",
+            developerBearerToken: "RSL_DEVELOPER_BEARER_TOKEN"
+          }
+        }
+      }
     });
+    const readinessEnv = {
+      RSL_SMOKE_ADMIN_PASSWORD: "RealAdminSecret123!",
+      RSL_SMOKE_DEVELOPER_PASSWORD: "RealDeveloperSecret123!",
+      RSL_DEVELOPER_BEARER_TOKEN: ""
+    };
 
-    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile]);
+    const result = runStatus(["--input-file", inputFile, "--actions-file", actionsFile], readinessEnv);
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(result.stderr, "");
     const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.productionSwitchProofPacket.secretEnvProof, {
+      status: "pending_real_environment_confirmation",
+      requiredKeys: [
+        "RSL_SMOKE_ADMIN_PASSWORD",
+        "RSL_SMOKE_DEVELOPER_PASSWORD",
+        "RSL_DEVELOPER_BEARER_TOKEN"
+      ],
+      presentKeys: [
+        "RSL_SMOKE_ADMIN_PASSWORD",
+        "RSL_SMOKE_DEVELOPER_PASSWORD"
+      ],
+      missingKeys: ["RSL_DEVELOPER_BEARER_TOKEN"],
+      requiredCount: 3,
+      missingCount: 1,
+      currentMissingKey: "RSL_DEVELOPER_BEARER_TOKEN",
+      targetEnvFile: "/etc/rocksolidlicense/staging.env",
+      currentActionKey: "set_required_secret_env",
+      nextAction: "Set RSL_DEVELOPER_BEARER_TOKEN in the target shell before continuing production switch proof."
+    });
     assert.equal(output.productionSwitchProofPacket.version, "staging-readiness-production-switch-proof-packet/v1");
     assert.equal(output.productionSwitchProofPacket.status, "blocked_until_real_environment_evidence");
     assert.equal(output.productionSwitchProofPacket.currentActionKey, "backfill_production_signoff");
@@ -615,7 +675,7 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
       output.productionSwitchProofPacket.proofItems.map((item) => [item.order, item.key, item.status, item.artifactPath]),
       [
         [1, "public_https_entrypoint", "pending_real_environment_value", null],
-        [2, "non_default_secret_env", "pending_real_environment_confirmation", null],
+        [2, "non_default_secret_env", "pending_real_environment_confirmation", "/etc/rocksolidlicense/staging.env"],
         [3, "storage_profile_selected", "pending_real_environment_value", null],
         [4, "backup_restore_drill", "ready_evidence_attached", "artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt"],
         [5, "live_write_smoke", "ready_evidence_attached", "artifacts/staging/<productCode>/<channel>/live-write-smoke-output.json"],
@@ -780,7 +840,7 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
       }
     );
 
-    const plain = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
+    const plain = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile], readinessEnv);
 
     assert.equal(plain.status, 0, plain.stderr || plain.stdout);
     assert.equal(plain.stderr, "");
@@ -794,6 +854,9 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(plain.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/<productCode>\/<channel>\/first-wave-closeout\.md/);
     assert.match(plain.stdout, /Launch evidence next action: Run command with real redacted evidence, then statusCommand to continue production sign-off\./);
     assert.match(plain.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=backfill_production_signoff\)/);
+    assert.match(plain.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
+    assert.match(plain.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
+    assert.match(plain.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(plain.stdout, /Production switch local baseline: npm\.cmd test -> artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt \(available_from_2026-05-28_full_suite_pass, tests=198, failures=0\)/);
     assert.match(plain.stdout, /Production switch proof 4\. backup_restore_drill: ready_evidence_attached -> artifacts\/staging\/<productCode>\/<channel>\/backup-restore-drill\.txt/);
     assert.match(plain.stdout, /Production switch proof 7\. production_signoff_and_receipts: blocked_after_full_test_signoff_backfill -> npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key staging_artifacts_archived --value-json <redacted-json> --actions-file .*readiness-action-queue\.md/);
@@ -808,6 +871,9 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(markdown, /- 6\. `launch_day_watch_and_stabilization` \[blocked\] commands `6` current `-` next `record_launch_day_watch_summary`/);
     assert.match(markdown, /## Production Switch Proof Packet/);
     assert.match(markdown, /Production switch proof packet: `blocked_until_real_environment_evidence` \(ready `3\/8`, blocked `5\/8`, current `backfill_production_signoff`\)/);
+    assert.match(markdown, /Production switch secret env proof: `pending_real_environment_confirmation` \(required `3`, missing `1`, current `RSL_DEVELOPER_BEARER_TOKEN`\)/);
+    assert.match(markdown, /Production switch secret env required: `RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN`/);
+    assert.match(markdown, /Production switch secret env missing: `RSL_DEVELOPER_BEARER_TOKEN`/);
     assert.match(markdown, /Production switch local baseline: `npm\.cmd test` -> `artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt`/);
     assert.match(markdown, /- 4\. `backup_restore_drill` \[ready_evidence_attached\] artifact `artifacts\/staging\/<productCode>\/<channel>\/backup-restore-drill\.txt`/);
     assert.match(markdown, /- 8\. `launch_day_watch_and_stabilization` \[blocked_after_production_signoff_readiness\] artifact `artifacts\/staging\/<productCode>\/<channel>\/launch-day-watch-summary\.md`/);

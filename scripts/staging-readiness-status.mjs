@@ -1423,6 +1423,35 @@ function filledEvidenceByKey(items = []) {
   return new Map((Array.isArray(items) ? items : []).map((item) => [item.key, item]));
 }
 
+function buildProductionSwitchSecretEnvProof(source = {}, targetEnvFile = null) {
+  const boundSecretEnvProof = buildBoundSecretEnvProof(source);
+  const requiredKeys = Array.isArray(boundSecretEnvProof.requiredKeys)
+    ? boundSecretEnvProof.requiredKeys
+    : [];
+  const missingKeys = Array.isArray(boundSecretEnvProof.missingKeys)
+    ? boundSecretEnvProof.missingKeys
+    : [];
+  const currentMissingKey = missingKeys[0] || null;
+  return {
+    status: boundSecretEnvProof.status || (missingKeys.length ? "pending_real_environment_confirmation" : "ready_secret_env_loaded"),
+    requiredKeys,
+    presentKeys: requiredKeys.filter((key) => !missingKeys.includes(key)),
+    missingKeys,
+    requiredCount: requiredKeys.length,
+    missingCount: missingKeys.length,
+    currentMissingKey,
+    targetEnvFile: targetEnvFile || null,
+    currentActionKey: currentMissingKey
+      ? "set_required_secret_env"
+      : requiredKeys.length ? "confirm_secret_env_loaded" : "bind_required_secret_env",
+    nextAction: currentMissingKey
+      ? `Set ${currentMissingKey} in the target shell before continuing production switch proof.`
+      : requiredKeys.length
+        ? "Required secret environment variables are loaded; continue production switch proof."
+        : "Bind the required secret environment variable names before continuing production switch proof."
+  };
+}
+
 function buildStagingProductionSwitchProofPacket({
   payload,
   inputFile,
@@ -1441,7 +1470,7 @@ function buildStagingProductionSwitchProofPacket({
   const baseUrl = payload.baseUrl || payload.summary?.baseUrl || null;
   const storageProfile = payload.storageProfile || payload.summary?.storageProfile || null;
   const targetEnvFile = payload.targetEnvFile || payload.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
-  const secretEnvProof = buildBoundSecretEnvProof(payload);
+  const secretEnvProof = buildProductionSwitchSecretEnvProof(payload, targetEnvFile);
   const fullTestArtifact = path.posix.join(archiveRoot, "full-test-output.txt");
   const backupRestoreEvidence = evidenceForCloseoutKey("backup_restore_drill_result", artifactPathRoot);
   const liveWriteEvidence = evidenceForCloseoutKey("live_write_smoke_result", artifactPathRoot);
@@ -1547,6 +1576,7 @@ function buildStagingProductionSwitchProofPacket({
     closeoutInputFile: inputFile,
     readinessActionQueueFile: actionsFile || null,
     launchDutyRecordIndexFile: launchDutyCompletionHandoff?.recordIndexFile || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -1936,9 +1966,17 @@ function renderProductionSwitchProofPacketMarkdown(result) {
     `Production switch proof packet: \`${packet.status || "-"}\` (ready \`${counts.ready ?? "-"}/${counts.total ?? "-"}\`, blocked \`${counts.blocked ?? "-"}/${counts.total ?? "-"}\`, current \`${packet.currentActionKey || "-"}\`)`,
     `Production switch current command: \`${packet.currentCommand || "-"}\``,
     `Production switch local baseline: \`${baseline.command || "-"}\` -> \`${baseline.outputArtifact || "-"}\` (\`${baseline.status || "-"}\`, tests \`${baseline.testCount ?? "-"}\`, failures \`${baseline.failureCount ?? "-"}\`)`,
-    `Production switch record index: \`${packet.launchDutyRecordIndexFile || "-"}\``,
-    ""
+    `Production switch record index: \`${packet.launchDutyRecordIndexFile || "-"}\``
   ];
+  const secretEnvProof = packet.secretEnvProof || {};
+  if (secretEnvProof.status) {
+    lines.push(
+      `Production switch secret env proof: \`${secretEnvProof.status || "-"}\` (required \`${secretEnvProof.requiredCount ?? "-"}\`, missing \`${secretEnvProof.missingCount ?? "-"}\`, current \`${secretEnvProof.currentMissingKey || "-"}\`)`,
+      `Production switch secret env required: \`${(secretEnvProof.requiredKeys || []).join(", ") || "-"}\``,
+      `Production switch secret env missing: \`${(secretEnvProof.missingKeys || []).join(", ") || "-"}\``
+    );
+  }
+  lines.push("");
   for (const item of packet.proofItems || []) {
     lines.push(`- ${item.order || "-"}. \`${item.key || "-"}\` [${item.status || "-"}] artifact \`${item.artifactPath || "-"}\` command \`${item.command || "-"}\``);
   }
@@ -2510,6 +2548,17 @@ function writeProductionSwitchProofPacketPlain(packet) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const secretEnvProof = packet.secretEnvProof || {};
+  if (secretEnvProof.status) {
+    console.log(
+      `Production switch secret env proof: ${secretEnvProof.status || "-"}`
+        + ` (required=${secretEnvProof.requiredCount ?? "-"}`
+        + `, missing=${secretEnvProof.missingCount ?? "-"}`
+        + `, current=${secretEnvProof.currentMissingKey || "-"})`
+    );
+    console.log(`Production switch secret env required: ${(secretEnvProof.requiredKeys || []).join(", ") || "-"}`);
+    console.log(`Production switch secret env missing: ${(secretEnvProof.missingKeys || []).join(", ") || "-"}`);
+  }
   const baseline = packet.localFullSuiteBaseline || {};
   console.log(
     `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`

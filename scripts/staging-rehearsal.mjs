@@ -5,7 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildBoundSecretEnvProof,
-  buildProductionSwitchPublicHttpsProof
+  buildProductionSwitchPublicHttpsProof,
+  buildProductionSwitchStorageProfileProof
 } from "./staging-proof-utils.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1185,6 +1186,7 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     || goLiveExecutionEntry.currentActionKey
     || "profile_rehearsal";
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(summary.baseUrl || null);
+  const storageProfileProof = buildProductionSwitchStorageProfileProof(summary.storageProfile || null);
   const httpsReady = publicHttpsProof.isHttps;
   const missingSecretEnv = Array.isArray(profilePreflight.missingSecretEnv)
     ? profilePreflight.missingSecretEnv
@@ -1299,6 +1301,7 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     readinessActionQueueFile,
     launchDutyRecordIndexFile,
     publicHttpsProof,
+    storageProfileProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: result.fullTestWindowReadiness?.command || "npm.cmd test",
@@ -9874,6 +9877,13 @@ function writeProductionSwitchProofPacketPlain(packet = null) {
     console.log(
       `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
         + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
+  const storageProfileProof = packet.storageProfileProof || {};
+  if (storageProfileProof.status) {
+    console.log(
+      `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
+        + ` (profile=${storageProfileProof.storageProfile || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

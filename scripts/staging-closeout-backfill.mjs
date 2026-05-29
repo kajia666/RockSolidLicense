@@ -3,7 +3,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   buildProductionSwitchPublicHttpsProof,
-  buildProductionSwitchSecretEnvProof
+  buildProductionSwitchSecretEnvProof,
+  buildProductionSwitchStorageProfileProof
 } from "./staging-proof-utils.mjs";
 
 const OPTION_FLAGS = {
@@ -793,6 +794,7 @@ function buildCloseoutBackfillProductionSwitchProofPacket({
   const baseUrl = closeoutInput?.baseUrl || closeoutInput?.summary?.baseUrl || null;
   const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(baseUrl);
+  const storageProfileProof = buildProductionSwitchStorageProfileProof(storageProfile);
   const secretEnvProof = buildProductionSwitchSecretEnvProof(closeoutInput, targetEnvFile);
   const backupRestoreField = closeoutFields.get("backup_restore_drill_result");
   const backupRestoreArtifactPath = backupRestoreField?.artifactPath || path.posix.join(archiveRoot, "backup_restore_drill_result.txt");
@@ -906,6 +908,7 @@ function buildCloseoutBackfillProductionSwitchProofPacket({
     readinessActionQueueFile: actionsFile || null,
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
     publicHttpsProof,
+    storageProfileProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -941,6 +944,13 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
         + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
+  const storageProfileProof = packet.storageProfileProof || {};
+  if (storageProfileProof.status) {
+    console.log(
+      `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
+        + ` (profile=${storageProfileProof.storageProfile || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

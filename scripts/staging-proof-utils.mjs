@@ -82,3 +82,19 @@ export function buildProductionSwitchPublicHttpsProof(baseUrl = null) {
         : "Replace the staging base URL with a public HTTPS endpoint before live-write smoke or production switch review."
   };
 }
+
+export function buildProductionSwitchStorageProfileProof(storageProfile = null) {
+  const normalizedStorageProfile = typeof storageProfile === "string"
+    ? storageProfile.trim()
+    : storageProfile == null ? "" : String(storageProfile).trim();
+  const isSelected = Boolean(normalizedStorageProfile);
+  return {
+    status: isSelected ? "ready_storage_profile_selected" : "pending_real_environment_value",
+    storageProfile: normalizedStorageProfile || null,
+    isSelected,
+    currentActionKey: isSelected ? "confirm_storage_profile_selected" : "select_storage_profile",
+    nextAction: isSelected
+      ? "Storage profile is selected; keep backup and recovery proof aligned to this profile."
+      : "Select the storage profile before continuing production switch proof."
+  };
+}

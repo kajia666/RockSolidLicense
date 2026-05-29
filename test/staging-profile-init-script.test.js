@@ -449,6 +449,13 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         currentActionKey: "confirm_public_https_entrypoint",
         nextAction: "Public HTTPS entrypoint is configured; keep live-write smoke and launch switch checks on this URL."
       },
+      storageProfileProof: {
+        status: "ready_storage_profile_selected",
+        storageProfile: "postgres-preview",
+        isSelected: true,
+        currentActionKey: "confirm_storage_profile_selected",
+        nextAction: "Storage profile is selected; keep backup and recovery proof aligned to this profile."
+      },
       secretEnvProof: {
         status: "pending_real_environment_confirmation",
         requiredKeys: [
@@ -1318,6 +1325,13 @@ test("staging profile init marks non-default secret env ready when required env 
       currentActionKey: "confirm_public_https_entrypoint",
       nextAction: "Public HTTPS entrypoint is configured; keep live-write smoke and launch switch checks on this URL."
     });
+    assert.deepEqual(output.productionSwitchProofPacket.storageProfileProof, {
+      status: "ready_storage_profile_selected",
+      storageProfile: "postgres-preview",
+      isSelected: true,
+      currentActionKey: "confirm_storage_profile_selected",
+      nextAction: "Storage profile is selected; keep backup and recovery proof aligned to this profile."
+    });
     assert.deepEqual(
       output.productionSwitchProofPacket.proofItems.slice(0, 3).map((item) => [item.key, item.status, item.artifactPath]),
       [
@@ -1392,6 +1406,7 @@ test("staging profile init prints secret env proof in plain output without secre
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /Production switch public HTTPS proof: ready_public_https_entrypoint \(scheme=https, url=https:\/\/staging\.example\.com\)/);
+    assert.match(result.stdout, /Production switch storage profile proof: ready_storage_profile_selected \(profile=postgres-preview\)/);
     assert.match(result.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
     assert.match(result.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(result.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);

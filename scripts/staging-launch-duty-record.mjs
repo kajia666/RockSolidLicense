@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   buildProductionSwitchPublicHttpsProof,
-  buildProductionSwitchSecretEnvProof
+  buildProductionSwitchSecretEnvProof,
+  buildProductionSwitchStorageProfileProof
 } from "./staging-proof-utils.mjs";
 
 const RECORD_INDEX_FILE_NAME = "launch-duty-record-index.json";
@@ -873,6 +874,7 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
   const targetEnvFile = closeoutInput?.targetEnvFile || closeoutInput?.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
   const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(baseUrl);
+  const storageProfileProof = buildProductionSwitchStorageProfileProof(storageProfile);
   const secretEnvProof = buildProductionSwitchSecretEnvProof(closeoutInput, targetEnvFile);
   const launchDayWatchRecord = recordIndex?.records?.launch_day_watch_summary || null;
   const firstWaveCloseoutRecord = recordIndex?.records?.first_wave_closeout || null;
@@ -969,6 +971,7 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
     readinessActionQueueFile: options.actionsFile || null,
     launchDutyRecordIndexFile: joinArtifactPath(archiveRoot, RECORD_INDEX_FILE_NAME),
     publicHttpsProof,
+    storageProfileProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -1148,6 +1151,13 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
         + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
+  const storageProfileProof = packet.storageProfileProof || {};
+  if (storageProfileProof.status) {
+    console.log(
+      `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
+        + ` (profile=${storageProfileProof.storageProfile || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

@@ -3,7 +3,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   buildProductionSwitchPublicHttpsProof,
-  buildProductionSwitchSecretEnvProof
+  buildProductionSwitchSecretEnvProof,
+  buildProductionSwitchStorageProfileProof
 } from "./staging-proof-utils.mjs";
 
 const ADMIN_PASSWORD_ENV = "RSL_SMOKE_ADMIN_PASSWORD";
@@ -1253,6 +1254,7 @@ function buildProductionSwitchProofPacket({
   launchDutyRecordIndexFile
 }) {
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(options.baseUrl);
+  const storageProfileProof = buildProductionSwitchStorageProfileProof(options.storageProfile);
   const httpsReady = publicHttpsProof.isHttps;
   const secretEnvProof = buildProductionSwitchSecretEnvProof({
     stagingEnvironmentBinding: {
@@ -1348,6 +1350,7 @@ function buildProductionSwitchProofPacket({
     readinessActionQueueFile,
     launchDutyRecordIndexFile,
     publicHttpsProof,
+    storageProfileProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: fullTestCommand,
@@ -1446,6 +1449,13 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
         + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
+  const storageProfileProof = packet.storageProfileProof || {};
+  if (storageProfileProof.status) {
+    console.log(
+      `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
+        + ` (profile=${storageProfileProof.storageProfile || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

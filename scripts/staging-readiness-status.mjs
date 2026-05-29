@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   buildBoundSecretEnvProof,
-  buildProductionSwitchPublicHttpsProof
+  buildProductionSwitchPublicHttpsProof,
+  buildProductionSwitchStorageProfileProof
 } from "./staging-proof-utils.mjs";
 
 const REQUIRED_CLOSEOUT_KEYS = [
@@ -1474,6 +1475,7 @@ function buildStagingProductionSwitchProofPacket({
   const storageProfile = payload.storageProfile || payload.summary?.storageProfile || null;
   const targetEnvFile = payload.targetEnvFile || payload.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(baseUrl);
+  const storageProfileProof = buildProductionSwitchStorageProfileProof(storageProfile);
   const secretEnvProof = buildProductionSwitchSecretEnvProof(payload, targetEnvFile);
   const fullTestArtifact = path.posix.join(archiveRoot, "full-test-output.txt");
   const backupRestoreEvidence = evidenceForCloseoutKey("backup_restore_drill_result", artifactPathRoot);
@@ -1581,6 +1583,7 @@ function buildStagingProductionSwitchProofPacket({
     readinessActionQueueFile: actionsFile || null,
     launchDutyRecordIndexFile: launchDutyCompletionHandoff?.recordIndexFile || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
     publicHttpsProof,
+    storageProfileProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -1977,6 +1980,12 @@ function renderProductionSwitchProofPacketMarkdown(result) {
   if (publicHttpsProof.status) {
     lines.push(
       `Production switch public HTTPS proof: \`${publicHttpsProof.status || "-"}\` (scheme \`${publicHttpsProof.scheme || "-"}\`, url \`${publicHttpsProof.baseUrl || "-"}\`)`
+    );
+  }
+  const storageProfileProof = packet.storageProfileProof || {};
+  if (storageProfileProof.status) {
+    lines.push(
+      `Production switch storage profile proof: \`${storageProfileProof.status || "-"}\` (profile \`${storageProfileProof.storageProfile || "-"}\`)`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};
@@ -2564,6 +2573,13 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch public HTTPS proof: ${publicHttpsProof.status || "-"}`
         + ` (scheme=${publicHttpsProof.scheme || "-"}, url=${publicHttpsProof.baseUrl || "-"})`
+    );
+  }
+  const storageProfileProof = packet.storageProfileProof || {};
+  if (storageProfileProof.status) {
+    console.log(
+      `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
+        + ` (profile=${storageProfileProof.storageProfile || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

@@ -498,6 +498,13 @@ function buildExpectedProductionSwitchProofPacket({
       currentActionKey: "set_public_https_entrypoint",
       nextAction: "Set a public HTTPS base URL before continuing production switch proof."
     },
+    storageProfileProof: {
+      status: "pending_real_environment_value",
+      storageProfile: null,
+      isSelected: false,
+      currentActionKey: "select_storage_profile",
+      nextAction: "Select the storage profile before continuing production switch proof."
+    },
     secretEnvProof: {
       status: "pending_real_environment_confirmation",
       requiredKeys: [],

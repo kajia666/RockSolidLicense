@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { buildBoundSecretEnvProof } from "./staging-proof-utils.mjs";
+import { buildProductionSwitchSecretEnvProof } from "./staging-proof-utils.mjs";
 
 const RECORD_INDEX_FILE_NAME = "launch-duty-record-index.json";
 const DEFAULT_ARTIFACT_ROOT = "artifacts/staging/<productCode>/<channel>";
@@ -869,7 +869,7 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
   const baseUrl = closeoutInput?.baseUrl || closeoutInput?.summary?.baseUrl || null;
   const targetEnvFile = closeoutInput?.targetEnvFile || closeoutInput?.stagingEnvironmentBinding?.environment?.targetEnvFile || null;
   const storageProfile = closeoutInput?.storageProfile || closeoutInput?.summary?.storageProfile || null;
-  const secretEnvProof = buildBoundSecretEnvProof(closeoutInput);
+  const secretEnvProof = buildProductionSwitchSecretEnvProof(closeoutInput, targetEnvFile);
   const launchDayWatchRecord = recordIndex?.records?.launch_day_watch_summary || null;
   const firstWaveCloseoutRecord = recordIndex?.records?.first_wave_closeout || null;
   const launchDutyRecorded = firstWaveCloseoutRecord?.status === "recorded";
@@ -964,6 +964,7 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
     closeoutInputFile: options.closeoutInputFile,
     readinessActionQueueFile: options.actionsFile || null,
     launchDutyRecordIndexFile: joinArtifactPath(archiveRoot, RECORD_INDEX_FILE_NAME),
+    secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -1137,6 +1138,17 @@ function writeProductionSwitchProofPacketPlain(packet) {
       + `, blocked=${counts.blocked ?? "-"}/${counts.total ?? "-"}`
       + `, current=${packet.currentActionKey || "-"})`
   );
+  const secretEnvProof = packet.secretEnvProof || {};
+  if (secretEnvProof.status) {
+    console.log(
+      `Production switch secret env proof: ${secretEnvProof.status || "-"}`
+        + ` (required=${secretEnvProof.requiredCount ?? "-"}`
+        + `, missing=${secretEnvProof.missingCount ?? "-"}`
+        + `, current=${secretEnvProof.currentMissingKey || "-"})`
+    );
+    console.log(`Production switch secret env required: ${(secretEnvProof.requiredKeys || []).join(", ") || "-"}`);
+    console.log(`Production switch secret env missing: ${(secretEnvProof.missingKeys || []).join(", ") || "-"}`);
+  }
   const baseline = packet.localFullSuiteBaseline || {};
   console.log(
     `Production switch local baseline: ${baseline.command || "-"} -> ${baseline.outputArtifact || "-"}`

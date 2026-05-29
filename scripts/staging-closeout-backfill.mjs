@@ -2,6 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  buildProductionSwitchBackupRestoreDrillProof,
   buildProductionSwitchPublicHttpsProof,
   buildProductionSwitchSecretEnvProof,
   buildProductionSwitchStorageProfileProof
@@ -810,6 +811,13 @@ function buildCloseoutBackfillProductionSwitchProofPacket({
       },
       actionsFile
     });
+  const backupRestoreDrillProof = buildProductionSwitchBackupRestoreDrillProof({
+    status: backupRestoreReady ? "ready_evidence_attached" : "blocked_after_readiness_status",
+    closeoutInputFile: outputFile,
+    artifactPath: backupRestoreArtifactPath,
+    command: backupRestoreCommand,
+    receiptOperations: Array.isArray(backupRestoreField?.receiptOperations) ? backupRestoreField.receiptOperations : []
+  });
   const liveWriteField = closeoutFields.get("live_write_smoke_result");
   const liveWriteArtifactPath = liveWriteField?.artifactPath || path.posix.join(archiveRoot, "live_write_smoke_result.txt");
   const liveWriteReady = isFilled(liveWriteField);
@@ -854,9 +862,9 @@ function buildCloseoutBackfillProductionSwitchProofPacket({
     {
       order: 4,
       key: "backup_restore_drill",
-      status: backupRestoreReady ? "ready_evidence_attached" : "blocked_after_readiness_status",
-      command: backupRestoreCommand,
-      artifactPath: backupRestoreArtifactPath,
+      status: backupRestoreDrillProof.status,
+      command: backupRestoreDrillProof.command,
+      artifactPath: backupRestoreDrillProof.artifactPath,
       nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
     },
     {
@@ -909,6 +917,7 @@ function buildCloseoutBackfillProductionSwitchProofPacket({
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
     publicHttpsProof,
     storageProfileProof,
+    backupRestoreDrillProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -951,6 +960,15 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
         + ` (profile=${storageProfileProof.storageProfile || "-"})`
+    );
+  }
+  const backupRestoreDrillProof = packet.backupRestoreDrillProof || {};
+  if (backupRestoreDrillProof.status) {
+    console.log(
+      `Production switch backup/restore proof: ${backupRestoreDrillProof.status || "-"}`
+        + ` (key=${backupRestoreDrillProof.closeoutKey || "-"}`
+        + `, artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+        + `, receipts=${(backupRestoreDrillProof.receiptOperations || []).join(", ") || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

@@ -169,6 +169,16 @@ test("staging readiness status reports closeout gap and next backfill command", 
       proofItems.get("live_write_smoke").command,
       `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key live_write_smoke_result --value-json <redacted-json> --artifact-path artifacts/staging/<productCode>/<channel>/live-write-smoke-output.json --receipt-id <record_launch_rehearsal_run-receipt-id>`
     );
+    assert.deepEqual(output.productionSwitchProofPacket.backupRestoreDrillProof, {
+      status: "blocked_after_readiness_status",
+      closeoutKey: "backup_restore_drill_result",
+      closeoutInputFile: inputFile,
+      artifactPath: "artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt",
+      command: `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id>`,
+      receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+      currentActionKey: "backfill_backup_restore_drill_evidence",
+      nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+    });
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }
@@ -218,6 +228,16 @@ test("staging readiness status marks bound non-default secret env ready when req
       isSelected: true,
       currentActionKey: "confirm_storage_profile_selected",
       nextAction: "Storage profile is selected; keep backup and recovery proof aligned to this profile."
+    });
+    assert.deepEqual(output.productionSwitchProofPacket.backupRestoreDrillProof, {
+      status: "blocked_after_readiness_status",
+      closeoutKey: "backup_restore_drill_result",
+      closeoutInputFile: inputFile,
+      artifactPath: "artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt",
+      command: `npm.cmd run staging:closeout:backfill -- --input-file ${inputFile} --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id>`,
+      receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+      currentActionKey: "backfill_backup_restore_drill_evidence",
+      nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
     });
     assert.deepEqual(output.productionSwitchProofPacket.secretEnvProof, {
       status: "ready_secret_env_loaded",
@@ -688,6 +708,16 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
       currentActionKey: "select_storage_profile",
       nextAction: "Select the storage profile before continuing production switch proof."
     });
+    assert.deepEqual(output.productionSwitchProofPacket.backupRestoreDrillProof, {
+      status: "ready_evidence_attached",
+      closeoutKey: "backup_restore_drill_result",
+      closeoutInputFile: inputFile,
+      artifactPath: "artifacts/staging/<productCode>/<channel>/backup-restore-drill.txt",
+      command: null,
+      receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+      currentActionKey: "confirm_backup_restore_drill_evidence",
+      nextAction: "Backup/restore drill evidence is attached; keep receipt links visible through production sign-off and launch-duty review."
+    });
     assert.deepEqual(output.productionSwitchProofPacket.localFullSuiteBaseline, {
       command: "npm.cmd test",
       status: "available_from_2026-05-28_full_suite_pass",
@@ -886,6 +916,7 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(plain.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=backfill_production_signoff\)/);
     assert.match(plain.stdout, /Production switch public HTTPS proof: pending_real_environment_value \(scheme=-, url=-\)/);
     assert.match(plain.stdout, /Production switch storage profile proof: pending_real_environment_value \(profile=-\)/);
+    assert.match(plain.stdout, /Production switch backup\/restore proof: ready_evidence_attached \(key=backup_restore_drill_result, artifact=artifacts\/staging\/<productCode>\/<channel>\/backup-restore-drill\.txt, receipts=record_recovery_drill, record_backup_verification\)/);
     assert.match(plain.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
     assert.match(plain.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(plain.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);
@@ -905,6 +936,7 @@ test("staging readiness status exposes launch evidence readiness gate in json pl
     assert.match(markdown, /Production switch proof packet: `blocked_until_real_environment_evidence` \(ready `3\/8`, blocked `5\/8`, current `backfill_production_signoff`\)/);
     assert.match(markdown, /Production switch public HTTPS proof: `pending_real_environment_value` \(scheme `-`, url `-`\)/);
     assert.match(markdown, /Production switch storage profile proof: `pending_real_environment_value` \(profile `-`\)/);
+    assert.match(markdown, /Production switch backup\/restore proof: `ready_evidence_attached` \(key `backup_restore_drill_result`, artifact `artifacts\/staging\/<productCode>\/<channel>\/backup-restore-drill\.txt`, receipts `record_recovery_drill, record_backup_verification`\)/);
     assert.match(markdown, /Production switch secret env proof: `pending_real_environment_confirmation` \(required `3`, missing `1`, current `RSL_DEVELOPER_BEARER_TOKEN`\)/);
     assert.match(markdown, /Production switch secret env required: `RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN`/);
     assert.match(markdown, /Production switch secret env missing: `RSL_DEVELOPER_BEARER_TOKEN`/);

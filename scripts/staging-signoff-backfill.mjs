@@ -2,6 +2,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  buildProductionSwitchBackupRestoreDrillProof,
   buildProductionSwitchPublicHttpsProof,
   buildProductionSwitchSecretEnvProof,
   buildProductionSwitchStorageProfileProof
@@ -825,6 +826,14 @@ function buildSignoffBackfillProductionSwitchProofPacket({
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(baseUrl);
   const storageProfileProof = buildProductionSwitchStorageProfileProof(storageProfile);
   const secretEnvProof = buildProductionSwitchSecretEnvProof(closeoutInput, targetEnvFile);
+  const backupRestoreField = closeoutFields.get("backup_restore_drill_result");
+  const backupRestoreDrillProof = buildProductionSwitchBackupRestoreDrillProof({
+    status: isFilled(backupRestoreField) ? "ready_evidence_attached" : "blocked_after_readiness_status",
+    closeoutInputFile: outputFile,
+    artifactPath: backupRestoreField?.artifactPath || path.posix.join(archiveRoot, "backup_restore_drill_result.txt"),
+    command: null,
+    receiptOperations: Array.isArray(backupRestoreField?.receiptOperations) ? backupRestoreField.receiptOperations : []
+  });
   const proofItems = [
     {
       order: 1,
@@ -855,9 +864,9 @@ function buildSignoffBackfillProductionSwitchProofPacket({
     {
       order: 4,
       key: "backup_restore_drill",
-      status: isFilled(closeoutFields.get("backup_restore_drill_result")) ? "ready_evidence_attached" : "blocked_after_readiness_status",
-      command: null,
-      artifactPath: closeoutFields.get("backup_restore_drill_result")?.artifactPath || path.posix.join(archiveRoot, "backup_restore_drill_result.txt"),
+      status: backupRestoreDrillProof.status,
+      command: backupRestoreDrillProof.command,
+      artifactPath: backupRestoreDrillProof.artifactPath,
       nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
     },
     {
@@ -913,6 +922,7 @@ function buildSignoffBackfillProductionSwitchProofPacket({
     launchDutyRecordIndexFile: path.posix.join(archiveRoot, "launch-duty-record-index.json"),
     publicHttpsProof,
     storageProfileProof,
+    backupRestoreDrillProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -1043,6 +1053,15 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
         + ` (profile=${storageProfileProof.storageProfile || "-"})`
+    );
+  }
+  const backupRestoreDrillProof = packet.backupRestoreDrillProof || {};
+  if (backupRestoreDrillProof.status) {
+    console.log(
+      `Production switch backup/restore proof: ${backupRestoreDrillProof.status || "-"}`
+        + ` (key=${backupRestoreDrillProof.closeoutKey || "-"}`
+        + `, artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+        + `, receipts=${(backupRestoreDrillProof.receiptOperations || []).join(", ") || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

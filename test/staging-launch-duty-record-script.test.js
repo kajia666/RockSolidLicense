@@ -155,6 +155,16 @@ function buildExpectedProductionSwitchProofPacket({
       currentActionKey: "select_storage_profile",
       nextAction: "Select the storage profile before continuing production switch proof."
     },
+    backupRestoreDrillProof: {
+      status: "ready_evidence_attached",
+      closeoutKey: "backup_restore_drill_result",
+      closeoutInputFile: closeoutInputFile,
+      artifactPath: join(archiveRoot, "backup_restore_drill_result.txt"),
+      command: null,
+      receiptOperations: [],
+      currentActionKey: "confirm_backup_restore_drill_evidence",
+      nextAction: "Backup/restore drill evidence is attached; keep receipt links visible through production sign-off and launch-duty review."
+    },
     secretEnvProof: {
       status: "pending_real_environment_confirmation",
       requiredKeys: [],
@@ -514,6 +524,7 @@ test("staging launch duty record prints secret env proof in plain output without
     });
 
     assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /Production switch backup\/restore proof: ready_evidence_attached \(key=backup_restore_drill_result, artifact=[^\n]*backup_restore_drill_result\.txt, receipts=-\)/);
     assert.match(result.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
     assert.match(result.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(result.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);

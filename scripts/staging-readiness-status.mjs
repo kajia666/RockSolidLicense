@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   buildBoundSecretEnvProof,
+  buildProductionSwitchBackupRestoreDrillProof,
   buildProductionSwitchPublicHttpsProof,
   buildProductionSwitchStorageProfileProof
 } from "./staging-proof-utils.mjs";
@@ -1483,6 +1484,16 @@ function buildStagingProductionSwitchProofPacket({
   const backupRestoreCommand = closeoutFilled.has("backup_restore_drill_result")
     ? null
     : commandForCloseoutBackfillProofItem(inputFile, "backup_restore_drill_result", backupRestoreEvidence, actionsFile);
+  const backupRestoreArtifactPath = closeoutFilled.get("backup_restore_drill_result")?.artifactPath
+    || backupRestoreEvidence?.artifactPathHint
+    || path.posix.join(archiveRoot, "backup-restore-drill.txt");
+  const backupRestoreDrillProof = buildProductionSwitchBackupRestoreDrillProof({
+    status: closeoutFilled.has("backup_restore_drill_result") ? "ready_evidence_attached" : "blocked_after_readiness_status",
+    closeoutInputFile: inputFile,
+    artifactPath: backupRestoreArtifactPath,
+    command: backupRestoreCommand,
+    receiptOperations: backupRestoreEvidence?.receiptOperations || []
+  });
   const liveWriteCommand = closeoutFilled.has("live_write_smoke_result")
     ? null
     : commandForCloseoutBackfillProofItem(inputFile, "live_write_smoke_result", liveWriteEvidence, actionsFile);
@@ -1522,11 +1533,9 @@ function buildStagingProductionSwitchProofPacket({
     {
       order: 4,
       key: "backup_restore_drill",
-      status: closeoutFilled.has("backup_restore_drill_result") ? "ready_evidence_attached" : "blocked_after_readiness_status",
-      command: backupRestoreCommand,
-      artifactPath: closeoutFilled.get("backup_restore_drill_result")?.artifactPath
-        || backupRestoreEvidence?.artifactPathHint
-        || path.posix.join(archiveRoot, "backup-restore-drill.txt"),
+      status: backupRestoreDrillProof.status,
+      command: backupRestoreDrillProof.command,
+      artifactPath: backupRestoreDrillProof.artifactPath,
       nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
     },
     {
@@ -1584,6 +1593,7 @@ function buildStagingProductionSwitchProofPacket({
     launchDutyRecordIndexFile: launchDutyCompletionHandoff?.recordIndexFile || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
     publicHttpsProof,
     storageProfileProof,
+    backupRestoreDrillProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -1986,6 +1996,12 @@ function renderProductionSwitchProofPacketMarkdown(result) {
   if (storageProfileProof.status) {
     lines.push(
       `Production switch storage profile proof: \`${storageProfileProof.status || "-"}\` (profile \`${storageProfileProof.storageProfile || "-"}\`)`
+    );
+  }
+  const backupRestoreDrillProof = packet.backupRestoreDrillProof || {};
+  if (backupRestoreDrillProof.status) {
+    lines.push(
+      `Production switch backup/restore proof: \`${backupRestoreDrillProof.status || "-"}\` (key \`${backupRestoreDrillProof.closeoutKey || "-"}\`, artifact \`${backupRestoreDrillProof.artifactPath || "-"}\`, receipts \`${(backupRestoreDrillProof.receiptOperations || []).join(", ") || "-"}\`)`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};
@@ -2580,6 +2596,15 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
         + ` (profile=${storageProfileProof.storageProfile || "-"})`
+    );
+  }
+  const backupRestoreDrillProof = packet.backupRestoreDrillProof || {};
+  if (backupRestoreDrillProof.status) {
+    console.log(
+      `Production switch backup/restore proof: ${backupRestoreDrillProof.status || "-"}`
+        + ` (key=${backupRestoreDrillProof.closeoutKey || "-"}`
+        + `, artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+        + `, receipts=${(backupRestoreDrillProof.receiptOperations || []).join(", ") || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

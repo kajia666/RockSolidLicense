@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildBoundSecretEnvProof,
+  buildProductionSwitchBackupRestoreDrillProof,
   buildProductionSwitchPublicHttpsProof,
   buildProductionSwitchStorageProfileProof
 } from "./staging-proof-utils.mjs";
@@ -1219,6 +1220,18 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     || result.launchDayWatchPlan?.watchEvidenceExecutionEntry?.currentCommand
     || null;
   const launchDutyProofArtifactPath = launchDutyCompletionHandoff?.firstWaveCloseoutArtifactPath || launchDayWatchSummaryFile;
+  const backupRestoreArtifactPath = path.posix.join(archiveRoot, "backup-restore-drill.txt");
+  const backupRestoreReceiptOperations = Array.isArray(result.stagingBackupRestoreDrillPacket?.closeoutBackfill?.receiptOperations)
+    && result.stagingBackupRestoreDrillPacket.closeoutBackfill.receiptOperations.length
+    ? result.stagingBackupRestoreDrillPacket.closeoutBackfill.receiptOperations
+    : ["record_recovery_drill", "record_backup_verification"];
+  const backupRestoreDrillProof = buildProductionSwitchBackupRestoreDrillProof({
+    status: "blocked_after_readiness_status",
+    closeoutInputFile,
+    artifactPath: backupRestoreArtifactPath,
+    command: result.nextCommands?.recovery?.appBackup || null,
+    receiptOperations: backupRestoreReceiptOperations
+  });
   const proofItems = [
     {
       order: 1,
@@ -1247,9 +1260,9 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     {
       order: 4,
       key: "backup_restore_drill",
-      status: "blocked_after_readiness_status",
-      command: result.nextCommands?.recovery?.appBackup || null,
-      artifactPath: path.posix.join(archiveRoot, "backup-restore-drill.txt"),
+      status: backupRestoreDrillProof.status,
+      command: backupRestoreDrillProof.command,
+      artifactPath: backupRestoreDrillProof.artifactPath,
       nextAction: "Run recovery preflight and backfill backup_restore_drill_result before live-write smoke."
     },
     {
@@ -1302,6 +1315,7 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     launchDutyRecordIndexFile,
     publicHttpsProof,
     storageProfileProof,
+    backupRestoreDrillProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: result.fullTestWindowReadiness?.command || "npm.cmd test",
@@ -9884,6 +9898,15 @@ function writeProductionSwitchProofPacketPlain(packet = null) {
     console.log(
       `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
         + ` (profile=${storageProfileProof.storageProfile || "-"})`
+    );
+  }
+  const backupRestoreDrillProof = packet.backupRestoreDrillProof || {};
+  if (backupRestoreDrillProof.status) {
+    console.log(
+      `Production switch backup/restore proof: ${backupRestoreDrillProof.status || "-"}`
+        + ` (key=${backupRestoreDrillProof.closeoutKey || "-"}`
+        + `, artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+        + `, receipts=${(backupRestoreDrillProof.receiptOperations || []).join(", ") || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

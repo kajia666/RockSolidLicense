@@ -2,6 +2,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  buildProductionSwitchBackupRestoreDrillProof,
   buildProductionSwitchPublicHttpsProof,
   buildProductionSwitchSecretEnvProof,
   buildProductionSwitchStorageProfileProof
@@ -876,6 +877,19 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(baseUrl);
   const storageProfileProof = buildProductionSwitchStorageProfileProof(storageProfile);
   const secretEnvProof = buildProductionSwitchSecretEnvProof(closeoutInput, targetEnvFile);
+  const closeoutFields = new Map(
+    (Array.isArray(closeoutInput?.acceptanceFields) ? closeoutInput.acceptanceFields : [])
+      .filter((field) => field?.key)
+      .map((field) => [field.key, field])
+  );
+  const backupRestoreField = closeoutFields.get("backup_restore_drill_result");
+  const backupRestoreDrillProof = buildProductionSwitchBackupRestoreDrillProof({
+    status: "ready_evidence_attached",
+    closeoutInputFile: options.closeoutInputFile,
+    artifactPath: backupRestoreField?.artifactPath || joinArtifactPath(archiveRoot, "backup_restore_drill_result.txt"),
+    command: null,
+    receiptOperations: Array.isArray(backupRestoreField?.receiptOperations) ? backupRestoreField.receiptOperations : []
+  });
   const launchDayWatchRecord = recordIndex?.records?.launch_day_watch_summary || null;
   const firstWaveCloseoutRecord = recordIndex?.records?.first_wave_closeout || null;
   const launchDutyRecorded = firstWaveCloseoutRecord?.status === "recorded";
@@ -917,9 +931,9 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
     {
       order: 4,
       key: "backup_restore_drill",
-      status: "ready_evidence_attached",
-      command: null,
-      artifactPath: joinArtifactPath(archiveRoot, "backup_restore_drill_result.txt"),
+      status: backupRestoreDrillProof.status,
+      command: backupRestoreDrillProof.command,
+      artifactPath: backupRestoreDrillProof.artifactPath,
       nextAction: "Attach backup/restore drill evidence before live-write smoke and production sign-off."
     },
     {
@@ -972,6 +986,7 @@ function buildLaunchDutyRecordProductionSwitchProofPacket({
     launchDutyRecordIndexFile: joinArtifactPath(archiveRoot, RECORD_INDEX_FILE_NAME),
     publicHttpsProof,
     storageProfileProof,
+    backupRestoreDrillProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: "npm.cmd test",
@@ -1158,6 +1173,15 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
         + ` (profile=${storageProfileProof.storageProfile || "-"})`
+    );
+  }
+  const backupRestoreDrillProof = packet.backupRestoreDrillProof || {};
+  if (backupRestoreDrillProof.status) {
+    console.log(
+      `Production switch backup/restore proof: ${backupRestoreDrillProof.status || "-"}`
+        + ` (key=${backupRestoreDrillProof.closeoutKey || "-"}`
+        + `, artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+        + `, receipts=${(backupRestoreDrillProof.receiptOperations || []).join(", ") || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

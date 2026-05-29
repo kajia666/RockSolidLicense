@@ -98,3 +98,48 @@ export function buildProductionSwitchStorageProfileProof(storageProfile = null) 
       : "Select the storage profile before continuing production switch proof."
   };
 }
+
+export function buildProductionSwitchBackupRestoreDrillProof({
+  status = "blocked_after_readiness_status",
+  closeoutInputFile = null,
+  artifactPath = null,
+  command = null,
+  closeoutKey = "backup_restore_drill_result",
+  receiptOperations = []
+} = {}) {
+  const normalizedStatus = typeof status === "string" && status.trim()
+    ? status.trim()
+    : "blocked_after_readiness_status";
+  const ready = normalizedStatus.startsWith("ready_");
+  const normalizedCloseoutInputFile = typeof closeoutInputFile === "string"
+    ? closeoutInputFile.trim() || null
+    : closeoutInputFile == null ? null : String(closeoutInputFile).trim() || null;
+  const normalizedArtifactPath = typeof artifactPath === "string"
+    ? artifactPath.trim() || null
+    : artifactPath == null ? null : String(artifactPath).trim() || null;
+  const normalizedCommand = typeof command === "string"
+    ? command.trim() || null
+    : command == null ? null : String(command).trim() || null;
+  const normalizedCloseoutKey = typeof closeoutKey === "string" && closeoutKey.trim()
+    ? closeoutKey.trim()
+    : "backup_restore_drill_result";
+  const normalizedReceiptOperations = Array.isArray(receiptOperations)
+    ? [...new Set(receiptOperations
+      .map((operation) => typeof operation === "string" ? operation.trim() : "")
+      .filter(Boolean))]
+    : [];
+  return {
+    status: normalizedStatus,
+    closeoutKey: normalizedCloseoutKey,
+    closeoutInputFile: normalizedCloseoutInputFile,
+    artifactPath: normalizedArtifactPath,
+    command: normalizedCommand,
+    receiptOperations: normalizedReceiptOperations,
+    currentActionKey: ready
+      ? "confirm_backup_restore_drill_evidence"
+      : "backfill_backup_restore_drill_evidence",
+    nextAction: ready
+      ? "Backup/restore drill evidence is attached; keep receipt links visible through production sign-off and launch-duty review."
+      : "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+  };
+}

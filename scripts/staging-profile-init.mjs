@@ -2,6 +2,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
+  buildProductionSwitchBackupRestoreDrillProof,
   buildProductionSwitchPublicHttpsProof,
   buildProductionSwitchSecretEnvProof,
   buildProductionSwitchStorageProfileProof
@@ -1255,6 +1256,14 @@ function buildProductionSwitchProofPacket({
 }) {
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(options.baseUrl);
   const storageProfileProof = buildProductionSwitchStorageProfileProof(options.storageProfile);
+  const backupRestoreArtifactPath = path.posix.join(archiveRoot, "backup-restore-drill.txt");
+  const backupRestoreDrillProof = buildProductionSwitchBackupRestoreDrillProof({
+    status: "blocked_after_readiness_status",
+    closeoutInputFile,
+    artifactPath: backupRestoreArtifactPath,
+    command: recoveryPreflightCommand,
+    receiptOperations: ["record_recovery_drill", "record_backup_verification"]
+  });
   const httpsReady = publicHttpsProof.isHttps;
   const secretEnvProof = buildProductionSwitchSecretEnvProof({
     stagingEnvironmentBinding: {
@@ -1296,9 +1305,9 @@ function buildProductionSwitchProofPacket({
     {
       order: 4,
       key: "backup_restore_drill",
-      status: "blocked_after_readiness_status",
-      command: recoveryPreflightCommand,
-      artifactPath: path.posix.join(archiveRoot, "backup-restore-drill.txt"),
+      status: backupRestoreDrillProof.status,
+      command: backupRestoreDrillProof.command,
+      artifactPath: backupRestoreDrillProof.artifactPath,
       nextAction: "Run recovery preflight and backfill backup_restore_drill_result before live-write smoke."
     },
     {
@@ -1351,6 +1360,7 @@ function buildProductionSwitchProofPacket({
     launchDutyRecordIndexFile,
     publicHttpsProof,
     storageProfileProof,
+    backupRestoreDrillProof,
     secretEnvProof,
     localFullSuiteBaseline: {
       command: fullTestCommand,
@@ -1456,6 +1466,15 @@ function writeProductionSwitchProofPacketPlain(packet) {
     console.log(
       `Production switch storage profile proof: ${storageProfileProof.status || "-"}`
         + ` (profile=${storageProfileProof.storageProfile || "-"})`
+    );
+  }
+  const backupRestoreDrillProof = packet.backupRestoreDrillProof || {};
+  if (backupRestoreDrillProof.status) {
+    console.log(
+      `Production switch backup/restore proof: ${backupRestoreDrillProof.status || "-"}`
+        + ` (key=${backupRestoreDrillProof.closeoutKey || "-"}`
+        + `, artifact=${backupRestoreDrillProof.artifactPath || "-"}`
+        + `, receipts=${(backupRestoreDrillProof.receiptOperations || []).join(", ") || "-"})`
     );
   }
   const secretEnvProof = packet.secretEnvProof || {};

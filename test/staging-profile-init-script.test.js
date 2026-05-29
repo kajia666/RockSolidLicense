@@ -456,6 +456,16 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         currentActionKey: "confirm_storage_profile_selected",
         nextAction: "Storage profile is selected; keep backup and recovery proof aligned to this profile."
       },
+      backupRestoreDrillProof: {
+        status: "blocked_after_readiness_status",
+        closeoutKey: "backup_restore_drill_result",
+        closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt",
+        command: recoveryPreflightCommand,
+        receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+        currentActionKey: "backfill_backup_restore_drill_evidence",
+        nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+      },
       secretEnvProof: {
         status: "pending_real_environment_confirmation",
         requiredKeys: [
@@ -1332,6 +1342,16 @@ test("staging profile init marks non-default secret env ready when required env 
       currentActionKey: "confirm_storage_profile_selected",
       nextAction: "Storage profile is selected; keep backup and recovery proof aligned to this profile."
     });
+    assert.deepEqual(output.productionSwitchProofPacket.backupRestoreDrillProof, {
+      status: "blocked_after_readiness_status",
+      closeoutKey: "backup_restore_drill_result",
+      closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
+      artifactPath: "artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt",
+      command: "npm.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/staging.env --app-backup-dir /var/lib/rocksolid/backups --postgres-backup-dir /var/lib/rocksolid/postgres-backups --base-url https://staging.example.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      receiptOperations: ["record_recovery_drill", "record_backup_verification"],
+      currentActionKey: "backfill_backup_restore_drill_evidence",
+      nextAction: "Backfill backup_restore_drill_result with redacted evidence and required receipt IDs before continuing production switch proof."
+    });
     assert.deepEqual(
       output.productionSwitchProofPacket.proofItems.slice(0, 3).map((item) => [item.key, item.status, item.artifactPath]),
       [
@@ -1407,6 +1427,7 @@ test("staging profile init prints secret env proof in plain output without secre
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.match(result.stdout, /Production switch public HTTPS proof: ready_public_https_entrypoint \(scheme=https, url=https:\/\/staging\.example\.com\)/);
     assert.match(result.stdout, /Production switch storage profile proof: ready_storage_profile_selected \(profile=postgres-preview\)/);
+    assert.match(result.stdout, /Production switch backup\/restore proof: blocked_after_readiness_status \(key=backup_restore_drill_result, artifact=artifacts\/staging\/PILOT_ALPHA\/beta\/backup-restore-drill\.txt, receipts=record_recovery_drill, record_backup_verification\)/);
     assert.match(result.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=1, current=RSL_DEVELOPER_BEARER_TOKEN\)/);
     assert.match(result.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(result.stdout, /Production switch secret env missing: RSL_DEVELOPER_BEARER_TOKEN/);

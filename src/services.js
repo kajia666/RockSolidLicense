@@ -52795,6 +52795,220 @@ function buildLaunchProductionProofPreflightEntrypoint({
   };
 }
 
+function cloneLaunchProductionProofPreflightHandoff(handoff = null) {
+  return handoff && typeof handoff === "object" ? { ...handoff } : null;
+}
+
+function buildLaunchProductionProofPreflightProfileInitCommand(entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  const parts = [
+    "npm.cmd run staging:profile:init --",
+    "--base-url",
+    commandTemplateValue(entrypoint.baseUrl, "<public-https-base-url>"),
+    "--product-code",
+    commandTemplateValue(entrypoint.productCode, "<productCode>"),
+    "--channel",
+    commandTemplateValue(entrypoint.channel, "stable"),
+    "--admin-username",
+    commandTemplateValue(entrypoint.adminUsername, "$env:RSL_SMOKE_ADMIN_USERNAME"),
+    "--developer-username",
+    commandTemplateValue(entrypoint.developerUsername, "$env:RSL_SMOKE_DEVELOPER_USERNAME"),
+    "--target-os",
+    commandTemplateValue(entrypoint.targetOs, "<target-os>"),
+    "--storage-profile",
+    commandTemplateValue(entrypoint.storageProfile, "<storage-profile>"),
+    "--target-env-file",
+    commandTemplateValue(entrypoint.targetEnvFile, "<target-env-file>"),
+    "--app-backup-dir",
+    commandTemplateValue(entrypoint.appBackupDir, "<app-backup-dir>")
+  ];
+  if (entrypoint.postgresBackupDir) {
+    parts.push("--postgres-backup-dir", commandTemplateValue(entrypoint.postgresBackupDir));
+  }
+  parts.push("--output-file", commandTemplateValue(entrypoint.profileOutputFile, "<profile-output-file>"));
+  return parts.join(" ");
+}
+
+function buildLaunchProductionProofPreflightRecoveryCommand(entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  const parts = [
+    "npm.cmd run recovery:preflight --",
+    "--target-os",
+    commandTemplateValue(entrypoint.targetOs, "<target-os>"),
+    "--storage-profile",
+    commandTemplateValue(entrypoint.storageProfile, "<storage-profile>"),
+    "--target-env-file",
+    commandTemplateValue(entrypoint.targetEnvFile, "<target-env-file>"),
+    "--app-backup-dir",
+    commandTemplateValue(entrypoint.appBackupDir, "<app-backup-dir>")
+  ];
+  if (entrypoint.postgresBackupDir) {
+    parts.push("--postgres-backup-dir", commandTemplateValue(entrypoint.postgresBackupDir));
+  }
+  parts.push(
+    "--base-url",
+    commandTemplateValue(entrypoint.baseUrl, "<public-https-base-url>"),
+    "--product-code",
+    commandTemplateValue(entrypoint.productCode, "<productCode>"),
+    "--channel",
+    commandTemplateValue(entrypoint.channel, "stable"),
+    "--closeout-input-file",
+    commandTemplateValue(entrypoint.closeoutInputFile, "<closeout-input-file>"),
+    "--actions-file",
+    commandTemplateValue(entrypoint.readinessActionQueueFile, "<actions-file>")
+  );
+  return parts.join(" ");
+}
+
+function buildLaunchProductionProofPreflightStagingPreflightCommand(entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  return [
+    "npm.cmd run staging:preflight --",
+    "--base-url",
+    commandTemplateValue(entrypoint.baseUrl, "<public-https-base-url>"),
+    "--product-code",
+    commandTemplateValue(entrypoint.productCode, "<productCode>"),
+    "--channel",
+    commandTemplateValue(entrypoint.channel, "stable"),
+    "--admin-username",
+    commandTemplateValue(entrypoint.adminUsername, "$env:RSL_SMOKE_ADMIN_USERNAME"),
+    "--admin-password",
+    commandTemplateValue(entrypoint.adminPassword, "$env:RSL_SMOKE_ADMIN_PASSWORD"),
+    "--developer-username",
+    commandTemplateValue(entrypoint.developerUsername, "$env:RSL_SMOKE_DEVELOPER_USERNAME"),
+    "--developer-password",
+    commandTemplateValue(entrypoint.developerPassword, "$env:RSL_SMOKE_DEVELOPER_PASSWORD")
+  ].join(" ");
+}
+
+function buildLaunchProductionProofPreflightSmokeCommand(entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  return [
+    "npm.cmd run launch:smoke:staging --",
+    "--base-url",
+    commandTemplateValue(entrypoint.baseUrl, "<public-https-base-url>"),
+    "--allow-live-writes",
+    "--product-code",
+    commandTemplateValue(entrypoint.productCode, "<productCode>"),
+    "--channel",
+    commandTemplateValue(entrypoint.channel, "stable"),
+    "--admin-username",
+    commandTemplateValue(entrypoint.adminUsername, "$env:RSL_SMOKE_ADMIN_USERNAME"),
+    "--admin-password",
+    commandTemplateValue(entrypoint.adminPassword, "$env:RSL_SMOKE_ADMIN_PASSWORD"),
+    "--developer-username",
+    commandTemplateValue(entrypoint.developerUsername, "$env:RSL_SMOKE_DEVELOPER_USERNAME"),
+    "--developer-password",
+    commandTemplateValue(entrypoint.developerPassword, "$env:RSL_SMOKE_DEVELOPER_PASSWORD"),
+    "--closeout-input-file",
+    commandTemplateValue(entrypoint.closeoutInputFile, "<closeout-input-file>"),
+    "--actions-file",
+    commandTemplateValue(entrypoint.readinessActionQueueFile, "<actions-file>")
+  ].join(" ");
+}
+
+function buildLaunchProductionProofPreflightReadinessCommand(entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  return [
+    "npm.cmd run staging:readiness:status --",
+    "--input-file",
+    commandTemplateValue(entrypoint.closeoutInputFile, "<closeout-input-file>"),
+    "--actions-file",
+    commandTemplateValue(entrypoint.readinessActionQueueFile, "<actions-file>")
+  ].join(" ");
+}
+
+function buildLaunchProductionProofPreflightHandoff(entrypoint = null) {
+  const source = cloneLaunchProductionProofPreflightEntrypoint(entrypoint);
+  if (!source) {
+    return null;
+  }
+  const preflightCommand = source.command
+    || buildLaunchProductionProofPreflightCommand(source);
+  const profileInitCommand = buildLaunchProductionProofPreflightProfileInitCommand(source);
+  const recoveryPreflightCommand = buildLaunchProductionProofPreflightRecoveryCommand(source);
+  const stagingPreflightCommand = buildLaunchProductionProofPreflightStagingPreflightCommand(source);
+  const launchSmokeCommand = buildLaunchProductionProofPreflightSmokeCommand(source);
+  const readinessRefreshCommand = buildLaunchProductionProofPreflightReadinessCommand(source);
+  const commandSequence = [
+    {
+      order: 1,
+      key: "production_proof_preflight",
+      command: preflightCommand,
+      willWriteLiveData: false,
+      willModifyData: false
+    },
+    {
+      order: 2,
+      key: "staging_profile_init",
+      command: profileInitCommand,
+      willWriteLiveData: false,
+      willModifyData: false
+    },
+    {
+      order: 3,
+      key: "recovery_preflight",
+      command: recoveryPreflightCommand,
+      willWriteLiveData: false,
+      willModifyData: false
+    },
+    {
+      order: 4,
+      key: "staging_preflight",
+      command: stagingPreflightCommand,
+      willWriteLiveData: false,
+      willModifyData: false
+    },
+    {
+      order: 5,
+      key: "launch_smoke_staging",
+      command: launchSmokeCommand,
+      willWriteLiveData: true,
+      willModifyData: true
+    },
+    {
+      order: 6,
+      key: "staging_readiness_status",
+      command: readinessRefreshCommand,
+      willWriteLiveData: false,
+      willModifyData: false
+    }
+  ];
+  return {
+    mode: "launch-production-proof-preflight-handoff/v1",
+    status: source.status === "ready_production_proof_preflight_confirmed"
+      ? "ready_production_proof_preflight_handoff_confirmed"
+      : "ready_for_production_proof_preflight_handoff",
+    readyForExecution: commandSequence.every((item) => Boolean(item.command)),
+    currentActionKey: source.currentActionKey || "run_production_proof_preflight",
+    preflightCommand,
+    profileInitCommand,
+    recoveryPreflightCommand,
+    stagingPreflightCommand,
+    launchSmokeCommand,
+    readinessRefreshCommand,
+    manualLiveWriteGate: "launch_smoke_staging",
+    commandSequence,
+    closeoutInputFile: source.closeoutInputFile || null,
+    readinessActionQueueFile: source.readinessActionQueueFile || null,
+    profileOutputFile: source.profileOutputFile || null,
+    backupRestoreArtifact: source.backupRestoreArtifact || null,
+    launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
+    proofStatus: source.proofStatus || null,
+    nextAction: "Run production proof preflight first; only run launch_smoke_staging after profile init, recovery preflight, and staging preflight pass."
+  };
+}
+
 function buildDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint({
   publicHttpsProof = null,
   secretEnvProof = null,
@@ -54568,6 +54782,9 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     productionSwitchProofPacket: proofPacket,
     realEnvironmentProofSummary
   });
+  proofPacket.productionProofPreflightHandoff = buildLaunchProductionProofPreflightHandoff(
+    proofPacket.productionProofPreflightEntrypoint
+  );
   proofPacket.productionSignoffExecutionEntrypoint = buildLaunchProductionSignoffExecutionEntrypoint({
     productionSwitchProofPacket: proofPacket,
     realEnvironmentProofSummary,
@@ -55030,6 +55247,11 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       productionSwitchProofPacket: switchProofPacket,
       realEnvironmentProofSummary
     });
+  const productionProofPreflightHandoff =
+    cloneLaunchProductionProofPreflightHandoff(
+      switchProofPacket?.productionProofPreflightHandoff
+    )
+    || buildLaunchProductionProofPreflightHandoff(productionProofPreflightEntrypoint);
   const productionSignoffExecutionEntrypoint =
     cloneLaunchProductionSignoffExecutionEntrypoint(
       switchProofPacket?.productionSignoffExecutionEntrypoint
@@ -55174,6 +55396,7 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     realEnvironmentProofSummary,
     realEnvironmentProofExecutionEntrypoint,
     productionProofPreflightEntrypoint,
+    productionProofPreflightHandoff,
     liveWriteSmokeExecutionEntrypoint,
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
@@ -62196,6 +62419,8 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
       ),
     productionProofPreflightEntrypoint:
       cloneLaunchProductionProofPreflightEntrypoint(checkpoint.productionProofPreflightEntrypoint),
+    productionProofPreflightHandoff:
+      cloneLaunchProductionProofPreflightHandoff(checkpoint.productionProofPreflightHandoff),
     liveWriteSmokeExecutionEntrypoint:
       cloneLaunchLiveWriteSmokeExecutionEntrypoint(checkpoint.liveWriteSmokeExecutionEntrypoint),
     productionSignoffExecutionEntrypoint:
@@ -62315,6 +62540,10 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
       productionSwitchProofPacket: proofPacket,
       realEnvironmentProofSummary
     });
+  const productionProofPreflightHandoff =
+    cloneLaunchProductionProofPreflightHandoff(checkpoint.productionProofPreflightHandoff)
+    || cloneLaunchProductionProofPreflightHandoff(proofPacket?.productionProofPreflightHandoff)
+    || buildLaunchProductionProofPreflightHandoff(productionProofPreflightEntrypoint);
   const liveWriteSmokeExecutionEntrypoint =
     cloneLaunchLiveWriteSmokeExecutionEntrypoint(checkpoint.liveWriteSmokeExecutionEntrypoint)
     || cloneLaunchLiveWriteSmokeExecutionEntrypoint(proofPacket?.liveWriteSmokeExecutionEntrypoint)
@@ -62405,6 +62634,7 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     realEnvironmentProofSummary,
     realEnvironmentProofExecutionEntrypoint,
     productionProofPreflightEntrypoint,
+    productionProofPreflightHandoff,
     liveWriteSmokeExecutionEntrypoint,
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
@@ -62612,6 +62842,10 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | launchDutyRecordIndex=${productionProofPreflightEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
   }
+  const productionProofPreflightHandoff =
+    cloneLaunchProductionProofPreflightHandoff(proofSource.productionProofPreflightHandoff)
+    || buildLaunchProductionProofPreflightHandoff(productionProofPreflightEntrypoint);
+  appendProductionProofPreflightHandoffLine(lines, productionProofPreflightHandoff);
   const realEnvironmentProofExecutionEntrypoint =
     cloneDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint(
       proofSource.realEnvironmentProofExecutionEntrypoint
@@ -62772,11 +63006,31 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
     || secretEnvProof
     || realEnvironmentProofSummary
     || productionProofPreflightEntrypoint
+    || productionProofPreflightHandoff
     || liveWriteSmokeExecutionEntrypoint
     || productionSignoffExecutionEntrypoint
     || launchDayWatchExecutionEntrypoint
     || productionSwitchExecutionRunbook
   );
+}
+
+function appendProductionProofPreflightHandoffLine(lines = [], handoff = null) {
+  if (!Array.isArray(lines) || !handoff || typeof handoff !== "object") {
+    return false;
+  }
+  lines.push(
+    "- productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh"
+    + ` | preflight=${handoff.preflightCommand || "-"}`
+    + ` | profile=${handoff.profileInitCommand || "-"}`
+    + ` | recovery=${handoff.recoveryPreflightCommand || "-"}`
+    + ` | staging=${handoff.stagingPreflightCommand || "-"}`
+    + ` | smoke=${handoff.launchSmokeCommand || "-"}`
+    + ` | refresh=${handoff.readinessRefreshCommand || "-"}`
+    + ` | manualGate=${handoff.manualLiveWriteGate || "-"}`
+    + ` | artifact=${handoff.backupRestoreArtifact || "-"}`
+    + ` | status=${handoff.status || "-"}`
+  );
+  return true;
 }
 
 function appendLaunchCutoverOperatorDecisionLine(lines = [], checkpoint = null) {

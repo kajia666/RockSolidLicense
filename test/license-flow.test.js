@@ -12474,6 +12474,10 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewOpsCheckpoint?.productionProofPreflightEntrypoint
     );
     assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint?.productionProofPreflightHandoff,
+      runtimeEvidenceReviewOpsCheckpoint?.productionProofPreflightHandoff
+    );
+    assert.deepEqual(
       {
         mode: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.mode,
         status: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.status,
@@ -12508,6 +12512,49 @@ test("developer license quickstart first-batch setup can create recommended laun
         backupRestoreArtifact: "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
         launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json",
         proofStatus: "blocked_until_real_environment_proof"
+      }
+    );
+    assert.deepEqual(
+      {
+        mode: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.mode,
+        status: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.status,
+        readyForExecution:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.readyForExecution,
+        currentActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.currentActionKey,
+        preflightCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.preflightCommand,
+        profileInitCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.profileInitCommand,
+        recoveryPreflightCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.recoveryPreflightCommand,
+        stagingPreflightCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.stagingPreflightCommand,
+        launchSmokeCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.launchSmokeCommand,
+        readinessRefreshCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.readinessRefreshCommand,
+        manualLiveWriteGate:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.manualLiveWriteGate,
+        backupRestoreArtifact:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.backupRestoreArtifact,
+        launchDutyRecordIndexPath:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.launchDutyRecordIndexPath
+      },
+      {
+        mode: "launch-production-proof-preflight-handoff/v1",
+        status: "ready_for_production_proof_preflight_handoff",
+        readyForExecution: true,
+        currentActionKey: "run_production_proof_preflight",
+        preflightCommand: "npm.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md --profile-output-file artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json --backup-restore-artifact artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        profileInitCommand: "npm.cmd run staging:profile:init -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --output-file artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json",
+        recoveryPreflightCommand: "npm.cmd run recovery:preflight -- --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        stagingPreflightCommand: "npm.cmd run staging:preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD",
+        launchSmokeCommand: "npm.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes --product-code FIRSTBATCH --channel stable --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        manualLiveWriteGate: "launch_smoke_staging",
+        backupRestoreArtifact: "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
       }
     );
     assert.deepEqual(
@@ -13182,6 +13229,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /productionProofPreflight=ready_for_production_proof_preflight \| ready=yes \| current=run_production_proof_preflight \| command=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| profile=npm\.cmd run staging:profile:init[^\n]*\| recovery=npm\.cmd run recovery:preflight[^\n]*\| staging=npm\.cmd run staging:preflight[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| manualGate=launch_smoke_staging \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| status=ready_for_production_proof_preflight_handoff/
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
@@ -24447,6 +24498,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           productionSwitchProofPacket?.realEnvironmentProofExecutionEntrypoint || null,
         productionProofPreflightEntrypoint:
           productionSwitchProofPacket?.productionProofPreflightEntrypoint || null,
+        productionProofPreflightHandoff:
+          productionSwitchProofPacket?.productionProofPreflightHandoff || null,
         liveWriteSmokeExecutionEntrypoint:
           productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint || null,
         productionSignoffExecutionEntrypoint:
@@ -24757,6 +24810,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*productionProofPreflight=ready_for_production_proof_preflight \| ready=yes \| current=run_production_proof_preflight \| command=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code EXPORT_CLOSEOUT_READY --channel stable/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| profile=npm\.cmd run staging:profile:init[^\n]*\| recovery=npm\.cmd run recovery:preflight[^\n]*\| staging=npm\.cmd run staging:preflight[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| manualGate=launch_smoke_staging \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt \| status=ready_for_production_proof_preflight_handoff/
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,

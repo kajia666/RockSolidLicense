@@ -12626,6 +12626,57 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.receiptVisibilityBackfillCommands?.[0]?.command || "",
       /npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --receipt-lane launchMainline/
     );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint?.launchDayWatchExecutionEntrypoint,
+      runtimeEvidenceReviewOpsCheckpoint?.launchDayWatchExecutionEntrypoint
+    );
+    assert.deepEqual(
+      {
+        mode: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.mode,
+        status: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.status,
+        readyForExecution:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.readyForExecution,
+        currentActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.currentActionKey,
+        currentCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.currentCommand,
+        currentRecordKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.currentRecordKey,
+        launchDayWatchArtifact:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.launchDayWatchArtifact,
+        firstWaveCloseoutArtifact:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.firstWaveCloseoutArtifact,
+        productionSignoffPacket:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.productionSignoffPacket,
+        closeoutInputFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.closeoutInputFile,
+        readinessActionQueueFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.readinessActionQueueFile,
+        launchDutyRecordIndexPath:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.launchDutyRecordIndexPath,
+        watchRecordCommandCount:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.watchRecordCommands?.length
+      },
+      {
+        mode: "launch-day-watch-execution-entrypoint/v1",
+        status: "blocked_until_real_environment_proof",
+        readyForExecution: false,
+        currentActionKey: "set_public_https_entrypoint",
+        currentCommand: null,
+        currentRecordKey: "launch_day_watch_summary",
+        launchDayWatchArtifact: "artifacts/staging/FIRSTBATCH/stable/launch-day-watch-summary.md",
+        firstWaveCloseoutArtifact: "artifacts/staging/FIRSTBATCH/stable/first-wave-closeout.md",
+        productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json",
+        closeoutInputFile: "artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json",
+        readinessActionQueueFile: "artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json",
+        watchRecordCommandCount: 6
+      }
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.watchRecordCommands?.[0]?.command || "",
+      /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/FIRSTBATCH\/stable\/launch-day-watch-summary\.md/
+    );
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
     assert.equal(
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.status,
@@ -12856,6 +12907,10 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewCutoverTriageAction.context?.productionSignoffExecutionEntrypoint,
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.productionSignoffExecutionEntrypoint
     );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageAction.context?.launchDayWatchExecutionEntrypoint,
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.launchDayWatchExecutionEntrypoint
+    );
     const runtimeEvidenceReviewCutoverTriageControl = runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.find((item) =>
       item?.label === "Review Cutover Triage"
     ) || null;
@@ -12896,6 +12951,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /productionSignoffEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| fullTest=npm\.cmd test \| backfill=npm\.cmd run staging:signoff:backfill/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /launchDayWatchEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| record=launch_day_watch_summary \| command=-/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -24035,6 +24094,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint || null,
         productionSignoffExecutionEntrypoint:
           productionSwitchProofPacket?.productionSignoffExecutionEntrypoint || null,
+        launchDayWatchExecutionEntrypoint:
+          productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint || null,
         cutoverOperatorDecision: {
           mode: "launch-cutover-operator-decision/v1",
           status: "hold_for_real_environment_proof",
@@ -32591,6 +32652,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                   launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.receiptVisibilityBackfillCommands?.length
               }
             : null,
+        launchDayWatchExecutionEntrypoint:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint
+            ? {
+                status: launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.status,
+                readyForExecution:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.readyForExecution,
+                currentActionKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.currentActionKey,
+                currentCommand:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.currentCommand,
+                currentRecordKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.currentRecordKey,
+                launchDayWatchArtifact:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.launchDayWatchArtifact,
+                firstWaveCloseoutArtifact:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.firstWaveCloseoutArtifact,
+                watchRecordCommandCount:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.watchRecordCommands?.length
+              }
+            : null,
         proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
       },
       {
@@ -32710,6 +32791,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           signoffConditionCommandCount: 6,
           receiptVisibilityCommandCount: 5
         },
+        launchDayWatchExecutionEntrypoint: {
+          status: "ready_launch_day_watch_records_attached",
+          readyForExecution: true,
+          currentActionKey: "confirm_launch_day_watch_and_stabilization",
+          currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          currentRecordKey: "first_wave_closeout",
+          launchDayWatchArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/launch-day-watch-summary.md",
+          firstWaveCloseoutArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
+          watchRecordCommandCount: 6
+        },
         proofCounts: {
           total: 8,
           ready: 8,
@@ -32797,6 +32888,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.signoffConditionCommands?.length,
         productionSignoffEntrypointReceiptCommandCount:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.receiptVisibilityBackfillCommands?.length,
+        launchDayWatchEntrypointStatus:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchDayWatchExecutionEntrypoint?.status,
+        launchDayWatchEntrypointReady:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchDayWatchExecutionEntrypoint?.readyForExecution,
+        launchDayWatchEntrypointCurrentActionKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchDayWatchExecutionEntrypoint?.currentActionKey,
+        launchDayWatchEntrypointCurrentCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchDayWatchExecutionEntrypoint?.currentCommand,
+        launchDayWatchEntrypointCurrentRecordKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchDayWatchExecutionEntrypoint?.currentRecordKey,
+        launchDayWatchEntrypointCommandCount:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchDayWatchExecutionEntrypoint?.watchRecordCommands?.length,
         cutoverDecisionStatus:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.cutoverOperatorDecision?.status,
         cutoverDecisionReadyForCutoverWatch:
@@ -32894,6 +32997,12 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         productionSignoffEntrypointFullTestCommand: "npm.cmd test",
         productionSignoffEntrypointSignoffCommandCount: 6,
         productionSignoffEntrypointReceiptCommandCount: 5,
+        launchDayWatchEntrypointStatus: "ready_launch_day_watch_records_attached",
+        launchDayWatchEntrypointReady: true,
+        launchDayWatchEntrypointCurrentActionKey: "confirm_launch_day_watch_and_stabilization",
+        launchDayWatchEntrypointCurrentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        launchDayWatchEntrypointCurrentRecordKey: "first_wave_closeout",
+        launchDayWatchEntrypointCommandCount: 6,
         cutoverDecisionStatus: "ready_for_cutover_watch",
         cutoverDecisionReadyForCutoverWatch: true,
         cutoverDecisionLaunchEvidenceProgress: "12/12",

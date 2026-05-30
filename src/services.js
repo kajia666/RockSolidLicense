@@ -53305,7 +53305,14 @@ function cloneProductionSwitchExecutionRunbook(runbook = null) {
   return {
     ...runbook,
     currentExecutionPacket: runbook.currentExecutionPacket && typeof runbook.currentExecutionPacket === "object"
-      ? { ...runbook.currentExecutionPacket }
+      ? {
+          ...runbook.currentExecutionPacket,
+          nextPhaseExecutionPreview:
+            runbook.currentExecutionPacket.nextPhaseExecutionPreview
+            && typeof runbook.currentExecutionPacket.nextPhaseExecutionPreview === "object"
+              ? { ...runbook.currentExecutionPacket.nextPhaseExecutionPreview }
+              : null
+        }
       : null,
     executionPhases: Array.isArray(runbook.executionPhases)
       ? runbook.executionPhases
@@ -53403,6 +53410,51 @@ function getProductionSwitchExecutionPhaseRehearsalReloadCommand(key = "", entry
   return null;
 }
 
+function getProductionSwitchExecutionPhaseBackfillCommand(key = "", entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  if (key === "live_write_smoke") {
+    return entrypoint.resultBackfillCommand || null;
+  }
+  if (key === "production_signoff") {
+    return entrypoint.fullTestBackfillCommand
+      || entrypoint.productionSignoffBackfillCommand
+      || null;
+  }
+  if (key === "launch_day_watch") {
+    return Array.isArray(entrypoint.watchRecordCommands)
+      ? entrypoint.watchRecordCommands.find((item) => item?.command)?.command || null
+      : null;
+  }
+  return null;
+}
+
+function getProductionSwitchExecutionRequiredBeforeStatus(key = "") {
+  if (key === "live_write_smoke") {
+    return {
+      phaseKey: "real_environment_proof",
+      status: "ready_for_real_environment_review"
+    };
+  }
+  if (key === "production_signoff") {
+    return {
+      phaseKey: "live_write_smoke",
+      status: "ready_live_write_smoke_evidence_attached"
+    };
+  }
+  if (key === "launch_day_watch") {
+    return {
+      phaseKey: "production_signoff",
+      status: "ready_production_signoff_evidence_attached"
+    };
+  }
+  return {
+    phaseKey: null,
+    status: null
+  };
+}
+
 function buildProductionSwitchExecutionRunbook({
   productionSwitchProofPacket = null,
   realEnvironmentProofExecutionEntrypoint = null,
@@ -53472,6 +53524,7 @@ function buildProductionSwitchExecutionRunbook({
       currentActionKey: entrypoint?.currentActionKey || null,
       currentCommand: getProductionSwitchExecutionPhaseCommand(phase.key, entrypoint),
       postCommandRefreshCommand: getProductionSwitchExecutionPhaseRefreshCommand(phase.key, entrypoint),
+      postCommandBackfillCommand: getProductionSwitchExecutionPhaseBackfillCommand(phase.key, entrypoint),
       rehearsalReloadCommand: getProductionSwitchExecutionPhaseRehearsalReloadCommand(phase.key, entrypoint),
       launchDutyRecordIndexPath: entrypoint?.launchDutyRecordIndexPath || null
     };
@@ -53512,6 +53565,26 @@ function buildProductionSwitchExecutionRunbook({
   const currentEntrypoint = readyForCutoverWatch
     ? launchDayWatchEntrypoint || productionSignoffEntrypoint || liveWriteEntrypoint || realEnvironmentEntrypoint
     : phaseSources.find((phase) => phase.key === currentPhase?.key)?.entrypoint || null;
+  const nextPhaseRequirement = getProductionSwitchExecutionRequiredBeforeStatus(nextPhase?.key || "");
+  const nextPhaseExecutionPreview = nextPhase
+    ? {
+        mode: "production-switch-next-phase-execution-preview/v1",
+        phaseKey: nextPhase.key || null,
+        status: nextPhase.status || null,
+        actionKey: nextPhase.currentActionKey || null,
+        command: nextPhase.currentCommand || null,
+        commandReady: Boolean(nextPhase.currentCommand),
+        postCommandBackfillCommand: nextPhase.postCommandBackfillCommand || null,
+        postCommandRefreshCommand: nextPhase.postCommandRefreshCommand || null,
+        rehearsalReloadCommand: nextPhase.rehearsalReloadCommand || null,
+        requiredBeforePhaseKey: nextPhaseRequirement.phaseKey,
+        requiredBeforeStatus: nextPhaseRequirement.status,
+        launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
+        nextAction: nextPhase.key
+          ? `After ${nextPhaseRequirement.phaseKey || "the current phase"} reaches ${nextPhaseRequirement.status || "ready"}, run ${nextPhase.label || nextPhase.key} and refresh readiness.`
+          : null
+      }
+    : null;
   const currentExecutionPacket = {
     mode: "production-switch-current-execution-packet/v1",
     status: readyForCutoverWatch
@@ -53535,6 +53608,7 @@ function buildProductionSwitchExecutionRunbook({
     nextPhaseKey: readyForCutoverWatch
       ? "stable_operations_handoff"
       : nextPhase?.key || null,
+    nextPhaseExecutionPreview,
     remainingPhaseCount: remainingPhases.length,
     launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
     nextAction: readyForCutoverWatch
@@ -62300,6 +62374,20 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
         + ` | blockedBy=${currentExecutionPacket.blockedByPhaseKey || "-"}/${currentExecutionPacket.blockedByActionKey || "-"}`
         + ` | next=${currentExecutionPacket.nextPhaseKey || "-"}`
       );
+      const nextPhasePreview = currentExecutionPacket.nextPhaseExecutionPreview
+        && typeof currentExecutionPacket.nextPhaseExecutionPreview === "object"
+        ? currentExecutionPacket.nextPhaseExecutionPreview
+        : null;
+      if (nextPhasePreview) {
+        lines.push(
+          `- productionSwitchNextPhasePreview=${nextPhasePreview.phaseKey || "-"}`
+          + ` | action=${nextPhasePreview.actionKey || "-"}`
+          + ` | commandReady=${nextPhasePreview.commandReady === true ? "yes" : "no"}`
+          + ` | required=${nextPhasePreview.requiredBeforePhaseKey || "-"}:${nextPhasePreview.requiredBeforeStatus || "-"}`
+          + ` | backfill=${nextPhasePreview.postCommandBackfillCommand || "-"}`
+          + ` | refresh=${nextPhasePreview.postCommandRefreshCommand || "-"}`
+        );
+      }
     }
   }
   return Boolean(

@@ -12756,6 +12756,22 @@ test("developer license quickstart first-batch setup can create recommended laun
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.blockedByActionKey,
         nextPhaseKey:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseKey,
+        nextPreviewPhaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.phaseKey,
+        nextPreviewActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.actionKey,
+        nextPreviewCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.command,
+        nextPreviewCommandReady:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.commandReady,
+        nextPreviewPostCommandRefreshCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.postCommandRefreshCommand,
+        nextPreviewPostCommandBackfillCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.postCommandBackfillCommand,
+        nextPreviewRequiredPhaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.requiredBeforePhaseKey,
+        nextPreviewRequiredStatus:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.requiredBeforeStatus,
         remainingPhaseCount:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.remainingPhaseCount,
         launchDutyRecordIndexPath:
@@ -12772,6 +12788,14 @@ test("developer license quickstart first-batch setup can create recommended laun
         blockedByPhaseKey: "real_environment_proof",
         blockedByActionKey: "set_public_https_entrypoint",
         nextPhaseKey: "live_write_smoke",
+        nextPreviewPhaseKey: "live_write_smoke",
+        nextPreviewActionKey: "set_public_https_entrypoint",
+        nextPreviewCommand: "npm.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes --product-code FIRSTBATCH --channel stable --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        nextPreviewCommandReady: true,
+        nextPreviewPostCommandRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        nextPreviewPostCommandBackfillCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --key live_write_smoke_result --value-json <redacted-json> --artifact-path artifacts/staging/FIRSTBATCH/stable/live-write-smoke-output.json --receipt-id <record_launch_rehearsal_run-receipt-id> --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        nextPreviewRequiredPhaseKey: "real_environment_proof",
+        nextPreviewRequiredStatus: "ready_for_real_environment_review",
         remainingPhaseCount: 4,
         launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
       }
@@ -13066,6 +13090,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /productionSwitchCurrentExecution=blocked_until_real_environment_proof \| phase=real_environment_proof \| action=set_public_https_entrypoint \| commandReady=yes \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| next=live_write_smoke/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionSwitchNextPhasePreview=live_write_smoke \| action=set_public_https_entrypoint \| commandReady=yes \| required=real_environment_proof:ready_for_real_environment_review \| backfill=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key live_write_smoke_result[\s\S]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(

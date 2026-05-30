@@ -13180,7 +13180,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
-      /Launch Review Cutover Triage Checkpoint:[\s\S]*productionSwitchExecutionQueue=live_write_smoke -> production_signoff -> launch_day_watch \| current=real_environment_proof\/set_public_https_entrypoint \| currentReady=yes \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| refresh=npm\.cmd run staging:readiness:status/
+      /Launch Review Cutover Triage Checkpoint:[\s\S]*productionSwitchExecutionQueue=live_write_smoke -> production_signoff -> launch_day_watch \| current=real_environment_proof\/set_public_https_entrypoint \| currentReady=yes \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| refresh=npm\.cmd run staging:readiness:status/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -13594,7 +13594,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
-      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*productionSwitchExecutionQueue=live_write_smoke -> production_signoff -> launch_day_watch \| current=real_environment_proof\/set_public_https_entrypoint \| currentReady=yes \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| refresh=npm\.cmd run staging:readiness:status/
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*productionSwitchExecutionQueue=live_write_smoke -> production_signoff -> launch_day_watch \| current=real_environment_proof\/set_public_https_entrypoint \| currentReady=yes \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| refresh=npm\.cmd run staging:readiness:status/
     );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
@@ -28253,7 +28253,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*productionSwitchProof=/);
     assert.match(
       launchOperationsOperatorEntryDownload.body,
-      /Operator Queue Checkpoint:[\s\S]*productionSwitchExecutionQueue=live_write_smoke -> production_signoff -> launch_day_watch \| current=real_environment_proof\/set_public_https_entrypoint \| currentReady=yes \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| refresh=npm\.cmd run staging:readiness:status/
+      /Operator Queue Checkpoint:[\s\S]*productionSwitchExecutionQueue=live_write_smoke -> production_signoff -> launch_day_watch \| current=real_environment_proof\/set_public_https_entrypoint \| currentReady=yes \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| refresh=npm\.cmd run staging:readiness:status/
     );
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);

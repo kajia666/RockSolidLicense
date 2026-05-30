@@ -13160,6 +13160,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
+      /liveWriteSmokeHandoff=real_environment_proof -> staging_preflight -> live_write_smoke -> live_write_smoke_result_backfill -> readiness_refresh -> rehearsal_reload \| gate=real_environment_proof:ready_for_real_environment_review \| preflight=npm\.cmd run staging:preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>[^\n]*\| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/live-write-smoke-output\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
       /productionSignoffEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| fullTest=npm\.cmd test \| backfill=npm\.cmd run staging:signoff:backfill/
     );
     assert.match(
@@ -13622,6 +13626,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
       /realEnvironmentProofReadbackQueue=1\.public_https_entrypoint\[status=pending_real_environment_value; ready=no; after=non_default_secret_env\] -> 2\.non_default_secret_env\[status=pending_real_environment_confirmation; ready=no; after=storage_profile_selected\] -> 3\.storage_profile_selected\[status=pending_real_environment_value; ready=no; after=backup_restore_drill\] -> 4\.backup_restore_drill\[status=blocked_after_readiness_status; ready=no; after=live_write_smoke\] \| current=public_https_entrypoint\/set_public_https_entrypoint \| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchSmoke.summaryText,
+      /liveWriteSmokeHandoff=real_environment_proof -> staging_preflight -> live_write_smoke -> live_write_smoke_result_backfill -> readiness_refresh -> rehearsal_reload \| gate=real_environment_proof:ready_for_real_environment_review \| preflight=npm\.cmd run staging:preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>[^\n]*\| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/live-write-smoke-output\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -25062,6 +25070,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*liveWriteSmokeHandoff=real_environment_proof -> staging_preflight -> live_write_smoke -> live_write_smoke_result_backfill -> readiness_refresh -> rehearsal_reload \| gate=real_environment_proof:ready_for_real_environment_review \| preflight=npm\.cmd run staging:preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>[^\n]*\| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/live-write-smoke-output\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchPostCommandQueue=live_write_smoke -> production_signoff -> launch_day_watch \| backfillReady=yes,yes,yes \| refreshReady=yes,yes,yes \| required=real_environment_proof:ready_for_real_environment_review -> live_write_smoke:ready_live_write_smoke_evidence_attached -> production_signoff:ready_production_signoff_evidence_attached \| status=blocked_until_real_environment_proof/
     );
     assert.match(
@@ -28342,6 +28354,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Operator Queue Checkpoint:[\s\S]*realEnvironmentProofReadbackQueue=1\.public_https_entrypoint\[status=pending_real_environment_value; ready=no; after=non_default_secret_env\] -> 2\.non_default_secret_env\[status=pending_real_environment_confirmation; ready=no; after=storage_profile_selected\] -> 3\.storage_profile_selected\[status=pending_real_environment_value; ready=no; after=backup_restore_drill\] -> 4\.backup_restore_drill\[status=blocked_after_readiness_status; ready=no; after=live_write_smoke\] \| current=public_https_entrypoint\/set_public_https_entrypoint \| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*liveWriteSmokeHandoff=real_environment_proof -> staging_preflight -> live_write_smoke -> live_write_smoke_result_backfill -> readiness_refresh -> rehearsal_reload \| gate=real_environment_proof:ready_for_real_environment_review \| preflight=npm\.cmd run staging:preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>[^\n]*\| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/live-write-smoke-output\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);

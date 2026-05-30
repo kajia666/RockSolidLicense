@@ -62421,6 +62421,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | artifact=${liveWriteSmokeExecutionEntrypoint.liveWriteSmokeOutputArtifact || "-"}`
       + ` | launchDutyRecordIndex=${liveWriteSmokeExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
+    appendLiveWriteSmokeHandoffLine(lines, liveWriteSmokeExecutionEntrypoint);
   }
   const productionSignoffExecutionEntrypoint =
     cloneLaunchProductionSignoffExecutionEntrypoint(proofSource.productionSignoffExecutionEntrypoint);
@@ -62667,6 +62668,24 @@ function appendRealEnvironmentProofReadbackQueueLine(lines = [], entrypoint = nu
     + ` | current=${entrypoint.currentProofKey || "-"}/${entrypoint.currentActionKey || "-"}`
     + ` | refresh=${entrypoint.readinessStatusCommand || "-"}`
     + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
+    + ` | status=${entrypoint.status || "-"}`
+  );
+  return true;
+}
+
+function appendLiveWriteSmokeHandoffLine(lines = [], entrypoint = null) {
+  if (!Array.isArray(lines) || !entrypoint || typeof entrypoint !== "object") {
+    return false;
+  }
+  lines.push(
+    "- liveWriteSmokeHandoff=real_environment_proof -> staging_preflight -> live_write_smoke -> live_write_smoke_result_backfill -> readiness_refresh -> rehearsal_reload"
+    + " | gate=real_environment_proof:ready_for_real_environment_review"
+    + ` | preflight=${entrypoint.smokePreflightCommand || "-"}`
+    + ` | smoke=${entrypoint.launchSmokeCommand || "-"}`
+    + ` | backfill=${entrypoint.resultBackfillCommand || "-"}`
+    + ` | refresh=${entrypoint.readinessRefreshCommand || "-"}`
+    + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
+    + ` | artifact=${entrypoint.liveWriteSmokeOutputArtifact || "-"}`
     + ` | status=${entrypoint.status || "-"}`
   );
   return true;

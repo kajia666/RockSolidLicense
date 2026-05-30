@@ -13188,6 +13188,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
+      /productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
       /Launch Review Cutover Triage Checkpoint:[\s\S]*productionSwitchExecutionQueue=live_write_smoke -> production_signoff -> launch_day_watch \| current=real_environment_proof\/set_public_https_entrypoint \| currentReady=yes \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| refresh=npm\.cmd run staging:readiness:status/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
@@ -13611,6 +13615,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
       /Launch Smoke Cutover Triage Checkpoint:[\s\S]*productionSwitchPostCommandQueue=live_write_smoke -> production_signoff -> launch_day_watch \| backfillReady=yes,yes,yes \| refreshReady=yes,yes,yes \| required=real_environment_proof:ready_for_real_environment_review -> live_write_smoke:ready_live_write_smoke_evidence_attached -> production_signoff:ready_production_signoff_evidence_attached \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchSmoke.summaryText,
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
     );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
@@ -25032,6 +25040,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchPostCommandQueue=live_write_smoke -> production_signoff -> launch_day_watch \| backfillReady=yes,yes,yes \| refreshReady=yes,yes,yes \| required=real_environment_proof:ready_for_real_environment_review -> live_write_smoke:ready_live_write_smoke_evidence_attached -> production_signoff:ready_production_signoff_evidence_attached \| status=blocked_until_real_environment_proof/
     );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
+    );
     assert.equal(launchOperationsOperatorEntry.checklistStepCount, 14);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
     assert.equal(launchOperationsOperatorEntry.checklistStepKeys[0], "open_launch_operations_handoff_summary");
@@ -28290,6 +28302,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Operator Queue Checkpoint:[\s\S]*productionSwitchPostCommandQueue=live_write_smoke -> production_signoff -> launch_day_watch \| backfillReady=yes,yes,yes \| refreshReady=yes,yes,yes \| required=real_environment_proof:ready_for_real_environment_review -> live_write_smoke:ready_live_write_smoke_evidence_attached -> production_signoff:ready_production_signoff_evidence_attached \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
     );
     assert.match(
       launchOperationsOperatorEntryDownload.body,

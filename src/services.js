@@ -62685,6 +62685,39 @@ function appendProductionSwitchPostCommandQueueLine(lines = [], source = null) {
     + ` | required=${requiredText || "-"}`
     + ` | status=${packet.status || runbook.status || "-"}`
   );
+  appendProductionSwitchPostCommandExecutionQueueLine(lines, runbook);
+  return true;
+}
+
+function appendProductionSwitchPostCommandExecutionQueueLine(lines = [], source = null) {
+  if (!Array.isArray(lines) || !source || typeof source !== "object") {
+    return false;
+  }
+  const runbook = source.productionSwitchExecutionRunbook
+    && typeof source.productionSwitchExecutionRunbook === "object"
+    ? source.productionSwitchExecutionRunbook
+    : source;
+  const packet = runbook?.currentExecutionPacket
+    && typeof runbook.currentExecutionPacket === "object"
+    ? runbook.currentExecutionPacket
+    : null;
+  const phaseExecutionPreviews = Array.isArray(packet?.phaseExecutionPreviews)
+    ? packet.phaseExecutionPreviews.filter((item) => item && typeof item === "object")
+    : [];
+  if (!phaseExecutionPreviews.length) {
+    return false;
+  }
+  const queueText = phaseExecutionPreviews
+    .map((item, index) =>
+      `${index + 1}.${item.phaseKey || "-"}`
+      + `[backfill=${item.postCommandBackfillCommand || "-"}`
+      + `; refresh=${item.postCommandRefreshCommand || "-"}]`
+    )
+    .join(" -> ");
+  lines.push(
+    `- productionSwitchPostCommandExecutionQueue=${queueText}`
+    + ` | status=${packet.status || runbook.status || "-"}`
+  );
   return true;
 }
 

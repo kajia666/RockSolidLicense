@@ -12804,6 +12804,12 @@ test("developer license quickstart first-batch setup can create recommended laun
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.thirdPhaseExecutionPreview?.requiredBeforePhaseKey,
         thirdPreviewRequiredStatus:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.thirdPhaseExecutionPreview?.requiredBeforeStatus,
+        phasePreviewKeys:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.phaseExecutionPreviews?.map((item) => item?.phaseKey),
+        phasePreviewRequiredBeforeKeys:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.phaseExecutionPreviews?.map((item) => item?.requiredBeforePhaseKey),
+        phasePreviewCommandReady:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.phaseExecutionPreviews?.map((item) => item?.commandReady),
         remainingPhaseCount:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.remainingPhaseCount,
         launchDutyRecordIndexPath:
@@ -12846,6 +12852,21 @@ test("developer license quickstart first-batch setup can create recommended laun
         thirdPreviewPostCommandRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
         thirdPreviewRequiredPhaseKey: "production_signoff",
         thirdPreviewRequiredStatus: "ready_production_signoff_evidence_attached",
+        phasePreviewKeys: [
+          "live_write_smoke",
+          "production_signoff",
+          "launch_day_watch"
+        ],
+        phasePreviewRequiredBeforeKeys: [
+          "real_environment_proof",
+          "live_write_smoke",
+          "production_signoff"
+        ],
+        phasePreviewCommandReady: [
+          true,
+          true,
+          true
+        ],
         remainingPhaseCount: 4,
         launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
       }
@@ -13152,6 +13173,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /productionSwitchThirdPhasePreview=launch_day_watch \| action=set_public_https_entrypoint \| commandReady=yes \| required=production_signoff:ready_production_signoff_evidence_attached \| backfill=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key launch_day_watch_summary[\s\S]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionSwitchPhasePreviewQueue=live_write_smoke -> production_signoff -> launch_day_watch \| ready=yes,yes,yes/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(

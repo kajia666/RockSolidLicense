@@ -53321,7 +53321,12 @@ function cloneProductionSwitchExecutionRunbook(runbook = null) {
             runbook.currentExecutionPacket.thirdPhaseExecutionPreview
             && typeof runbook.currentExecutionPacket.thirdPhaseExecutionPreview === "object"
               ? { ...runbook.currentExecutionPacket.thirdPhaseExecutionPreview }
-              : null
+              : null,
+          phaseExecutionPreviews: Array.isArray(runbook.currentExecutionPacket.phaseExecutionPreviews)
+            ? runbook.currentExecutionPacket.phaseExecutionPreviews
+              .filter((item) => item && typeof item === "object")
+              .map((item) => ({ ...item }))
+            : []
         }
       : null,
     executionPhases: Array.isArray(runbook.executionPhases)
@@ -53651,6 +53656,11 @@ function buildProductionSwitchExecutionRunbook({
           : null
       }
     : null;
+  const phaseExecutionPreviews = [
+    nextPhaseExecutionPreview,
+    followingPhaseExecutionPreview,
+    thirdPhaseExecutionPreview
+  ].filter((item) => item && typeof item === "object");
   const currentExecutionPacket = {
     mode: "production-switch-current-execution-packet/v1",
     status: readyForCutoverWatch
@@ -53677,6 +53687,7 @@ function buildProductionSwitchExecutionRunbook({
     nextPhaseExecutionPreview,
     followingPhaseExecutionPreview,
     thirdPhaseExecutionPreview,
+    phaseExecutionPreviews,
     remainingPhaseCount: remainingPhases.length,
     launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
     nextAction: readyForCutoverWatch
@@ -62482,6 +62493,15 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
           + ` | required=${thirdPhasePreview.requiredBeforePhaseKey || "-"}:${thirdPhasePreview.requiredBeforeStatus || "-"}`
           + ` | backfill=${thirdPhasePreview.postCommandBackfillCommand || "-"}`
           + ` | refresh=${thirdPhasePreview.postCommandRefreshCommand || "-"}`
+        );
+      }
+      const phaseExecutionPreviews = Array.isArray(currentExecutionPacket.phaseExecutionPreviews)
+        ? currentExecutionPacket.phaseExecutionPreviews.filter((item) => item && typeof item === "object")
+        : [];
+      if (phaseExecutionPreviews.length > 0) {
+        lines.push(
+          `- productionSwitchPhasePreviewQueue=${phaseExecutionPreviews.map((item) => item.phaseKey || "-").join(" -> ")}`
+          + ` | ready=${phaseExecutionPreviews.map((item) => item.commandReady === true ? "yes" : "no").join(",")}`
         );
       }
     }

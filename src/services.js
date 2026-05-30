@@ -62564,6 +62564,37 @@ function appendLaunchStagingRehearsalExecutionEntrypointLine(lines = [], source 
   return true;
 }
 
+function appendProductionSwitchExecutionQueueLine(lines = [], source = null) {
+  if (!Array.isArray(lines) || !source || typeof source !== "object") {
+    return false;
+  }
+  const runbook = source.productionSwitchExecutionRunbook
+    && typeof source.productionSwitchExecutionRunbook === "object"
+    ? source.productionSwitchExecutionRunbook
+    : null;
+  const packet = runbook?.currentExecutionPacket
+    && typeof runbook.currentExecutionPacket === "object"
+    ? runbook.currentExecutionPacket
+    : null;
+  if (!packet) {
+    return false;
+  }
+  const phaseExecutionPreviews = Array.isArray(packet.phaseExecutionPreviews)
+    ? packet.phaseExecutionPreviews.filter((item) => item && typeof item === "object")
+    : [];
+  const queueText = phaseExecutionPreviews.length
+    ? phaseExecutionPreviews.map((item) => item.phaseKey || "-").join(" -> ")
+    : packet.nextPhaseKey || runbook.nextPhaseKey || "-";
+  lines.push(
+    `- productionSwitchExecutionQueue=${queueText}`
+    + ` | current=${packet.phaseKey || runbook.currentPhaseKey || "-"}/${packet.actionKey || runbook.currentActionKey || "-"}`
+    + ` | currentReady=${packet.commandReady === true ? "yes" : "no"}`
+    + ` | blockedBy=${packet.blockedByPhaseKey || "-"}/${packet.blockedByActionKey || "-"}`
+    + ` | refresh=${packet.postCommandRefreshCommand || "-"}`
+  );
+  return true;
+}
+
 function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null, {
   leadingBlank = true,
   heading = "Launch Cutover Triage Checkpoint:"
@@ -62590,6 +62621,7 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
+  appendProductionSwitchExecutionQueueLine(lines, checkpoint);
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
   appendLaunchStagingRehearsalExecutionEntrypointLine(lines, checkpoint);
@@ -69254,6 +69286,7 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | current=${checkpoint.productionSwitchProofCurrentActionKey || "-"}`
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
+  appendProductionSwitchExecutionQueueLine(lines, checkpoint);
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
   appendLaunchStagingRehearsalExecutionEntrypointLine(lines, checkpoint);

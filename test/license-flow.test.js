@@ -34015,6 +34015,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*productionSwitchExecutionQueue=stable_operations_handoff \| current=cutover_watch\/refresh_readiness_status \| currentReady=yes \| blockedBy=-\/- \| command=npm\.cmd run staging:readiness:status[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| status=ready_for_cutover_watch/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
     );
     assert.match(
@@ -34500,6 +34504,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
+      /Launch Review Cutover Triage Checkpoint:[\s\S]*productionSwitchExecutionQueue=stable_operations_handoff \| current=cutover_watch\/refresh_readiness_status \| currentReady=yes \| blockedBy=-\/- \| command=npm\.cmd run staging:readiness:status[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| status=ready_for_cutover_watch/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
     );
     assert.match(
@@ -34615,6 +34623,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /Launch Smoke Cutover Triage Checkpoint:[\s\S]*launchCutoverTriage=ready_for_cutover_watch/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*productionSwitchExecutionQueue=stable_operations_handoff \| current=cutover_watch\/refresh_readiness_status \| currentReady=yes \| blockedBy=-\/- \| command=npm\.cmd run staging:readiness:status[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| status=ready_for_cutover_watch/
     );
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,

@@ -62592,6 +62592,7 @@ function appendProductionSwitchExecutionQueueLine(lines = [], source = null) {
     + ` | blockedBy=${packet.blockedByPhaseKey || "-"}/${packet.blockedByActionKey || "-"}`
     + ` | command=${packet.command || runbook.currentCommand || "-"}`
     + ` | refresh=${packet.postCommandRefreshCommand || "-"}`
+    + ` | status=${packet.status || runbook.status || "-"}`
   );
   return true;
 }

@@ -62438,6 +62438,11 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | launchDutyRecordIndex=${productionSignoffExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
   }
+  appendLiveWriteSmokeReadbackHandoffLine(
+    lines,
+    liveWriteSmokeExecutionEntrypoint,
+    productionSignoffExecutionEntrypoint
+  );
   const launchDayWatchExecutionEntrypoint =
     cloneLaunchDayWatchExecutionEntrypoint(proofSource.launchDayWatchExecutionEntrypoint);
   if (launchDayWatchExecutionEntrypoint) {
@@ -62687,6 +62692,31 @@ function appendLiveWriteSmokeHandoffLine(lines = [], entrypoint = null) {
     + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
     + ` | artifact=${entrypoint.liveWriteSmokeOutputArtifact || "-"}`
     + ` | status=${entrypoint.status || "-"}`
+  );
+  return true;
+}
+
+function appendLiveWriteSmokeReadbackHandoffLine(
+  lines = [],
+  liveWriteSmokeEntrypoint = null,
+  productionSignoffEntrypoint = null
+) {
+  if (!Array.isArray(lines) || !liveWriteSmokeEntrypoint || typeof liveWriteSmokeEntrypoint !== "object") {
+    return false;
+  }
+  const signoffEntrypoint = productionSignoffEntrypoint && typeof productionSignoffEntrypoint === "object"
+    ? productionSignoffEntrypoint
+    : null;
+  lines.push(
+    "- liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry"
+    + ` | backfill=${liveWriteSmokeEntrypoint.resultBackfillCommand || "-"}`
+    + ` | readback=${liveWriteSmokeEntrypoint.readinessRefreshCommand || "-"}`
+    + ` | rehearsal=${liveWriteSmokeEntrypoint.rehearsalReloadCommand || "-"}`
+    + " | expected=live_write_smoke:ready_live_write_smoke_evidence_attached"
+    + " | next=production_signoff"
+    + ` | signoff=${signoffEntrypoint?.currentCommand || signoffEntrypoint?.fullTestCommand || signoffEntrypoint?.productionSignoffBackfillCommand || "-"}`
+    + ` | packet=${signoffEntrypoint?.productionSignoffPacket || "-"}`
+    + ` | status=${liveWriteSmokeEntrypoint.status || "-"}`
   );
   return true;
 }

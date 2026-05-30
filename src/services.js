@@ -62613,6 +62613,33 @@ function appendRealEnvironmentProofExecutionQueueLine(lines = [], entrypoint = n
     + ` | readiness=${entrypoint.readinessStatusCommand || "-"}`
     + ` | status=${entrypoint.status || "-"}`
   );
+  appendRealEnvironmentProofCommandQueueLine(lines, entrypoint);
+  return true;
+}
+
+function appendRealEnvironmentProofCommandQueueLine(lines = [], entrypoint = null) {
+  if (!Array.isArray(lines) || !entrypoint || typeof entrypoint !== "object") {
+    return false;
+  }
+  const proofSteps = Array.isArray(entrypoint.proofSteps)
+    ? entrypoint.proofSteps.filter((item) => item && typeof item === "object")
+    : [];
+  if (!proofSteps.length) {
+    return false;
+  }
+  const queueText = proofSteps
+    .map((item, index) =>
+      `${index + 1}.${item.key || "-"}`
+      + `[action=${item.currentActionKey || "-"}`
+      + `; command=${item.command || "-"}`
+      + `; artifact=${item.artifactPath || "-"}]`
+    )
+    .join(" -> ");
+  lines.push(
+    `- realEnvironmentProofCommandQueue=${queueText}`
+    + ` | readiness=${entrypoint.readinessStatusCommand || "-"}`
+    + ` | status=${entrypoint.status || "-"}`
+  );
   return true;
 }
 

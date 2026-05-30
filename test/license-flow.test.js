@@ -13148,6 +13148,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
+      /realEnvironmentProofCommandQueue=1\.public_https_entrypoint\[action=set_public_https_entrypoint; command=npm\.cmd run staging:rehearsal[^\n]*; artifact=-\] -> 2\.non_default_secret_env\[action=set_required_secret_env; command=npm\.cmd run staging:readiness:status[^\n]*; artifact=-\] -> 3\.storage_profile_selected\[action=select_storage_profile; command=npm\.cmd run staging:rehearsal[^\n]*; artifact=-\] -> 4\.backup_restore_drill\[action=backfill_backup_restore_drill_evidence; command=npm\.cmd run staging:closeout:backfill[^\n]*; artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt\] \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
       /liveWriteSmokeEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>/
     );
     assert.match(
@@ -13606,6 +13610,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
       /realEnvironmentProofExecutionQueue=public_https_entrypoint -> non_default_secret_env -> storage_profile_selected -> backup_restore_drill \| ready=no,no,no,no \| current=public_https_entrypoint\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^\n|]+ \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchSmoke.summaryText,
+      /realEnvironmentProofCommandQueue=1\.public_https_entrypoint\[action=set_public_https_entrypoint; command=npm\.cmd run staging:rehearsal[^\n]*; artifact=-\] -> 2\.non_default_secret_env\[action=set_required_secret_env; command=npm\.cmd run staging:readiness:status[^\n]*; artifact=-\] -> 3\.storage_profile_selected\[action=select_storage_profile; command=npm\.cmd run staging:rehearsal[^\n]*; artifact=-\] -> 4\.backup_restore_drill\[action=backfill_backup_restore_drill_evidence; command=npm\.cmd run staging:closeout:backfill[^\n]*; artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt\] \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
     );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -25034,6 +25042,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*realEnvironmentProofCommandQueue=1\.public_https_entrypoint\[action=set_public_https_entrypoint; command=npm\.cmd run staging:rehearsal[^\n]*; artifact=-\] -> 2\.non_default_secret_env\[action=set_required_secret_env; command=npm\.cmd run staging:readiness:status[^\n]*; artifact=-\] -> 3\.storage_profile_selected\[action=select_storage_profile; command=npm\.cmd run staging:rehearsal[^\n]*; artifact=-\] -> 4\.backup_restore_drill\[action=backfill_backup_restore_drill_evidence; command=npm\.cmd run staging:closeout:backfill[^\n]*; artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt\] \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*liveWriteSmokeEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>/
     );
     assert.match(
@@ -28310,6 +28322,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Operator Queue Checkpoint:[\s\S]*realEnvironmentProofExecutionQueue=public_https_entrypoint -> non_default_secret_env -> storage_profile_selected -> backup_restore_drill \| ready=no,no,no,no \| current=public_https_entrypoint\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^\n|]+ \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*realEnvironmentProofCommandQueue=1\.public_https_entrypoint\[action=set_public_https_entrypoint; command=npm\.cmd run staging:rehearsal[^\n]*; artifact=-\] -> 2\.non_default_secret_env\[action=set_required_secret_env; command=npm\.cmd run staging:readiness:status[^\n]*; artifact=-\] -> 3\.storage_profile_selected\[action=select_storage_profile; command=npm\.cmd run staging:rehearsal[^\n]*; artifact=-\] -> 4\.backup_restore_drill\[action=backfill_backup_restore_drill_evidence; command=npm\.cmd run staging:closeout:backfill[^\n]*; artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt\] \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
     );
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);

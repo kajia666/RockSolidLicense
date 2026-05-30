@@ -13144,6 +13144,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
+      /realEnvironmentProofExecutionQueue=public_https_entrypoint -> non_default_secret_env -> storage_profile_selected -> backup_restore_drill \| ready=no,no,no,no \| current=public_https_entrypoint\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^\n|]+ \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
       /liveWriteSmokeEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>/
     );
     assert.match(
@@ -13591,6 +13595,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /storageProfileProof=pending_real_environment_value \| profile=-/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/);
+    assert.match(
+      runtimeEvidenceLaunchSmoke.summaryText,
+      /realEnvironmentProofExecutionQueue=public_https_entrypoint -> non_default_secret_env -> storage_profile_selected -> backup_restore_drill \| ready=no,no,no,no \| current=public_https_entrypoint\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^\n|]+ \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
+    );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
@@ -25006,6 +25014,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*realEnvironmentProofExecutionQueue=public_https_entrypoint -> non_default_secret_env -> storage_profile_selected -> backup_restore_drill \| ready=no,no,no,no \| current=public_https_entrypoint\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^\n|]+ \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*liveWriteSmokeEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>/
     );
     assert.equal(launchOperationsOperatorEntry.checklistStepCount, 14);
@@ -28262,6 +28274,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Operator Queue Checkpoint:[\s\S]*productionSwitchExecutionQueue=live_write_smoke -> production_signoff -> launch_day_watch \| current=real_environment_proof\/set_public_https_entrypoint \| currentReady=yes \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| refresh=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*realEnvironmentProofExecutionQueue=public_https_entrypoint -> non_default_secret_env -> storage_profile_selected -> backup_restore_drill \| ready=no,no,no,no \| current=public_https_entrypoint\/set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^\n|]+ \| readiness=npm\.cmd run staging:readiness:status[^\n]*\| status=blocked_until_real_environment_proof/
     );
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);

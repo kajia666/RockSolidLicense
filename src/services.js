@@ -62406,6 +62406,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | readiness=${realEnvironmentProofExecutionEntrypoint.readinessStatusCommand || "-"}`
       + ` | launchDutyRecordIndex=${realEnvironmentProofExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
+    appendRealEnvironmentProofExecutionQueueLine(lines, realEnvironmentProofExecutionEntrypoint);
   }
   const liveWriteSmokeExecutionEntrypoint =
     cloneLaunchLiveWriteSmokeExecutionEntrypoint(proofSource.liveWriteSmokeExecutionEntrypoint);
@@ -62585,6 +62586,31 @@ function appendLaunchStagingRehearsalExecutionEntrypointLine(lines = [], source 
     + ` | readiness=${entrypoint.readinessStatusCommand || "-"}`
     + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
     + ` | launchDutyRecordIndex=${entrypoint.launchDutyRecordIndexPath || "-"}`
+  );
+  return true;
+}
+
+function appendRealEnvironmentProofExecutionQueueLine(lines = [], entrypoint = null) {
+  if (!Array.isArray(lines) || !entrypoint || typeof entrypoint !== "object") {
+    return false;
+  }
+  const proofSteps = Array.isArray(entrypoint.proofSteps)
+    ? entrypoint.proofSteps.filter((item) => item && typeof item === "object")
+    : [];
+  if (!proofSteps.length) {
+    return false;
+  }
+  const queueText = proofSteps.map((item) => item.key || "-").join(" -> ");
+  const readyText = proofSteps
+    .map((item) => isDeveloperOpsProductionSwitchRealEnvironmentProofReady(item) ? "yes" : "no")
+    .join(",");
+  lines.push(
+    `- realEnvironmentProofExecutionQueue=${queueText}`
+    + ` | ready=${readyText || "-"}`
+    + ` | current=${entrypoint.currentProofKey || "-"}/${entrypoint.currentActionKey || "-"}`
+    + ` | command=${entrypoint.currentCommand || "-"}`
+    + ` | readiness=${entrypoint.readinessStatusCommand || "-"}`
+    + ` | status=${entrypoint.status || "-"}`
   );
   return true;
 }

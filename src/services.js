@@ -62437,6 +62437,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | packet=${productionSignoffExecutionEntrypoint.productionSignoffPacket || "-"}`
       + ` | launchDutyRecordIndex=${productionSignoffExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
+    appendProductionSignoffHandoffLine(lines, productionSignoffExecutionEntrypoint);
   }
   appendLiveWriteSmokeReadbackHandoffLine(
     lines,
@@ -62717,6 +62718,33 @@ function appendLiveWriteSmokeReadbackHandoffLine(
     + ` | signoff=${signoffEntrypoint?.currentCommand || signoffEntrypoint?.fullTestCommand || signoffEntrypoint?.productionSignoffBackfillCommand || "-"}`
     + ` | packet=${signoffEntrypoint?.productionSignoffPacket || "-"}`
     + ` | status=${liveWriteSmokeEntrypoint.status || "-"}`
+  );
+  return true;
+}
+
+function appendProductionSignoffHandoffLine(lines = [], entrypoint = null) {
+  if (!Array.isArray(lines) || !entrypoint || typeof entrypoint !== "object") {
+    return false;
+  }
+  const signoffCommands = Array.isArray(entrypoint.signoffConditionCommands)
+    ? entrypoint.signoffConditionCommands.filter((item) => item && typeof item === "object")
+    : [];
+  const receiptCommands = Array.isArray(entrypoint.receiptVisibilityBackfillCommands)
+    ? entrypoint.receiptVisibilityBackfillCommands.filter((item) => item && typeof item === "object")
+    : [];
+  lines.push(
+    "- productionSignoffHandoff=full_test_window -> full_test_window_passed_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_conditions -> receipt_visibility"
+    + ` | fullTest=${entrypoint.fullTestCommand || "-"}`
+    + ` | backfill=${entrypoint.fullTestBackfillCommand || "-"}`
+    + ` | readback=${entrypoint.readinessRefreshCommand || "-"}`
+    + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
+    + " | expected=full_test_window:ready_full_test_window_evidence_attached"
+    + ` | signoffQueue=${signoffCommands.length}`
+    + ` | signoffFirst=${signoffCommands.find((item) => item.command)?.command || "-"}`
+    + ` | receiptQueue=${receiptCommands.length}`
+    + ` | receiptFirst=${receiptCommands.find((item) => item.command)?.command || "-"}`
+    + ` | packet=${entrypoint.productionSignoffPacket || "-"}`
+    + ` | status=${entrypoint.status || "-"}`
   );
   return true;
 }

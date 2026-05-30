@@ -53304,6 +53304,9 @@ function cloneProductionSwitchExecutionRunbook(runbook = null) {
   }
   return {
     ...runbook,
+    currentExecutionPacket: runbook.currentExecutionPacket && typeof runbook.currentExecutionPacket === "object"
+      ? { ...runbook.currentExecutionPacket }
+      : null,
     executionPhases: Array.isArray(runbook.executionPhases)
       ? runbook.executionPhases
         .filter((item) => item && typeof item === "object")
@@ -53366,6 +53369,38 @@ function getProductionSwitchExecutionPhaseCommand(key = "", entrypoint = null) {
       || null;
   }
   return entrypoint.currentCommand || null;
+}
+
+function getProductionSwitchExecutionPhaseRefreshCommand(key = "", entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  if (key === "real_environment_proof") {
+    return entrypoint.readinessStatusCommand || entrypoint.currentCommand || null;
+  }
+  if (key === "live_write_smoke") {
+    return entrypoint.readinessRefreshCommand || entrypoint.currentCommand || null;
+  }
+  if (key === "production_signoff") {
+    return entrypoint.readinessRefreshCommand || entrypoint.currentCommand || null;
+  }
+  if (key === "launch_day_watch") {
+    return entrypoint.readinessRefreshCommand || entrypoint.currentCommand || null;
+  }
+  return entrypoint.currentCommand || null;
+}
+
+function getProductionSwitchExecutionPhaseRehearsalReloadCommand(key = "", entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  if (key === "real_environment_proof") {
+    return entrypoint.rehearsalReloadCommand || null;
+  }
+  if (key === "live_write_smoke" || key === "production_signoff" || key === "launch_day_watch") {
+    return entrypoint.rehearsalReloadCommand || null;
+  }
+  return null;
 }
 
 function buildProductionSwitchExecutionRunbook({
@@ -53436,6 +53471,8 @@ function buildProductionSwitchExecutionRunbook({
       readyForExecution: entrypoint?.readyForExecution === true,
       currentActionKey: entrypoint?.currentActionKey || null,
       currentCommand: getProductionSwitchExecutionPhaseCommand(phase.key, entrypoint),
+      postCommandRefreshCommand: getProductionSwitchExecutionPhaseRefreshCommand(phase.key, entrypoint),
+      rehearsalReloadCommand: getProductionSwitchExecutionPhaseRehearsalReloadCommand(phase.key, entrypoint),
       launchDutyRecordIndexPath: entrypoint?.launchDutyRecordIndexPath || null
     };
   });
@@ -53472,6 +53509,40 @@ function buildProductionSwitchExecutionRunbook({
       || realEnvironmentEntrypoint?.currentActionKey
       || null
     : currentPhase?.currentActionKey || null;
+  const currentEntrypoint = readyForCutoverWatch
+    ? launchDayWatchEntrypoint || productionSignoffEntrypoint || liveWriteEntrypoint || realEnvironmentEntrypoint
+    : phaseSources.find((phase) => phase.key === currentPhase?.key)?.entrypoint || null;
+  const currentExecutionPacket = {
+    mode: "production-switch-current-execution-packet/v1",
+    status: readyForCutoverWatch
+      ? "ready_for_cutover_watch"
+      : currentPhase?.status || proofPacket.status || null,
+    phaseKey: readyForCutoverWatch ? "cutover_watch" : currentPhase?.key || null,
+    actionKey: currentActionKey,
+    command: currentCommand,
+    commandReady: Boolean(currentCommand),
+    postCommandRefreshCommand: readyForCutoverWatch
+      ? proofPacket.currentCommand
+        || getProductionSwitchExecutionPhaseRefreshCommand("launch_day_watch", launchDayWatchEntrypoint)
+        || getProductionSwitchExecutionPhaseRefreshCommand("production_signoff", productionSignoffEntrypoint)
+        || null
+      : currentPhase?.postCommandRefreshCommand || null,
+    rehearsalReloadCommand: readyForCutoverWatch
+      ? getProductionSwitchExecutionPhaseRehearsalReloadCommand("launch_day_watch", currentEntrypoint) || null
+      : currentPhase?.rehearsalReloadCommand || null,
+    blockedByPhaseKey: readyForCutoverWatch ? null : currentPhase?.key || null,
+    blockedByActionKey: readyForCutoverWatch ? null : currentActionKey,
+    nextPhaseKey: readyForCutoverWatch
+      ? "stable_operations_handoff"
+      : nextPhase?.key || null,
+    remainingPhaseCount: remainingPhases.length,
+    launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
+    nextAction: readyForCutoverWatch
+      ? "Run cutover watch from the readiness packet, then continue stable-operations handoff."
+      : currentPhase?.key
+        ? `Run the current ${currentPhase.label || currentPhase.key} command, refresh readiness, then continue the production switch queue.`
+        : proofPacket.nextAction || null
+  };
   return {
     mode: "production-switch-execution-runbook/v1",
     status: readyForCutoverWatch
@@ -53486,6 +53557,7 @@ function buildProductionSwitchExecutionRunbook({
       : nextPhase?.key || null,
     remainingPhaseCount: remainingPhases.length,
     launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
+    currentExecutionPacket,
     executionPhases,
     nextAction: readyForCutoverWatch
       ? "Production switch proof is ready; continue cutover watch, then move to stable-operations handoff."
@@ -62214,6 +62286,21 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + `/${Array.isArray(productionSwitchExecutionRunbook.executionPhases) ? productionSwitchExecutionRunbook.executionPhases.length : "-"}`
       + ` | next=${productionSwitchExecutionRunbook.nextPhaseKey || "-"}`
     );
+    const currentExecutionPacket = productionSwitchExecutionRunbook.currentExecutionPacket
+      && typeof productionSwitchExecutionRunbook.currentExecutionPacket === "object"
+      ? productionSwitchExecutionRunbook.currentExecutionPacket
+      : null;
+    if (currentExecutionPacket) {
+      lines.push(
+        `- productionSwitchCurrentExecution=${currentExecutionPacket.status || "-"}`
+        + ` | phase=${currentExecutionPacket.phaseKey || "-"}`
+        + ` | action=${currentExecutionPacket.actionKey || "-"}`
+        + ` | commandReady=${currentExecutionPacket.commandReady === true ? "yes" : "no"}`
+        + ` | refresh=${currentExecutionPacket.postCommandRefreshCommand || "-"}`
+        + ` | blockedBy=${currentExecutionPacket.blockedByPhaseKey || "-"}/${currentExecutionPacket.blockedByActionKey || "-"}`
+        + ` | next=${currentExecutionPacket.nextPhaseKey || "-"}`
+      );
+    }
   }
   return Boolean(
     publicHttpsProof

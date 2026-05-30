@@ -12732,6 +12732,50 @@ test("developer license quickstart first-batch setup can create recommended laun
         [4, "launch_day_watch", "blocked_until_real_environment_proof", false, "set_public_https_entrypoint"]
       ]
     );
+    assert.deepEqual(
+      {
+        mode:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.mode,
+        status:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.status,
+        phaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.phaseKey,
+        actionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.actionKey,
+        commandReady:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.commandReady,
+        commandIsProfileRehearsal:
+          /^npm\.cmd run staging:rehearsal -- --profile-file /.test(
+            runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.command || ""
+          ),
+        postCommandRefreshCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.postCommandRefreshCommand,
+        blockedByPhaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.blockedByPhaseKey,
+        blockedByActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.blockedByActionKey,
+        nextPhaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseKey,
+        remainingPhaseCount:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.remainingPhaseCount,
+        launchDutyRecordIndexPath:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.launchDutyRecordIndexPath
+      },
+      {
+        mode: "production-switch-current-execution-packet/v1",
+        status: "blocked_until_real_environment_proof",
+        phaseKey: "real_environment_proof",
+        actionKey: "set_public_https_entrypoint",
+        commandReady: true,
+        commandIsProfileRehearsal: true,
+        postCommandRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        blockedByPhaseKey: "real_environment_proof",
+        blockedByActionKey: "set_public_https_entrypoint",
+        nextPhaseKey: "live_write_smoke",
+        remainingPhaseCount: 4,
+        launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
+      }
+    );
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
     assert.equal(
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.status,
@@ -13018,6 +13062,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /productionSwitchExecutionRunbook=blocked_until_real_environment_proof \| ready=no \| current=real_environment_proof \| action=set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| remaining=4\/4 \| next=live_write_smoke/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionSwitchCurrentExecution=blocked_until_real_environment_proof \| phase=real_environment_proof \| action=set_public_https_entrypoint \| commandReady=yes \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| next=live_write_smoke/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -32757,6 +32805,31 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                   launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.executionPhases?.length
               }
             : null,
+        productionSwitchCurrentExecutionPacket:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket
+            ? {
+                status:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.status,
+                phaseKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.phaseKey,
+                actionKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.actionKey,
+                command:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.command,
+                commandReady:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.commandReady,
+                postCommandRefreshCommand:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.postCommandRefreshCommand,
+                blockedByPhaseKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.blockedByPhaseKey,
+                blockedByActionKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.blockedByActionKey,
+                nextPhaseKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.nextPhaseKey,
+                remainingPhaseCount:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentExecutionPacket.remainingPhaseCount
+              }
+            : null,
         proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
       },
       {
@@ -32896,6 +32969,18 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           remainingPhaseCount: 0,
           phaseCount: 4
         },
+        productionSwitchCurrentExecutionPacket: {
+          status: "ready_for_cutover_watch",
+          phaseKey: "cutover_watch",
+          actionKey: "refresh_readiness_status",
+          command: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          commandReady: true,
+          postCommandRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          blockedByPhaseKey: null,
+          blockedByActionKey: null,
+          nextPhaseKey: "stable_operations_handoff",
+          remainingPhaseCount: 0
+        },
         proofCounts: {
           total: 8,
           ready: 8,
@@ -33011,6 +33096,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.remainingPhaseCount,
         productionSwitchRunbookPhaseCount:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.executionPhases?.length,
+        productionSwitchCurrentExecutionPacketStatus:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentExecutionPacket?.status,
+        productionSwitchCurrentExecutionPacketPhaseKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentExecutionPacket?.phaseKey,
+        productionSwitchCurrentExecutionPacketActionKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentExecutionPacket?.actionKey,
+        productionSwitchCurrentExecutionPacketCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentExecutionPacket?.command,
+        productionSwitchCurrentExecutionPacketCommandReady:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentExecutionPacket?.commandReady,
+        productionSwitchCurrentExecutionPacketRefreshCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentExecutionPacket?.postCommandRefreshCommand,
+        productionSwitchCurrentExecutionPacketBlockedByPhaseKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentExecutionPacket?.blockedByPhaseKey,
+        productionSwitchCurrentExecutionPacketNextPhaseKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseKey,
         cutoverDecisionStatus:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.cutoverOperatorDecision?.status,
         cutoverDecisionReadyForCutoverWatch:
@@ -33122,6 +33223,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         productionSwitchRunbookNextPhaseKey: "stable_operations_handoff",
         productionSwitchRunbookRemainingPhaseCount: 0,
         productionSwitchRunbookPhaseCount: 4,
+        productionSwitchCurrentExecutionPacketStatus: "ready_for_cutover_watch",
+        productionSwitchCurrentExecutionPacketPhaseKey: "cutover_watch",
+        productionSwitchCurrentExecutionPacketActionKey: "refresh_readiness_status",
+        productionSwitchCurrentExecutionPacketCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        productionSwitchCurrentExecutionPacketCommandReady: true,
+        productionSwitchCurrentExecutionPacketRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        productionSwitchCurrentExecutionPacketBlockedByPhaseKey: null,
+        productionSwitchCurrentExecutionPacketNextPhaseKey: "stable_operations_handoff",
         cutoverDecisionStatus: "ready_for_cutover_watch",
         cutoverDecisionReadyForCutoverWatch: true,
         cutoverDecisionLaunchEvidenceProgress: "12/12",

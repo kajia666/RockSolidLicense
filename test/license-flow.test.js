@@ -12555,6 +12555,77 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint?.resultBackfillCommand || "",
       /npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key live_write_smoke_result/
     );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint?.productionSignoffExecutionEntrypoint,
+      runtimeEvidenceReviewOpsCheckpoint?.productionSignoffExecutionEntrypoint
+    );
+    assert.deepEqual(
+      {
+        mode: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.mode,
+        status: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.status,
+        readyForExecution:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.readyForExecution,
+        currentActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.currentActionKey,
+        currentCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.currentCommand,
+        fullTestCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.fullTestCommand,
+        fullTestTargetKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.fullTestTargetKey,
+        fullTestQueueKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.fullTestQueueKey,
+        fullTestOutputArtifact:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.fullTestOutputArtifact,
+        productionSignoffTargetKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.productionSignoffTargetKey,
+        productionSignoffQueueKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.productionSignoffQueueKey,
+        productionSignoffPacket:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.productionSignoffPacket,
+        closeoutInputFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.closeoutInputFile,
+        readinessActionQueueFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.readinessActionQueueFile,
+        launchDutyRecordIndexPath:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.launchDutyRecordIndexPath,
+        signoffConditionCommandCount:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.signoffConditionCommands?.length,
+        receiptVisibilityCommandCount:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.receiptVisibilityBackfillCommands?.length
+      },
+      {
+        mode: "launch-production-signoff-execution-entrypoint/v1",
+        status: "blocked_until_real_environment_proof",
+        readyForExecution: false,
+        currentActionKey: "set_public_https_entrypoint",
+        currentCommand: null,
+        fullTestCommand: "npm.cmd test",
+        fullTestTargetKey: "full_test_window_passed",
+        fullTestQueueKey: "full_test_window_passed_backfill",
+        fullTestOutputArtifact: "artifacts/staging/FIRSTBATCH/stable/full-test-output.txt",
+        productionSignoffTargetKey: "production_signoff_packet",
+        productionSignoffQueueKey: "production_signoff_packet_backfill",
+        productionSignoffPacket: "artifacts/staging/FIRSTBATCH/stable/staging-production-signoff-packet.json",
+        closeoutInputFile: "artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json",
+        readinessActionQueueFile: "artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json",
+        signoffConditionCommandCount: 6,
+        receiptVisibilityCommandCount: 5
+      }
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.fullTestBackfillCommand || "",
+      /npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --condition-key full_test_window_passed/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.signoffConditionCommands?.[0]?.command || "",
+      /npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --condition-key staging_artifacts_archived/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint?.receiptVisibilityBackfillCommands?.[0]?.command || "",
+      /npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --receipt-lane launchMainline/
+    );
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
     assert.equal(
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.status,
@@ -12781,6 +12852,10 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewCutoverTriageAction.context?.liveWriteSmokeExecutionEntrypoint,
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.liveWriteSmokeExecutionEntrypoint
     );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageAction.context?.productionSignoffExecutionEntrypoint,
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.productionSignoffExecutionEntrypoint
+    );
     const runtimeEvidenceReviewCutoverTriageControl = runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.find((item) =>
       item?.label === "Review Cutover Triage"
     ) || null;
@@ -12817,6 +12892,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /liveWriteSmokeEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url>/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionSignoffEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| fullTest=npm\.cmd test \| backfill=npm\.cmd run staging:signoff:backfill/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -23954,6 +24033,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           productionSwitchProofPacket?.realEnvironmentProofExecutionEntrypoint || null,
         liveWriteSmokeExecutionEntrypoint:
           productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint || null,
+        productionSignoffExecutionEntrypoint:
+          productionSwitchProofPacket?.productionSignoffExecutionEntrypoint || null,
         cutoverOperatorDecision: {
           mode: "launch-cutover-operator-decision/v1",
           status: "hold_for_real_environment_proof",
@@ -32488,6 +32569,28 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                   launchDutyCloseoutRecordedGate.productionSwitchProofPacket.liveWriteSmokeExecutionEntrypoint.liveWriteSmokeOutputArtifact
               }
             : null,
+        productionSignoffExecutionEntrypoint:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionSignoffExecutionEntrypoint
+            ? {
+                status: launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.status,
+                readyForExecution:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.readyForExecution,
+                currentActionKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.currentActionKey,
+                currentCommand:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.currentCommand,
+                fullTestCommand:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.fullTestCommand,
+                fullTestBackfillCommand:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.fullTestBackfillCommand,
+                productionSignoffPacket:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.productionSignoffPacket,
+                signoffConditionCommandCount:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.signoffConditionCommands?.length,
+                receiptVisibilityCommandCount:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSignoffExecutionEntrypoint.receiptVisibilityBackfillCommands?.length
+              }
+            : null,
         proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
       },
       {
@@ -32596,6 +32699,17 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           resultQueueKey: "live_write_smoke_result_backfill",
           liveWriteSmokeOutputArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/live-write-smoke-output.json"
         },
+        productionSignoffExecutionEntrypoint: {
+          status: "ready_production_signoff_evidence_attached",
+          readyForExecution: true,
+          currentActionKey: "confirm_production_signoff_and_receipts",
+          currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          fullTestCommand: "npm.cmd test",
+          fullTestBackfillCommand: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts/staging/EXPORT_CLOSEOUT_READY/stable/full-test-output.txt --decision ready-for-production-signoff --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          productionSignoffPacket: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/staging-production-signoff-packet.json",
+          signoffConditionCommandCount: 6,
+          receiptVisibilityCommandCount: 5
+        },
         proofCounts: {
           total: 8,
           ready: 8,
@@ -32669,6 +32783,20 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.liveWriteSmokeExecutionEntrypoint?.currentActionKey,
         liveWriteSmokeEntrypointCurrentCommand:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.liveWriteSmokeExecutionEntrypoint?.currentCommand,
+        productionSignoffEntrypointStatus:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.status,
+        productionSignoffEntrypointReady:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.readyForExecution,
+        productionSignoffEntrypointCurrentActionKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.currentActionKey,
+        productionSignoffEntrypointCurrentCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.currentCommand,
+        productionSignoffEntrypointFullTestCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.fullTestCommand,
+        productionSignoffEntrypointSignoffCommandCount:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.signoffConditionCommands?.length,
+        productionSignoffEntrypointReceiptCommandCount:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSignoffExecutionEntrypoint?.receiptVisibilityBackfillCommands?.length,
         cutoverDecisionStatus:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.cutoverOperatorDecision?.status,
         cutoverDecisionReadyForCutoverWatch:
@@ -32759,6 +32887,13 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         liveWriteSmokeEntrypointReady: true,
         liveWriteSmokeEntrypointCurrentActionKey: "confirm_live_write_smoke_evidence",
         liveWriteSmokeEntrypointCurrentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        productionSignoffEntrypointStatus: "ready_production_signoff_evidence_attached",
+        productionSignoffEntrypointReady: true,
+        productionSignoffEntrypointCurrentActionKey: "confirm_production_signoff_and_receipts",
+        productionSignoffEntrypointCurrentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        productionSignoffEntrypointFullTestCommand: "npm.cmd test",
+        productionSignoffEntrypointSignoffCommandCount: 6,
+        productionSignoffEntrypointReceiptCommandCount: 5,
         cutoverDecisionStatus: "ready_for_cutover_watch",
         cutoverDecisionReadyForCutoverWatch: true,
         cutoverDecisionLaunchEvidenceProgress: "12/12",

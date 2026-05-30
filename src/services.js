@@ -62529,6 +62529,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
           `- productionSwitchPhasePreviewQueue=${phaseExecutionPreviews.map((item) => item.phaseKey || "-").join(" -> ")}`
           + ` | ready=${phaseExecutionPreviews.map((item) => item.commandReady === true ? "yes" : "no").join(",")}`
         );
+        appendProductionSwitchPostCommandQueueLine(lines, productionSwitchExecutionRunbook);
       }
     }
   }
@@ -62643,6 +62644,45 @@ function appendProductionSwitchExecutionQueueLine(lines = [], source = null) {
     + ` | blockedBy=${packet.blockedByPhaseKey || "-"}/${packet.blockedByActionKey || "-"}`
     + ` | command=${packet.command || runbook.currentCommand || "-"}`
     + ` | refresh=${packet.postCommandRefreshCommand || "-"}`
+    + ` | status=${packet.status || runbook.status || "-"}`
+  );
+  appendProductionSwitchPostCommandQueueLine(lines, runbook);
+  return true;
+}
+
+function appendProductionSwitchPostCommandQueueLine(lines = [], source = null) {
+  if (!Array.isArray(lines) || !source || typeof source !== "object") {
+    return false;
+  }
+  const runbook = source.productionSwitchExecutionRunbook
+    && typeof source.productionSwitchExecutionRunbook === "object"
+    ? source.productionSwitchExecutionRunbook
+    : source;
+  const packet = runbook?.currentExecutionPacket
+    && typeof runbook.currentExecutionPacket === "object"
+    ? runbook.currentExecutionPacket
+    : null;
+  const phaseExecutionPreviews = Array.isArray(packet?.phaseExecutionPreviews)
+    ? packet.phaseExecutionPreviews.filter((item) => item && typeof item === "object")
+    : [];
+  if (!phaseExecutionPreviews.length) {
+    return false;
+  }
+  const queueText = phaseExecutionPreviews.map((item) => item.phaseKey || "-").join(" -> ");
+  const backfillReady = phaseExecutionPreviews
+    .map((item) => item.postCommandBackfillCommand ? "yes" : "no")
+    .join(",");
+  const refreshReady = phaseExecutionPreviews
+    .map((item) => item.postCommandRefreshCommand ? "yes" : "no")
+    .join(",");
+  const requiredText = phaseExecutionPreviews
+    .map((item) => `${item.requiredBeforePhaseKey || "-"}:${item.requiredBeforeStatus || "-"}`)
+    .join(" -> ");
+  lines.push(
+    `- productionSwitchPostCommandQueue=${queueText}`
+    + ` | backfillReady=${backfillReady || "-"}`
+    + ` | refreshReady=${refreshReady || "-"}`
+    + ` | required=${requiredText || "-"}`
     + ` | status=${packet.status || runbook.status || "-"}`
   );
   return true;

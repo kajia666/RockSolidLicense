@@ -62640,6 +62640,35 @@ function appendRealEnvironmentProofCommandQueueLine(lines = [], entrypoint = nul
     + ` | readiness=${entrypoint.readinessStatusCommand || "-"}`
     + ` | status=${entrypoint.status || "-"}`
   );
+  appendRealEnvironmentProofReadbackQueueLine(lines, entrypoint);
+  return true;
+}
+
+function appendRealEnvironmentProofReadbackQueueLine(lines = [], entrypoint = null) {
+  if (!Array.isArray(lines) || !entrypoint || typeof entrypoint !== "object") {
+    return false;
+  }
+  const proofSteps = Array.isArray(entrypoint.proofSteps)
+    ? entrypoint.proofSteps.filter((item) => item && typeof item === "object")
+    : [];
+  if (!proofSteps.length) {
+    return false;
+  }
+  const queueText = proofSteps
+    .map((item, index) =>
+      `${index + 1}.${item.key || "-"}`
+      + `[status=${item.status || "-"}`
+      + `; ready=${isDeveloperOpsProductionSwitchRealEnvironmentProofReady(item) ? "yes" : "no"}`
+      + `; after=${proofSteps[index + 1]?.key || "live_write_smoke"}]`
+    )
+    .join(" -> ");
+  lines.push(
+    `- realEnvironmentProofReadbackQueue=${queueText}`
+    + ` | current=${entrypoint.currentProofKey || "-"}/${entrypoint.currentActionKey || "-"}`
+    + ` | refresh=${entrypoint.readinessStatusCommand || "-"}`
+    + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
+    + ` | status=${entrypoint.status || "-"}`
+  );
   return true;
 }
 

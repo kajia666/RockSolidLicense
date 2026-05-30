@@ -24328,6 +24328,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint || null,
         productionSwitchExecutionRunbook:
           productionSwitchProofPacket?.productionSwitchExecutionRunbook || null,
+        stableOperationsHandoff: launchEvidenceReadinessGate?.stableOperationsHandoff
+          ? {
+              ...launchEvidenceReadinessGate.stableOperationsHandoff,
+              handoffArtifacts: Array.isArray(launchEvidenceReadinessGate.stableOperationsHandoff.handoffArtifacts)
+                ? launchEvidenceReadinessGate.stableOperationsHandoff.handoffArtifacts.slice()
+                : []
+            }
+          : null,
         cutoverOperatorDecision: {
           mode: "launch-cutover-operator-decision/v1",
           status: "hold_for_real_environment_proof",
@@ -33963,6 +33971,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*stableOperationsHandoffExecution=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| command=npm\.cmd run staging:readiness:status[^\n]*\| next=reload_staging_rehearsal_for_stable_operations \| nextCommand=npm\.cmd run staging:rehearsal[^\n]*\| readback=awaiting_readiness_and_rehearsal_readback[^\n]*\| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json[^\n]*\| firstWaveCloseout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Current Stable Operations Handoff Packet:[\s\S]*status=ready_for_readiness_refresh \| action=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| source=first_wave_closeout \| sourceRecorded=yes/
     );
     assert.match(
@@ -34508,6 +34520,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
+      /Launch Review Cutover Triage Checkpoint:[\s\S]*stableOperationsHandoffExecution=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| command=npm\.cmd run staging:readiness:status[^\n]*\| next=reload_staging_rehearsal_for_stable_operations \| nextCommand=npm\.cmd run staging:rehearsal[^\n]*\| readback=awaiting_readiness_and_rehearsal_readback[^\n]*\| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json[^\n]*\| firstWaveCloseout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
     );
     assert.match(
@@ -34627,6 +34643,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /Launch Smoke Cutover Triage Checkpoint:[\s\S]*productionSwitchExecutionQueue=stable_operations_handoff \| current=cutover_watch\/refresh_readiness_status \| currentReady=yes \| blockedBy=-\/- \| command=npm\.cmd run staging:readiness:status[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| status=ready_for_cutover_watch/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*stableOperationsHandoffExecution=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| command=npm\.cmd run staging:readiness:status[^\n]*\| next=reload_staging_rehearsal_for_stable_operations \| nextCommand=npm\.cmd run staging:rehearsal[^\n]*\| readback=awaiting_readiness_and_rehearsal_readback[^\n]*\| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json[^\n]*\| firstWaveCloseout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
@@ -35311,6 +35331,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
       /Stable Operations Handoff Execution:[\s\S]*status=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| packet=ready_for_readiness_refresh \| readback=awaiting_readiness_and_rehearsal_readback/
+    );
+    assert.match(
+      launchMainlineStableOperationsHandoffExecutionDirectDownload.body,
+      /stableOperationsHandoffExecution=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| command=npm\.cmd run staging:readiness:status[^\n]*\| next=reload_staging_rehearsal_for_stable_operations \| nextCommand=npm\.cmd run staging:rehearsal[^\n]*\| readback=awaiting_readiness_and_rehearsal_readback[^\n]*\| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json[^\n]*\| firstWaveCloseout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
     );
     assert.match(
       launchMainlineStableOperationsHandoffExecutionDirectDownload.body,

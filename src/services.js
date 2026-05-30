@@ -29731,6 +29731,7 @@ function appendStableOperationsHandoffExecutionLines(lines = [], execution = nul
     + ` | launchDutyRecordIndex=${execution.launchDutyRecordIndexPath || "-"}`
     + ` | firstWaveCloseout=${execution.firstWaveCloseoutArtifactPath || "-"}`
   );
+  appendStableOperationsHandoffExecutionQueueLine(lines, execution);
   lines.push(
     "Stable Operations Handoff Readiness Expectations:"
     + ` readinessGate=${execution.expectedReadinessGate || "-"}`
@@ -54996,6 +54997,14 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
     productionSwitchExecutionRunbook,
+    stableOperationsHandoff: stableOperationsHandoff
+      ? {
+          ...stableOperationsHandoff,
+          handoffArtifacts: Array.isArray(stableOperationsHandoff.handoffArtifacts)
+            ? stableOperationsHandoff.handoffArtifacts.slice()
+            : []
+        }
+      : null,
     cutoverOperatorDecision,
     proofExecutionEntrypoint,
     stagingRehearsalExecutionEntrypoint,
@@ -62009,6 +62018,14 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
       cloneLaunchDayWatchExecutionEntrypoint(checkpoint.launchDayWatchExecutionEntrypoint),
     productionSwitchExecutionRunbook:
       cloneProductionSwitchExecutionRunbook(checkpoint.productionSwitchExecutionRunbook),
+    stableOperationsHandoff: checkpoint.stableOperationsHandoff && typeof checkpoint.stableOperationsHandoff === "object"
+      ? {
+          ...checkpoint.stableOperationsHandoff,
+          handoffArtifacts: Array.isArray(checkpoint.stableOperationsHandoff.handoffArtifacts)
+            ? checkpoint.stableOperationsHandoff.handoffArtifacts.slice()
+            : []
+        }
+      : null,
     cutoverOperatorDecision: cloneLaunchCutoverOperatorDecision(checkpoint.cutoverOperatorDecision),
     launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
     proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
@@ -62191,6 +62208,14 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
     productionSwitchExecutionRunbook,
+    stableOperationsHandoff: checkpoint.stableOperationsHandoff && typeof checkpoint.stableOperationsHandoff === "object"
+      ? {
+          ...checkpoint.stableOperationsHandoff,
+          handoffArtifacts: Array.isArray(checkpoint.stableOperationsHandoff.handoffArtifacts)
+            ? checkpoint.stableOperationsHandoff.handoffArtifacts.slice()
+            : []
+        }
+      : null,
     cutoverOperatorDecision,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
@@ -62597,6 +62622,74 @@ function appendProductionSwitchExecutionQueueLine(lines = [], source = null) {
   return true;
 }
 
+function normalizeStableOperationsHandoffExecutionLineSource(source = null) {
+  const input = source && typeof source === "object" ? source : null;
+  if (!input) {
+    return null;
+  }
+  const handoff = input.stableOperationsHandoff && typeof input.stableOperationsHandoff === "object"
+    ? input.stableOperationsHandoff
+    : input;
+  if (!handoff || typeof handoff !== "object") {
+    return null;
+  }
+  const readbackPacket = handoff.readinessReloadReadbackPacket
+    && typeof handoff.readinessReloadReadbackPacket === "object"
+      ? handoff.readinessReloadReadbackPacket
+      : null;
+  const cutoverRunbook = handoff.cutoverStableOperationsRunbook
+    && typeof handoff.cutoverStableOperationsRunbook === "object"
+      ? handoff.cutoverStableOperationsRunbook
+      : input.cutoverStableOperationsRunbook
+        && typeof input.cutoverStableOperationsRunbook === "object"
+        ? input.cutoverStableOperationsRunbook
+        : input.proofExecutionEntrypoint?.cutoverStableOperationsRunbook
+          && typeof input.proofExecutionEntrypoint.cutoverStableOperationsRunbook === "object"
+          ? input.proofExecutionEntrypoint.cutoverStableOperationsRunbook
+          : null;
+  return {
+    status: handoff.status || null,
+    ready: handoff.ready === true || handoff.readyForHandoff === true,
+    currentActionKey: handoff.currentActionKey || handoff.actionKey || null,
+    currentCommand: handoff.currentCommand
+      || handoff.command
+      || handoff.readinessStatusCommand
+      || null,
+    nextActionKey: handoff.nextActionKey || null,
+    nextCommand: handoff.nextCommand || handoff.rehearsalReloadCommand || null,
+    readbackPacketStatus: handoff.readbackPacketStatus || readbackPacket?.status || null,
+    launchDutyRecordIndexPath: handoff.launchDutyRecordIndexPath || handoff.recordIndexFile || null,
+    firstWaveCloseoutArtifactPath: handoff.firstWaveCloseoutArtifactPath || null,
+    steadyStateHandoffHref: handoff.steadyStateHandoffHref
+      || cutoverRunbook?.steadyStateHandoffHref
+      || input.steadyStateHandoffHref
+      || null
+  };
+}
+
+function appendStableOperationsHandoffExecutionQueueLine(lines = [], source = null) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const execution = normalizeStableOperationsHandoffExecutionLineSource(source);
+  if (!execution || !execution.status) {
+    return false;
+  }
+  lines.push(
+    `- stableOperationsHandoffExecution=${execution.status || "-"}`
+    + ` | ready=${execution.ready === true ? "yes" : "no"}`
+    + ` | current=${execution.currentActionKey || "-"}`
+    + ` | command=${execution.currentCommand || "-"}`
+    + ` | next=${execution.nextActionKey || "-"}`
+    + ` | nextCommand=${execution.nextCommand || "-"}`
+    + ` | readback=${execution.readbackPacketStatus || "-"}`
+    + ` | recordIndex=${execution.launchDutyRecordIndexPath || "-"}`
+    + ` | firstWaveCloseout=${execution.firstWaveCloseoutArtifactPath || "-"}`
+    + ` | steadyState=${execution.steadyStateHandoffHref || "-"}`
+  );
+  return true;
+}
+
 function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null, {
   leadingBlank = true,
   heading = "Launch Cutover Triage Checkpoint:"
@@ -62624,6 +62717,7 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
   appendProductionSwitchExecutionQueueLine(lines, checkpoint);
+  appendStableOperationsHandoffExecutionQueueLine(lines, checkpoint);
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
   appendLaunchStagingRehearsalExecutionEntrypointLine(lines, checkpoint);
@@ -69289,6 +69383,7 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
     + ` | currentCommand=${checkpoint.productionSwitchProofCurrentCommand || checkpoint.proofExecutionEntrypoint?.command || "-"}`
   );
   appendProductionSwitchExecutionQueueLine(lines, checkpoint);
+  appendStableOperationsHandoffExecutionQueueLine(lines, checkpoint);
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
   appendLaunchStagingRehearsalExecutionEntrypointLine(lines, checkpoint);

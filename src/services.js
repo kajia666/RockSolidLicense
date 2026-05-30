@@ -55005,6 +55005,9 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
             : []
         }
       : null,
+    ...(stableTransition?.tailReady === true
+      ? { stableOperationsTransition: normalizeStableOperationsTransitionShortcut(stableTransition) }
+      : {}),
     cutoverOperatorDecision,
     proofExecutionEntrypoint,
     stagingRehearsalExecutionEntrypoint,
@@ -62026,6 +62029,13 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
             : []
         }
       : null,
+    ...(checkpoint.stableOperationsTransition && typeof checkpoint.stableOperationsTransition === "object"
+      ? {
+          stableOperationsTransition: normalizeStableOperationsTransitionShortcut(
+            checkpoint.stableOperationsTransition
+          )
+        }
+      : {}),
     cutoverOperatorDecision: cloneLaunchCutoverOperatorDecision(checkpoint.cutoverOperatorDecision),
     launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
     proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
@@ -62216,6 +62226,13 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
             : []
         }
       : null,
+    ...(checkpoint.stableOperationsTransition && typeof checkpoint.stableOperationsTransition === "object"
+      ? {
+          stableOperationsTransition: normalizeStableOperationsTransitionShortcut(
+            checkpoint.stableOperationsTransition
+          )
+        }
+      : {}),
     cutoverOperatorDecision,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
@@ -62980,6 +62997,70 @@ function appendStableOperationsHandoffExecutionQueueLine(lines = [], source = nu
   return true;
 }
 
+function normalizeStableOperationsPacketReviewHandoffLineSource(source = null) {
+  const input = source && typeof source === "object" ? source : null;
+  if (!input) {
+    return null;
+  }
+  const transitionSource = input.stableOperationsTransition
+    && typeof input.stableOperationsTransition === "object"
+      ? input.stableOperationsTransition
+      : input.launchDutyStableOperationsTransitionAction
+        && typeof input.launchDutyStableOperationsTransitionAction === "object"
+        ? input.launchDutyStableOperationsTransitionAction
+        : input;
+  const transition = normalizeStableOperationsTransitionShortcut(transitionSource);
+  if (!transition || !transition.status || transition.tailReady !== true) {
+    return null;
+  }
+  const bridge = normalizeStableOperationsPacketReviewBridge(transition.packetReviewBridge);
+  const nextDownloadFormat = transition.nextDownloadFormat || bridge?.nextDownloadFormat || null;
+  const nextDownloadHref = transition.nextDownloadHref || bridge?.nextDownloadHref || null;
+  return {
+    status: transition.status,
+    ready: transition.ready === true,
+    currentActionKey: transition.currentActionKey || null,
+    currentPacketKey: bridge?.currentPacketKey || null,
+    currentPacketPath: bridge?.currentPacketPath || null,
+    packetReviewProgress: bridge?.packetReviewProgress || transition.packetReviewProgress || null,
+    nextPacketKey: bridge?.nextPacketKey || null,
+    nextDownloadFormat,
+    nextDownloadHref,
+    landingHref: transition.landingHref
+      || (nextDownloadFormat === "steady-state-handoff-brief" ? nextDownloadHref : null)
+      || null,
+    launchDutyRecordIndexPath: transition.launchDutyRecordIndexPath
+      || bridge?.launchDutyRecordIndexPath
+      || input.launchDutyRecordIndexPath
+      || null
+  };
+}
+
+function appendStableOperationsPacketReviewHandoffLine(lines = [], source = null) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const handoff = normalizeStableOperationsPacketReviewHandoffLineSource(source);
+  if (!handoff) {
+    return false;
+  }
+  lines.push(
+    "- stableOperationsPacketReviewHandoff=packet_review -> steady_state_landing"
+    + ` | status=${handoff.status || "-"}`
+    + ` | ready=${handoff.ready === true ? "yes" : "no"}`
+    + ` | current=${handoff.currentActionKey || "-"}`
+    + ` | packet=${handoff.currentPacketKey || "-"}`
+    + ` | packetPath=${handoff.currentPacketPath || "-"}`
+    + ` | progress=${handoff.packetReviewProgress || "-"}`
+    + ` | nextPacket=${handoff.nextPacketKey || "-"}`
+    + ` | nextDownload=${handoff.nextDownloadFormat || "-"}`
+    + ` | nextHref=${handoff.nextDownloadHref || "-"}`
+    + ` | landing=${handoff.landingHref || "-"}`
+    + ` | recordIndex=${handoff.launchDutyRecordIndexPath || "-"}`
+  );
+  return true;
+}
+
 function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null, {
   leadingBlank = true,
   heading = "Launch Cutover Triage Checkpoint:"
@@ -63008,6 +63089,7 @@ function appendLaunchCutoverTriageCheckpointLines(lines = [], checkpoint = null,
   );
   appendProductionSwitchExecutionQueueLine(lines, checkpoint);
   appendStableOperationsHandoffExecutionQueueLine(lines, checkpoint);
+  appendStableOperationsPacketReviewHandoffLine(lines, checkpoint);
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
   appendLaunchStagingRehearsalExecutionEntrypointLine(lines, checkpoint);
@@ -69674,6 +69756,7 @@ function appendDeveloperOpsLaunchOperationsOperatorQueueCheckpointLines(lines = 
   );
   appendProductionSwitchExecutionQueueLine(lines, checkpoint);
   appendStableOperationsHandoffExecutionQueueLine(lines, checkpoint);
+  appendStableOperationsPacketReviewHandoffLine(lines, checkpoint);
   appendProductionSwitchEnvironmentProofLines(lines, checkpoint);
   appendLaunchCutoverOperatorDecisionLine(lines, checkpoint);
   appendLaunchStagingRehearsalExecutionEntrypointLine(lines, checkpoint);

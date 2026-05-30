@@ -34139,6 +34139,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*stableOperationsPacketReviewHandoff=packet_review -> steady_state_landing \| status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| packet=[^\n]*\| packetPath=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/[^\n]*\| progress=0\/6 \| nextPacket=[^\n]*\| nextDownload=launch-operations-operator-entry \| nextHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| landing=- \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Current Stable Operations Handoff Packet:[\s\S]*status=ready_for_readiness_refresh \| action=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| source=first_wave_closeout \| sourceRecorded=yes/
     );
     assert.match(
@@ -34692,6 +34696,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
+      /Launch Review Cutover Triage Checkpoint:[\s\S]*stableOperationsPacketReviewHandoff=packet_review -> steady_state_landing \| status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| packet=[^\n]*\| packetPath=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/[^\n]*\| progress=0\/6 \| nextPacket=[^\n]*\| nextDownload=launch-operations-operator-entry \| nextHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| landing=- \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
     );
     assert.match(
@@ -34819,6 +34827,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /Launch Smoke Cutover Triage Checkpoint:[\s\S]*launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff \| closeout=npm\.cmd run staging:launch-duty:record --[^\n]*--key first_wave_closeout[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=launch_day_watch:ready_launch_day_watch_records_attached \| next=stable_operations_handoff \| stable=npm\.cmd run staging:readiness:status[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| status=ready_launch_day_watch_records_attached/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*stableOperationsPacketReviewHandoff=packet_review -> steady_state_landing \| status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| packet=[^\n]*\| packetPath=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/[^\n]*\| progress=0\/6 \| nextPacket=[^\n]*\| nextDownload=launch-operations-operator-entry \| nextHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| landing=- \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
@@ -35057,6 +35069,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
       /Launch Mainline Stable Operations Packet Review Bridge:[\s\S]*operatorAction=continue_packet_result_review \| reviewRequired=no \| nextDownload=launch-operations-operator-entry/
+    );
+    assert.match(
+      launchMainlineCloseoutRecordedSummaryDownload.body,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*stableOperationsPacketReviewHandoff=packet_review -> steady_state_landing \| status=blocked_until_packet_result_review \| ready=no \| current=review_staging_packet_results \| packet=run_record_index \| packetPath=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-run-record-index\.json \| progress=0\/6 \| nextPacket=artifact_manifest \| nextDownload=launch-operations-operator-entry \| nextHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=launch-operations-operator-entry \| landing=- \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     assert.match(
       launchMainlineCloseoutRecordedSummaryDownload.body,
@@ -36135,6 +36151,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyPacketReviewOperatorEntryDownload.body,
       /Quick Access Downloads:[\s\S]*key=ops_steady_state_handoff_brief \| file=developer-ops-steady-state-handoff-brief\.txt \| format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchDutyPacketReviewOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*stableOperationsPacketReviewHandoff=packet_review -> steady_state_landing \| status=ready_for_steady_state_handoff \| ready=yes \| current=open_steady_state_handoff_brief \| packet=- \| packetPath=- \| progress=6\/6 \| nextPacket=- \| nextDownload=steady-state-handoff-brief \| nextHref=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| landing=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/
     );
     const launchMainlineSteadyStateHandoff = await getJson(
       baseUrl,

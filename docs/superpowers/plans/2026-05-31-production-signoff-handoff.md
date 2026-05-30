@@ -268,3 +268,54 @@ npm.cmd test -- test/license-flow.test.js --test-name-pattern "developer ops exp
 Observed GREEN: `81 pass / 0 fail`.
 
 Roadmap updated with a new “Latest launch-day watch readback handoff slice” bullet.
+
+### Task 6: Add stable-operations packet-review continuation into steady-state landing
+
+**Files:**
+- Modify: `D:\code\OnlineVerification\test\license-flow.test.js`
+- Modify: `D:\code\OnlineVerification\src\services.js`
+- Modify: `D:\code\OnlineVerification\docs\project-roadmap-progress.md`
+
+- [x] **Step 1: Add failing blocked-state and ready-state assertions**
+
+Added `stableOperationsPacketReviewHandoff=packet_review -> steady_state_landing` assertions for:
+- Developer Ops Operator Queue blocked state
+- Launch Mainline Operator Queue mirror blocked state
+- Launch Review and Launch Smoke cutover-triage blocked states
+- Developer Ops Operator Queue ready steady-state landing state
+
+- [x] **Step 2: Confirm RED on focused scope**
+
+```powershell
+npm.cmd test -- test/license-flow.test.js --test-name-pattern "developer ops export bundles scoped data and downloadable assets"
+```
+
+Observed RED: `80 pass / 1 fail`, caused by the missing `stableOperationsPacketReviewHandoff` row.
+
+- [x] **Step 3: Carry the existing transition summary into tail-ready checkpoints and add the shared formatter**
+
+Implemented a display-only checkpoint continuation:
+
+```js
+appendStableOperationsPacketReviewHandoffLine(lines, checkpoint);
+```
+
+The formatter remains hidden before the stable-operations tail is ready and surfaces:
+- packet-review status and current action
+- current packet key and artifact path
+- packet-review progress and next packet
+- exact next download format and href
+- steady-state landing href once unlocked
+- shared launch-duty record index
+
+- [x] **Step 4: Confirm GREEN**
+
+```powershell
+node --check src/services.js
+node --check test/license-flow.test.js
+npm.cmd test -- test/license-flow.test.js --test-name-pattern "developer ops export bundles scoped data and downloadable assets"
+```
+
+Observed GREEN before the final Mainline mirror assertion: `81 pass / 0 fail`.
+
+Roadmap updated with a new "Latest stable-operations packet-review handoff slice" bullet.

@@ -55126,8 +55126,18 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
     launchEvidenceReadinessGate: gatePayload,
     productionSwitchProofPacket
   });
+  const productionProofPreflightEntrypoint =
+    cloneLaunchProductionProofPreflightEntrypoint(
+      productionSwitchProofPacket?.productionProofPreflightEntrypoint
+    );
+  const productionProofPreflightHandoff =
+    cloneLaunchProductionProofPreflightHandoff(
+      productionSwitchProofPacket?.productionProofPreflightHandoff
+    );
   return {
     ...gatePayload,
+    productionProofPreflightEntrypoint,
+    productionProofPreflightHandoff,
     stagingRehearsalExecutionEntrypoint: productionSwitchProofPacket?.stagingRehearsalExecutionEntrypoint || null,
     launchExecutionPhasePlan,
     productionSwitchProofPacket: productionSwitchProofPacket
@@ -70374,6 +70384,7 @@ function appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines = [], gate = n
     `- launchDayWatch=${gate.launchDayWatchArtifact || "-"}`
     + ` | firstWaveCloseout=${gate.firstWaveCloseoutArtifact || "-"}`
   );
+  appendProductionProofPreflightGateHandoffLine(lines, gate.productionProofPreflightHandoff);
   const productionSwitchProofPacket = gate.productionSwitchProofPacket
     && typeof gate.productionSwitchProofPacket === "object"
       ? gate.productionSwitchProofPacket
@@ -70408,6 +70419,22 @@ function appendDeveloperOpsLaunchEvidenceReadinessGateLines(lines = [], gate = n
     );
   }
   lines.push(`- nextAction=${gate.nextAction || "-"}`);
+  return true;
+}
+
+function appendProductionProofPreflightGateHandoffLine(lines = [], handoff = null) {
+  if (!Array.isArray(lines) || !handoff || typeof handoff !== "object") {
+    return false;
+  }
+  lines.push(
+    `- productionProofPreflightGateHandoff=${handoff.status || "-"}`
+    + ` | ready=${handoff.readyForExecution === true ? "yes" : "no"}`
+    + ` | current=${handoff.currentActionKey || "-"}`
+    + ` | preflight=${handoff.preflightCommand || "-"}`
+    + ` | smoke=${handoff.launchSmokeCommand || "-"}`
+    + ` | manualGate=${handoff.manualLiveWriteGate || "-"}`
+    + ` | artifact=${handoff.backupRestoreArtifact || "-"}`
+  );
   return true;
 }
 

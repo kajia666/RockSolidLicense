@@ -25142,6 +25142,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       launchEvidenceReadinessGate.productionSwitchProofPacket
     );
     assert.deepEqual(
+      launchEvidenceReadinessGate.productionProofPreflightEntrypoint,
+      launchEvidenceReadinessGate.productionSwitchProofPacket?.productionProofPreflightEntrypoint
+    );
+    assert.deepEqual(
+      launchEvidenceReadinessGate.productionProofPreflightHandoff,
+      launchEvidenceReadinessGate.productionSwitchProofPacket?.productionProofPreflightHandoff
+    );
+    assert.deepEqual(
       launchMainlineSteadyStateDutyReceiptReview.mainlineSummary.productionSwitchProofPacket,
       launchEvidenceReadinessGate.productionSwitchProofPacket
     );
@@ -25183,6 +25191,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchProof=blocked_until_real_environment_evidence \| ready=1\/8 \| blocked=7\/8 \| current=backfill_closeout_evidence/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionProofPreflightGateHandoff=ready_for_production_proof_preflight_handoff \| ready=yes \| current=run_production_proof_preflight \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/backup-restore-drill\.txt/
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,

@@ -12470,6 +12470,47 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewOpsCheckpoint?.realEnvironmentProofExecutionEntrypoint
     );
     assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint?.productionProofPreflightEntrypoint,
+      runtimeEvidenceReviewOpsCheckpoint?.productionProofPreflightEntrypoint
+    );
+    assert.deepEqual(
+      {
+        mode: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.mode,
+        status: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.status,
+        readyForExecution:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.readyForExecution,
+        currentActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.currentActionKey,
+        command:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.command,
+        closeoutInputFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.closeoutInputFile,
+        readinessActionQueueFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.readinessActionQueueFile,
+        profileOutputFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.profileOutputFile,
+        backupRestoreArtifact:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.backupRestoreArtifact,
+        launchDutyRecordIndexPath:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.launchDutyRecordIndexPath,
+        proofStatus:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.proofStatus
+      },
+      {
+        mode: "launch-production-proof-preflight-entrypoint/v1",
+        status: "ready_for_production_proof_preflight",
+        readyForExecution: true,
+        currentActionKey: "run_production_proof_preflight",
+        command: "npm.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md --profile-output-file artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json --backup-restore-artifact artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        closeoutInputFile: "artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json",
+        readinessActionQueueFile: "artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        profileOutputFile: "artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json",
+        backupRestoreArtifact: "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json",
+        proofStatus: "blocked_until_real_environment_proof"
+      }
+    );
+    assert.deepEqual(
       runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.realEnvironmentProofExecutionEntrypoint?.proofSteps?.map((item) => [
         item.key,
         item.status,
@@ -13138,6 +13179,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceLaunchReview.summaryText, /storageProfileProof=pending_real_environment_value \| profile=-/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /realEnvironmentProof=blocked_until_real_environment_proof \| ready=0\/4 \| blocked=4\/4 \| current=public_https_entrypoint \| action=set_public_https_entrypoint/);
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionProofPreflight=ready_for_production_proof_preflight \| ready=yes \| current=run_production_proof_preflight \| command=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable/
+    );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /realEnvironmentProofEntrypoint=blocked_until_real_environment_proof \| ready=yes \| current=public_https_entrypoint \| action=set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file/
@@ -24400,6 +24445,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         realEnvironmentProofSummary: productionSwitchProofPacket?.realEnvironmentProofSummary || null,
         realEnvironmentProofExecutionEntrypoint:
           productionSwitchProofPacket?.realEnvironmentProofExecutionEntrypoint || null,
+        productionProofPreflightEntrypoint:
+          productionSwitchProofPacket?.productionProofPreflightEntrypoint || null,
         liveWriteSmokeExecutionEntrypoint:
           productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint || null,
         productionSignoffExecutionEntrypoint:
@@ -24706,6 +24753,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Operator Queue Checkpoint:[\s\S]*secretEnvProof=pending_real_environment_confirmation \| required=3 \| missing=3 \| current=RSL_SMOKE_ADMIN_PASSWORD/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Operator Queue Checkpoint:[\s\S]*productionProofPreflight=ready_for_production_proof_preflight \| ready=yes \| current=run_production_proof_preflight \| command=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code EXPORT_CLOSEOUT_READY --channel stable/
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,

@@ -52627,6 +52627,174 @@ function cloneDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoin
   };
 }
 
+function commandTemplateValue(value = null, fallback = "") {
+  const text = String(value || fallback || "").trim();
+  if (!text) {
+    return "";
+  }
+  return /[\s"`]/.test(text) ? `"${text.replace(/"/g, '\\"')}"` : text;
+}
+
+function buildLaunchProductionProofPreflightCommand({
+  baseUrl = null,
+  productCode = null,
+  channel = null,
+  targetOs = null,
+  storageProfile = null,
+  targetEnvFile = null,
+  appBackupDir = null,
+  postgresBackupDir = null,
+  adminUsername = "$env:RSL_SMOKE_ADMIN_USERNAME",
+  developerUsername = "$env:RSL_SMOKE_DEVELOPER_USERNAME",
+  closeoutInputFile = null,
+  readinessActionQueueFile = null,
+  profileOutputFile = null,
+  backupRestoreArtifact = null
+} = {}) {
+  const resolvedStorageProfile = storageProfile || "<storage-profile>";
+  const parts = [
+    "npm.cmd run launch:production-proof-preflight --",
+    "--base-url",
+    commandTemplateValue(baseUrl, "<public-https-base-url>"),
+    "--product-code",
+    commandTemplateValue(productCode, "<productCode>"),
+    "--channel",
+    commandTemplateValue(channel, "stable"),
+    "--target-os",
+    commandTemplateValue(targetOs, "<target-os>"),
+    "--storage-profile",
+    commandTemplateValue(resolvedStorageProfile),
+    "--target-env-file",
+    commandTemplateValue(targetEnvFile, "<target-env-file>"),
+    "--app-backup-dir",
+    commandTemplateValue(appBackupDir, "<app-backup-dir>")
+  ];
+  if (postgresBackupDir || resolvedStorageProfile === "postgres-preview" || resolvedStorageProfile === "<storage-profile>") {
+    parts.push("--postgres-backup-dir", commandTemplateValue(postgresBackupDir, "<postgres-backup-dir>"));
+  }
+  parts.push(
+    "--admin-username",
+    commandTemplateValue(adminUsername, "$env:RSL_SMOKE_ADMIN_USERNAME"),
+    "--developer-username",
+    commandTemplateValue(developerUsername, "$env:RSL_SMOKE_DEVELOPER_USERNAME")
+  );
+  if (closeoutInputFile) {
+    parts.push("--closeout-input-file", commandTemplateValue(closeoutInputFile));
+  }
+  if (readinessActionQueueFile) {
+    parts.push("--actions-file", commandTemplateValue(readinessActionQueueFile));
+  }
+  if (profileOutputFile) {
+    parts.push("--profile-output-file", commandTemplateValue(profileOutputFile));
+  }
+  if (backupRestoreArtifact) {
+    parts.push("--backup-restore-artifact", commandTemplateValue(backupRestoreArtifact));
+  }
+  return parts.join(" ");
+}
+
+function cloneLaunchProductionProofPreflightEntrypoint(entrypoint = null) {
+  return entrypoint && typeof entrypoint === "object" ? { ...entrypoint } : null;
+}
+
+function buildLaunchProductionProofPreflightEntrypoint({
+  productionSwitchProofPacket = null,
+  realEnvironmentProofSummary = null
+} = {}) {
+  const proofPacket = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : null;
+  if (!proofPacket) {
+    return null;
+  }
+  const summary = realEnvironmentProofSummary && typeof realEnvironmentProofSummary === "object"
+    ? realEnvironmentProofSummary
+    : proofPacket.realEnvironmentProofSummary && typeof proofPacket.realEnvironmentProofSummary === "object"
+      ? proofPacket.realEnvironmentProofSummary
+      : null;
+  const archiveRoot = proofPacket.archiveRoot
+    || inferDeveloperOpsLaunchEvidenceArchiveRoot(proofPacket, {
+      productCode: proofPacket.productCode,
+      channel: proofPacket.channel
+    });
+  const profileDrivenDryRunCommand = proofPacket.profileDrivenDryRunCommand || null;
+  const closeoutInputFile = proofPacket.closeoutInputFile
+    || extractCommandOptionValue(proofPacket.readinessStatusCommand, "input-file")
+    || null;
+  const readinessActionQueueFile = proofPacket.readinessActionQueueFile
+    || extractCommandOptionValue(proofPacket.readinessStatusCommand, "actions-file")
+    || null;
+  const profileOutputFile = extractCommandOptionValue(profileDrivenDryRunCommand, "output-file")
+    || path.posix.join(archiveRoot, "staging-rehearsal-profile.json");
+  const backupRestoreArtifact = proofPacket.backupRestoreDrillProof?.artifactPath
+    || path.posix.join(archiveRoot, "backup-restore-drill.txt");
+  const baseUrl = proofPacket.publicHttpsProof?.baseUrl
+    || proofPacket.baseUrl
+    || extractCommandOptionValue(profileDrivenDryRunCommand, "base-url")
+    || "<public-https-base-url>";
+  const targetOs = proofPacket.targetOs
+    || extractCommandOptionValue(profileDrivenDryRunCommand, "target-os")
+    || "<target-os>";
+  const storageProfile = proofPacket.storageProfile
+    || proofPacket.storageProfileProof?.storageProfile
+    || extractCommandOptionValue(profileDrivenDryRunCommand, "storage-profile")
+    || "<storage-profile>";
+  const targetEnvFile = proofPacket.secretEnvProof?.targetEnvFile
+    || extractCommandOptionValue(profileDrivenDryRunCommand, "target-env-file")
+    || "<target-env-file>";
+  const appBackupDir = extractCommandOptionValue(profileDrivenDryRunCommand, "app-backup-dir")
+    || "<app-backup-dir>";
+  const postgresBackupDir = extractCommandOptionValue(profileDrivenDryRunCommand, "postgres-backup-dir")
+    || "<postgres-backup-dir>";
+  const command = buildLaunchProductionProofPreflightCommand({
+    baseUrl,
+    productCode: proofPacket.productCode,
+    channel: proofPacket.channel,
+    targetOs,
+    storageProfile,
+    targetEnvFile,
+    appBackupDir,
+    postgresBackupDir,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    profileOutputFile,
+    backupRestoreArtifact
+  });
+  const proofStatus = summary?.status || null;
+  const readyForRealEnvironmentReview = proofStatus === "ready_for_real_environment_review";
+  return {
+    mode: "launch-production-proof-preflight-entrypoint/v1",
+    status: readyForRealEnvironmentReview
+      ? "ready_production_proof_preflight_confirmed"
+      : "ready_for_production_proof_preflight",
+    readyForExecution: Boolean(command),
+    currentActionKey: readyForRealEnvironmentReview
+      ? "confirm_production_proof_preflight"
+      : "run_production_proof_preflight",
+    command,
+    baseUrl,
+    productCode: proofPacket.productCode || null,
+    channel: proofPacket.channel || null,
+    targetOs,
+    storageProfile,
+    targetEnvFile,
+    appBackupDir,
+    postgresBackupDir,
+    closeoutInputFile,
+    readinessActionQueueFile,
+    profileOutputFile,
+    backupRestoreArtifact,
+    launchDutyRecordIndexPath: proofPacket.launchDutyRecordIndexPath
+      || proofPacket.launchDutyRecordIndexFile
+      || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
+    proofStatus,
+    realEnvironmentProofProgress: summary ? `${summary.ready ?? "-"}/${summary.total ?? "-"}` : null,
+    nextAction: readyForRealEnvironmentReview
+      ? "Production proof preflight is represented by ready proof objects; continue readiness refresh before live-write smoke or cutover watch."
+      : "Run this no-write preflight first, then follow its profile, recovery, staging preflight, and guarded live-write smoke commands."
+  };
+}
+
 function buildDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint({
   publicHttpsProof = null,
   secretEnvProof = null,
@@ -54396,6 +54564,10 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     productionSwitchProofPacket: proofPacket,
     realEnvironmentProofSummary
   });
+  proofPacket.productionProofPreflightEntrypoint = buildLaunchProductionProofPreflightEntrypoint({
+    productionSwitchProofPacket: proofPacket,
+    realEnvironmentProofSummary
+  });
   proofPacket.productionSignoffExecutionEntrypoint = buildLaunchProductionSignoffExecutionEntrypoint({
     productionSwitchProofPacket: proofPacket,
     realEnvironmentProofSummary,
@@ -54850,6 +55022,14 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     cloneLaunchLiveWriteSmokeExecutionEntrypoint(
       switchProofPacket?.liveWriteSmokeExecutionEntrypoint
     );
+  const productionProofPreflightEntrypoint =
+    cloneLaunchProductionProofPreflightEntrypoint(
+      switchProofPacket?.productionProofPreflightEntrypoint
+    )
+    || buildLaunchProductionProofPreflightEntrypoint({
+      productionSwitchProofPacket: switchProofPacket,
+      realEnvironmentProofSummary
+    });
   const productionSignoffExecutionEntrypoint =
     cloneLaunchProductionSignoffExecutionEntrypoint(
       switchProofPacket?.productionSignoffExecutionEntrypoint
@@ -54993,6 +55173,7 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
       : null,
     realEnvironmentProofSummary,
     realEnvironmentProofExecutionEntrypoint,
+    productionProofPreflightEntrypoint,
     liveWriteSmokeExecutionEntrypoint,
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
@@ -62013,6 +62194,8 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
       cloneDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint(
         checkpoint.realEnvironmentProofExecutionEntrypoint
       ),
+    productionProofPreflightEntrypoint:
+      cloneLaunchProductionProofPreflightEntrypoint(checkpoint.productionProofPreflightEntrypoint),
     liveWriteSmokeExecutionEntrypoint:
       cloneLaunchLiveWriteSmokeExecutionEntrypoint(checkpoint.liveWriteSmokeExecutionEntrypoint),
     productionSignoffExecutionEntrypoint:
@@ -62125,6 +62308,13 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
       readinessActionQueueFile: proofPacket?.readinessActionQueueFile || null,
       launchDutyRecordIndexPath
     });
+  const productionProofPreflightEntrypoint =
+    cloneLaunchProductionProofPreflightEntrypoint(checkpoint.productionProofPreflightEntrypoint)
+    || cloneLaunchProductionProofPreflightEntrypoint(proofPacket?.productionProofPreflightEntrypoint)
+    || buildLaunchProductionProofPreflightEntrypoint({
+      productionSwitchProofPacket: proofPacket,
+      realEnvironmentProofSummary
+    });
   const liveWriteSmokeExecutionEntrypoint =
     cloneLaunchLiveWriteSmokeExecutionEntrypoint(checkpoint.liveWriteSmokeExecutionEntrypoint)
     || cloneLaunchLiveWriteSmokeExecutionEntrypoint(proofPacket?.liveWriteSmokeExecutionEntrypoint)
@@ -62214,6 +62404,7 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     backupRestoreDrillProof: backupRestoreDrillProof ? { ...backupRestoreDrillProof } : null,
     realEnvironmentProofSummary,
     realEnvironmentProofExecutionEntrypoint,
+    productionProofPreflightEntrypoint,
     liveWriteSmokeExecutionEntrypoint,
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
@@ -62409,6 +62600,18 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | action=${realEnvironmentProofSummary.currentActionKey || "-"}`
     );
   }
+  const productionProofPreflightEntrypoint =
+    cloneLaunchProductionProofPreflightEntrypoint(proofSource.productionProofPreflightEntrypoint);
+  if (productionProofPreflightEntrypoint) {
+    lines.push(
+      `- productionProofPreflight=${productionProofPreflightEntrypoint.status || "-"}`
+      + ` | ready=${productionProofPreflightEntrypoint.readyForExecution === true ? "yes" : "no"}`
+      + ` | current=${productionProofPreflightEntrypoint.currentActionKey || "-"}`
+      + ` | command=${productionProofPreflightEntrypoint.command || "-"}`
+      + ` | proof=${productionProofPreflightEntrypoint.proofStatus || "-"}`
+      + ` | launchDutyRecordIndex=${productionProofPreflightEntrypoint.launchDutyRecordIndexPath || "-"}`
+    );
+  }
   const realEnvironmentProofExecutionEntrypoint =
     cloneDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint(
       proofSource.realEnvironmentProofExecutionEntrypoint
@@ -62568,6 +62771,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
     || storageProfileProof
     || secretEnvProof
     || realEnvironmentProofSummary
+    || productionProofPreflightEntrypoint
     || liveWriteSmokeExecutionEntrypoint
     || productionSignoffExecutionEntrypoint
     || launchDayWatchExecutionEntrypoint

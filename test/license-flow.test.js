@@ -13180,6 +13180,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
+      /launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff \| closeout=npm\.cmd run staging:launch-duty:record --[^\n]*--key first_wave_closeout[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=launch_day_watch:ready_launch_day_watch_records_attached \| next=stable_operations_handoff \| stable=[^\n]*\| steadyState=[^\n]*\| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/first-wave-closeout\.md \| recordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
       /launchDayWatchEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| record=launch_day_watch_summary \| command=-/
     );
     assert.match(
@@ -13654,6 +13658,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
       /launchDayWatchHandoff=production_signoff_evidence -> launch_day_watch_summary -> receipt_visibility_snapshot -> first_wave_incident_log -> rollback_signal_review -> stabilization_owner_handoff -> first_wave_closeout \| expected=production_signoff:ready_production_signoff_evidence_attached \| records=6 \| firstRecord=launch_day_watch_summary \| firstCommand=npm\.cmd run staging:launch-duty:record --[^\n]*--key launch_day_watch_summary[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/launch-day-watch-summary\.md \| closeout=artifacts\/staging\/FIRSTBATCH\/stable\/first-wave-closeout\.md \| packet=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchSmoke.summaryText,
+      /launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff \| closeout=npm\.cmd run staging:launch-duty:record --[^\n]*--key first_wave_closeout[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=launch_day_watch:ready_launch_day_watch_records_attached \| next=stable_operations_handoff \| stable=[^\n]*\| steadyState=[^\n]*\| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/first-wave-closeout\.md \| recordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -25110,6 +25118,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff \| closeout=npm\.cmd run staging:launch-duty:record --[^\n]*--key first_wave_closeout[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=launch_day_watch:ready_launch_day_watch_records_attached \| next=stable_operations_handoff \| stable=npm\.cmd run staging:readiness:status[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchPostCommandQueue=live_write_smoke -> production_signoff -> launch_day_watch \| backfillReady=yes,yes,yes \| refreshReady=yes,yes,yes \| required=real_environment_proof:ready_for_real_environment_review -> live_write_smoke:ready_live_write_smoke_evidence_attached -> production_signoff:ready_production_signoff_evidence_attached \| status=blocked_until_real_environment_proof/
     );
     assert.match(
@@ -28406,6 +28418,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Operator Queue Checkpoint:[\s\S]*launchDayWatchHandoff=production_signoff_evidence -> launch_day_watch_summary -> receipt_visibility_snapshot -> first_wave_incident_log -> rollback_signal_review -> stabilization_owner_handoff -> first_wave_closeout \| expected=production_signoff:ready_production_signoff_evidence_attached \| records=6 \| firstRecord=launch_day_watch_summary \| firstCommand=npm\.cmd run staging:launch-duty:record --[^\n]*--key launch_day_watch_summary[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md \| closeout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| packet=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff \| closeout=npm\.cmd run staging:launch-duty:record --[^\n]*--key first_wave_closeout[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=launch_day_watch:ready_launch_day_watch_records_attached \| next=stable_operations_handoff \| stable=npm\.cmd run staging:readiness:status[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);
@@ -34119,6 +34135,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchDutyCloseoutRecordedOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff \| closeout=npm\.cmd run staging:launch-duty:record --[^\n]*--key first_wave_closeout[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=launch_day_watch:ready_launch_day_watch_records_attached \| next=stable_operations_handoff \| stable=npm\.cmd run staging:readiness:status[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| status=ready_launch_day_watch_records_attached/
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOperatorEntryDownload.body,
       /Current Stable Operations Handoff Packet:[\s\S]*status=ready_for_readiness_refresh \| action=refresh_staging_readiness_after_first_wave_closeout \| next=reload_staging_rehearsal_for_stable_operations \| source=first_wave_closeout \| sourceRecorded=yes/
     );
     assert.match(
@@ -34668,6 +34688,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchReviewCloseoutRecordedProofPacketDownload.body,
+      /Launch Review Cutover Triage Checkpoint:[\s\S]*launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff \| closeout=npm\.cmd run staging:launch-duty:record --[^\n]*--key first_wave_closeout[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=launch_day_watch:ready_launch_day_watch_records_attached \| next=stable_operations_handoff \| stable=npm\.cmd run staging:readiness:status[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| status=ready_launch_day_watch_records_attached/
+    );
+    assert.match(
+      launchReviewCloseoutRecordedProofPacketDownload.body,
       /productionSwitchProof=ready_for_production_switch_review \| ready=8\/8 \| blocked=0\/8 \| current=refresh_readiness_status/
     );
     assert.match(
@@ -34791,6 +34815,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,
       /Launch Smoke Cutover Triage Checkpoint:[\s\S]*stableOperationsHandoffExecution=ready_for_stable_operations_handoff \| ready=yes \| current=refresh_staging_readiness_after_first_wave_closeout \| command=npm\.cmd run staging:readiness:status[^\n]*\| next=reload_staging_rehearsal_for_stable_operations \| nextCommand=npm\.cmd run staging:rehearsal[^\n]*\| readback=awaiting_readiness_and_rehearsal_readback[^\n]*\| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json[^\n]*\| firstWaveCloseout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief/
+    );
+    assert.match(
+      launchSmokeCloseoutRecordedProofPacketDownload.body,
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff \| closeout=npm\.cmd run staging:launch-duty:record --[^\n]*--key first_wave_closeout[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=launch_day_watch:ready_launch_day_watch_records_attached \| next=stable_operations_handoff \| stable=npm\.cmd run staging:readiness:status[^\n]*\| steadyState=\/api\/developer\/ops\/export\/download\?productCode=EXPORT_CLOSEOUT_READY&channel=stable&limit=80&format=steady-state-handoff-brief \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| status=ready_launch_day_watch_records_attached/
     );
     assert.match(
       launchSmokeCloseoutRecordedProofPacketDownload.body,

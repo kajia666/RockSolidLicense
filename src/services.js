@@ -62459,6 +62459,11 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | launchDutyRecordIndex=${launchDayWatchExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
     appendLaunchDayWatchHandoffLine(lines, launchDayWatchExecutionEntrypoint);
+    appendLaunchDayWatchReadbackHandoffLine(
+      lines,
+      launchDayWatchExecutionEntrypoint,
+      proofSource
+    );
   }
   const productionSwitchExecutionRunbook =
     cloneProductionSwitchExecutionRunbook(proofSource.productionSwitchExecutionRunbook);
@@ -62768,6 +62773,35 @@ function appendLaunchDayWatchHandoffLine(lines = [], entrypoint = null) {
     + ` | artifact=${entrypoint.launchDayWatchArtifact || "-"}`
     + ` | closeout=${entrypoint.firstWaveCloseoutArtifact || "-"}`
     + ` | packet=${entrypoint.productionSignoffPacket || "-"}`
+    + ` | status=${entrypoint.status || "-"}`
+  );
+  return true;
+}
+
+function appendLaunchDayWatchReadbackHandoffLine(
+  lines = [],
+  entrypoint = null,
+  stableOperationsSource = null
+) {
+  if (!Array.isArray(lines) || !entrypoint || typeof entrypoint !== "object") {
+    return false;
+  }
+  const watchRecords = Array.isArray(entrypoint.watchRecordCommands)
+    ? entrypoint.watchRecordCommands.filter((item) => item && typeof item === "object")
+    : [];
+  const firstWaveCloseout = watchRecords.find((item) => item.key === "first_wave_closeout") || null;
+  const stableOperations = normalizeStableOperationsHandoffExecutionLineSource(stableOperationsSource);
+  lines.push(
+    "- launchDayWatchReadbackHandoff=first_wave_closeout_record -> readiness_readback -> rehearsal_reload -> stable_operations_handoff"
+    + ` | closeout=${firstWaveCloseout?.command || "-"}`
+    + ` | readback=${entrypoint.readinessRefreshCommand || "-"}`
+    + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
+    + " | expected=launch_day_watch:ready_launch_day_watch_records_attached"
+    + " | next=stable_operations_handoff"
+    + ` | stable=${stableOperations?.currentCommand || "-"}`
+    + ` | steadyState=${stableOperations?.steadyStateHandoffHref || "-"}`
+    + ` | artifact=${entrypoint.firstWaveCloseoutArtifact || "-"}`
+    + ` | recordIndex=${entrypoint.launchDutyRecordIndexPath || "-"}`
     + ` | status=${entrypoint.status || "-"}`
   );
   return true;

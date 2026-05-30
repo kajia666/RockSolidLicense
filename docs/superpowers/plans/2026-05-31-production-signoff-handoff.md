@@ -215,3 +215,56 @@ npm.cmd test -- test/license-flow.test.js --test-name-pattern "developer ops exp
 Observed GREEN: `81 pass / 0 fail`.
 
 Roadmap updated with a new “Latest launch-day watch handoff slice” bullet.
+
+### Task 5: Add launch-day-watch readback handoff into stable operations
+
+**Files:**
+- Modify: `D:\code\OnlineVerification\test\license-flow.test.js`
+- Modify: `D:\code\OnlineVerification\src\services.js`
+- Modify: `D:\code\OnlineVerification\docs\project-roadmap-progress.md`
+
+- [x] **Step 1: Add failing blocked-state and ready-state assertions**
+
+Added `launchDayWatchReadbackHandoff=...` assertions for:
+- Launch Review and Launch Smoke `FIRSTBATCH` blocked-state summaries
+- Launch Mainline readiness gate and Developer Ops operator-entry blocked-state summaries
+- Developer Ops, Launch Review, and Launch Smoke 6/6-record ready-state summaries
+
+- [x] **Step 2: Confirm RED on focused scope**
+
+```powershell
+npm.cmd test -- test/license-flow.test.js --test-name-pattern "developer ops export bundles scoped data and downloadable assets"
+```
+
+Observed RED: `79 pass / 2 fail`, failures caused by missing `launchDayWatchReadbackHandoff`.
+
+- [x] **Step 3: Add the shared readback formatter**
+
+Implemented:
+
+```js
+appendLaunchDayWatchReadbackHandoffLine(
+  lines,
+  launchDayWatchExecutionEntrypoint,
+  proofSource
+);
+```
+
+The formatter surfaces:
+- final `first_wave_closeout` write command
+- readiness readback and rehearsal reload commands
+- expected `ready_launch_day_watch_records_attached` gate
+- stable-operations readiness command and steady-state handoff URL
+- first-wave closeout artifact, shared record index, and blocked/ready status
+
+- [x] **Step 4: Confirm GREEN**
+
+```powershell
+node --check src/services.js
+node --check test/license-flow.test.js
+npm.cmd test -- test/license-flow.test.js --test-name-pattern "developer ops export bundles scoped data and downloadable assets"
+```
+
+Observed GREEN: `81 pass / 0 fail`.
+
+Roadmap updated with a new “Latest launch-day watch readback handoff slice” bullet.

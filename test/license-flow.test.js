@@ -12677,6 +12677,61 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint?.watchRecordCommands?.[0]?.command || "",
       /npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/FIRSTBATCH\/stable\/launch-day-watch-summary\.md/
     );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint?.productionSwitchExecutionRunbook,
+      runtimeEvidenceReviewOpsCheckpoint?.productionSwitchExecutionRunbook
+    );
+    assert.deepEqual(
+      {
+        mode: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.mode,
+        status: runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.status,
+        readyForCutoverWatch:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.readyForCutoverWatch,
+        currentPhaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentPhaseKey,
+        currentActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentActionKey,
+        currentCommandIsProfileRehearsal:
+          /^npm\.cmd run staging:rehearsal -- --profile-file /.test(
+            runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentCommand || ""
+          ),
+        nextPhaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.nextPhaseKey,
+        remainingPhaseCount:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.remainingPhaseCount,
+        phaseCount:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.executionPhases?.length,
+        launchDutyRecordIndexPath:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.launchDutyRecordIndexPath
+      },
+      {
+        mode: "production-switch-execution-runbook/v1",
+        status: "blocked_until_real_environment_proof",
+        readyForCutoverWatch: false,
+        currentPhaseKey: "real_environment_proof",
+        currentActionKey: "set_public_https_entrypoint",
+        currentCommandIsProfileRehearsal: true,
+        nextPhaseKey: "live_write_smoke",
+        remainingPhaseCount: 4,
+        phaseCount: 4,
+        launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
+      }
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.executionPhases?.map((item) => [
+        item.order,
+        item.key,
+        item.status,
+        item.readyForExecution,
+        item.currentActionKey
+      ]),
+      [
+        [1, "real_environment_proof", "blocked_until_real_environment_proof", true, "set_public_https_entrypoint"],
+        [2, "live_write_smoke", "blocked_until_real_environment_proof", false, "set_public_https_entrypoint"],
+        [3, "production_signoff", "blocked_until_real_environment_proof", false, "set_public_https_entrypoint"],
+        [4, "launch_day_watch", "blocked_until_real_environment_proof", false, "set_public_https_entrypoint"]
+      ]
+    );
     assert.ok(runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint);
     assert.equal(
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.status,
@@ -12911,6 +12966,10 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewCutoverTriageAction.context?.launchDayWatchExecutionEntrypoint,
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.launchDayWatchExecutionEntrypoint
     );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageAction.context?.productionSwitchExecutionRunbook,
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.productionSwitchExecutionRunbook
+    );
     const runtimeEvidenceReviewCutoverTriageControl = runtimeEvidenceLaunchReview.reviewSummary.routeFocus?.controls?.find((item) =>
       item?.label === "Review Cutover Triage"
     ) || null;
@@ -12955,6 +13014,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /launchDayWatchEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| record=launch_day_watch_summary \| command=-/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionSwitchExecutionRunbook=blocked_until_real_environment_proof \| ready=no \| current=real_environment_proof \| action=set_public_https_entrypoint \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| remaining=4\/4 \| next=live_write_smoke/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -24096,6 +24159,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           productionSwitchProofPacket?.productionSignoffExecutionEntrypoint || null,
         launchDayWatchExecutionEntrypoint:
           productionSwitchProofPacket?.launchDayWatchExecutionEntrypoint || null,
+        productionSwitchExecutionRunbook:
+          productionSwitchProofPacket?.productionSwitchExecutionRunbook || null,
         cutoverOperatorDecision: {
           mode: "launch-cutover-operator-decision/v1",
           status: "hold_for_real_environment_proof",
@@ -32672,6 +32737,26 @@ test("developer ops export bundles scoped data and downloadable assets", async (
                   launchDutyCloseoutRecordedGate.productionSwitchProofPacket.launchDayWatchExecutionEntrypoint.watchRecordCommands?.length
               }
             : null,
+        productionSwitchExecutionRunbook:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionSwitchExecutionRunbook
+            ? {
+                status: launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.status,
+                readyForCutoverWatch:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.readyForCutoverWatch,
+                currentPhaseKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentPhaseKey,
+                currentActionKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentActionKey,
+                currentCommand:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.currentCommand,
+                nextPhaseKey:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.nextPhaseKey,
+                remainingPhaseCount:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.remainingPhaseCount,
+                phaseCount:
+                  launchDutyCloseoutRecordedGate.productionSwitchProofPacket.productionSwitchExecutionRunbook.executionPhases?.length
+              }
+            : null,
         proofCounts: launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.proofCounts
       },
       {
@@ -32801,6 +32886,16 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           firstWaveCloseoutArtifact: "artifacts/staging/EXPORT_CLOSEOUT_READY/stable/first-wave-closeout.md",
           watchRecordCommandCount: 6
         },
+        productionSwitchExecutionRunbook: {
+          status: "ready_for_cutover_watch",
+          readyForCutoverWatch: true,
+          currentPhaseKey: "cutover_watch",
+          currentActionKey: "refresh_readiness_status",
+          currentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+          nextPhaseKey: "stable_operations_handoff",
+          remainingPhaseCount: 0,
+          phaseCount: 4
+        },
         proofCounts: {
           total: 8,
           ready: 8,
@@ -32900,6 +32995,22 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchDayWatchExecutionEntrypoint?.currentRecordKey,
         launchDayWatchEntrypointCommandCount:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.launchDayWatchExecutionEntrypoint?.watchRecordCommands?.length,
+        productionSwitchRunbookStatus:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.status,
+        productionSwitchRunbookReadyForCutoverWatch:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.readyForCutoverWatch,
+        productionSwitchRunbookCurrentPhaseKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentPhaseKey,
+        productionSwitchRunbookCurrentActionKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentActionKey,
+        productionSwitchRunbookCurrentCommand:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.currentCommand,
+        productionSwitchRunbookNextPhaseKey:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.nextPhaseKey,
+        productionSwitchRunbookRemainingPhaseCount:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.remainingPhaseCount,
+        productionSwitchRunbookPhaseCount:
+          launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.productionSwitchExecutionRunbook?.executionPhases?.length,
         cutoverDecisionStatus:
           launchDutyCloseoutRecordedOperatorEntry.operatorQueueCheckpoint?.cutoverOperatorDecision?.status,
         cutoverDecisionReadyForCutoverWatch:
@@ -33003,6 +33114,14 @@ test("developer ops export bundles scoped data and downloadable assets", async (
         launchDayWatchEntrypointCurrentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
         launchDayWatchEntrypointCurrentRecordKey: "first_wave_closeout",
         launchDayWatchEntrypointCommandCount: 6,
+        productionSwitchRunbookStatus: "ready_for_cutover_watch",
+        productionSwitchRunbookReadyForCutoverWatch: true,
+        productionSwitchRunbookCurrentPhaseKey: "cutover_watch",
+        productionSwitchRunbookCurrentActionKey: "refresh_readiness_status",
+        productionSwitchRunbookCurrentCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/filled-closeout-input.json --actions-file artifacts/staging/EXPORT_CLOSEOUT_READY/stable/readiness-action-queue.md",
+        productionSwitchRunbookNextPhaseKey: "stable_operations_handoff",
+        productionSwitchRunbookRemainingPhaseCount: 0,
+        productionSwitchRunbookPhaseCount: 4,
         cutoverDecisionStatus: "ready_for_cutover_watch",
         cutoverDecisionReadyForCutoverWatch: true,
         cutoverDecisionLaunchEvidenceProgress: "12/12",

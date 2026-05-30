@@ -8002,6 +8002,21 @@ function parseProductionEndpoint(value) {
   }
 }
 
+const LAUNCH_MAINLINE_EVIDENCE_RECORDED_AT_KEYS_BY_EVENT = {
+  "product.launch-mainline.recovery-drill": "drillRecordedAt",
+  "product.launch-mainline.backup-verification": "backupVerifiedAt",
+  "product.launch-mainline.operations-walkthrough": "operationsWalkthroughAt",
+  "product.launch-mainline.launch-rehearsal-run": "launchRehearsalRunAt",
+  "product.launch-mainline.deploy-verification": "deployVerifiedAt",
+  "product.launch-mainline.health-verification": "healthVerifiedAt",
+  "product.launch-mainline.rollback-walkthrough": "rollbackWalkthroughAt",
+  "product.launch-mainline.cutover-walkthrough": "cutoverWalkthroughAt",
+  "product.launch-mainline.launch-day-readiness-review": "launchDayReadinessReviewedAt",
+  "product.launch-mainline.post-launch-ops-sweep": "postLaunchOpsSweepAt",
+  "product.launch-mainline.launch-stabilization-review": "launchStabilizationReviewedAt",
+  "product.launch-mainline.launch-closeout-review": "launchCloseoutReviewedAt"
+};
+
 function queryLatestLaunchMainlineEvidence(db, {
   productCode = "",
   channel = "stable",
@@ -8031,13 +8046,18 @@ function queryLatestLaunchMainlineEvidence(db, {
   if (!row) {
     return null;
   }
+  const metadata = row.metadata_json ? JSON.parse(row.metadata_json) : null;
+  const recordedAtKey = LAUNCH_MAINLINE_EVIDENCE_RECORDED_AT_KEYS_BY_EVENT[normalizedEventType] || "";
+  const evidenceCreatedAt = recordedAtKey && metadata && typeof metadata === "object"
+    ? String(metadata[recordedAtKey] || "").trim()
+    : "";
   return {
     id: row.id,
     eventType: row.event_type,
     entityType: row.entity_type,
     entityId: row.entity_id,
-    createdAt: row.created_at,
-    metadata: row.metadata_json ? JSON.parse(row.metadata_json) : null
+    createdAt: evidenceCreatedAt || row.created_at,
+    metadata
   };
 }
 
@@ -53278,6 +53298,203 @@ function buildLaunchDayWatchExecutionEntrypoint({
   };
 }
 
+function cloneProductionSwitchExecutionRunbook(runbook = null) {
+  if (!runbook || typeof runbook !== "object") {
+    return null;
+  }
+  return {
+    ...runbook,
+    executionPhases: Array.isArray(runbook.executionPhases)
+      ? runbook.executionPhases
+        .filter((item) => item && typeof item === "object")
+        .map((item) => ({ ...item }))
+      : []
+  };
+}
+
+function isProductionSwitchExecutionPhaseComplete(key = "", entrypoint = null) {
+  const status = entrypoint?.status || "";
+  if (key === "real_environment_proof") {
+    return status === "ready_for_real_environment_review";
+  }
+  if (key === "live_write_smoke") {
+    return status === "ready_live_write_smoke_evidence_attached";
+  }
+  if (key === "production_signoff") {
+    return status === "ready_production_signoff_evidence_attached";
+  }
+  if (key === "launch_day_watch") {
+    return status === "ready_launch_day_watch_records_attached";
+  }
+  return status.startsWith("ready_") && entrypoint?.readyForExecution === true;
+}
+
+function getProductionSwitchExecutionPhaseCommand(key = "", entrypoint = null) {
+  if (!entrypoint || typeof entrypoint !== "object") {
+    return null;
+  }
+  if (key === "real_environment_proof") {
+    return entrypoint.currentCommand
+      || entrypoint.readinessStatusCommand
+      || entrypoint.profileDrivenDryRunCommand
+      || entrypoint.rehearsalReloadCommand
+      || null;
+  }
+  if (key === "live_write_smoke") {
+    return entrypoint.currentCommand
+      || entrypoint.launchSmokeCommand
+      || entrypoint.resultBackfillCommand
+      || entrypoint.readinessRefreshCommand
+      || null;
+  }
+  if (key === "production_signoff") {
+    return entrypoint.currentCommand
+      || entrypoint.fullTestCommand
+      || entrypoint.fullTestBackfillCommand
+      || entrypoint.productionSignoffBackfillCommand
+      || entrypoint.readinessRefreshCommand
+      || null;
+  }
+  if (key === "launch_day_watch") {
+    const firstRecordCommand = Array.isArray(entrypoint.watchRecordCommands)
+      ? entrypoint.watchRecordCommands.find((item) => item?.command)?.command || null
+      : null;
+    return entrypoint.currentCommand
+      || firstRecordCommand
+      || entrypoint.readinessRefreshCommand
+      || entrypoint.rehearsalReloadCommand
+      || null;
+  }
+  return entrypoint.currentCommand || null;
+}
+
+function buildProductionSwitchExecutionRunbook({
+  productionSwitchProofPacket = null,
+  realEnvironmentProofExecutionEntrypoint = null,
+  liveWriteSmokeExecutionEntrypoint = null,
+  productionSignoffExecutionEntrypoint = null,
+  launchDayWatchExecutionEntrypoint = null,
+  launchDutyRecordIndexPath = null
+} = {}) {
+  const proofPacket = productionSwitchProofPacket && typeof productionSwitchProofPacket === "object"
+    ? productionSwitchProofPacket
+    : null;
+  if (!proofPacket) {
+    return null;
+  }
+  const realEnvironmentEntrypoint =
+    cloneDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint(realEnvironmentProofExecutionEntrypoint)
+    || cloneDeveloperOpsProductionSwitchRealEnvironmentProofExecutionEntrypoint(
+      proofPacket.realEnvironmentProofExecutionEntrypoint
+    );
+  const liveWriteEntrypoint =
+    cloneLaunchLiveWriteSmokeExecutionEntrypoint(liveWriteSmokeExecutionEntrypoint)
+    || cloneLaunchLiveWriteSmokeExecutionEntrypoint(proofPacket.liveWriteSmokeExecutionEntrypoint);
+  const productionSignoffEntrypoint =
+    cloneLaunchProductionSignoffExecutionEntrypoint(productionSignoffExecutionEntrypoint)
+    || cloneLaunchProductionSignoffExecutionEntrypoint(proofPacket.productionSignoffExecutionEntrypoint);
+  const launchDayWatchEntrypoint =
+    cloneLaunchDayWatchExecutionEntrypoint(launchDayWatchExecutionEntrypoint)
+    || cloneLaunchDayWatchExecutionEntrypoint(proofPacket.launchDayWatchExecutionEntrypoint);
+  const phaseSources = [
+    {
+      order: 1,
+      key: "real_environment_proof",
+      label: "Real environment proof",
+      entrypoint: realEnvironmentEntrypoint
+    },
+    {
+      order: 2,
+      key: "live_write_smoke",
+      label: "Live-write smoke",
+      entrypoint: liveWriteEntrypoint
+    },
+    {
+      order: 3,
+      key: "production_signoff",
+      label: "Production sign-off",
+      entrypoint: productionSignoffEntrypoint
+    },
+    {
+      order: 4,
+      key: "launch_day_watch",
+      label: "Launch-day watch",
+      entrypoint: launchDayWatchEntrypoint
+    }
+  ];
+  const executionPhases = phaseSources.map((phase) => {
+    const entrypoint = phase.entrypoint && typeof phase.entrypoint === "object"
+      ? phase.entrypoint
+      : null;
+    const complete = isProductionSwitchExecutionPhaseComplete(phase.key, entrypoint);
+    return {
+      order: phase.order,
+      key: phase.key,
+      label: phase.label,
+      status: entrypoint?.status || null,
+      complete,
+      readyForExecution: entrypoint?.readyForExecution === true,
+      currentActionKey: entrypoint?.currentActionKey || null,
+      currentCommand: getProductionSwitchExecutionPhaseCommand(phase.key, entrypoint),
+      launchDutyRecordIndexPath: entrypoint?.launchDutyRecordIndexPath || null
+    };
+  });
+  const remainingPhases = executionPhases.filter((phase) => phase.complete !== true);
+  const currentPhase = remainingPhases[0] || null;
+  const readyForCutoverWatch = remainingPhases.length === 0
+    && proofPacket.status === "ready_for_production_switch_review";
+  const currentPhaseIndex = currentPhase
+    ? executionPhases.findIndex((phase) => phase.key === currentPhase.key)
+    : -1;
+  const nextPhase = currentPhaseIndex >= 0
+    ? executionPhases.slice(currentPhaseIndex + 1).find((phase) => phase.complete !== true)
+      || executionPhases[currentPhaseIndex + 1]
+      || null
+    : null;
+  const resolvedLaunchDutyRecordIndexPath = launchDutyRecordIndexPath
+    || proofPacket.launchDutyRecordIndexPath
+    || proofPacket.launchDutyRecordIndexFile
+    || executionPhases.find((phase) => phase.launchDutyRecordIndexPath)?.launchDutyRecordIndexPath
+    || null;
+  const currentCommand = readyForCutoverWatch
+    ? proofPacket.currentCommand
+      || launchDayWatchEntrypoint?.currentCommand
+      || productionSignoffEntrypoint?.currentCommand
+      || liveWriteEntrypoint?.currentCommand
+      || realEnvironmentEntrypoint?.currentCommand
+      || null
+    : currentPhase?.currentCommand || null;
+  const currentActionKey = readyForCutoverWatch
+    ? proofPacket.currentActionKey
+      || launchDayWatchEntrypoint?.currentActionKey
+      || productionSignoffEntrypoint?.currentActionKey
+      || liveWriteEntrypoint?.currentActionKey
+      || realEnvironmentEntrypoint?.currentActionKey
+      || null
+    : currentPhase?.currentActionKey || null;
+  return {
+    mode: "production-switch-execution-runbook/v1",
+    status: readyForCutoverWatch
+      ? "ready_for_cutover_watch"
+      : currentPhase?.status || proofPacket.status || null,
+    readyForCutoverWatch,
+    currentPhaseKey: readyForCutoverWatch ? "cutover_watch" : currentPhase?.key || null,
+    currentActionKey,
+    currentCommand,
+    nextPhaseKey: readyForCutoverWatch
+      ? "stable_operations_handoff"
+      : nextPhase?.key || null,
+    remainingPhaseCount: remainingPhases.length,
+    launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
+    executionPhases,
+    nextAction: readyForCutoverWatch
+      ? "Production switch proof is ready; continue cutover watch, then move to stable-operations handoff."
+      : currentPhase?.key
+        ? `Continue ${currentPhase.label || currentPhase.key} before advancing the production switch execution queue.`
+        : proofPacket.nextAction || null
+  };
+}
+
 function buildLaunchLiveWriteSmokeExecutionEntrypoint({
   productionSwitchProofPacket = null,
   realEnvironmentProofSummary = null,
@@ -53963,6 +54180,13 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     realEnvironmentProofSummary,
     productionSignoffExecutionEntrypoint: proofPacket.productionSignoffExecutionEntrypoint
   });
+  proofPacket.productionSwitchExecutionRunbook = buildProductionSwitchExecutionRunbook({
+    productionSwitchProofPacket: proofPacket,
+    realEnvironmentProofExecutionEntrypoint: proofPacket.realEnvironmentProofExecutionEntrypoint,
+    liveWriteSmokeExecutionEntrypoint: proofPacket.liveWriteSmokeExecutionEntrypoint,
+    productionSignoffExecutionEntrypoint: proofPacket.productionSignoffExecutionEntrypoint,
+    launchDayWatchExecutionEntrypoint: proofPacket.launchDayWatchExecutionEntrypoint
+  });
   proofPacket.stagingRehearsalExecutionEntrypoint = buildLaunchStagingRehearsalExecutionEntrypoint({
     launchEvidenceReadinessGate: gate,
     productionSwitchProofPacket: proofPacket,
@@ -54408,6 +54632,16 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     cloneLaunchDayWatchExecutionEntrypoint(
       switchProofPacket?.launchDayWatchExecutionEntrypoint
     );
+  const productionSwitchExecutionRunbook =
+    cloneProductionSwitchExecutionRunbook(switchProofPacket?.productionSwitchExecutionRunbook)
+    || buildProductionSwitchExecutionRunbook({
+      productionSwitchProofPacket: switchProofPacket,
+      realEnvironmentProofExecutionEntrypoint,
+      liveWriteSmokeExecutionEntrypoint,
+      productionSignoffExecutionEntrypoint,
+      launchDayWatchExecutionEntrypoint,
+      launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath
+    });
   const proofExecutionEntrypoint = buildLaunchCutoverTriageProofExecutionEntrypoint({
     checkpoint: {
       launchCutoverTriageStatus,
@@ -54536,6 +54770,7 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     liveWriteSmokeExecutionEntrypoint,
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
+    productionSwitchExecutionRunbook,
     cutoverOperatorDecision,
     proofExecutionEntrypoint,
     stagingRehearsalExecutionEntrypoint,
@@ -61547,6 +61782,8 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
       cloneLaunchProductionSignoffExecutionEntrypoint(checkpoint.productionSignoffExecutionEntrypoint),
     launchDayWatchExecutionEntrypoint:
       cloneLaunchDayWatchExecutionEntrypoint(checkpoint.launchDayWatchExecutionEntrypoint),
+    productionSwitchExecutionRunbook:
+      cloneProductionSwitchExecutionRunbook(checkpoint.productionSwitchExecutionRunbook),
     cutoverOperatorDecision: cloneLaunchCutoverOperatorDecision(checkpoint.cutoverOperatorDecision),
     launchDutyRecordIndexPath: checkpoint.launchDutyRecordIndexPath || null,
     proofExecutionEntrypoint: checkpoint.proofExecutionEntrypoint && typeof checkpoint.proofExecutionEntrypoint === "object"
@@ -61665,6 +61902,17 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
       proofExecutionEntrypoint,
       launchDutyRecordIndexPath
     });
+  const productionSwitchExecutionRunbook =
+    cloneProductionSwitchExecutionRunbook(checkpoint.productionSwitchExecutionRunbook)
+    || cloneProductionSwitchExecutionRunbook(proofPacket?.productionSwitchExecutionRunbook)
+    || buildProductionSwitchExecutionRunbook({
+      productionSwitchProofPacket: proofPacket,
+      realEnvironmentProofExecutionEntrypoint,
+      liveWriteSmokeExecutionEntrypoint,
+      productionSignoffExecutionEntrypoint,
+      launchDayWatchExecutionEntrypoint,
+      launchDutyRecordIndexPath
+    });
   const productionSwitchProofReadyCount = checkpoint.productionSwitchProofReadyCount ?? proofCounts.ready ?? null;
   const productionSwitchProofTotalCount = checkpoint.productionSwitchProofTotalCount ?? proofCounts.total ?? null;
   const productionSwitchProofBlockedCount = checkpoint.productionSwitchProofBlockedCount ?? proofCounts.blocked ?? null;
@@ -61717,6 +61965,7 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     liveWriteSmokeExecutionEntrypoint,
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
+    productionSwitchExecutionRunbook,
     cutoverOperatorDecision,
     launchDutyRecordIndexPath,
     proofExecutionEntrypoint,
@@ -61952,6 +62201,20 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | launchDutyRecordIndex=${launchDayWatchExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
   }
+  const productionSwitchExecutionRunbook =
+    cloneProductionSwitchExecutionRunbook(proofSource.productionSwitchExecutionRunbook);
+  if (productionSwitchExecutionRunbook) {
+    lines.push(
+      `- productionSwitchExecutionRunbook=${productionSwitchExecutionRunbook.status || "-"}`
+      + ` | ready=${productionSwitchExecutionRunbook.readyForCutoverWatch === true ? "yes" : "no"}`
+      + ` | current=${productionSwitchExecutionRunbook.currentPhaseKey || "-"}`
+      + ` | action=${productionSwitchExecutionRunbook.currentActionKey || "-"}`
+      + ` | command=${productionSwitchExecutionRunbook.currentCommand || "-"}`
+      + ` | remaining=${productionSwitchExecutionRunbook.remainingPhaseCount ?? "-"}`
+      + `/${Array.isArray(productionSwitchExecutionRunbook.executionPhases) ? productionSwitchExecutionRunbook.executionPhases.length : "-"}`
+      + ` | next=${productionSwitchExecutionRunbook.nextPhaseKey || "-"}`
+    );
+  }
   return Boolean(
     publicHttpsProof
     || storageProfileProof
@@ -61960,6 +62223,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
     || liveWriteSmokeExecutionEntrypoint
     || productionSignoffExecutionEntrypoint
     || launchDayWatchExecutionEntrypoint
+    || productionSwitchExecutionRunbook
   );
 }
 

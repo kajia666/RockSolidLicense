@@ -62458,6 +62458,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | firstWaveCloseout=${launchDayWatchExecutionEntrypoint.firstWaveCloseoutArtifact || "-"}`
       + ` | launchDutyRecordIndex=${launchDayWatchExecutionEntrypoint.launchDutyRecordIndexPath || "-"}`
     );
+    appendLaunchDayWatchHandoffLine(lines, launchDayWatchExecutionEntrypoint);
   }
   const productionSwitchExecutionRunbook =
     cloneProductionSwitchExecutionRunbook(proofSource.productionSwitchExecutionRunbook);
@@ -62743,6 +62744,29 @@ function appendProductionSignoffHandoffLine(lines = [], entrypoint = null) {
     + ` | signoffFirst=${signoffCommands.find((item) => item.command)?.command || "-"}`
     + ` | receiptQueue=${receiptCommands.length}`
     + ` | receiptFirst=${receiptCommands.find((item) => item.command)?.command || "-"}`
+    + ` | packet=${entrypoint.productionSignoffPacket || "-"}`
+    + ` | status=${entrypoint.status || "-"}`
+  );
+  return true;
+}
+
+function appendLaunchDayWatchHandoffLine(lines = [], entrypoint = null) {
+  if (!Array.isArray(lines) || !entrypoint || typeof entrypoint !== "object") {
+    return false;
+  }
+  const watchRecords = Array.isArray(entrypoint.watchRecordCommands)
+    ? entrypoint.watchRecordCommands.filter((item) => item && typeof item === "object")
+    : [];
+  lines.push(
+    "- launchDayWatchHandoff=production_signoff_evidence -> launch_day_watch_summary -> receipt_visibility_snapshot -> first_wave_incident_log -> rollback_signal_review -> stabilization_owner_handoff -> first_wave_closeout"
+    + " | expected=production_signoff:ready_production_signoff_evidence_attached"
+    + ` | records=${watchRecords.length}`
+    + ` | firstRecord=${watchRecords.find((item) => item.key)?.key || "-"}`
+    + ` | firstCommand=${watchRecords.find((item) => item.command)?.command || "-"}`
+    + ` | refresh=${entrypoint.readinessRefreshCommand || "-"}`
+    + ` | rehearsal=${entrypoint.rehearsalReloadCommand || "-"}`
+    + ` | artifact=${entrypoint.launchDayWatchArtifact || "-"}`
+    + ` | closeout=${entrypoint.firstWaveCloseoutArtifact || "-"}`
     + ` | packet=${entrypoint.productionSignoffPacket || "-"}`
     + ` | status=${entrypoint.status || "-"}`
   );

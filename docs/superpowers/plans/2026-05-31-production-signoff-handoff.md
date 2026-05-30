@@ -164,3 +164,54 @@ git log -2 --oneline
 ```
 
 Expected: the implementation commit and prior design commit are pushed together; the worktree is clean and synchronized with `origin/codex/production-switch-proof-hardening`.
+
+### Task 4: Extend the same first-screen bridge into launch-day watch handoff
+
+**Files:**
+- Modify: `D:\code\OnlineVerification\test\license-flow.test.js`
+- Modify: `D:\code\OnlineVerification\src\services.js`
+- Modify: `D:\code\OnlineVerification\docs\project-roadmap-progress.md`
+
+- [x] **Step 1: Add failing assertions for `launchDayWatchHandoff` on all mirrored surfaces**
+
+Added `launchDayWatchHandoff=...` assertions beside existing `productionSignoffHandoff` checks for:
+- Launch Review `FIRSTBATCH`
+- Launch Smoke `FIRSTBATCH`
+- Launch Mainline Launch Evidence Gate `EXPORT_CLOSEOUT_READY`
+- Developer Ops Operator Queue Checkpoint `EXPORT_CLOSEOUT_READY`
+
+- [x] **Step 2: Confirm RED on focused scope**
+
+```powershell
+npm.cmd test -- test/license-flow.test.js --test-name-pattern "developer ops export bundles scoped data and downloadable assets"
+```
+
+Observed RED: `79 pass / 2 fail`, failures caused by missing `launchDayWatchHandoff`.
+
+- [x] **Step 3: Add shared launch-day-watch handoff formatter**
+
+Implemented a display-only shared formatter:
+
+```js
+appendLaunchDayWatchHandoffLine(lines, launchDayWatchExecutionEntrypoint);
+```
+
+The formatter surfaces:
+- fixed handoff chain (`production_signoff_evidence -> ... -> first_wave_closeout`)
+- expected readiness gate
+- watch record queue count and first record command
+- readiness/rehearsal commands
+- launch-day-watch artifact and first-wave closeout artifact
+- production signoff packet and status
+
+- [x] **Step 4: Re-run focused verification and roadmap update**
+
+```powershell
+node --check src/services.js
+node --check test/license-flow.test.js
+npm.cmd test -- test/license-flow.test.js --test-name-pattern "developer ops export bundles scoped data and downloadable assets"
+```
+
+Observed GREEN: `81 pass / 0 fail`.
+
+Roadmap updated with a new “Latest launch-day watch handoff slice” bullet.

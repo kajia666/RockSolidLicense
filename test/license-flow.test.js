@@ -13176,6 +13176,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
+      /launchDayWatchHandoff=production_signoff_evidence -> launch_day_watch_summary -> receipt_visibility_snapshot -> first_wave_incident_log -> rollback_signal_review -> stabilization_owner_handoff -> first_wave_closeout \| expected=production_signoff:ready_production_signoff_evidence_attached \| records=6 \| firstRecord=launch_day_watch_summary \| firstCommand=npm\.cmd run staging:launch-duty:record --[^\n]*--key launch_day_watch_summary[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/launch-day-watch-summary\.md \| closeout=artifacts\/staging\/FIRSTBATCH\/stable\/first-wave-closeout\.md \| packet=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
       /launchDayWatchEntrypoint=blocked_until_real_environment_proof \| ready=no \| current=set_public_https_entrypoint \| record=launch_day_watch_summary \| command=-/
     );
     assert.match(
@@ -13646,6 +13650,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
       /productionSignoffHandoff=full_test_window -> full_test_window_passed_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_conditions -> receipt_visibility \| fullTest=npm\.cmd test \| backfill=npm\.cmd run staging:signoff:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=full_test_window:ready_full_test_window_evidence_attached \| signoffQueue=6 \| signoffFirst=npm\.cmd run staging:signoff:backfill[^\n]*\| receiptQueue=5 \| receiptFirst=npm\.cmd run staging:signoff:backfill[^\n]*\| packet=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      runtimeEvidenceLaunchSmoke.summaryText,
+      /launchDayWatchHandoff=production_signoff_evidence -> launch_day_watch_summary -> receipt_visibility_snapshot -> first_wave_incident_log -> rollback_signal_review -> stabilization_owner_handoff -> first_wave_closeout \| expected=production_signoff:ready_production_signoff_evidence_attached \| records=6 \| firstRecord=launch_day_watch_summary \| firstCommand=npm\.cmd run staging:launch-duty:record --[^\n]*--key launch_day_watch_summary[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/launch-day-watch-summary\.md \| closeout=artifacts\/staging\/FIRSTBATCH\/stable\/first-wave-closeout\.md \| packet=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(
@@ -25098,6 +25106,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*launchDayWatchHandoff=production_signoff_evidence -> launch_day_watch_summary -> receipt_visibility_snapshot -> first_wave_incident_log -> rollback_signal_review -> stabilization_owner_handoff -> first_wave_closeout \| expected=production_signoff:ready_production_signoff_evidence_attached \| records=6 \| firstRecord=launch_day_watch_summary \| firstCommand=npm\.cmd run staging:launch-duty:record --[^\n]*--key launch_day_watch_summary[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md \| closeout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| packet=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchMainlineSteadyStateDutyReceiptReview.summaryText,
       /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchPostCommandQueue=live_write_smoke -> production_signoff -> launch_day_watch \| backfillReady=yes,yes,yes \| refreshReady=yes,yes,yes \| required=real_environment_proof:ready_for_real_environment_review -> live_write_smoke:ready_live_write_smoke_evidence_attached -> production_signoff:ready_production_signoff_evidence_attached \| status=blocked_until_real_environment_proof/
     );
     assert.match(
@@ -28390,6 +28402,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchOperationsOperatorEntryDownload.body,
       /Operator Queue Checkpoint:[\s\S]*productionSignoffHandoff=full_test_window -> full_test_window_passed_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_conditions -> receipt_visibility \| fullTest=npm\.cmd test \| backfill=npm\.cmd run staging:signoff:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=full_test_window:ready_full_test_window_evidence_attached \| signoffQueue=6 \| signoffFirst=npm\.cmd run staging:signoff:backfill[^\n]*\| receiptQueue=5 \| receiptFirst=npm\.cmd run staging:signoff:backfill[^\n]*\| packet=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+    );
+    assert.match(
+      launchOperationsOperatorEntryDownload.body,
+      /Operator Queue Checkpoint:[\s\S]*launchDayWatchHandoff=production_signoff_evidence -> launch_day_watch_summary -> receipt_visibility_snapshot -> first_wave_incident_log -> rollback_signal_review -> stabilization_owner_handoff -> first_wave_closeout \| expected=production_signoff:ready_production_signoff_evidence_attached \| records=6 \| firstRecord=launch_day_watch_summary \| firstCommand=npm\.cmd run staging:launch-duty:record --[^\n]*--key launch_day_watch_summary[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-day-watch-summary\.md \| closeout=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/first-wave-closeout\.md \| packet=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(launchOperationsOperatorEntryDownload.body, /Operator Queue Checkpoint:[\s\S]*launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(launchOperationsOperatorEntryDownload.body, /Launch Evidence Readiness Gate:/);

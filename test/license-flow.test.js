@@ -12772,6 +12772,22 @@ test("developer license quickstart first-batch setup can create recommended laun
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.requiredBeforePhaseKey,
         nextPreviewRequiredStatus:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.nextPhaseExecutionPreview?.requiredBeforeStatus,
+        followingPreviewPhaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.followingPhaseExecutionPreview?.phaseKey,
+        followingPreviewActionKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.followingPhaseExecutionPreview?.actionKey,
+        followingPreviewCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.followingPhaseExecutionPreview?.command,
+        followingPreviewCommandReady:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.followingPhaseExecutionPreview?.commandReady,
+        followingPreviewPostCommandBackfillCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.followingPhaseExecutionPreview?.postCommandBackfillCommand,
+        followingPreviewPostCommandRefreshCommand:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.followingPhaseExecutionPreview?.postCommandRefreshCommand,
+        followingPreviewRequiredPhaseKey:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.followingPhaseExecutionPreview?.requiredBeforePhaseKey,
+        followingPreviewRequiredStatus:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.followingPhaseExecutionPreview?.requiredBeforeStatus,
         remainingPhaseCount:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionSwitchExecutionRunbook?.currentExecutionPacket?.remainingPhaseCount,
         launchDutyRecordIndexPath:
@@ -12796,6 +12812,14 @@ test("developer license quickstart first-batch setup can create recommended laun
         nextPreviewPostCommandBackfillCommand: "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --key live_write_smoke_result --value-json <redacted-json> --artifact-path artifacts/staging/FIRSTBATCH/stable/live-write-smoke-output.json --receipt-id <record_launch_rehearsal_run-receipt-id> --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
         nextPreviewRequiredPhaseKey: "real_environment_proof",
         nextPreviewRequiredStatus: "ready_for_real_environment_review",
+        followingPreviewPhaseKey: "production_signoff",
+        followingPreviewActionKey: "set_public_https_entrypoint",
+        followingPreviewCommand: "npm.cmd test",
+        followingPreviewCommandReady: true,
+        followingPreviewPostCommandBackfillCommand: "npm.cmd run staging:signoff:backfill -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --condition-key full_test_window_passed --value-json <redacted-json> --artifact-path artifacts/staging/FIRSTBATCH/stable/full-test-output.txt --decision ready-for-production-signoff --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        followingPreviewPostCommandRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
+        followingPreviewRequiredPhaseKey: "live_write_smoke",
+        followingPreviewRequiredStatus: "ready_live_write_smoke_evidence_attached",
         remainingPhaseCount: 4,
         launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
       }
@@ -13094,6 +13118,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /productionSwitchNextPhasePreview=live_write_smoke \| action=set_public_https_entrypoint \| commandReady=yes \| required=real_environment_proof:ready_for_real_environment_review \| backfill=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key live_write_smoke_result[\s\S]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionSwitchFollowingPhasePreview=production_signoff \| action=set_public_https_entrypoint \| commandReady=yes \| required=live_write_smoke:ready_live_write_smoke_evidence_attached \| backfill=npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --condition-key full_test_window_passed[\s\S]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
     );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /cutoverOperatorDecision=hold_for_real_environment_proof \| ready=no \| gate=hold_for_launch_evidence \| evidence=blocked_until_real_launch_evidence_attached \| realEnv=blocked_until_real_environment_proof \| proof=blocked_until_real_environment_evidence \| current=set_public_https_entrypoint \| command=-/);
     assert.match(

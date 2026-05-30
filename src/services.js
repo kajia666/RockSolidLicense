@@ -53311,6 +53311,11 @@ function cloneProductionSwitchExecutionRunbook(runbook = null) {
             runbook.currentExecutionPacket.nextPhaseExecutionPreview
             && typeof runbook.currentExecutionPacket.nextPhaseExecutionPreview === "object"
               ? { ...runbook.currentExecutionPacket.nextPhaseExecutionPreview }
+              : null,
+          followingPhaseExecutionPreview:
+            runbook.currentExecutionPacket.followingPhaseExecutionPreview
+            && typeof runbook.currentExecutionPacket.followingPhaseExecutionPreview === "object"
+              ? { ...runbook.currentExecutionPacket.followingPhaseExecutionPreview }
               : null
         }
       : null,
@@ -53585,6 +53590,34 @@ function buildProductionSwitchExecutionRunbook({
           : null
       }
     : null;
+  const nextPhaseIndex = nextPhase
+    ? executionPhases.findIndex((phase) => phase.key === nextPhase.key)
+    : -1;
+  const followingPhase = nextPhaseIndex >= 0
+    ? executionPhases.slice(nextPhaseIndex + 1).find((phase) => phase.complete !== true)
+      || executionPhases[nextPhaseIndex + 1]
+      || null
+    : null;
+  const followingPhaseRequirement = getProductionSwitchExecutionRequiredBeforeStatus(followingPhase?.key || "");
+  const followingPhaseExecutionPreview = followingPhase
+    ? {
+        mode: "production-switch-following-phase-execution-preview/v1",
+        phaseKey: followingPhase.key || null,
+        status: followingPhase.status || null,
+        actionKey: followingPhase.currentActionKey || null,
+        command: followingPhase.currentCommand || null,
+        commandReady: Boolean(followingPhase.currentCommand),
+        postCommandBackfillCommand: followingPhase.postCommandBackfillCommand || null,
+        postCommandRefreshCommand: followingPhase.postCommandRefreshCommand || null,
+        rehearsalReloadCommand: followingPhase.rehearsalReloadCommand || null,
+        requiredBeforePhaseKey: followingPhaseRequirement.phaseKey,
+        requiredBeforeStatus: followingPhaseRequirement.status,
+        launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
+        nextAction: followingPhase.key
+          ? `After ${followingPhaseRequirement.phaseKey || "the previous phase"} reaches ${followingPhaseRequirement.status || "ready"}, run ${followingPhase.label || followingPhase.key} and refresh readiness.`
+          : null
+      }
+    : null;
   const currentExecutionPacket = {
     mode: "production-switch-current-execution-packet/v1",
     status: readyForCutoverWatch
@@ -53609,6 +53642,7 @@ function buildProductionSwitchExecutionRunbook({
       ? "stable_operations_handoff"
       : nextPhase?.key || null,
     nextPhaseExecutionPreview,
+    followingPhaseExecutionPreview,
     remainingPhaseCount: remainingPhases.length,
     launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
     nextAction: readyForCutoverWatch
@@ -62386,6 +62420,20 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
           + ` | required=${nextPhasePreview.requiredBeforePhaseKey || "-"}:${nextPhasePreview.requiredBeforeStatus || "-"}`
           + ` | backfill=${nextPhasePreview.postCommandBackfillCommand || "-"}`
           + ` | refresh=${nextPhasePreview.postCommandRefreshCommand || "-"}`
+        );
+      }
+      const followingPhasePreview = currentExecutionPacket.followingPhaseExecutionPreview
+        && typeof currentExecutionPacket.followingPhaseExecutionPreview === "object"
+        ? currentExecutionPacket.followingPhaseExecutionPreview
+        : null;
+      if (followingPhasePreview) {
+        lines.push(
+          `- productionSwitchFollowingPhasePreview=${followingPhasePreview.phaseKey || "-"}`
+          + ` | action=${followingPhasePreview.actionKey || "-"}`
+          + ` | commandReady=${followingPhasePreview.commandReady === true ? "yes" : "no"}`
+          + ` | required=${followingPhasePreview.requiredBeforePhaseKey || "-"}:${followingPhasePreview.requiredBeforeStatus || "-"}`
+          + ` | backfill=${followingPhasePreview.postCommandBackfillCommand || "-"}`
+          + ` | refresh=${followingPhasePreview.postCommandRefreshCommand || "-"}`
         );
       }
     }

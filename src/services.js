@@ -53316,6 +53316,11 @@ function cloneProductionSwitchExecutionRunbook(runbook = null) {
             runbook.currentExecutionPacket.followingPhaseExecutionPreview
             && typeof runbook.currentExecutionPacket.followingPhaseExecutionPreview === "object"
               ? { ...runbook.currentExecutionPacket.followingPhaseExecutionPreview }
+              : null,
+          thirdPhaseExecutionPreview:
+            runbook.currentExecutionPacket.thirdPhaseExecutionPreview
+            && typeof runbook.currentExecutionPacket.thirdPhaseExecutionPreview === "object"
+              ? { ...runbook.currentExecutionPacket.thirdPhaseExecutionPreview }
               : null
         }
       : null,
@@ -53618,6 +53623,34 @@ function buildProductionSwitchExecutionRunbook({
           : null
       }
     : null;
+  const followingPhaseIndex = followingPhase
+    ? executionPhases.findIndex((phase) => phase.key === followingPhase.key)
+    : -1;
+  const thirdPhase = followingPhaseIndex >= 0
+    ? executionPhases.slice(followingPhaseIndex + 1).find((phase) => phase.complete !== true)
+      || executionPhases[followingPhaseIndex + 1]
+      || null
+    : null;
+  const thirdPhaseRequirement = getProductionSwitchExecutionRequiredBeforeStatus(thirdPhase?.key || "");
+  const thirdPhaseExecutionPreview = thirdPhase
+    ? {
+        mode: "production-switch-third-phase-execution-preview/v1",
+        phaseKey: thirdPhase.key || null,
+        status: thirdPhase.status || null,
+        actionKey: thirdPhase.currentActionKey || null,
+        command: thirdPhase.currentCommand || null,
+        commandReady: Boolean(thirdPhase.currentCommand),
+        postCommandBackfillCommand: thirdPhase.postCommandBackfillCommand || null,
+        postCommandRefreshCommand: thirdPhase.postCommandRefreshCommand || null,
+        rehearsalReloadCommand: thirdPhase.rehearsalReloadCommand || null,
+        requiredBeforePhaseKey: thirdPhaseRequirement.phaseKey,
+        requiredBeforeStatus: thirdPhaseRequirement.status,
+        launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
+        nextAction: thirdPhase.key
+          ? `After ${thirdPhaseRequirement.phaseKey || "the previous phase"} reaches ${thirdPhaseRequirement.status || "ready"}, run ${thirdPhase.label || thirdPhase.key} and refresh readiness.`
+          : null
+      }
+    : null;
   const currentExecutionPacket = {
     mode: "production-switch-current-execution-packet/v1",
     status: readyForCutoverWatch
@@ -53643,6 +53676,7 @@ function buildProductionSwitchExecutionRunbook({
       : nextPhase?.key || null,
     nextPhaseExecutionPreview,
     followingPhaseExecutionPreview,
+    thirdPhaseExecutionPreview,
     remainingPhaseCount: remainingPhases.length,
     launchDutyRecordIndexPath: resolvedLaunchDutyRecordIndexPath,
     nextAction: readyForCutoverWatch
@@ -62434,6 +62468,20 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
           + ` | required=${followingPhasePreview.requiredBeforePhaseKey || "-"}:${followingPhasePreview.requiredBeforeStatus || "-"}`
           + ` | backfill=${followingPhasePreview.postCommandBackfillCommand || "-"}`
           + ` | refresh=${followingPhasePreview.postCommandRefreshCommand || "-"}`
+        );
+      }
+      const thirdPhasePreview = currentExecutionPacket.thirdPhaseExecutionPreview
+        && typeof currentExecutionPacket.thirdPhaseExecutionPreview === "object"
+        ? currentExecutionPacket.thirdPhaseExecutionPreview
+        : null;
+      if (thirdPhasePreview) {
+        lines.push(
+          `- productionSwitchThirdPhasePreview=${thirdPhasePreview.phaseKey || "-"}`
+          + ` | action=${thirdPhasePreview.actionKey || "-"}`
+          + ` | commandReady=${thirdPhasePreview.commandReady === true ? "yes" : "no"}`
+          + ` | required=${thirdPhasePreview.requiredBeforePhaseKey || "-"}:${thirdPhasePreview.requiredBeforeStatus || "-"}`
+          + ` | backfill=${thirdPhasePreview.postCommandBackfillCommand || "-"}`
+          + ` | refresh=${thirdPhasePreview.postCommandRefreshCommand || "-"}`
         );
       }
     }

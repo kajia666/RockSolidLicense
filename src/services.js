@@ -2022,6 +2022,26 @@ function appendRouteFocusHandoffTextLines(lines = [], routeFocus = {}) {
   );
 }
 
+function formatRouteFocusControlProductionProofPreflightHandoffText(control = null) {
+  const handoff = control?.productionProofPreflightHandoff
+    && typeof control.productionProofPreflightHandoff === "object"
+      ? control.productionProofPreflightHandoff
+      : control?.context?.productionProofPreflightHandoff
+        && typeof control.context.productionProofPreflightHandoff === "object"
+        ? control.context.productionProofPreflightHandoff
+        : null;
+  if (!handoff) {
+    return "";
+  }
+  return " | "
+    + [
+      `preflight=${handoff.preflightCommand || "-"}`,
+      `smoke=${handoff.launchSmokeCommand || "-"}`,
+      `manualGate=${handoff.manualLiveWriteGate || "-"}`,
+      `launchDutyRecordIndex=${handoff.launchDutyRecordIndexPath || "-"}`
+    ].join(" | ");
+}
+
 function buildReleasePackageSummaryText(manifest = {}) {
   const project = manifest.project || {};
   const release = manifest.release || {};
@@ -12310,6 +12330,7 @@ function buildDeveloperLaunchReviewSummaryText(payload = {}) {
           `- control: ${control?.label || control?.kind || "Action"}`
           + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
           + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
+          + formatRouteFocusControlProductionProofPreflightHandoffText(control)
         );
       }
     }
@@ -13889,6 +13910,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
             label: "Review Cutover Triage",
             recommendedDownload: reviewProductionSwitchProofPacketDownload,
             proofExecutionEntrypoint: launchCutoverTriageCheckpoint.proofExecutionEntrypoint || null,
+            productionProofPreflightHandoff:
+              cloneLaunchProductionProofPreflightHandoff(launchCutoverTriageCheckpoint.productionProofPreflightHandoff),
             context: buildLaunchCutoverTriageActionContext(launchCutoverTriageCheckpoint)
           }
         : null,
@@ -16316,6 +16339,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
             label: "Review Cutover Triage",
             recommendedDownload: launchSmokeKitProductionSwitchProofPacketDownload,
             proofExecutionEntrypoint: launchCutoverTriageCheckpoint.proofExecutionEntrypoint || null,
+            productionProofPreflightHandoff:
+              cloneLaunchProductionProofPreflightHandoff(launchCutoverTriageCheckpoint.productionProofPreflightHandoff),
             context: buildLaunchCutoverTriageActionContext(launchCutoverTriageCheckpoint)
           }
         : null,
@@ -16570,6 +16595,7 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
           `- control: ${control?.label || control?.kind || "Action"}`
           + `${control?.workspaceAction ? ` | workspace=${formatWorkspaceActionText(control.workspaceAction)}` : ""}`
           + `${control?.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(control.recommendedDownload)}` : ""}`
+          + formatRouteFocusControlProductionProofPreflightHandoffText(control)
         );
       }
     }

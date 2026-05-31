@@ -13217,9 +13217,17 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewCutoverTriageControl.proofExecutionEntrypoint?.proofItemKey,
       "backup_restore_drill"
     );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageControl.productionProofPreflightHandoff,
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.productionProofPreflightHandoff
+    );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /productionSwitchProof=/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Cutover Triage Checkpoint:/);
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /Launch Review Route Focus:[\s\S]*- control: Review Cutover Triage[^\n]*preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /Launch Review Action Plan:[\s\S]*context=launch_cutover_triage \| status=hold_for_launch_evidence[\s\S]*preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
@@ -13726,9 +13734,17 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceSmokeCutoverTriageControl.proofExecutionEntrypoint?.proofItemKey,
       "backup_restore_drill"
     );
+    assert.deepEqual(
+      runtimeEvidenceSmokeCutoverTriageControl.productionProofPreflightHandoff,
+      runtimeEvidenceLaunchSmoke.smokeSummary.launchCutoverTriageCheckpoint.productionProofPreflightHandoff
+    );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /Launch Smoke Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /productionSwitchProof=/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /Launch Smoke Cutover Triage Checkpoint:/);
+    assert.match(
+      runtimeEvidenceLaunchSmoke.summaryText,
+      /Launch Smoke Route Focus:[\s\S]*- control: Review Cutover Triage[^\n]*preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
       /Launch Smoke Action Plan:[\s\S]*context=launch_cutover_triage \| status=hold_for_launch_evidence[\s\S]*preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/

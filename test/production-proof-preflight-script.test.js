@@ -462,6 +462,8 @@ test("production proof preflight can load launch inputs from a staging profile f
       ]
     );
     assert.equal(output.productionProofExecutionPack.currentActionKey, "recovery_preflight");
+    assert.deepEqual(output.productionProofExecutionPack.completedStepKeys, ["staging_profile_init"]);
+    assert.equal(output.productionProofExecutionPack.currentCommand, output.nextCommands.recoveryPreflight.command);
     assert.deepEqual(output.productionProofExecutionPack.executionCursor, {
       from: "1/5",
       to: "5/5",
@@ -474,6 +476,10 @@ test("production proof preflight can load launch inputs from a staging profile f
       output.productionProofExecutionPack.noWriteCommands.map((item) => item.key),
       ["recovery_preflight", "staging_preflight"]
     );
+    const executionPack = readFileSync(executionPackFile, "utf8");
+    assert.match(executionPack, /Completed Steps: staging_profile_init/);
+    assert.match(executionPack, /Current Command:/);
+    assert.match(executionPack, /npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview/);
     assert.equal(
       output.nextCommands.profileInit.command,
       `npm.cmd run staging:profile:init -- --base-url https://profile-staging.example.com --product-code PROFILE_ALPHA --channel stable --admin-username profile.admin@example.com --developer-username profile.dev --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/profile.env --app-backup-dir /var/lib/rocksolid/profile-backups --postgres-backup-dir /var/lib/rocksolid/profile-postgres-backups --output-file ${profileFile}`

@@ -765,6 +765,10 @@ function buildProductionProofExecutionPack(realEnvironmentInputContract, product
   const profileLoaded = productionProofExecutionQueue.steps?.[0]?.status === "completed_from_profile_file";
   const cursor = profileLoaded ? "1/5" : "0/5";
   const nextStepKey = profileLoaded ? "recovery_preflight" : "staging_profile_init";
+  const completedStepKeys = (productionProofExecutionQueue.steps || [])
+    .filter((item) => String(item.status || "").startsWith("completed_"))
+    .map((item) => item.key)
+    .filter(Boolean);
   const noWriteCommands = (productionProofExecutionQueue.steps || [])
     .filter((item) => item.phase === "no_write" && item.status !== "completed_from_profile_file")
     .slice(0, 3)
@@ -783,6 +787,10 @@ function buildProductionProofExecutionPack(realEnvironmentInputContract, product
     currentActionKey: readyForNoWriteExecution
       ? nextStepKey
       : "production_proof_preflight",
+    currentCommand: readyForNoWriteExecution
+      ? productionProofExecutionQueue.currentCommand
+      : null,
+    completedStepKeys,
     executionCursor: {
       from: cursor,
       to: "5/5",
@@ -985,6 +993,10 @@ function writeProductionProofExecutionPack(pack, writeLine) {
       + ` | invalid=${(pack.inputCheck?.invalidInputKeys || []).join(",") || "-"}`
   );
   writeLine(
+    `Production proof execution pack current command: ${pack.currentCommand || "-"}`
+      + ` | completed=${(pack.completedStepKeys || []).join(",") || "-"}`
+  );
+  writeLine(
     `Production proof execution pack no-write: ${[
       `1=${pack.noWriteCommands?.[0]?.key || "-"}`,
       `2=${pack.noWriteCommands?.[1]?.key || "-"}`,
@@ -1030,9 +1042,15 @@ function renderProductionProofExecutionPackMarkdown(result) {
     `Cursor: ${cursor.expression || "-"}`,
     `Current Step: ${cursor.currentStepKey || "-"}`,
     `Next Step: ${cursor.nextStepKey || "-"}`,
+    `Completed Steps: ${markdownList(pack.completedStepKeys || [])}`,
+    `Current Command: ${pack.currentCommand || "-"}`,
     `Input Check: ${inputCheck.status || "-"}`,
     "",
     "Secret values are not included. Load secret values only through the named environment variables in the target shell.",
+    "",
+    "## Current Command",
+    "",
+    markdownCommandBlock(pack.currentCommand),
     "",
     "## Input Check",
     "",

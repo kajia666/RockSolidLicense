@@ -424,6 +424,172 @@ function buildNextCommands(options, backupRestoreDrillProof) {
   };
 }
 
+function buildRealEnvironmentInputContract(options, proofs, nextCommands) {
+  const nonSecretInput = ({
+    key,
+    flag,
+    envNames = [],
+    value = null,
+    required = true,
+    valid = Boolean(value)
+  }) => {
+    const present = Boolean(value);
+    return {
+      key,
+      flag,
+      envNames,
+      required,
+      present,
+      valid,
+      ready: valid && (!required || present),
+      value: present ? value : null
+    };
+  };
+  const nonSecretInputs = [
+    nonSecretInput({
+      key: "base_url",
+      flag: "--base-url",
+      envNames: ["RSL_PRODUCTION_SWITCH_BASE_URL", "RSL_STAGING_BASE_URL"],
+      value: options.baseUrl,
+      valid: proofs.publicHttpsProof.status === "ready_public_https_entrypoint"
+    }),
+    nonSecretInput({
+      key: "product_code",
+      flag: "--product-code",
+      envNames: ["RSL_PRODUCTION_SWITCH_PRODUCT_CODE", "RSL_SMOKE_PRODUCT_CODE"],
+      value: options.productCode,
+      valid: /^[A-Z0-9_-]{2,64}$/.test(options.productCode)
+    }),
+    nonSecretInput({
+      key: "channel",
+      flag: "--channel",
+      envNames: ["RSL_PRODUCTION_SWITCH_CHANNEL", "RSL_SMOKE_CHANNEL"],
+      value: options.channel,
+      valid: /^[a-z0-9_-]{2,32}$/.test(options.channel)
+    }),
+    nonSecretInput({
+      key: "target_os",
+      flag: "--target-os",
+      envNames: ["RSL_RECOVERY_TARGET_OS"],
+      value: options.targetOs,
+      valid: SUPPORTED_TARGET_OS.has(options.targetOs)
+    }),
+    nonSecretInput({
+      key: "storage_profile",
+      flag: "--storage-profile",
+      envNames: ["RSL_RECOVERY_STORAGE_PROFILE"],
+      value: options.storageProfile,
+      valid: SUPPORTED_STORAGE_PROFILES.has(options.storageProfile)
+    }),
+    nonSecretInput({
+      key: "target_env_file",
+      flag: "--target-env-file",
+      envNames: ["RSL_RECOVERY_ENV_FILE"],
+      value: options.targetEnvFile
+    }),
+    nonSecretInput({
+      key: "app_backup_dir",
+      flag: "--app-backup-dir",
+      envNames: ["RSL_RECOVERY_APP_BACKUP_DIR"],
+      value: options.appBackupDir
+    }),
+    nonSecretInput({
+      key: "postgres_backup_dir",
+      flag: "--postgres-backup-dir",
+      envNames: ["RSL_RECOVERY_POSTGRES_BACKUP_DIR"],
+      value: options.postgresBackupDir,
+      required: options.storageProfile === "postgres-preview",
+      valid: options.storageProfile !== "postgres-preview" || Boolean(options.postgresBackupDir)
+    }),
+    nonSecretInput({
+      key: "admin_username",
+      flag: "--admin-username",
+      envNames: ["RSL_SMOKE_ADMIN_USERNAME"],
+      value: options.adminUsername,
+      valid: /^[A-Za-z0-9._@-]{3,80}$/.test(String(options.adminUsername || ""))
+    }),
+    nonSecretInput({
+      key: "developer_username",
+      flag: "--developer-username",
+      envNames: ["RSL_SMOKE_DEVELOPER_USERNAME"],
+      value: options.developerUsername,
+      valid: /^[A-Za-z0-9._@-]{3,80}$/.test(String(options.developerUsername || ""))
+    }),
+    nonSecretInput({
+      key: "closeout_input_file",
+      flag: "--closeout-input-file",
+      value: options.closeoutInputFile
+    }),
+    nonSecretInput({
+      key: "actions_file",
+      flag: "--actions-file",
+      value: options.actionsFile
+    }),
+    nonSecretInput({
+      key: "profile_output_file",
+      flag: "--profile-output-file",
+      value: options.profileOutputFile
+    }),
+    nonSecretInput({
+      key: "backup_restore_artifact",
+      flag: "--backup-restore-artifact",
+      value: options.backupRestoreArtifact
+    })
+  ];
+  const secretEnvInputs = [
+    ["admin_password", options.adminPasswordEnv],
+    ["developer_password", options.developerPasswordEnv],
+    ["developer_bearer_token", options.developerBearerTokenEnv]
+  ].map(([key, envName]) => ({
+    key,
+    envName,
+    required: true,
+    present: proofs.secretEnvProof.presentKeys.includes(envName),
+    value: "<redacted>"
+  }));
+  const missingRequiredInputKeys = nonSecretInputs
+    .filter((item) => item.required && !item.present)
+    .map((item) => item.key);
+  const invalidRequiredInputKeys = nonSecretInputs
+    .filter((item) => item.required && item.present && !item.valid)
+    .map((item) => item.key);
+  const missingSecretEnvKeys = secretEnvInputs
+    .filter((item) => item.required && !item.present)
+    .map((item) => item.envName);
+  const ready = missingRequiredInputKeys.length === 0
+    && invalidRequiredInputKeys.length === 0
+    && missingSecretEnvKeys.length === 0;
+  return {
+    mode: "launch-production-proof-preflight-input-contract/v1",
+    status: ready
+      ? "ready_for_production_proof_preflight"
+      : "blocked_until_real_environment_inputs_ready",
+    ready,
+    willWriteLiveData: false,
+    willModifyData: false,
+    nonSecretReadyCount: nonSecretInputs.filter((item) => item.ready).length,
+    nonSecretInputCount: nonSecretInputs.length,
+    secretEnvReadyCount: secretEnvInputs.filter((item) => item.present).length,
+    secretEnvInputCount: secretEnvInputs.length,
+    missingRequiredInputKeys,
+    invalidRequiredInputKeys,
+    missingSecretEnvKeys,
+    nonSecretInputs,
+    secretEnvInputs,
+    manualLiveWriteGate: {
+      key: "launch_smoke_staging",
+      status: "operator_confirmation_required",
+      requiresOperatorConfirmation: true,
+      willWriteLiveData: true,
+      willModifyData: true,
+      command: nextCommands.launchSmokeStaging.command
+    },
+    nextAction: ready
+      ? "Run the no-write profile, recovery, and staging preflight commands before manually approving launch_smoke_staging."
+      : "Fill missing or invalid real-environment inputs and secret environment variables, then rerun production proof preflight."
+  };
+}
+
 function buildResult(options) {
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(options.baseUrl);
   const storageProfileProof = buildProductionSwitchStorageProfileProof(options.storageProfile);
@@ -450,6 +616,7 @@ function buildResult(options) {
     ? "ready_for_real_environment_proof_start"
     : "blocked_before_real_environment_proof_start";
   const nextCommands = buildNextCommands(options, backupRestoreDrillProof);
+  const realEnvironmentInputContract = buildRealEnvironmentInputContract(options, proofs, nextCommands);
   return {
     status,
     mode: "launch-production-proof-preflight",
@@ -476,6 +643,7 @@ function buildResult(options) {
       options.developerPasswordEnv,
       options.developerBearerTokenEnv
     ],
+    realEnvironmentInputContract,
     nextCommands,
     nextAction: status === "pass"
       ? "Run profileInit and recoveryPreflight first; run stagingPreflight before launchSmokeStaging, and backfill backup_restore_drill_result after the recovery drill passes."
@@ -484,6 +652,47 @@ function buildResult(options) {
       ? { error: { message: failedChecks[0]?.message || "Production proof preflight failed." } }
       : {})
   };
+}
+
+function writeRealEnvironmentInputContract(contract, writeLine) {
+  if (!contract || typeof contract !== "object") {
+    return;
+  }
+  writeLine(
+    `Production proof real-environment input contract: ${contract.status || "-"}`
+      + ` | nonSecret=${contract.nonSecretReadyCount ?? "-"}/${contract.nonSecretInputCount ?? "-"}`
+      + ` | secretEnv=${contract.secretEnvReadyCount ?? "-"}/${contract.secretEnvInputCount ?? "-"}`
+      + ` | missing=${[
+        ...(contract.missingRequiredInputKeys || []),
+        ...(contract.missingSecretEnvKeys || [])
+      ].join(",") || "-"}`
+      + ` | invalid=${(contract.invalidRequiredInputKeys || []).join(",") || "-"}`
+  );
+  for (const input of contract.nonSecretInputs || []) {
+    writeLine(
+      `Production proof non-secret input: ${input.key || "-"}`
+        + ` | flag=${input.flag || "-"}`
+        + ` | env=${(input.envNames || []).join(",") || "-"}`
+        + ` | required=${input.required ? "yes" : "no"}`
+        + ` | present=${input.present ? "yes" : "no"}`
+        + ` | valid=${input.valid ? "yes" : "no"}`
+        + ` | value=${input.value || "-"}`
+    );
+  }
+  for (const input of contract.secretEnvInputs || []) {
+    writeLine(
+      `Production proof secret env input: ${input.key || "-"}`
+        + ` | env=${input.envName || "-"}`
+        + ` | required=${input.required ? "yes" : "no"}`
+        + ` | present=${input.present ? "yes" : "no"}`
+        + ` | value=<redacted>`
+    );
+  }
+  writeLine(
+    `Production proof manual live-write gate: ${contract.manualLiveWriteGate?.key || "-"}`
+      + ` | status=${contract.manualLiveWriteGate?.status || "-"}`
+      + ` | command=${contract.manualLiveWriteGate?.command || "-"}`
+  );
 }
 
 function writeResult(result, json) {
@@ -495,6 +704,7 @@ function writeResult(result, json) {
   if (result.status === "pass") {
     console.log("Production proof preflight passed. No data was modified.");
     console.log(`Production proof status: ${result.summary.proofStatus}`);
+    writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.log);
     console.log(`Production proof profile init: ${result.nextCommands.profileInit.command}`);
     console.log(`Production proof recovery preflight: ${result.nextCommands.recoveryPreflight.command}`);
     console.log(`Production proof staging preflight: ${result.nextCommands.stagingPreflight.command}`);
@@ -504,6 +714,7 @@ function writeResult(result, json) {
   }
 
   console.error(`Production proof preflight failed: ${result.error.message}`);
+  writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.error);
   for (const check of result.checks) {
     console.error(`- ${check.status.toUpperCase()} ${check.name}: ${check.message}`);
   }

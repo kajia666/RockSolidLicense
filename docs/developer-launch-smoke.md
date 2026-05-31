@@ -54,7 +54,23 @@ The workspace routes intentionally carry `source=launch-smoke` and `handoff=firs
 
 In local ephemeral mode these entries use routes only because the temporary app shuts down after the script exits. In remote `--base-url` mode they also include absolute `href` values.
 
-Before running the remote write-path smoke against staging, run the no-write staging preflight first:
+Before running the remote write-path smoke against staging, start with the no-write production proof preflight:
+
+```powershell
+npm.cmd run launch:production-proof-preflight -- `
+  --base-url https://staging.example.com `
+  --product-code SMOKE_ALPHA `
+  --channel stable `
+  --target-os linux `
+  --storage-profile postgres-preview `
+  --target-env-file /etc/rocksolidlicense/staging.env `
+  --app-backup-dir /var/lib/rocksolid/backups `
+  --postgres-backup-dir /var/lib/rocksolid/postgres-backups `
+  --admin-username admin@example.com `
+  --developer-username launch.smoke.owner
+```
+
+This command does not write data. Its `Production proof real-environment input contract` section lists the non-secret CLI or env inputs, required secret environment variable names, missing or invalid fields, and the guarded `launch_smoke_staging` manual gate without printing password or bearer-token values. After the input contract is ready, continue with the profile-driven no-write staging rehearsal:
 
 ```powershell
 npm.cmd --silent run staging:rehearsal -- --json `

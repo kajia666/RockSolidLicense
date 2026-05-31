@@ -110,6 +110,30 @@ test("production proof preflight is exposed and blocks non-https or missing secr
   assert.equal(output.secretEnvProof.targetEnvFile, "/etc/rocksolidlicense/staging.env");
   assert.equal(output.checks.find((item) => item.name === "public-https.ready")?.status, "fail");
   assert.equal(output.checks.find((item) => item.name === "secret-env.loaded")?.status, "fail");
+  assert.equal(output.realEnvironmentInputContract.status, "blocked_until_real_environment_inputs_ready");
+  assert.deepEqual(output.realEnvironmentInputContract.missingRequiredInputKeys, []);
+  assert.deepEqual(output.realEnvironmentInputContract.invalidRequiredInputKeys, ["base_url"]);
+  assert.deepEqual(output.realEnvironmentInputContract.missingSecretEnvKeys, [
+    "RSL_SMOKE_ADMIN_PASSWORD",
+    "RSL_SMOKE_DEVELOPER_PASSWORD",
+    "RSL_DEVELOPER_BEARER_TOKEN"
+  ]);
+  assert.equal(
+    output.realEnvironmentInputContract.nonSecretInputs.find((item) => item.key === "base_url")?.valid,
+    false
+  );
+  assert.deepEqual(
+    output.realEnvironmentInputContract.secretEnvInputs.map((item) => ({
+      envName: item.envName,
+      present: item.present,
+      value: item.value
+    })),
+    [
+      { envName: "RSL_SMOKE_ADMIN_PASSWORD", present: false, value: "<redacted>" },
+      { envName: "RSL_SMOKE_DEVELOPER_PASSWORD", present: false, value: "<redacted>" },
+      { envName: "RSL_DEVELOPER_BEARER_TOKEN", present: false, value: "<redacted>" }
+    ]
+  );
   assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
 });
 
@@ -127,6 +151,18 @@ test("production proof preflight returns no-write launch commands when real-envi
   assert.equal(output.summary.willModifyData, false);
   assert.equal(output.summary.proofStatus, "ready_for_real_environment_proof_start");
   assert.ok(output.checks.every((item) => item.status === "pass"));
+  assert.equal(output.realEnvironmentInputContract.status, "ready_for_production_proof_preflight");
+  assert.deepEqual(output.realEnvironmentInputContract.missingRequiredInputKeys, []);
+  assert.deepEqual(output.realEnvironmentInputContract.invalidRequiredInputKeys, []);
+  assert.deepEqual(output.realEnvironmentInputContract.missingSecretEnvKeys, []);
+  assert.deepEqual(output.realEnvironmentInputContract.manualLiveWriteGate, {
+    key: "launch_smoke_staging",
+    status: "operator_confirmation_required",
+    requiresOperatorConfirmation: true,
+    willWriteLiveData: true,
+    willModifyData: true,
+    command: "npm.cmd run launch:smoke:staging -- --base-url https://staging.example.com --allow-live-writes --product-code PILOT_ALPHA --channel beta --admin-username admin@example.com --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD --developer-username launch.smoke.owner --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+  });
   assert.deepEqual(output.publicHttpsProof, {
     status: "ready_public_https_entrypoint",
     baseUrl: "https://staging.example.com",
@@ -202,7 +238,25 @@ test("production proof preflight plain output prints copyable commands without s
   assert.match(result.stdout, /Production proof recovery preflight: npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview/);
   assert.match(result.stdout, /Production proof staging preflight: npm\.cmd run staging:preflight -- --base-url https:\/\/staging\.example\.com/);
   assert.match(result.stdout, /Production proof live-write smoke \(manual gate\): npm\.cmd run launch:smoke:staging -- --base-url https:\/\/staging\.example\.com --allow-live-writes/);
+  assert.match(result.stdout, /Production proof real-environment input contract: ready_for_production_proof_preflight \| nonSecret=14\/14 \| secretEnv=3\/3 \| missing=- \| invalid=-/);
+  assert.match(result.stdout, /Production proof non-secret input: base_url \| flag=--base-url \| env=RSL_PRODUCTION_SWITCH_BASE_URL,RSL_STAGING_BASE_URL \| required=yes \| present=yes \| valid=yes \| value=https:\/\/staging\.example\.com/);
+  assert.match(result.stdout, /Production proof secret env input: admin_password \| env=RSL_SMOKE_ADMIN_PASSWORD \| required=yes \| present=yes \| value=<redacted>/);
+  assert.match(result.stdout, /Production proof manual live-write gate: launch_smoke_staging \| status=operator_confirmation_required \| command=npm\.cmd run launch:smoke:staging -- --base-url https:\/\/staging\.example\.com --allow-live-writes/);
   assert.match(result.stdout, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
   assert.match(result.stdout, /\$env:RSL_SMOKE_DEVELOPER_PASSWORD/);
   assert.doesNotMatch(result.stdout, /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+});
+
+test("production proof preflight plain failure prints a secret-free input contract", () => {
+  const result = runPlainPreflight(validArgs, {
+    RSL_SMOKE_ADMIN_PASSWORD: "",
+    RSL_SMOKE_DEVELOPER_PASSWORD: "",
+    RSL_DEVELOPER_BEARER_TOKEN: ""
+  });
+
+  assert.equal(result.status, 1, result.stderr || result.stdout);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /Production proof real-environment input contract: blocked_until_real_environment_inputs_ready \| nonSecret=14\/14 \| secretEnv=0\/3 \| missing=RSL_SMOKE_ADMIN_PASSWORD,RSL_SMOKE_DEVELOPER_PASSWORD,RSL_DEVELOPER_BEARER_TOKEN \| invalid=-/);
+  assert.match(result.stderr, /Production proof secret env input: admin_password \| env=RSL_SMOKE_ADMIN_PASSWORD \| required=yes \| present=no \| value=<redacted>/);
+  assert.doesNotMatch(result.stderr, /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
 });

@@ -409,6 +409,55 @@ function buildPostFullTestSignoffBridge({
   };
 }
 
+function buildPostReceiptVisibilityLaunchDayBridge({
+  outputFile,
+  actionsFile,
+  targetType,
+  key,
+  signoffProgress,
+  launchDutyReadyHandoff,
+  launchEvidenceReadinessGate
+}) {
+  if (targetType !== "receipt_visibility_lane" || !launchDutyReadyHandoff || signoffProgress?.status !== "filled") {
+    return null;
+  }
+  return {
+    version: "staging-signoff-post-receipt-visibility-launch-day-bridge/v1",
+    status: "ready_for_launch_day_watch",
+    currentGate: "launch_day_watch",
+    currentActionKey: launchDutyReadyHandoff.currentActionKey || "archive_production_signoff",
+    currentCommand: launchDutyReadyHandoff.statusCommand || null,
+    actionQueueFile: actionsFile || null,
+    outputFile,
+    completedReceiptVisibilityLane: key,
+    signoffProgress: {
+      filledConditionCount: signoffProgress.filledConditionCount ?? 0,
+      requiredConditionCount: signoffProgress.requiredConditionCount ?? 0,
+      visibleReceiptLaneCount: signoffProgress.visibleReceiptLaneCount ?? 0,
+      requiredReceiptLaneCount: signoffProgress.requiredReceiptLaneCount ?? RECEIPT_VISIBILITY_KEYS.length
+    },
+    productionSignoffPacketPath: launchDutyReadyHandoff.productionSignoffPacketPath || null,
+    launchDutyArchiveIndexPath: launchDutyReadyHandoff.launchDutyArchiveIndexPath || null,
+    launchDutyRecordIndexPath: launchDutyReadyHandoff.launchDutyRecordIndexPath || launchEvidenceReadinessGate?.launchDutyRecordIndexPath || null,
+    launchDayWatch: {
+      key: "launch_day_watch_summary",
+      status: "blocked_after_rehearsal_reload",
+      command: launchEvidenceReadinessGate?.currentEvidenceKey === "launch_day_watch_summary"
+        ? launchEvidenceReadinessGate.currentCommand
+        : null,
+      artifactPath: launchEvidenceReadinessGate?.launchDayWatchArtifact || null
+    },
+    firstWaveCloseout: {
+      key: "first_wave_closeout",
+      status: "blocked_after_launch_day_watch_summary",
+      artifactPath: launchEvidenceReadinessGate?.firstWaveCloseoutArtifact || null
+    },
+    statusCommand: launchDutyReadyHandoff.statusCommand || null,
+    rehearsalReloadCommand: launchDutyReadyHandoff.reloadCommand || null,
+    nextAction: "Run statusCommand, run rehearsalReloadCommand, archive the production sign-off packet, then record launch_day_watch_summary."
+  };
+}
+
 function buildEvidenceValue(options) {
   const parsed = JSON.parse(options.valueJson);
   const value = parsed && typeof parsed === "object" && !Array.isArray(parsed)
@@ -1123,6 +1172,26 @@ function writePostFullTestSignoffBridgePlain(bridge) {
   console.log(`Post-full-test next action: ${bridge.nextAction || "-"}`);
 }
 
+function writePostReceiptVisibilityLaunchDayBridgePlain(bridge) {
+  if (!bridge) {
+    return;
+  }
+  console.log(
+    `Post-receipt launch-day bridge: ${bridge.status || "-"}`
+      + ` | receipt=${bridge.completedReceiptVisibilityLane || "-"}`
+      + ` | signoff=${bridge.signoffProgress?.filledConditionCount ?? "-"}/${bridge.signoffProgress?.requiredConditionCount ?? "-"}`
+      + ` | receipts=${bridge.signoffProgress?.visibleReceiptLaneCount ?? "-"}/${bridge.signoffProgress?.requiredReceiptLaneCount ?? "-"}`
+  );
+  console.log(`Post-receipt current: ${bridge.currentActionKey || "-"} -> ${bridge.currentCommand || "-"}`);
+  console.log(`Post-receipt rehearsal reload: ${bridge.rehearsalReloadCommand || "-"}`);
+  console.log(`Post-receipt launch-day watch: ${bridge.launchDayWatch?.key || "-"} -> ${bridge.launchDayWatch?.command || "-"}`);
+  console.log(
+    `Post-receipt launch-day packet: ${bridge.productionSignoffPacketPath || "-"}`
+      + ` | recordIndex=${bridge.launchDutyRecordIndexPath || "-"}`
+  );
+  console.log(`Post-receipt next action: ${bridge.nextAction || "-"}`);
+}
+
 function writeProductionSwitchProofPacketPlain(packet) {
   if (!packet) {
     return;
@@ -1211,6 +1280,7 @@ function writeResult(result, json) {
     }
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     writePostFullTestSignoffBridgePlain(result.postFullTestSignoffBridge);
+    writePostReceiptVisibilityLaunchDayBridgePlain(result.postReceiptVisibilityLaunchDayBridge);
     if (result.launchEvidenceReadinessGate) {
       const gate = result.launchEvidenceReadinessGate;
       console.log(
@@ -1356,6 +1426,15 @@ function main() {
       readinessStatusCommand: nextStatusCommand,
       rehearsalCommand: nextCommand
     });
+    const postReceiptVisibilityLaunchDayBridge = buildPostReceiptVisibilityLaunchDayBridge({
+      outputFile,
+      actionsFile,
+      targetType,
+      key,
+      signoffProgress,
+      launchDutyReadyHandoff,
+      launchEvidenceReadinessGate
+    });
     writeResult({
       status: "written",
       mode: "staging-signoff-backfill",
@@ -1375,6 +1454,7 @@ function main() {
       productionSwitchProofPacket,
       launchEvidenceReadinessGate,
       ...(postFullTestSignoffBridge ? { postFullTestSignoffBridge } : {}),
+      ...(postReceiptVisibilityLaunchDayBridge ? { postReceiptVisibilityLaunchDayBridge } : {}),
       ...(launchDutyReadyHandoff ? { launchDutyReadyHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,

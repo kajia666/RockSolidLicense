@@ -1215,6 +1215,46 @@ test("staging signoff backfill prints launch-duty ready handoff after final rece
       launchDutyRecordIndexPath: "artifacts/staging/PILOT_ALPHA/stable/launch-duty-record-index.json",
       nextAction: "Run statusCommand to confirm launch-day watch readiness, then run reloadCommand and archive the production sign-off packet."
     });
+    assert.deepEqual(output.postReceiptVisibilityLaunchDayBridge, {
+      version: "staging-signoff-post-receipt-visibility-launch-day-bridge/v1",
+      status: "ready_for_launch_day_watch",
+      currentGate: "launch_day_watch",
+      currentActionKey: "archive_production_signoff",
+      currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      actionQueueFile: actionsFile,
+      outputFile: closeoutInputFile,
+      completedReceiptVisibilityLane: "launchOpsOverviewStatus",
+      signoffProgress: {
+        filledConditionCount: 7,
+        requiredConditionCount: 7,
+        visibleReceiptLaneCount: 5,
+        requiredReceiptLaneCount: 5
+      },
+      productionSignoffPacketPath: "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json",
+      launchDutyArchiveIndexPath: "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json",
+      launchDutyRecordIndexPath: "artifacts/staging/PILOT_ALPHA/stable/launch-duty-record-index.json",
+      launchDayWatch: {
+        key: "launch_day_watch_summary",
+        status: "blocked_after_rehearsal_reload",
+        command: buildLaunchDutyRecordCommand({
+          closeoutInputFile,
+          actionsFile,
+          archiveRoot: "artifacts/staging/PILOT_ALPHA/stable",
+          key: "launch_day_watch_summary",
+          artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md",
+          receiptIds: ["<record_cutover_walkthrough-receipt-id>", "<record_launch_day_readiness_review-receipt-id>"]
+        }),
+        artifactPath: "artifacts/staging/PILOT_ALPHA/stable/launch-day-watch-summary.md"
+      },
+      firstWaveCloseout: {
+        key: "first_wave_closeout",
+        status: "blocked_after_launch_day_watch_summary",
+        artifactPath: "artifacts/staging/PILOT_ALPHA/stable/first-wave-closeout.md"
+      },
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      rehearsalReloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      nextAction: "Run statusCommand, run rehearsalReloadCommand, archive the production sign-off packet, then record launch_day_watch_summary."
+    });
 
     const plainResult = runBackfillPlain([
       "--input-file",
@@ -1239,6 +1279,11 @@ test("staging signoff backfill prints launch-duty ready handoff after final rece
     assert.match(plainResult.stdout, /Launch duty archive index: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-launch-duty-archive-index\.json/);
     assert.match(plainResult.stdout, /Launch duty record index: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
     assert.match(plainResult.stdout, /Launch duty next action: Run statusCommand to confirm launch-day watch readiness, then run reloadCommand and archive the production sign-off packet\./);
+    assert.match(plainResult.stdout, /Post-receipt launch-day bridge: ready_for_launch_day_watch \| receipt=launchOpsOverviewStatus \| signoff=7\/7 \| receipts=5\/5/);
+    assert.match(plainResult.stdout, /Post-receipt current: archive_production_signoff -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input-plain\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(plainResult.stdout, /Post-receipt rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input-plain\.json/);
+    assert.match(plainResult.stdout, /Post-receipt launch-day watch: launch_day_watch_summary -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file .*filled-closeout-input-plain\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/launch-day-watch-summary\.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(plainResult.stdout, /Post-receipt launch-day packet: artifacts\/staging\/PILOT_ALPHA\/stable\/staging-production-signoff-packet\.json \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

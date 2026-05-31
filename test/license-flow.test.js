@@ -13464,7 +13464,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
-      /liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry \| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=live_write_smoke:ready_live_write_smoke_evidence_attached \| next=production_signoff \| signoff=npm\.cmd test \| packet=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+      /liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry \| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=live_write_smoke:ready_live_write_smoke_evidence_attached \| next=production_signoff \| signoff=npm\.cmd test \| packet=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/live-write-smoke-output\.json \| recordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
@@ -14002,7 +14002,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
-      /liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry \| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=live_write_smoke:ready_live_write_smoke_evidence_attached \| next=production_signoff \| signoff=npm\.cmd test \| packet=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+      /liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry \| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=live_write_smoke:ready_live_write_smoke_evidence_attached \| next=production_signoff \| signoff=npm\.cmd test \| packet=artifacts\/staging\/FIRSTBATCH\/stable\/staging-production-signoff-packet\.json \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/live-write-smoke-output\.json \| recordIndex=artifacts\/staging\/FIRSTBATCH\/stable\/launch-duty-record-index\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
@@ -25498,7 +25498,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
-      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry \| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=live_write_smoke:ready_live_write_smoke_evidence_attached \| next=production_signoff \| signoff=npm\.cmd test \| packet=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry \| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=live_write_smoke:ready_live_write_smoke_evidence_attached \| next=production_signoff \| signoff=npm\.cmd test \| packet=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/live-write-smoke-output\.json \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
@@ -28817,7 +28817,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsOperatorEntryDownload.body,
-      /Operator Queue Checkpoint:[\s\S]*liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry \| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=live_write_smoke:ready_live_write_smoke_evidence_attached \| next=production_signoff \| signoff=npm\.cmd test \| packet=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| status=blocked_until_real_environment_proof/
+      /Operator Queue Checkpoint:[\s\S]*liveWriteSmokeReadbackHandoff=live_write_smoke_result_backfill -> readiness_readback -> rehearsal_reload -> production_signoff_entry \| backfill=npm\.cmd run staging:closeout:backfill[^\n]*\| readback=npm\.cmd run staging:readiness:status[^\n]*\| rehearsal=npm\.cmd run staging:rehearsal[^\n]*\| expected=live_write_smoke:ready_live_write_smoke_evidence_attached \| next=production_signoff \| signoff=npm\.cmd test \| packet=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/staging-production-signoff-packet\.json \| artifact=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/live-write-smoke-output\.json \| recordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json \| status=blocked_until_real_environment_proof/
     );
     assert.match(
       launchOperationsOperatorEntryDownload.body,

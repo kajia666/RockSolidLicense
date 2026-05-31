@@ -63829,6 +63829,8 @@ function appendLiveWriteSmokeReadbackHandoffLine(
     + " | next=production_signoff"
     + ` | signoff=${signoffEntrypoint?.currentCommand || signoffEntrypoint?.fullTestCommand || signoffEntrypoint?.productionSignoffBackfillCommand || "-"}`
     + ` | packet=${signoffEntrypoint?.productionSignoffPacket || "-"}`
+    + ` | artifact=${liveWriteSmokeEntrypoint.liveWriteSmokeOutputArtifact || "-"}`
+    + ` | recordIndex=${liveWriteSmokeEntrypoint.launchDutyRecordIndexPath || "-"}`
     + ` | status=${liveWriteSmokeEntrypoint.status || "-"}`
   );
   return true;

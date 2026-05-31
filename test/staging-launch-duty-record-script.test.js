@@ -918,6 +918,51 @@ test("staging launch duty record emits completion handoff after first-wave close
       rehearsalReloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
       nextAction: "Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner."
     });
+    assert.deepEqual(output.postFirstWaveCloseoutStableOpsBridge, {
+      version: "staging-launch-duty-record-post-first-wave-closeout-stable-ops-bridge/v1",
+      status: "ready_for_stable_operations_refresh",
+      currentGate: "stable_operations_handoff",
+      completedRecordKey: "first_wave_closeout",
+      closeoutInputFile,
+      actionsFile,
+      recordIndexFile,
+      progress: {
+        recordedCount: 6,
+        pendingCount: 0,
+        completedRecordKeys: [
+          "launch_day_watch_summary",
+          "receipt_visibility_snapshot",
+          "first_wave_incident_log",
+          "rollback_signal_review",
+          "stabilization_owner_handoff",
+          "first_wave_closeout"
+        ]
+      },
+      currentActionKey: "readiness_status",
+      currentCommand: `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`,
+      nextActionKey: "rehearsal_reload",
+      nextCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`,
+      expectedReadbacks: {
+        readiness: {
+          gate: "stable_operations_handoff",
+          status: "ready_for_stabilization_handoff",
+          nextAction: "reload_rehearsal_for_stabilization_handoff"
+        },
+        rehearsal: {
+          status: "ready_for_stable_operations_handoff",
+          current: "stable_operations_handoff",
+          confirmationPoints: ["launch_duty_record_index", "first_wave_closeout"]
+        }
+      },
+      handoffArtifacts: [recordIndexFile, closeoutArtifactPath],
+      stableOperationsHandoff: {
+        status: "blocked_after_rehearsal_reload",
+        requiredArtifacts: [recordIndexFile, closeoutArtifactPath],
+        firstWaveCloseoutArtifactPath: closeoutArtifactPath,
+        nextAction: "Open stable-operations handoff after readiness and rehearsal confirm the completed launch-duty record index."
+      },
+      nextAction: "Run currentCommand, run nextCommand, then open stable-operations handoff with the launch-duty record index and first-wave closeout artifact."
+    });
     assert.deepEqual(
       {
         version: output.launchEvidenceReadinessGate?.version,
@@ -1056,6 +1101,12 @@ test("staging launch duty record prints completion handoff after first-wave clos
     assert.match(result.stdout, /Launch duty completion handoff: ready_for_stabilization_handoff/);
     assert.match(result.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch duty completion handoff next action: Refresh readiness status, reload rehearsal, then hand off the launch-duty record index and first-wave closeout artifact to the stabilization owner\./);
+    assert.match(result.stdout, /Post-first-wave stable bridge: ready_for_stable_operations_refresh \| recorded=6\/6 \| current=readiness_status \| next=rehearsal_reload/);
+    assert.match(result.stdout, /Post-first-wave current: readiness_status -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Post-first-wave rehearsal reload: rehearsal_reload -> npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(result.stdout, /Post-first-wave readiness readback: stable_operations_handoff \| status=ready_for_stabilization_handoff \| next=reload_rehearsal_for_stabilization_handoff/);
+    assert.match(result.stdout, /Post-first-wave rehearsal readback: ready_for_stable_operations_handoff \| current=stable_operations_handoff \| confirmations=launch_duty_record_index,first_wave_closeout/);
+    assert.match(result.stdout, /Post-first-wave stable handoff: blocked_after_rehearsal_reload -> .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch duty operator next blocked_after_rehearsal_reload: stable_operations_handoff -> -/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

@@ -563,6 +563,57 @@ function buildPostLaunchDayWatchFirstWaveBridge({
   };
 }
 
+function buildPostFirstWaveCloseoutStableOpsBridge({
+  options,
+  recordIndexFile,
+  recordIndex,
+  statusRefreshCommand,
+  rehearsalReloadCommand
+}) {
+  const completionHandoff = recordIndex?.completionHandoff || null;
+  if (options.key !== "first_wave_closeout" || !completionHandoff) {
+    return null;
+  }
+  return {
+    version: "staging-launch-duty-record-post-first-wave-closeout-stable-ops-bridge/v1",
+    status: "ready_for_stable_operations_refresh",
+    currentGate: "stable_operations_handoff",
+    completedRecordKey: "first_wave_closeout",
+    closeoutInputFile: options.closeoutInputFile,
+    actionsFile: options.actionsFile || null,
+    recordIndexFile,
+    progress: {
+      recordedCount: recordIndex.recordedCount,
+      pendingCount: recordIndex.pendingCount,
+      completedRecordKeys: recordIndex.recordedKeys
+    },
+    currentActionKey: "readiness_status",
+    currentCommand: statusRefreshCommand,
+    nextActionKey: "rehearsal_reload",
+    nextCommand: rehearsalReloadCommand,
+    expectedReadbacks: {
+      readiness: {
+        gate: "stable_operations_handoff",
+        status: "ready_for_stabilization_handoff",
+        nextAction: "reload_rehearsal_for_stabilization_handoff"
+      },
+      rehearsal: {
+        status: "ready_for_stable_operations_handoff",
+        current: "stable_operations_handoff",
+        confirmationPoints: ["launch_duty_record_index", "first_wave_closeout"]
+      }
+    },
+    handoffArtifacts: completionHandoff.handoffArtifacts || [recordIndexFile, completionHandoff.firstWaveCloseoutArtifactPath].filter(Boolean),
+    stableOperationsHandoff: {
+      status: "blocked_after_rehearsal_reload",
+      requiredArtifacts: completionHandoff.handoffArtifacts || [recordIndexFile, completionHandoff.firstWaveCloseoutArtifactPath].filter(Boolean),
+      firstWaveCloseoutArtifactPath: completionHandoff.firstWaveCloseoutArtifactPath,
+      nextAction: "Open stable-operations handoff after readiness and rehearsal confirm the completed launch-duty record index."
+    },
+    nextAction: "Run currentCommand, run nextCommand, then open stable-operations handoff with the launch-duty record index and first-wave closeout artifact."
+  };
+}
+
 function buildRecordIndexEntry({ options, target, value, sourceRecords, recordedAt }) {
   return {
     key: options.key,
@@ -1219,6 +1270,13 @@ function buildResult(options) {
     statusRefreshCommand,
     rehearsalReloadCommand
   });
+  const postFirstWaveCloseoutStableOpsBridge = buildPostFirstWaveCloseoutStableOpsBridge({
+    options,
+    recordIndexFile,
+    recordIndex,
+    statusRefreshCommand,
+    rehearsalReloadCommand
+  });
   writeRecordIndex(recordIndexFile, recordIndex);
   return {
     status: "written",
@@ -1252,6 +1310,7 @@ function buildResult(options) {
     launchEvidenceReadinessGate,
     productionSwitchProofPacket,
     ...(postLaunchDayWatchFirstWaveBridge ? { postLaunchDayWatchFirstWaveBridge } : {}),
+    ...(postFirstWaveCloseoutStableOpsBridge ? { postFirstWaveCloseoutStableOpsBridge } : {}),
     nextAction: recordIndex.nextAction
   };
 }
@@ -1332,6 +1391,32 @@ function writePostLaunchDayWatchFirstWaveBridgePlain(bridge) {
   console.log(`Post-launch-day next action: ${bridge.nextAction || "-"}`);
 }
 
+function writePostFirstWaveCloseoutStableOpsBridgePlain(bridge) {
+  if (!bridge) {
+    return;
+  }
+  console.log(
+    `Post-first-wave stable bridge: ${bridge.status || "-"}`
+      + ` | recorded=${bridge.progress?.recordedCount ?? "-"}/6`
+      + ` | current=${bridge.currentActionKey || "-"}`
+      + ` | next=${bridge.nextActionKey || "-"}`
+  );
+  console.log(`Post-first-wave current: ${bridge.currentActionKey || "-"} -> ${bridge.currentCommand || "-"}`);
+  console.log(`Post-first-wave rehearsal reload: ${bridge.nextActionKey || "-"} -> ${bridge.nextCommand || "-"}`);
+  console.log(
+    `Post-first-wave readiness readback: ${bridge.expectedReadbacks?.readiness?.gate || "-"}`
+      + ` | status=${bridge.expectedReadbacks?.readiness?.status || "-"}`
+      + ` | next=${bridge.expectedReadbacks?.readiness?.nextAction || "-"}`
+  );
+  console.log(
+    `Post-first-wave rehearsal readback: ${bridge.expectedReadbacks?.rehearsal?.status || "-"}`
+      + ` | current=${bridge.expectedReadbacks?.rehearsal?.current || "-"}`
+      + ` | confirmations=${bridge.expectedReadbacks?.rehearsal?.confirmationPoints?.join(",") || "-"}`
+  );
+  console.log(`Post-first-wave stable handoff: ${bridge.stableOperationsHandoff?.status || "-"} -> ${bridge.stableOperationsHandoff?.requiredArtifacts?.join("; ") || "-"}`);
+  console.log(`Post-first-wave next action: ${bridge.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -1375,6 +1460,7 @@ function writeResult(result, json) {
       console.log(`Launch duty checkpoint next action: ${checkpoint.nextAction}`);
     }
     writePostLaunchDayWatchFirstWaveBridgePlain(result.postLaunchDayWatchFirstWaveBridge);
+    writePostFirstWaveCloseoutStableOpsBridgePlain(result.postFirstWaveCloseoutStableOpsBridge);
     if (result.launchEvidenceReadinessGate) {
       const gate = result.launchEvidenceReadinessGate;
       console.log(

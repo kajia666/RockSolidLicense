@@ -13221,6 +13221,69 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceReviewCutoverTriageControl.productionProofPreflightHandoff,
       runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.productionProofPreflightHandoff
     );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageControl.productionProofPreflightHandoff?.productionProofExecutionQueue?.steps
+        ?.map((item) => ({
+          order: item.order,
+          key: item.key,
+          phase: item.phase,
+          status: item.status,
+          willWriteLiveData: item.willWriteLiveData
+        })),
+      [
+        {
+          order: 1,
+          key: "staging_profile_init",
+          phase: "no_write",
+          status: "blocked_until_production_proof_preflight_passes",
+          willWriteLiveData: false
+        },
+        {
+          order: 2,
+          key: "recovery_preflight",
+          phase: "no_write",
+          status: "blocked_until_previous_step_complete",
+          willWriteLiveData: false
+        },
+        {
+          order: 3,
+          key: "staging_preflight",
+          phase: "no_write",
+          status: "blocked_until_previous_step_complete",
+          willWriteLiveData: false
+        },
+        {
+          order: 4,
+          key: "launch_smoke_staging",
+          phase: "manual_live_write_gate",
+          status: "blocked_until_operator_confirmation",
+          willWriteLiveData: true
+        },
+        {
+          order: 5,
+          key: "staging_readiness_status",
+          phase: "readback",
+          status: "blocked_until_previous_step_complete",
+          willWriteLiveData: false
+        }
+      ]
+    );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionQueue,
+      runtimeEvidenceReviewCutoverTriageControl.productionProofPreflightHandoff?.productionProofExecutionQueue
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.productionProofExecutionQueue,
+      runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionQueue
+    );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageAction.context?.productionProofExecutionQueue,
+      runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionQueue
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofExecutionQueue,
+      runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionQueue
+    );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /productionSwitchProof=/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Cutover Triage Checkpoint:/);
@@ -13476,6 +13539,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceReviewHandoffRoutes.body,
       /Production Proof Preflight Handoff:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofExecutionQueue=staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> staging_readiness_status \| status=blocked_until_production_proof_preflight_passes \| current=production_proof_preflight \| currentCommand=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| ready=no,no,no,no,no \| write=no,no,no,yes,no \| manualGate=launch_smoke_staging/
     );
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /launchCutoverTriage=hold_for_launch_evidence/);
@@ -13942,6 +14009,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceSmokeHandoffRoutes.body,
       /Production Proof Preflight Handoff:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
+    assert.match(
+      runtimeEvidenceSmokeHandoffRoutes.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofExecutionQueue=staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> staging_readiness_status \| status=blocked_until_production_proof_preflight_passes \| current=production_proof_preflight \| currentCommand=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| ready=no,no,no,no,no \| write=no,no,no,yes,no \| manualGate=launch_smoke_staging/
     );
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /launchCutoverTriage=hold_for_launch_evidence/);
@@ -24542,6 +24613,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           productionSwitchProofPacket?.productionProofPreflightEntrypoint || null,
         productionProofPreflightHandoff:
           productionSwitchProofPacket?.productionProofPreflightHandoff || null,
+        productionProofExecutionQueue:
+          productionSwitchProofPacket?.productionProofExecutionQueue || null,
         liveWriteSmokeExecutionEntrypoint:
           productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint || null,
         productionSignoffExecutionEntrypoint:
@@ -27427,6 +27500,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofExecutionQueue=staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> staging_readiness_status \| status=blocked_until_production_proof_preflight_passes \| current=production_proof_preflight \| currentCommand=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| ready=no,no,no,no,no \| write=no,no,no,yes,no \| manualGate=launch_smoke_staging/
+    );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
       /Operator Order:[\s\S]*Check the front-loaded path first: launch-mainline-handoff-routes\.txt -> surface-review-closeout-shortcut-download\.txt -> developer-ops-pre-staging-readiness-self-check\.txt\./
     );
     assert.doesNotMatch(launchOperationsMainlineHandoffRoutesDownload.body, /complete Launch Mainline route map/);
@@ -27495,6 +27572,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Production Proof Preflight Handoff:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofExecutionQueue=staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> staging_readiness_status \| status=blocked_until_production_proof_preflight_passes \| current=production_proof_preflight \| currentCommand=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| ready=no,no,no,no,no \| write=no,no,no,yes,no \| manualGate=launch_smoke_staging/
     );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,

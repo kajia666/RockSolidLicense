@@ -200,6 +200,37 @@ test("launch smoke script runs the first-wave operations preflight", () => {
       [5, "download_ops_handoff_index", output.handoff.downloads.opsHandoffIndex.route]
     ]
   );
+  assert.equal(output.handoff.postSmokeCloseoutHandoff.version, "launch-smoke-post-smoke-closeout-handoff/v1");
+  assert.equal(output.handoff.postSmokeCloseoutHandoff.status, "ready_for_closeout_backfill");
+  assert.equal(output.handoff.postSmokeCloseoutHandoff.currentActionKey, "backfill_live_write_smoke_result");
+  assert.equal(output.handoff.postSmokeCloseoutHandoff.currentCloseoutKey, "live_write_smoke_result");
+  assert.equal(output.handoff.postSmokeCloseoutHandoff.currentCommand, output.handoff.closeoutBackfill.commands[0].command);
+  assert.deepEqual(output.handoff.postSmokeCloseoutHandoff.closeoutBackfillKeys, [
+    "live_write_smoke_result",
+    "launch_smoke_handoff",
+    "launch_mainline_evidence_receipts",
+    "receipt_visibility_review"
+  ]);
+  assert.deepEqual(output.handoff.postSmokeCloseoutHandoff.remainingCloseoutBackfillKeys, [
+    "launch_smoke_handoff",
+    "launch_mainline_evidence_receipts",
+    "receipt_visibility_review"
+  ]);
+  assert.equal(
+    output.handoff.postSmokeCloseoutHandoff.nextGate.command,
+    output.handoff.closeoutBackfill.statusCommand
+  );
+  assert.deepEqual(output.handoff.postSmokeCloseoutHandoff.productionSignoffGate, {
+    key: "production_signoff_entry",
+    status: "blocked_until_live_write_smoke_closeout_and_readiness_refresh",
+    blockedBy: [
+      "live_write_smoke_result",
+      "launch_smoke_handoff",
+      "launch_mainline_evidence_receipts",
+      "receipt_visibility_review",
+      "staging_readiness_status"
+    ]
+  });
   assert.deepEqual(output.handoff.operatorQueueCheckpoint, {
     mode: "launch-smoke-operator-queue-checkpoint",
     status: "awaiting_launch_review_handoff",
@@ -280,6 +311,11 @@ test("launch smoke plain output prints the ordered launch-duty handoff queue", (
   assert.match(result.stdout, /Closeout backfill queue:/);
   assert.match(result.stdout, /2\. launch_smoke_handoff: next -> npm\.cmd run staging:closeout:backfill/);
   assert.match(result.stdout, /4\. receipt_visibility_review: next -> npm\.cmd run staging:closeout:backfill/);
+  assert.match(result.stdout, /Post-smoke closeout handoff: ready_for_closeout_backfill \| current=live_write_smoke_result \| backfills=4 \| nextGate=refresh_staging_readiness_after_post_smoke_backfill/);
+  assert.match(result.stdout, /Post-smoke closeout command: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json --key live_write_smoke_result --value-json/);
+  assert.match(result.stdout, /Post-smoke closeout files: closeout=artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json \| actions=artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Post-smoke closeout readiness: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/SMOKE_PLAIN_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Post-smoke production signoff gate: production_signoff_entry \| status=blocked_until_live_write_smoke_closeout_and_readiness_refresh \| blockedBy=live_write_smoke_result, launch_smoke_handoff, launch_mainline_evidence_receipts, receipt_visibility_review, staging_readiness_status/);
 });
 
 test("launch smoke script requires explicit consent before remote live writes", () => {

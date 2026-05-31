@@ -514,6 +514,53 @@ function buildLaunchSmokeOperatorQueueCheckpoint(handoff) {
   };
 }
 
+function buildLaunchSmokePostSmokeCloseoutHandoff(handoff) {
+  const receiptVisibilityOperatorQueue = Array.isArray(handoff.receiptVisibilityOperatorQueue)
+    ? handoff.receiptVisibilityOperatorQueue
+    : [];
+  const closeoutBackfill = handoff.closeoutBackfill || {};
+  const closeoutCommands = Array.isArray(closeoutBackfill.commands) ? closeoutBackfill.commands : [];
+  const currentCloseoutBackfill = closeoutCommands.find((item) => item.status === "current") || closeoutCommands[0] || {};
+  const closeoutBackfillKeys = closeoutCommands.map((item) => item.key).filter(Boolean);
+  return {
+    version: "launch-smoke-post-smoke-closeout-handoff/v1",
+    status: closeoutBackfill.status || "blocked_missing_closeout_backfill",
+    currentActionKey: "backfill_live_write_smoke_result",
+    currentCloseoutKey: currentCloseoutBackfill.key || null,
+    currentCommand: currentCloseoutBackfill.command || null,
+    closeoutInputFile: closeoutBackfill.filledCloseoutInputFile || null,
+    readinessActionQueueFile: closeoutBackfill.readinessActionQueueFile || null,
+    readinessStatusCommand: closeoutBackfill.statusCommand || null,
+    closeoutBackfillKeys,
+    remainingCloseoutBackfillKeys: closeoutCommands
+      .filter((item) => item.status !== "current")
+      .map((item) => item.key)
+      .filter(Boolean),
+    receiptVisibilityCheckpoints: receiptVisibilityOperatorQueue.map((item) => ({
+      order: item.order,
+      key: item.key,
+      status: item.status,
+      kind: item.kind,
+      target: item.target,
+      launchDutyRecordIndexPath: item.launchDutyRecordIndexPath || null
+    })),
+    nextGate: {
+      key: "refresh_staging_readiness_after_post_smoke_backfill",
+      status: "blocked_until_closeout_backfills_pass",
+      command: closeoutBackfill.statusCommand || null
+    },
+    productionSignoffGate: {
+      key: "production_signoff_entry",
+      status: "blocked_until_live_write_smoke_closeout_and_readiness_refresh",
+      blockedBy: [
+        ...closeoutBackfillKeys,
+        "staging_readiness_status"
+      ]
+    },
+    nextAction: "Run the current closeout command, finish the remaining closeout backfills, refresh staging readiness, then enter production sign-off."
+  };
+}
+
 function parseAttachmentFileName(contentDisposition) {
   if (!contentDisposition) {
     return null;
@@ -795,6 +842,7 @@ function buildLaunchDutyHandoff({
   handoff.operatorNextCommands = buildLaunchDutyOperatorNextCommands(handoff.operatorChecklist);
   handoff.receiptVisibilityOperatorQueue = buildLaunchSmokeReceiptVisibilityOperatorQueue({ options, handoff });
   handoff.closeoutBackfill = buildLaunchSmokeCloseoutBackfill({ options, handoff, checksPassed });
+  handoff.postSmokeCloseoutHandoff = buildLaunchSmokePostSmokeCloseoutHandoff(handoff);
   handoff.operatorQueueCheckpoint = buildLaunchSmokeOperatorQueueCheckpoint(handoff);
   return handoff;
 }
@@ -1292,6 +1340,7 @@ function writeResult(result, json) {
           console.log(`${item.order}. ${item.key}: ${item.status} -> ${item.command}`);
         }
       }
+      printLaunchSmokePostSmokeCloseoutHandoff(result.handoff.postSmokeCloseoutHandoff);
       console.log(`- Open Launch Review: ${result.handoff.nextWorkspace.href || result.handoff.nextWorkspace.route}`);
       console.log(`- Verify Launch Review receipt visibility: ${result.handoff.downloads.launchReviewSummary.href || result.handoff.downloads.launchReviewSummary.route}`);
       console.log(`- Verify Launch Smoke receipt visibility: ${result.handoff.downloads.launchSmokeSummary.href || result.handoff.downloads.launchSmokeSummary.route}`);
@@ -1328,6 +1377,26 @@ function printLaunchSmokeOperatorQueueCheckpoint(checkpoint) {
       + `, nextCloseout=${checkpoint.nextCloseoutBackfillCount ?? "-"}`
   );
   console.log(`Launch smoke checkpoint next milestone: ${checkpoint.nextMilestoneKey || "-"} -> ${checkpoint.nextMilestoneTarget || "-"}`);
+}
+
+function printLaunchSmokePostSmokeCloseoutHandoff(handoff) {
+  if (!handoff) {
+    return;
+  }
+  console.log(
+    `Post-smoke closeout handoff: ${handoff.status || "-"}`
+      + ` | current=${handoff.currentCloseoutKey || "-"}`
+      + ` | backfills=${handoff.closeoutBackfillKeys?.length ?? "-"}`
+      + ` | nextGate=${handoff.nextGate?.key || "-"}`
+  );
+  console.log(`Post-smoke closeout command: ${handoff.currentCommand || "-"}`);
+  console.log(`Post-smoke closeout files: closeout=${handoff.closeoutInputFile || "-"} | actions=${handoff.readinessActionQueueFile || "-"}`);
+  console.log(`Post-smoke closeout readiness: ${handoff.readinessStatusCommand || "-"}`);
+  console.log(
+    `Post-smoke production signoff gate: ${handoff.productionSignoffGate?.key || "-"}`
+      + ` | status=${handoff.productionSignoffGate?.status || "-"}`
+      + ` | blockedBy=${(handoff.productionSignoffGate?.blockedBy || []).join(", ")}`
+  );
 }
 
 async function main() {

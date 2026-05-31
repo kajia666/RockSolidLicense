@@ -4733,6 +4733,24 @@ function formatLaunchWorkflowActionContextText(context = null) {
     }
     return segments.join(" | ");
   }
+  if (context.kind === "launch_cutover_triage") {
+    const preflightHandoff = context.productionProofPreflightHandoff
+      && typeof context.productionProofPreflightHandoff === "object"
+        ? context.productionProofPreflightHandoff
+        : null;
+    const segments = [
+      "context=launch_cutover_triage",
+      `status=${context.launchCutoverTriageStatus || "-"}`,
+      `evidence=${context.launchEvidenceStatus || "-"}:${context.launchEvidencePendingCount ?? "-"}/${context.launchEvidenceTotalCount ?? "-"}`,
+      `proof=${context.productionSwitchProofStatus || "-"}:${context.productionSwitchProofBlockedCount ?? "-"}/${context.productionSwitchProofTotalCount ?? "-"}`,
+      `current=${context.productionSwitchProofCurrentActionKey || "-"}`,
+      `preflight=${preflightHandoff?.preflightCommand || context.productionProofPreflightEntrypoint?.command || "-"}`,
+      `smoke=${preflightHandoff?.launchSmokeCommand || context.liveWriteSmokeExecutionEntrypoint?.launchSmokeCommand || "-"}`,
+      `manualGate=${preflightHandoff?.manualLiveWriteGate || "-"}`,
+      `launchDutyRecordIndex=${context.launchDutyRecordIndexPath || preflightHandoff?.launchDutyRecordIndexPath || "-"}`
+    ];
+    return segments.join(" | ");
+  }
   return `context=${context.kind || context.version || "action_context"}`;
 }
 
@@ -16604,6 +16622,10 @@ function buildDeveloperLaunchSmokeKitSummaryText(payload = {}) {
       lines.push(
         `- ${item.title || item.key || "step"} | ${String(item.priority || "secondary").toUpperCase()} | ${item.summary || "-"}${item.workspaceAction ? ` | workspace=${formatWorkspaceActionText(item.workspaceAction)}` : ""}${item.recommendedDownload ? ` | download=${formatLaunchHandoffDownloadText(item.recommendedDownload)}` : ""}${item.bootstrapAction ? ` | bootstrap=${item.bootstrapAction.label || item.bootstrapAction.key || "-"}` : ""}${item.setupAction ? ` | setup=${item.setupAction.label || item.setupAction.key || "-"}@${item.setupAction.mode || "recommended"}:${item.setupAction.operation || "first_batch_setup"}` : ""}`
       );
+      const contextText = formatLaunchWorkflowActionContextText(item.context);
+      if (contextText) {
+        lines.push(`  ${contextText}`);
+      }
     }
   }
 
@@ -62396,6 +62418,7 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
     return null;
   }
   return {
+    kind: "launch_cutover_triage",
     launchCutoverTriageStatus: checkpoint.status || null,
     launchEvidenceStatus: checkpoint.launchEvidenceStatus || null,
     launchEvidenceCurrentKey: checkpoint.launchEvidenceCurrentKey || null,

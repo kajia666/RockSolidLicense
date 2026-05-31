@@ -13496,15 +13496,15 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
-      /productionSwitchNextPhasePreview=live_write_smoke \| action=set_public_https_entrypoint \| commandReady=yes \| required=real_environment_proof:ready_for_real_environment_review \| backfill=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key live_write_smoke_result[\s\S]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
+      /productionSwitchNextPhasePreview=live_write_smoke \| action=set_public_https_entrypoint \| commandReady=yes \| command=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| required=real_environment_proof:ready_for_real_environment_review \| backfill=npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key live_write_smoke_result[^\n]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
-      /productionSwitchFollowingPhasePreview=production_signoff \| action=set_public_https_entrypoint \| commandReady=yes \| required=live_write_smoke:ready_live_write_smoke_evidence_attached \| backfill=npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --condition-key full_test_window_passed[\s\S]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
+      /productionSwitchFollowingPhasePreview=production_signoff \| action=set_public_https_entrypoint \| commandReady=yes \| command=npm\.cmd test \| required=live_write_smoke:ready_live_write_smoke_evidence_attached \| backfill=npm\.cmd run staging:signoff:backfill -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --condition-key full_test_window_passed[^\n]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
-      /productionSwitchThirdPhasePreview=launch_day_watch \| action=set_public_https_entrypoint \| commandReady=yes \| required=production_signoff:ready_production_signoff_evidence_attached \| backfill=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key launch_day_watch_summary[\s\S]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
+      /productionSwitchThirdPhasePreview=launch_day_watch \| action=set_public_https_entrypoint \| commandReady=yes \| command=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key launch_day_watch_summary[^\n]* \| required=production_signoff:ready_production_signoff_evidence_attached \| backfill=npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --key launch_day_watch_summary[^\n]* \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md/
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
@@ -13516,7 +13516,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
-      /productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
+      /productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[command=npm\.cmd run launch:smoke:staging[^\n]*; backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[command=npm\.cmd test; backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[command=npm\.cmd run staging:launch-duty:record[^\n]*; backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
@@ -13686,6 +13686,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceReviewHandoffRoutes.body,
       /Launch Cutover Triage Checkpoint:[\s\S]*productionSwitchCurrentExecution=blocked_until_real_environment_proof \| phase=real_environment_proof \| action=set_public_https_entrypoint \| commandReady=yes \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| refresh=npm\.cmd run staging:readiness:status/
+    );
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /Launch Cutover Triage Checkpoint:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[command=npm\.cmd run launch:smoke:staging[^\n]*; backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[command=npm\.cmd test; backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[command=npm\.cmd run staging:launch-duty:record[^\n]*; backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\]/
     );
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Review Package:/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Handoff Index:.*format=handoff-index/);
@@ -14023,7 +14027,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchSmoke.summaryText,
-      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
+      /Launch Smoke Cutover Triage Checkpoint:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[command=npm\.cmd run launch:smoke:staging[^\n]*; backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[command=npm\.cmd test; backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[command=npm\.cmd run staging:launch-duty:record[^\n]*; backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
     );
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemContinuation=current=backup_restore_drill \| remaining=5 \| next=live_write_smoke \| nextQueue=live_write_smoke_result_backfill/);
     assert.match(runtimeEvidenceLaunchSmoke.summaryText, /proofItemRunbook=currentQueue=backup_restore_drill_result_backfill \| refresh=yes \| nextQueue=live_write_smoke_result_backfill/);
@@ -25514,7 +25518,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchMainlineSteadyStateDutyReceiptReview.summaryText,
-      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
+      /Launch Mainline Launch Evidence Readiness Gate:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[command=npm\.cmd run launch:smoke:staging[^\n]*; backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[command=npm\.cmd test; backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[command=npm\.cmd run staging:launch-duty:record[^\n]*; backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
     );
     assert.equal(launchOperationsOperatorEntry.checklistStepCount, 14);
     assert.ok(Array.isArray(launchOperationsOperatorEntry.checklistStepKeys));
@@ -28793,7 +28797,7 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     );
     assert.match(
       launchOperationsOperatorEntryDownload.body,
-      /Operator Queue Checkpoint:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
+      /Operator Queue Checkpoint:[\s\S]*productionSwitchPostCommandExecutionQueue=1\.live_write_smoke\[command=npm\.cmd run launch:smoke:staging[^\n]*; backfill=npm\.cmd run staging:closeout:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 2\.production_signoff\[command=npm\.cmd test; backfill=npm\.cmd run staging:signoff:backfill[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] -> 3\.launch_day_watch\[command=npm\.cmd run staging:launch-duty:record[^\n]*; backfill=npm\.cmd run staging:launch-duty:record[^\n]*; refresh=npm\.cmd run staging:readiness:status[^\n]*\] \| status=blocked_until_real_environment_proof/
     );
     assert.match(
       launchOperationsOperatorEntryDownload.body,

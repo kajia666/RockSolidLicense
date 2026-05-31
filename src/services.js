@@ -63469,6 +63469,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
           `- productionSwitchNextPhasePreview=${nextPhasePreview.phaseKey || "-"}`
           + ` | action=${nextPhasePreview.actionKey || "-"}`
           + ` | commandReady=${nextPhasePreview.commandReady === true ? "yes" : "no"}`
+          + ` | command=${nextPhasePreview.command || "-"}`
           + ` | required=${nextPhasePreview.requiredBeforePhaseKey || "-"}:${nextPhasePreview.requiredBeforeStatus || "-"}`
           + ` | backfill=${nextPhasePreview.postCommandBackfillCommand || "-"}`
           + ` | refresh=${nextPhasePreview.postCommandRefreshCommand || "-"}`
@@ -63483,6 +63484,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
           `- productionSwitchFollowingPhasePreview=${followingPhasePreview.phaseKey || "-"}`
           + ` | action=${followingPhasePreview.actionKey || "-"}`
           + ` | commandReady=${followingPhasePreview.commandReady === true ? "yes" : "no"}`
+          + ` | command=${followingPhasePreview.command || "-"}`
           + ` | required=${followingPhasePreview.requiredBeforePhaseKey || "-"}:${followingPhasePreview.requiredBeforeStatus || "-"}`
           + ` | backfill=${followingPhasePreview.postCommandBackfillCommand || "-"}`
           + ` | refresh=${followingPhasePreview.postCommandRefreshCommand || "-"}`
@@ -63497,6 +63499,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
           `- productionSwitchThirdPhasePreview=${thirdPhasePreview.phaseKey || "-"}`
           + ` | action=${thirdPhasePreview.actionKey || "-"}`
           + ` | commandReady=${thirdPhasePreview.commandReady === true ? "yes" : "no"}`
+          + ` | command=${thirdPhasePreview.command || "-"}`
           + ` | required=${thirdPhasePreview.requiredBeforePhaseKey || "-"}:${thirdPhasePreview.requiredBeforeStatus || "-"}`
           + ` | backfill=${thirdPhasePreview.postCommandBackfillCommand || "-"}`
           + ` | refresh=${thirdPhasePreview.postCommandRefreshCommand || "-"}`
@@ -64004,7 +64007,8 @@ function appendProductionSwitchPostCommandExecutionQueueLine(lines = [], source 
   const queueText = phaseExecutionPreviews
     .map((item, index) =>
       `${index + 1}.${item.phaseKey || "-"}`
-      + `[backfill=${item.postCommandBackfillCommand || "-"}`
+      + `[command=${item.command || "-"}`
+      + `; backfill=${item.postCommandBackfillCommand || "-"}`
       + `; refresh=${item.postCommandRefreshCommand || "-"}]`
     )
     .join(" -> ");

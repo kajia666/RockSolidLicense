@@ -141,19 +141,12 @@ function buildRecoveryPreflightCommand({ options, closeoutInputFile, readinessAc
   return parts.join(" ");
 }
 
-function buildProductionProofPreflightCommand({
-  outputFile,
-  productionProofExecutionPackFile
-}) {
-  const parts = [
+function buildProductionProofPreflightCommand({ outputFile }) {
+  return [
     "npm.cmd run launch:production-proof-preflight --",
     "--profile-file",
     commandValue(outputFile)
-  ];
-  if (productionProofExecutionPackFile) {
-    parts.push("--execution-pack-file", commandValue(productionProofExecutionPackFile));
-  }
-  return parts.join(" ");
+  ].join(" ");
 }
 
 function buildRouteMapGateCommand({ options, closeoutInputFile, readinessActionQueueFile, dryRun = false }) {

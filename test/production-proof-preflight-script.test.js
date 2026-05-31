@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -429,12 +429,13 @@ test("production proof preflight can load launch inputs from a staging profile f
     const profileResult = runProfileInit(profileArgs);
     assert.equal(profileResult.status, 0, profileResult.stderr || profileResult.stdout);
     assert.equal(profileResult.stderr, "");
+    const profile = JSON.parse(readFileSync(profileFile, "utf8"));
+    profile.productionProofExecutionPackFile = executionPackFile;
+    writeFileSync(profileFile, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
 
     const preflightResult = runPreflight([
       "--profile-file",
-      profileFile,
-      "--execution-pack-file",
-      executionPackFile
+      profileFile
     ], secretEnv);
 
     assert.equal(preflightResult.status, 0, preflightResult.stderr || preflightResult.stdout);

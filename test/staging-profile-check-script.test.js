@@ -39,7 +39,7 @@ test("staging profile check validates the committed real-like example without lo
   );
   assert.equal(
     output.nextCommand,
-    "npm.cmd run launch:production-proof-preflight -- --profile-file docs/staging-rehearsal-profile.example.json --execution-pack-file artifacts/staging/PILOT_ALPHA/stable/production-proof-execution-pack.md"
+    "npm.cmd run launch:production-proof-preflight -- --profile-file docs/staging-rehearsal-profile.example.json"
   );
   assert.match(output.nextAction, /set required secret env vars/i);
 });
@@ -88,6 +88,33 @@ test("staging profile check rejects secret values before real-like rehearsal", (
     assert.deepEqual(output.summary.secretFieldKeys, ["developerBearerToken"]);
     assert.doesNotMatch(result.stdout, /must-not-be-stored/);
     assert.match(output.error.message, /secret values must stay in environment variables/i);
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("staging profile check accepts an older two-argument command and normalizes the next command", () => {
+  const tempRoot = mkdtempSync(join(tmpdir(), "staging-profile-check-legacy-command-"));
+  const profileFile = join(tempRoot, "staging-profile.json");
+  try {
+    const profile = JSON.parse(
+      readFileSync(join(repoRoot, "docs/staging-rehearsal-profile.example.json"), "utf8")
+    );
+    profile.productionProofPreflightCommand =
+      `npm.cmd run launch:production-proof-preflight -- --profile-file ${profileFile}`
+      + ` --execution-pack-file ${profile.productionProofExecutionPackFile}`;
+    writeFileSync(profileFile, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
+
+    const result = runProfileCheck(["--profile-file", profileFile]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "pass");
+    assert.equal(output.summary.legacyProductionProofCommand, true);
+    assert.equal(
+      output.nextCommand,
+      `npm.cmd run launch:production-proof-preflight -- --profile-file ${profileFile}`
+    );
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }

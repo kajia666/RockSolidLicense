@@ -627,15 +627,11 @@ function buildProfileDrivenCommand(options) {
 
 function buildProductionProofPreflightCommand(options) {
   if (options.profileFile) {
-    const parts = [
+    return [
       "npm.cmd run launch:production-proof-preflight --",
       "--profile-file",
       commandValue(options.profileFile)
-    ];
-    if (options.productionProofExecutionPackFile) {
-      parts.push("--execution-pack-file", commandValue(options.productionProofExecutionPackFile));
-    }
-    return parts.join(" ");
+    ].join(" ");
   }
   if (!options.productionProofExecutionPackFile) {
     return options.productionProofPreflightCommand || null;

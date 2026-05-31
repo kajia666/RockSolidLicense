@@ -73,11 +73,17 @@ function commandValue(value) {
   return text;
 }
 
-function buildProductionProofPreflightCommand(profileFile, executionPackFile) {
+function buildProductionProofPreflightCommand(profileFile) {
   return [
     "npm.cmd run launch:production-proof-preflight --",
     "--profile-file",
-    commandValue(profileFile),
+    commandValue(profileFile)
+  ].join(" ");
+}
+
+function buildLegacyProductionProofPreflightCommand(profileFile, executionPackFile) {
+  return [
+    buildProductionProofPreflightCommand(profileFile),
     "--execution-pack-file",
     commandValue(executionPackFile)
   ].join(" ");
@@ -144,11 +150,13 @@ function validateProfile(profileFile, profile) {
     "production-proof-execution-pack.md"
   );
   const productionProofCommand = String(profile.productionProofPreflightCommand || "").trim();
-  const expectedCommandPrefix = "npm.cmd run launch:production-proof-preflight -- --profile-file ";
-  const expectedCommandSuffix = ` --execution-pack-file ${commandValue(profile.productionProofExecutionPackFile)}`;
-  const productionProofCommandReady = productionProofCommand.startsWith(expectedCommandPrefix)
-    && productionProofCommand.endsWith(expectedCommandSuffix)
-    && productionProofCommand.length > expectedCommandPrefix.length + expectedCommandSuffix.length;
+  const expectedProductionProofCommand = buildProductionProofPreflightCommand(profileFile);
+  const legacyProductionProofCommand = productionProofCommand === buildLegacyProductionProofPreflightCommand(
+    profileFile,
+    profile.productionProofExecutionPackFile
+  );
+  const productionProofCommandReady = productionProofCommand === expectedProductionProofCommand
+    || legacyProductionProofCommand;
   const httpsReady = (() => {
     try {
       return new URL(profile.baseUrl).protocol === "https:";
@@ -190,7 +198,7 @@ function validateProfile(profileFile, profile) {
     makeCheck(
       "production_proof_short_command",
       productionProofCommandReady,
-      "productionProofPreflightCommand must use the short --profile-file and --execution-pack-file handoff."
+      "productionProofPreflightCommand must use the single-argument --profile-file handoff."
     )
   ];
   const failedChecks = checks.filter((item) => item.status === "fail");
@@ -205,11 +213,12 @@ function validateProfile(profileFile, profile) {
       willWriteLiveData: false,
       willModifyData: false,
       missingRequiredKeys,
-      secretFieldKeys
+      secretFieldKeys,
+      legacyProductionProofCommand
     },
     checks,
     productionProofExecutionPackFile: executionPackFile,
-    nextCommand: buildProductionProofPreflightCommand(profileFile, executionPackFile),
+    nextCommand: buildProductionProofPreflightCommand(profileFile),
     nextAction: failedChecks.length
       ? failedChecks[0].message
       : "Set required secret env vars, run nextCommand, then execute the no-write recovery and staging preflight steps before the manual live-write smoke gate.",

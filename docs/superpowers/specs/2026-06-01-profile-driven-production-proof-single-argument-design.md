@@ -33,7 +33,7 @@ Keep direct CLI production-proof usage unchanged. Operators without a profile ca
 
 1. `staging:profile:init` derives `production-proof-execution-pack.md` and stores it as `productionProofExecutionPackFile`.
 2. The generated profile stores a normalized `productionProofPreflightCommand` containing only `--profile-file`.
-3. `staging:profile:check` validates the stored execution-pack path and verifies that the stored command uses the one-argument profile handoff.
+3. `staging:profile:check` validates the stored execution-pack path and verifies that the stored command uses the one-argument profile handoff or the known older two-argument predecessor.
 4. `staging:profile:check` prints the normalized one-argument `nextCommand`.
 5. `staging:rehearsal --profile-file` prints the same normalized one-argument command even when an older profile embeds the two-argument form.
 6. `launch:production-proof-preflight` resolves the execution-pack path from the loaded profile and writes the secret-free Markdown pack when the operator runs the one-argument command.
@@ -41,7 +41,7 @@ Keep direct CLI production-proof usage unchanged. Operators without a profile ca
 ## Error Handling
 
 - Reject profiles missing `productionProofExecutionPackFile` or `productionProofPreflightCommand`.
-- Reject profile commands that do not use exactly the profile-driven one-argument shape.
+- Reject profile commands that match neither the profile-driven one-argument shape nor the known older two-argument shape with the same profile and execution-pack paths.
 - Preserve existing profile secret-field rejection and HTTPS/storage validation.
 - Do not auto-run production proof from profile check. The read-only check and pack-writing preflight remain two explicit operator steps.
 

@@ -2344,7 +2344,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     const readinessActionQueueFile = join(tempDir, "profile-readiness-action-queue.md");
     const productionProofExecutionPackFile = "artifacts/staging/PROFILE_PRODUCT/stable/production-proof-execution-pack.md";
     const embeddedProductionProofPreflightCommand = `npm.cmd run launch:production-proof-preflight -- --base-url https://profile-staging.example.com --product-code PROFILE_PRODUCT --channel stable --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/profile.env --app-backup-dir /var/lib/rocksolid/profile-backups --postgres-backup-dir /var/lib/rocksolid/profile-postgres-backups --admin-username profile-admin@example.com --developer-username profile.developer --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json --actions-file ${readinessActionQueueFile} --profile-output-file ${profileFile} --backup-restore-artifact artifacts/staging/PROFILE_PRODUCT/stable/backup-restore-drill.txt --execution-pack-file ${productionProofExecutionPackFile}`;
-    const productionProofPreflightCommand = `npm.cmd run launch:production-proof-preflight -- --profile-file ${profileFile} --execution-pack-file ${productionProofExecutionPackFile}`;
+    const productionProofPreflightCommand = `npm.cmd run launch:production-proof-preflight -- --profile-file ${profileFile}`;
     writeFileSync(profileFile, JSON.stringify({
       baseUrl: "https://profile-staging.example.com",
       productCode: "PROFILE_PRODUCT",
@@ -2843,7 +2843,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Missing secret env: RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(handoff, /Can run dry run: yes/);
     assert.match(handoff, /Can record evidence: no/);
-    assert.match(handoff, /Production proof preflight: `npm\.cmd run launch:production-proof-preflight -- --profile-file .*staging-profile\.json --execution-pack-file artifacts\/staging\/PROFILE_PRODUCT\/stable\/production-proof-execution-pack\.md`/);
+    assert.match(handoff, /Production proof preflight: `npm\.cmd run launch:production-proof-preflight -- --profile-file .*staging-profile\.json`/);
     assert.match(handoff, /Real staging run focus: blocked_until_secret_env \(dryRun=yes, liveWriteSmoke=yes, evidence=no\)/);
     assert.match(handoff, /Real staging current action: set_required_secret_env \(env=RSL_DEVELOPER_BEARER_TOKEN\)/);
     assert.match(handoff, /Real staging archive root: artifacts\/staging\/PROFILE_PRODUCT\/stable/);

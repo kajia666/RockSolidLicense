@@ -64,7 +64,7 @@ npm.cmd run launch:production-proof-preflight -- `
   --profile-file artifacts/staging/SMOKE_ALPHA/stable/staging-rehearsal-profile.json
 ```
 
-`staging:profile:check` is a read-only profile lint step. It verifies the real-like HTTPS, storage, recovery, production-proof execution-pack path, short production-proof command, and secret-free policy before the operator loads password or bearer-token environment variables. The generated profile already stores `productionProofExecutionPackFile`, so the short preflight command writes the secret-free Markdown execution pack without another `--execution-pack-file` splice. `docs/staging-rehearsal-profile.example.json` is the committed secret-free starting point when preparing a new real-like profile.
+`staging:profile:check` is a read-only profile lint step. It verifies the real-like HTTPS, storage, recovery, production-proof execution-pack path, single-argument production-proof command, and secret-free policy before the operator loads password or bearer-token environment variables. The generated profile already stores `productionProofExecutionPackFile`, so the profile-driven preflight command only needs `--profile-file` and still writes the secret-free Markdown execution pack. Older profiles that store the previous `--profile-file ... --execution-pack-file ...` command remain readable, but profile check and rehearsal normalize the next command to the single-argument form. `docs/staging-rehearsal-profile.example.json` is the committed secret-free starting point when preparing a new real-like profile.
 
 If no profile file exists yet, use the direct no-write production proof preflight form:
 

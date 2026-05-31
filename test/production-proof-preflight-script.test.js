@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -382,6 +383,45 @@ test("production proof preflight returns no-write launch commands when real-envi
   );
   assert.equal(output.productionProofExecutionPack.readinessReadback.targetCursor, "5/5");
   assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+});
+
+test("production proof preflight can write a secret-free markdown execution pack", () => {
+  const tempRoot = mkdtempSync(join(tmpdir(), "production-proof-pack-"));
+  const executionPackFile = join(tempRoot, "production-proof-execution-pack.md");
+
+  try {
+    const result = runPreflight([
+      ...validArgs,
+      "--execution-pack-file",
+      executionPackFile
+    ], secretEnv);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.equal(existsSync(executionPackFile), true);
+
+    const output = JSON.parse(result.stdout);
+    assert.deepEqual(output.productionProofExecutionPackFile, {
+      path: executionPackFile,
+      written: true,
+      format: "markdown",
+      secretFree: true
+    });
+
+    const markdown = readFileSync(executionPackFile, "utf8");
+    assert.match(markdown, /# Production Proof Execution Pack/);
+    assert.match(markdown, /Status: ready_for_no_write_execution/);
+    assert.match(markdown, /Cursor: 0\/5 -> 5\/5/);
+    assert.match(markdown, /Input Check: ready_for_production_proof_preflight/);
+    assert.match(markdown, /staging_profile_init/);
+    assert.match(markdown, /npm\.cmd run staging:profile:init/);
+    assert.match(markdown, /launch_smoke_staging/);
+    assert.match(markdown, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
+    assert.match(markdown, /Secret values are not included/);
+    assert.doesNotMatch(markdown, /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("production proof preflight plain output prints copyable commands without secret values", () => {

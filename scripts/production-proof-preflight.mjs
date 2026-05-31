@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   buildProductionSwitchBackupRestoreDrillProof,
@@ -38,7 +39,8 @@ const OPTION_FLAGS = {
   "--closeout-input-file": "closeoutInputFile",
   "--actions-file": "actionsFile",
   "--profile-output-file": "profileOutputFile",
-  "--backup-restore-artifact": "backupRestoreArtifact"
+  "--backup-restore-artifact": "backupRestoreArtifact",
+  "--execution-pack-file": "executionPackFile"
 };
 
 function requireArgValue(name, value, inlineValue) {
@@ -76,7 +78,8 @@ function parseArgs(argv) {
     closeoutInputFile: null,
     actionsFile: null,
     profileOutputFile: null,
-    backupRestoreArtifact: null
+    backupRestoreArtifact: null,
+    executionPackFile: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -164,6 +167,7 @@ function normalizeOptions(options) {
     actionsFile: options.actionsFile || path.posix.join(artifactRoot, "readiness-action-queue.md"),
     profileOutputFile: options.profileOutputFile || path.posix.join(artifactRoot, "staging-rehearsal-profile.json"),
     backupRestoreArtifact: options.backupRestoreArtifact || path.posix.join(artifactRoot, "backup-restore-drill.txt"),
+    executionPackFile: options.executionPackFile || null,
     artifactRoot
   };
 }
@@ -774,6 +778,12 @@ function buildResult(options) {
     realEnvironmentInputContract,
     productionProofExecutionQueue,
     productionProofExecutionPack,
+    productionProofExecutionPackFile: {
+      path: options.executionPackFile,
+      written: false,
+      format: "markdown",
+      secretFree: true
+    },
     nextCommands,
     nextAction: status === "pass"
       ? "Run profileInit and recoveryPreflight first; run stagingPreflight before launchSmokeStaging, and backfill backup_restore_drill_result after the recovery drill passes."
@@ -880,6 +890,104 @@ function writeProductionProofExecutionPack(pack, writeLine) {
   );
 }
 
+function markdownList(values) {
+  return values?.length ? values.join(", ") : "-";
+}
+
+function markdownCommandBlock(command) {
+  return [
+    "```powershell",
+    command || "-",
+    "```"
+  ].join("\n");
+}
+
+function renderProductionProofExecutionPackMarkdown(result) {
+  const pack = result.productionProofExecutionPack || {};
+  const summary = result.summary || {};
+  const inputCheck = pack.inputCheck || {};
+  const cursor = pack.executionCursor || {};
+  const lines = [
+    "# Production Proof Execution Pack",
+    "",
+    `Generated At: ${result.generatedAt || "-"}`,
+    `Status: ${pack.status || "-"}`,
+    `Product: ${summary.productCode || "-"}`,
+    `Channel: ${summary.channel || "-"}`,
+    `Cursor: ${cursor.expression || "-"}`,
+    `Current Step: ${cursor.currentStepKey || "-"}`,
+    `Next Step: ${cursor.nextStepKey || "-"}`,
+    `Input Check: ${inputCheck.status || "-"}`,
+    "",
+    "Secret values are not included. Load secret values only through the named environment variables in the target shell.",
+    "",
+    "## Input Check",
+    "",
+    `Missing Inputs: ${markdownList(inputCheck.missingInputKeys || [])}`,
+    `Invalid Inputs: ${markdownList(inputCheck.invalidInputKeys || [])}`,
+    `Credential Env Names: ${markdownList(result.credentialEnv || [])}`,
+    "",
+    "## No-Write Commands"
+  ];
+
+  for (const item of pack.noWriteCommands || []) {
+    lines.push(
+      "",
+      `### ${item.order}. ${item.key || "-"}`,
+      "",
+      `Will Write Live Data: ${item.willWriteLiveData ? "yes" : "no"}`,
+      `Will Modify Data: ${item.willModifyData ? "yes" : "no"}`,
+      "",
+      markdownCommandBlock(item.command)
+    );
+  }
+
+  lines.push(
+    "",
+    "## Manual Live-Write Gate",
+    "",
+    `Key: ${pack.manualLiveWriteGate?.key || "-"}`,
+    `Status: ${pack.manualLiveWriteGate?.status || "-"}`,
+    `Confirmation: ${pack.manualLiveWriteGate?.confirmation || "manual_confirmation_required"}`,
+    `Will Write Live Data: ${pack.manualLiveWriteGate?.willWriteLiveData ? "yes" : "no"}`,
+    `Will Modify Data: ${pack.manualLiveWriteGate?.willModifyData ? "yes" : "no"}`,
+    "",
+    markdownCommandBlock(pack.manualLiveWriteGate?.command),
+    "",
+    "## Readiness Readback",
+    "",
+    `Key: ${pack.readinessReadback?.key || "-"}`,
+    `Target Cursor: ${pack.readinessReadback?.targetCursor || "-"}`,
+    "",
+    markdownCommandBlock(pack.readinessReadback?.command),
+    ""
+  );
+
+  return lines.join("\n");
+}
+
+function writeProductionProofExecutionPackMarkdownFile(result) {
+  const file = result.productionProofExecutionPackFile;
+  if (!file?.path) {
+    return;
+  }
+  mkdirSync(path.dirname(file.path), { recursive: true });
+  writeFileSync(file.path, renderProductionProofExecutionPackMarkdown(result), "utf8");
+  file.written = true;
+}
+
+function writeProductionProofExecutionPackFile(file, writeLine) {
+  if (!file?.path) {
+    return;
+  }
+  writeLine(
+    `Production proof execution pack file: ${file.path}`
+      + ` | written=${file.written ? "yes" : "no"}`
+      + ` | format=${file.format || "-"}`
+      + ` | secretFree=${file.secretFree ? "yes" : "no"}`
+  );
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -892,6 +1000,7 @@ function writeResult(result, json) {
     writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.log);
     writeProductionProofExecutionQueue(result.productionProofExecutionQueue, console.log);
     writeProductionProofExecutionPack(result.productionProofExecutionPack, console.log);
+    writeProductionProofExecutionPackFile(result.productionProofExecutionPackFile, console.log);
     console.log(`Production proof profile init: ${result.nextCommands.profileInit.command}`);
     console.log(`Production proof recovery preflight: ${result.nextCommands.recoveryPreflight.command}`);
     console.log(`Production proof staging preflight: ${result.nextCommands.stagingPreflight.command}`);
@@ -904,6 +1013,7 @@ function writeResult(result, json) {
   writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.error);
   writeProductionProofExecutionQueue(result.productionProofExecutionQueue, console.error);
   writeProductionProofExecutionPack(result.productionProofExecutionPack, console.error);
+  writeProductionProofExecutionPackFile(result.productionProofExecutionPackFile, console.error);
   for (const check of result.checks) {
     console.error(`- ${check.status.toUpperCase()} ${check.name}: ${check.message}`);
   }
@@ -915,6 +1025,7 @@ function main() {
     const options = parseArgs(process.argv.slice(2));
     json = options.json;
     const result = buildResult(options);
+    writeProductionProofExecutionPackMarkdownFile(result);
     writeResult(result, json);
     if (result.status !== "pass") {
       process.exitCode = 1;

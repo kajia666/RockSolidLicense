@@ -2342,6 +2342,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     const launchDutyArchiveIndexFile = join(tempDir, "profile-launch-duty-archive-index.json");
     const filledCloseoutDraftFile = join(tempDir, "profile-filled-closeout-input.draft.json");
     const readinessActionQueueFile = join(tempDir, "profile-readiness-action-queue.md");
+    const productionProofExecutionPackFile = "artifacts/staging/PROFILE_PRODUCT/stable/production-proof-execution-pack.md";
+    const productionProofPreflightCommand = `npm.cmd run launch:production-proof-preflight -- --base-url https://profile-staging.example.com --product-code PROFILE_PRODUCT --channel stable --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/profile.env --app-backup-dir /var/lib/rocksolid/profile-backups --postgres-backup-dir /var/lib/rocksolid/profile-postgres-backups --admin-username profile-admin@example.com --developer-username profile.developer --closeout-input-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json --actions-file ${readinessActionQueueFile} --profile-output-file ${profileFile} --backup-restore-artifact artifacts/staging/PROFILE_PRODUCT/stable/backup-restore-drill.txt --execution-pack-file ${productionProofExecutionPackFile}`;
     writeFileSync(profileFile, JSON.stringify({
       baseUrl: "https://profile-staging.example.com",
       productCode: "PROFILE_PRODUCT",
@@ -2353,7 +2355,9 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
       targetEnvFile: "/etc/rocksolidlicense/profile.env",
       appBackupDir: "/var/lib/rocksolid/profile-backups",
       postgresBackupDir: "/var/lib/rocksolid/profile-postgres-backups",
-      readinessActionQueueFile
+      readinessActionQueueFile,
+      productionProofExecutionPackFile,
+      productionProofPreflightCommand
     }, null, 2));
 
     const result = runRehearsal([
@@ -2401,6 +2405,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
         "developerUsername",
         "postgresBackupDir",
         "productCode",
+        "productionProofExecutionPackFile",
+        "productionProofPreflightCommand",
         "readinessActionQueueFile",
         "storageProfile",
         "targetEnvFile",
@@ -2441,6 +2447,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /npm\.cmd run staging:rehearsal -- --profile-file /);
     assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /--channel stable/);
     assert.match(output.stagingProfileLaunchPlan.recommendedCommand, /--handoff-file /);
+    assert.equal(output.stagingProfileLaunchPlan.productionProofExecutionPackFile, productionProofExecutionPackFile);
+    assert.equal(output.stagingProfileLaunchPlan.productionProofPreflightCommand, productionProofPreflightCommand);
     assert.match(output.stagingEnvironmentBinding.dryRunCommand, /--readiness-action-queue-file /);
     assert.match(output.stagingEnvironmentBinding.dryRunCommand, /profile-readiness-action-queue\.md/);
     assert.match(output.stagingProfileLaunchPlan.nextAction, /Set required secret env vars/);
@@ -2466,6 +2474,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
         ["readiness_review_packet", readinessReviewPacketFile, "pending_write"],
         ["production_signoff_packet", productionSignoffPacketFile, "pending_write"],
         ["launch_duty_archive_index", launchDutyArchiveIndexFile, "pending_write"],
+        ["production_proof_execution_pack", productionProofExecutionPackFile, "operator_generate"],
         ["filled_closeout_input", "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json", "operator_create"],
         ["filled_closeout_draft", filledCloseoutDraftFile, "pending_write"],
         ["readiness_action_queue", readinessActionQueueFile, "operator_generate"],
@@ -2492,6 +2501,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.stagingProfileOperatorPreflight.commands.profileDrivenRehearsal, output.stagingProfileLaunchPlan.recommendedCommand);
     assert.equal(output.stagingProfileOperatorPreflight.commands.stagingDryRun, output.stagingEnvironmentBinding.dryRunCommand);
     assert.equal(output.stagingProfileOperatorPreflight.commands.routeMapGate, "npm.cmd run launch:route-map-gate");
+    assert.equal(output.stagingProfileOperatorPreflight.commands.productionProofPreflight, productionProofPreflightCommand);
     assert.equal(
       output.stagingProfileOperatorPreflight.commands.closeoutInit,
       `npm.cmd run staging:closeout:init -- --draft-file ${filledCloseoutDraftFile} --output-file artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json --actions-file ${readinessActionQueueFile}`
@@ -2513,6 +2523,8 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.productionSwitchProofPacket.archiveRoot, "artifacts/staging/PROFILE_PRODUCT/stable");
     assert.equal(output.productionSwitchProofPacket.closeoutInputFile, "artifacts/staging/PROFILE_PRODUCT/stable/filled-closeout-input.json");
     assert.equal(output.productionSwitchProofPacket.readinessActionQueueFile, readinessActionQueueFile);
+    assert.equal(output.productionSwitchProofPacket.productionProofExecutionPackFile, productionProofExecutionPackFile);
+    assert.equal(output.productionSwitchProofPacket.productionProofPreflightCommand, productionProofPreflightCommand);
     assert.equal(output.productionSwitchProofPacket.launchDutyRecordIndexFile, "artifacts/staging/PROFILE_PRODUCT/stable/launch-duty-record-index.json");
     assert.deepEqual(output.productionSwitchProofPacket.publicHttpsProof, {
       status: "ready_public_https_entrypoint",
@@ -2817,7 +2829,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.equal(output.stagingEnvironmentBinding.environment.postgresBackupDir, "/var/lib/rocksolid/profile-postgres-backups");
     const handoff = readFileSync(handoffFile, "utf8");
     assert.match(handoff, new RegExp(`Staging profile: ${profileFile.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}`));
-    assert.match(handoff, /Profile keys: adminUsername, appBackupDir, baseUrl, channel, developerUsername, postgresBackupDir, productCode, readinessActionQueueFile, storageProfile, targetEnvFile, targetOs/);
+    assert.match(handoff, /Profile keys: adminUsername, appBackupDir, baseUrl, channel, developerUsername, postgresBackupDir, productCode, productionProofExecutionPackFile, productionProofPreflightCommand, readinessActionQueueFile, storageProfile, targetEnvFile, targetOs/);
     assert.match(handoff, /## Staging Profile Launch Plan/);
     assert.match(handoff, /Profile launch plan status: ready_for_profile_driven_rehearsal/);
     assert.match(handoff, /CLI override keys: channel, handoffFile, closeoutFile, runRecordFile, artifactManifestFile, backupRestorePacketFile, closeoutReloadPacketFile, readinessReviewPacketFile, productionSignoffPacketFile, launchDutyArchiveIndexFile, filledCloseoutDraftFile/);
@@ -2830,6 +2842,7 @@ test("staging rehearsal runner can load a non-secret staging profile file", () =
     assert.match(handoff, /Missing secret env: RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(handoff, /Can run dry run: yes/);
     assert.match(handoff, /Can record evidence: no/);
+    assert.match(handoff, /Production proof preflight: `npm\.cmd run launch:production-proof-preflight -- --base-url https:\/\/profile-staging\.example\.com/);
     assert.match(handoff, /Real staging run focus: blocked_until_secret_env \(dryRun=yes, liveWriteSmoke=yes, evidence=no\)/);
     assert.match(handoff, /Real staging current action: set_required_secret_env \(env=RSL_DEVELOPER_BEARER_TOKEN\)/);
     assert.match(handoff, /Real staging archive root: artifacts\/staging\/PROFILE_PRODUCT\/stable/);

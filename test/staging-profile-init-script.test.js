@@ -784,7 +784,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       productCode: "PILOT_ALPHA",
       channel: "beta",
       archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
-      profileKeyCount: 21,
+      profileKeyCount: 23,
       secretPolicy: "passwords_and_bearer_tokens_must_stay_in_environment_variables",
       nextCommand: `npm.cmd run staging:rehearsal -- --profile-file ${outputFile}`,
       closeoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
@@ -1159,7 +1159,9 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       productionSignoffPacketFile: "artifacts/staging/PILOT_ALPHA/beta/staging-production-signoff-packet.json",
       launchDutyArchiveIndexFile: "artifacts/staging/PILOT_ALPHA/beta/staging-launch-duty-archive-index.json",
       filledCloseoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
-      readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
+      readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      productionProofExecutionPackFile,
+      productionProofPreflightCommand
     });
     assert.doesNotMatch(JSON.stringify(profile), /password|bearer|token/i);
 
@@ -1192,6 +1194,10 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     const rehearsalOutput = JSON.parse(rehearsal.stdout);
     assert.equal(rehearsalOutput.stagingProfile.loaded, true);
     assert.equal(rehearsalOutput.stagingProfile.providedKeys.includes("readinessActionQueueFile"), true);
+    assert.equal(rehearsalOutput.stagingProfile.providedKeys.includes("productionProofExecutionPackFile"), true);
+    assert.equal(rehearsalOutput.stagingProfile.providedKeys.includes("productionProofPreflightCommand"), true);
+    assert.equal(rehearsalOutput.stagingProfileLaunchPlan.productionProofExecutionPackFile, productionProofExecutionPackFile);
+    assert.equal(rehearsalOutput.stagingProfileOperatorPreflight.commands.productionProofPreflight, productionProofPreflightCommand);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

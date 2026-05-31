@@ -80,7 +80,9 @@ const PROFILE_ALLOWED_FIELDS = [
   "launchDutyArchiveIndexFile",
   "filledCloseoutDraftFile",
   "readinessActionQueueFile",
-  "closeoutInputFile"
+  "closeoutInputFile",
+  "productionProofExecutionPackFile",
+  "productionProofPreflightCommand"
 ];
 
 const PROFILE_SECRET_FIELDS = [
@@ -114,7 +116,8 @@ const PROFILE_OPTION_FLAGS = {
   launchDutyArchiveIndexFile: "--launch-duty-archive-index-file",
   filledCloseoutDraftFile: "--filled-closeout-draft-file",
   readinessActionQueueFile: "--readiness-action-queue-file",
-  closeoutInputFile: "--closeout-input-file"
+  closeoutInputFile: "--closeout-input-file",
+  productionProofExecutionPackFile: "--production-proof-execution-pack-file"
 };
 
 const STAGING_PROFILE_OUTPUT_FILE_KEYS = [
@@ -250,6 +253,7 @@ function parseArgs(argv) {
     filledCloseoutDraftFile: null,
     readinessActionQueueFile: null,
     closeoutInputFile: null,
+    productionProofExecutionPackFile: null,
     profileFile: null
   };
 
@@ -310,6 +314,8 @@ function parseArgs(argv) {
       options.readinessActionQueueFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--closeout-input-file") {
       options.closeoutInputFile = requireArgValue(name, value, inlineValue);
+    } else if (name === "--production-proof-execution-pack-file") {
+      options.productionProofExecutionPackFile = requireArgValue(name, value, inlineValue);
     } else if (name === "--profile-file") {
       options.profileFile = requireArgValue(name, value, inlineValue);
     } else {
@@ -364,7 +370,9 @@ function parseArgs(argv) {
     launchDutyArchiveIndexFile: resolveProfileOption(options.launchDutyArchiveIndexFile, "RSL_REHEARSAL_LAUNCH_DUTY_ARCHIVE_INDEX_FILE", stagingProfile, "launchDutyArchiveIndexFile"),
     filledCloseoutDraftFile: resolveProfileOption(options.filledCloseoutDraftFile, "RSL_REHEARSAL_FILLED_CLOSEOUT_DRAFT_FILE", stagingProfile, "filledCloseoutDraftFile"),
     readinessActionQueueFile: resolveProfileOption(options.readinessActionQueueFile, "RSL_REHEARSAL_READINESS_ACTION_QUEUE_FILE", stagingProfile, "readinessActionQueueFile"),
-    closeoutInputFile: resolveProfileOption(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE", stagingProfile, "closeoutInputFile")
+    closeoutInputFile: resolveProfileOption(options.closeoutInputFile, "RSL_REHEARSAL_CLOSEOUT_INPUT_FILE", stagingProfile, "closeoutInputFile"),
+    productionProofExecutionPackFile: resolveProfileOption(options.productionProofExecutionPackFile, "RSL_PRODUCTION_PROOF_EXECUTION_PACK_FILE", stagingProfile, "productionProofExecutionPackFile"),
+    productionProofPreflightCommand: stagingProfile?.values?.productionProofPreflightCommand || null
   };
 }
 
@@ -617,6 +625,55 @@ function buildProfileDrivenCommand(options) {
   return parts.join(" ");
 }
 
+function buildProductionProofPreflightCommand(options) {
+  if (!options.productionProofExecutionPackFile) {
+    return options.productionProofPreflightCommand || null;
+  }
+  const productCode = sanitizeArtifactPathSegment(options.productCode, "product");
+  const channel = sanitizeArtifactPathSegment(options.channel || "stable", "stable");
+  const archiveRoot = path.posix.join("artifacts", "staging", productCode, channel);
+  const closeoutInputFile = options.closeoutInputFile || path.posix.join(archiveRoot, "filled-closeout-input.json");
+  const readinessActionQueueFile = options.readinessActionQueueFile || path.posix.join(archiveRoot, "readiness-action-queue.md");
+  const backupRestoreArtifactFile = path.posix.join(archiveRoot, "backup-restore-drill.txt");
+  const parts = [
+    "npm.cmd run launch:production-proof-preflight --",
+    "--base-url",
+    commandValue(options.baseUrl),
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel || "stable"),
+    "--target-os",
+    commandValue(options.targetOs),
+    "--storage-profile",
+    commandValue(options.storageProfile),
+    "--target-env-file",
+    commandValue(options.targetEnvFile),
+    "--app-backup-dir",
+    commandValue(options.appBackupDir)
+  ];
+  if (options.postgresBackupDir) {
+    parts.push("--postgres-backup-dir", commandValue(options.postgresBackupDir));
+  }
+  parts.push(
+    "--admin-username",
+    commandValue(options.adminUsername),
+    "--developer-username",
+    commandValue(options.developerUsername),
+    "--closeout-input-file",
+    commandValue(closeoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile),
+    "--profile-output-file",
+    commandValue(options.profileFile),
+    "--backup-restore-artifact",
+    commandValue(backupRestoreArtifactFile),
+    "--execution-pack-file",
+    commandValue(options.productionProofExecutionPackFile)
+  );
+  return parts.join(" ");
+}
+
 function buildProfileBackfillManifest(options) {
   if (options.stagingProfile?.loaded !== true) {
     return {
@@ -728,6 +785,8 @@ function buildStagingProfileLaunchPlan(options) {
     unsafeCliSecretOverrides,
     requiredSecretEnv,
     recommendedCommand: buildProfileDrivenCommand(options),
+    productionProofExecutionPackFile: options.productionProofExecutionPackFile || null,
+    productionProofPreflightCommand: buildProductionProofPreflightCommand(options),
     backfillManifest: buildProfileBackfillManifest(options),
     nextAction
   };
@@ -757,6 +816,7 @@ function buildStagingProfileOperatorPreflight(result) {
   const readinessActionQueueFile = keyedPath(recommendedFiles, "readiness_action_queue");
   const commands = {
     profileDrivenRehearsal: plan.recommendedCommand || null,
+    productionProofPreflight: plan.productionProofPreflightCommand || null,
     stagingDryRun: binding.dryRunCommand || null,
     routeMapGate: result.nextCommands?.launchRouteMapGate?.command || null,
     liveWriteSmoke: result.nextCommands?.launchSmoke || null,
@@ -1167,6 +1227,12 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     || path.posix.join(archiveRoot, "filled-closeout-input.json");
   const readinessActionQueueFile = lookupRecommendedOutputPath(environmentBinding, "readiness_action_queue")
     || null;
+  const productionProofExecutionPackFile = result.stagingProfileLaunchPlan?.productionProofExecutionPackFile
+    || lookupRecommendedOutputPath(environmentBinding, "production_proof_execution_pack")
+    || null;
+  const productionProofPreflightCommand = profileCommands.productionProofPreflight
+    || result.stagingProfileLaunchPlan?.productionProofPreflightCommand
+    || null;
   const launchDayWatchSummaryFile = result.launchDayWatchPlan?.watchRecordDraft?.records
     ?.find((item) => item.key === "launch_day_watch_summary")?.artifactPath
     || path.posix.join(archiveRoot, "launch-day-watch-summary.md");
@@ -1312,6 +1378,8 @@ function buildRehearsalProductionSwitchProofPacket(result) {
     archiveRoot,
     closeoutInputFile,
     readinessActionQueueFile,
+    productionProofExecutionPackFile,
+    productionProofPreflightCommand,
     launchDutyRecordIndexFile,
     publicHttpsProof,
     storageProfileProof,
@@ -7333,6 +7401,7 @@ function buildStagingEnvironmentBinding(result, options = {}) {
     || result.filledCloseoutInputDraft?.saveAs
     || path.posix.join(archiveRoot, "filled-closeout-input.draft.json");
   const readinessActionQueuePath = options.readinessActionQueueFile || path.posix.join(archiveRoot, "readiness-action-queue.md");
+  const productionProofExecutionPackPath = options.productionProofExecutionPackFile || null;
   const filledExamplePath = result.filledCloseoutInputExample?.saveAs || path.posix.join(archiveRoot, "filled-closeout-input.example.json");
   const environment = {
     baseUrl: result.summary?.baseUrl || options.baseUrl || null,
@@ -7453,6 +7522,15 @@ function buildStagingEnvironmentBinding(result, options = {}) {
         path: launchDutyArchiveIndexPath,
         status: result.launchDutyArchiveIndexFile ? fileOutputStatus(result.launchDutyArchiveIndexFile) : "recommended_default"
       },
+      ...(productionProofExecutionPackPath
+        ? [
+          {
+            key: "production_proof_execution_pack",
+            path: productionProofExecutionPackPath,
+            status: "operator_generate"
+          }
+        ]
+        : []),
       {
         key: "filled_closeout_input",
         path: filledCloseoutInputPath,
@@ -9205,6 +9283,8 @@ function renderStagingProfileLaunchPlan(plan) {
     `- Required output files: ${(plan.outputFiles || []).join(", ") || "-"}`,
     `- Missing output files: ${(plan.missingOutputFiles || []).join(", ") || "-"}`,
     `- Recommended command: \`${plan.recommendedCommand || "-"}\``,
+    `- Production proof execution pack: ${plan.productionProofExecutionPackFile || "-"}`,
+    `- Production proof preflight: \`${plan.productionProofPreflightCommand || "-"}\``,
     `- Next action: ${plan.nextAction || "-"}`
   ];
   if (Array.isArray(plan.requiredSecretEnv) && plan.requiredSecretEnv.length) {
@@ -9247,6 +9327,7 @@ function renderStagingProfileOperatorPreflight(preflight) {
     `- Profile command: \`${preflight.commands?.profileDrivenRehearsal || "-"}\``,
     `- Staging dry run: \`${preflight.commands?.stagingDryRun || "-"}\``,
     `- Route-map gate: \`${preflight.commands?.routeMapGate || "-"}\``,
+    `- Production proof preflight: \`${preflight.commands?.productionProofPreflight || "-"}\``,
     `- Closeout init: \`${preflight.commands?.closeoutInit || "-"}\``,
     `- Readiness status: \`${preflight.commands?.readinessStatus || "-"}\``,
     `- Closeout reload: \`${preflight.commands?.closeoutReload || "-"}\``,

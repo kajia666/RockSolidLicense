@@ -1728,8 +1728,6 @@ function main() {
     const outputFile = options.outputFile
       ? path.resolve(options.outputFile)
       : path.resolve("artifacts", "staging", sanitizeArtifactSegment(options.productCode, "product"), sanitizeArtifactSegment(options.channel || "stable", "stable"), "staging-rehearsal-profile.json");
-    mkdirSync(path.dirname(outputFile), { recursive: true });
-    writeFileSync(outputFile, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
     const nextCommand = `npm.cmd run staging:rehearsal -- --profile-file ${commandValue(outputFile)}`;
     const closeoutInitCommand = `npm.cmd run staging:closeout:init -- --draft-file ${commandValue(closeoutDraftFile)} --output-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`;
     const postCloseoutInitStatusCommand = `npm.cmd run staging:readiness:status -- --input-file ${commandValue(closeoutInputFile)} --actions-file ${commandValue(readinessActionQueueFile)}`;
@@ -1746,6 +1744,10 @@ function main() {
       backupRestoreArtifactFile,
       productionProofExecutionPackFile
     });
+    profile.productionProofExecutionPackFile = productionProofExecutionPackFile;
+    profile.productionProofPreflightCommand = productionProofPreflightCommand;
+    mkdirSync(path.dirname(outputFile), { recursive: true });
+    writeFileSync(outputFile, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
     const routeMapGateDryRunCommand = buildRouteMapGateCommand({
       options,
       closeoutInputFile,

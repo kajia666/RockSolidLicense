@@ -7,6 +7,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const SUPPORTED_TARGET_OS = new Set(["linux", "windows"]);
 const SUPPORTED_STORAGE_PROFILES = new Set(["sqlite", "postgres-preview"]);
+const STAGING_PREFLIGHT_REQUIRED_ENV = [
+  "RSL_SMOKE_ADMIN_USERNAME",
+  "RSL_SMOKE_ADMIN_PASSWORD",
+  "RSL_SMOKE_DEVELOPER_USERNAME",
+  "RSL_SMOKE_DEVELOPER_PASSWORD"
+];
 
 function parseArgs(argv) {
   const options = {
@@ -309,6 +315,53 @@ function buildRecoveryCloseoutBackfill(options) {
   };
 }
 
+function buildStagingPreflightCommand(options) {
+  return [
+    "npm.cmd run staging:preflight --",
+    "--base-url",
+    commandValue(options.baseUrl),
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel)
+  ].join(" ");
+}
+
+function isHttpsUrl(value) {
+  try {
+    return new URL(String(value || "")).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function buildStagingContinuationHandoff(options, closeoutBackfill) {
+  const httpsReady = isHttpsUrl(options.baseUrl);
+  return {
+    mode: "recovery-preflight-staging-continuation/v1",
+    status: httpsReady
+      ? "ready_for_staging_preflight_after_backup_restore_backfill"
+      : "blocked_until_https_staging_base_url",
+    currentActionKey: "backfill_backup_restore_drill_result",
+    currentCommand: closeoutBackfill.command,
+    nextActionKey: "run_staging_preflight",
+    stagingPreflightCommand: buildStagingPreflightCommand(options),
+    requiredEnv: STAGING_PREFLIGHT_REQUIRED_ENV,
+    manualLiveWriteGate: {
+      key: "launch_smoke_staging",
+      status: "blocked_until_backup_restore_backfill_and_staging_preflight_pass",
+      requiresOperatorConfirmation: true,
+      blockedBy: ["backup_restore_drill_result", "staging_preflight"],
+      willWriteLiveData: true,
+      willModifyData: true
+    },
+    readinessStatusCommand: closeoutBackfill.statusCommand,
+    nextAction: httpsReady
+      ? "Backfill backup_restore_drill_result, run staging:preflight with the named smoke credential env vars loaded, then keep launch_smoke_staging blocked until both no-write gates pass."
+      : "Set recovery base URL to the public HTTPS staging URL before using this staging preflight continuation."
+  };
+}
+
 function buildLinuxCommands(options) {
   const appBackup = `ENV_FILE="${shellQuote(options.envFile)}" BACKUP_DIR="${shellQuote(options.appBackupDir)}" LABEL=rehearsal deploy/linux/backup-rocksolid.sh`;
   const healthcheck = `BASE_URL="${shellQuote(options.baseUrl)}" deploy/linux/healthcheck-rocksolid.sh --skip-tcp`;
@@ -364,6 +417,7 @@ function buildResult(options) {
   const { checks, requiredAssets } = validateOptions(options);
   const failedChecks = checks.filter((item) => item.status === "fail");
   const status = failedChecks.length === 0 ? "pass" : "fail";
+  const closeoutBackfill = status === "pass" ? buildRecoveryCloseoutBackfill(options) : null;
   return {
     status,
     mode: "recovery-preflight",
@@ -380,10 +434,30 @@ function buildResult(options) {
     ...(status === "pass"
       ? {
           nextCommands: buildNextCommands(options),
-          closeoutBackfill: buildRecoveryCloseoutBackfill(options)
+          closeoutBackfill,
+          stagingContinuationHandoff: buildStagingContinuationHandoff(options, closeoutBackfill)
         }
       : { error: { message: failedChecks[0]?.message || "Recovery preflight failed." } })
   };
+}
+
+function writeStagingContinuationHandoff(handoff) {
+  if (!handoff || typeof handoff !== "object") {
+    return;
+  }
+  console.log(
+    `Recovery staging continuation: ${handoff.status || "-"}`
+      + ` | current=${handoff.currentActionKey || "-"}`
+      + ` | next=${handoff.nextActionKey || "-"}`
+      + ` | manualGate=${handoff.manualLiveWriteGate?.key || "-"}`
+  );
+  console.log(`Recovery staging preflight command: ${handoff.stagingPreflightCommand || "-"}`);
+  console.log(`Recovery staging continuation required env: ${(handoff.requiredEnv || []).join(", ") || "-"}`);
+  console.log(
+    `Recovery staging continuation manual gate: ${handoff.manualLiveWriteGate?.key || "-"}`
+      + ` | status=${handoff.manualLiveWriteGate?.status || "-"}`
+      + ` | blockedBy=${(handoff.manualLiveWriteGate?.blockedBy || []).join(",") || "-"}`
+  );
 }
 
 function writeResult(result, json) {
@@ -403,6 +477,7 @@ function writeResult(result, json) {
     if (result.closeoutBackfill) {
       console.log(`Recovery closeout backfill current: ${result.closeoutBackfill.key}`);
       console.log(`Recovery closeout backfill command: ${result.closeoutBackfill.command}`);
+      writeStagingContinuationHandoff(result.stagingContinuationHandoff);
       console.log(`Recovery readiness status: ${result.closeoutBackfill.statusCommand}`);
     }
     return;

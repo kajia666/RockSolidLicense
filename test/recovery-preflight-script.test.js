@@ -83,6 +83,8 @@ test("recovery preflight returns no-write linux postgres preview rehearsal comma
   assert.match(output.nextCommands.postgresBackup, /deploy\/postgres\/backup-postgres\.sh/);
   assert.match(output.nextCommands.postgresRestoreDryRun, /restore-postgres\.sh --file \$BACKUP_FILE --no-clean/);
   assert.match(output.nextCommands.healthcheck, /deploy\/linux\/healthcheck-rocksolid\.sh/);
+  assert.equal(output.stagingContinuationHandoff.status, "blocked_until_https_staging_base_url");
+  assert.match(output.stagingContinuationHandoff.nextAction, /set recovery base url to the public https staging url/i);
 });
 
 test("recovery preflight emits a backup restore closeout backfill handoff", () => {
@@ -97,6 +99,8 @@ test("recovery preflight emits a backup restore closeout backfill handoff", () =
     "/var/lib/rocksolid/backups",
     "--postgres-backup-dir",
     "/var/lib/rocksolid/postgres-backups",
+    "--base-url",
+    "https://staging.example.com",
     "--product-code",
     "pilot_alpha",
     "--channel",
@@ -124,6 +128,30 @@ test("recovery preflight emits a backup restore closeout backfill handoff", () =
     "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md"
   );
   assert.match(output.closeoutBackfill.nextAction, /backfill backup_restore_drill_result/i);
+  assert.equal(output.stagingContinuationHandoff.mode, "recovery-preflight-staging-continuation/v1");
+  assert.equal(output.stagingContinuationHandoff.status, "ready_for_staging_preflight_after_backup_restore_backfill");
+  assert.equal(output.stagingContinuationHandoff.currentActionKey, "backfill_backup_restore_drill_result");
+  assert.equal(output.stagingContinuationHandoff.currentCommand, output.closeoutBackfill.command);
+  assert.equal(output.stagingContinuationHandoff.nextActionKey, "run_staging_preflight");
+  assert.equal(
+    output.stagingContinuationHandoff.stagingPreflightCommand,
+    "npm.cmd run staging:preflight -- --base-url https://staging.example.com --product-code PILOT_ALPHA --channel stable"
+  );
+  assert.deepEqual(output.stagingContinuationHandoff.requiredEnv, [
+    "RSL_SMOKE_ADMIN_USERNAME",
+    "RSL_SMOKE_ADMIN_PASSWORD",
+    "RSL_SMOKE_DEVELOPER_USERNAME",
+    "RSL_SMOKE_DEVELOPER_PASSWORD"
+  ]);
+  assert.deepEqual(output.stagingContinuationHandoff.manualLiveWriteGate, {
+    key: "launch_smoke_staging",
+    status: "blocked_until_backup_restore_backfill_and_staging_preflight_pass",
+    requiresOperatorConfirmation: true,
+    blockedBy: ["backup_restore_drill_result", "staging_preflight"],
+    willWriteLiveData: true,
+    willModifyData: true
+  });
+  assert.equal(output.stagingContinuationHandoff.readinessStatusCommand, output.closeoutBackfill.statusCommand);
 });
 
 test("recovery preflight returns no-write windows sqlite rehearsal commands", () => {
@@ -163,6 +191,8 @@ test("recovery preflight plain output prints closeout backfill handoff", () => {
     "C:\\RockSolidLicense\\deploy\\windows\\rocksolid.env.ps1",
     "--app-backup-dir",
     "C:\\RockSolidLicense\\backups",
+    "--base-url",
+    "https://staging.example.com",
     "--product-code",
     "pilot_alpha",
     "--channel",
@@ -174,5 +204,9 @@ test("recovery preflight plain output prints closeout backfill handoff", () => {
   assert.match(result.stdout, /Recovery preflight passed\. No data was modified\./);
   assert.match(result.stdout, /Recovery closeout backfill current: backup_restore_drill_result/);
   assert.match(result.stdout, /Recovery closeout backfill command: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/backup-restore-drill\.txt --receipt-id <recovery-drill-receipt-id> --receipt-id <backup-verification-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
+  assert.match(result.stdout, /Recovery staging continuation: ready_for_staging_preflight_after_backup_restore_backfill \| current=backfill_backup_restore_drill_result \| next=run_staging_preflight \| manualGate=launch_smoke_staging/);
+  assert.match(result.stdout, /Recovery staging preflight command: npm\.cmd run staging:preflight -- --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel stable/);
+  assert.match(result.stdout, /Recovery staging continuation required env: RSL_SMOKE_ADMIN_USERNAME, RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_USERNAME, RSL_SMOKE_DEVELOPER_PASSWORD/);
+  assert.match(result.stdout, /Recovery staging continuation manual gate: launch_smoke_staging \| status=blocked_until_backup_restore_backfill_and_staging_preflight_pass \| blockedBy=backup_restore_drill_result,staging_preflight/);
   assert.match(result.stdout, /Recovery readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
 });

@@ -13492,7 +13492,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
-      /productionSwitchCurrentExecution=blocked_until_real_environment_proof \| phase=real_environment_proof \| action=set_public_https_entrypoint \| commandReady=yes \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| next=live_write_smoke/
+      /productionSwitchCurrentExecution=blocked_until_real_environment_proof \| phase=real_environment_proof \| action=set_public_https_entrypoint \| commandReady=yes \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| refresh=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/FIRSTBATCH\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/FIRSTBATCH\/stable\/readiness-action-queue\.md \| blockedBy=real_environment_proof\/set_public_https_entrypoint \| next=live_write_smoke/
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
@@ -13683,6 +13683,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     );
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /launchCutoverTriage=hold_for_launch_evidence/);
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /Launch Cutover Triage Checkpoint:[\s\S]*productionSwitchCurrentExecution=blocked_until_real_environment_proof \| phase=real_environment_proof \| action=set_public_https_entrypoint \| commandReady=yes \| command=npm\.cmd run staging:rehearsal -- --profile-file [^|]+ \| refresh=npm\.cmd run staging:readiness:status/
+    );
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Review Package:/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Handoff Index:.*format=handoff-index/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Developer Ops Launch Mainline Routes:.*format=launch-mainline-handoff-routes/);

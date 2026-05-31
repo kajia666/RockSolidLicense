@@ -63455,6 +63455,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
         + ` | phase=${currentExecutionPacket.phaseKey || "-"}`
         + ` | action=${currentExecutionPacket.actionKey || "-"}`
         + ` | commandReady=${currentExecutionPacket.commandReady === true ? "yes" : "no"}`
+        + ` | command=${currentExecutionPacket.command || "-"}`
         + ` | refresh=${currentExecutionPacket.postCommandRefreshCommand || "-"}`
         + ` | blockedBy=${currentExecutionPacket.blockedByPhaseKey || "-"}/${currentExecutionPacket.blockedByActionKey || "-"}`
         + ` | next=${currentExecutionPacket.nextPhaseKey || "-"}`

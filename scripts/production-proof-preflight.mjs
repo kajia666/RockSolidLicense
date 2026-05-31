@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   buildProductionSwitchBackupRestoreDrillProof,
@@ -38,6 +38,7 @@ const OPTION_FLAGS = {
   "--developer-bearer-token-env": "developerBearerTokenEnv",
   "--closeout-input-file": "closeoutInputFile",
   "--actions-file": "actionsFile",
+  "--profile-file": "profileFile",
   "--profile-output-file": "profileOutputFile",
   "--backup-restore-artifact": "backupRestoreArtifact",
   "--execution-pack-file": "executionPackFile"
@@ -59,6 +60,58 @@ function readOptionOrEnv(value, envName) {
   return resolved === null ? null : String(resolved).trim();
 }
 
+function readProfileValue(profile, key) {
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+    return null;
+  }
+  const value = profile[key];
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const trimmed = String(value).trim();
+  return trimmed || null;
+}
+
+function buildSiblingArtifactPath(filePath, nextFileName) {
+  const source = String(filePath || "").trim();
+  if (!source) {
+    return null;
+  }
+  if (source.includes("/")) {
+    const normalized = source.replace(/\\/g, "/");
+    const lastSlashIndex = normalized.lastIndexOf("/");
+    if (lastSlashIndex < 0) {
+      return nextFileName;
+    }
+    return `${normalized.slice(0, lastSlashIndex + 1)}${nextFileName}`;
+  }
+  return path.join(path.dirname(source), nextFileName);
+}
+
+function loadStagingProfile(profileFile) {
+  const profilePath = String(profileFile || "").trim();
+  if (!profilePath) {
+    return {
+      path: null,
+      data: null
+    };
+  }
+  const resolvedPath = path.resolve(profilePath);
+  let parsed = null;
+  try {
+    parsed = JSON.parse(readFileSync(resolvedPath, "utf8"));
+  } catch (error) {
+    throw new Error(`Unable to read --profile-file ${resolvedPath}: ${error.message}`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`--profile-file ${resolvedPath} must be a JSON object.`);
+  }
+  return {
+    path: resolvedPath,
+    data: parsed
+  };
+}
+
 function parseArgs(argv) {
   const options = {
     json: false,
@@ -77,6 +130,7 @@ function parseArgs(argv) {
     developerBearerTokenEnv: DEFAULT_DEVELOPER_BEARER_TOKEN_ENV,
     closeoutInputFile: null,
     actionsFile: null,
+    profileFile: null,
     profileOutputFile: null,
     backupRestoreArtifact: null,
     executionPackFile: null
@@ -132,11 +186,28 @@ function sanitizeArtifactSegment(value, fallback) {
 }
 
 function normalizeOptions(options) {
+  const profile = loadStagingProfile(options.profileFile);
+  const profileData = profile.data || {};
+  const profileActionsFile = readProfileValue(profileData, "actionsFile")
+    || readProfileValue(profileData, "readinessActionQueueFile");
+  const profileCloseoutInputFile = readProfileValue(profileData, "closeoutInputFile")
+    || readProfileValue(profileData, "filledCloseoutInputFile")
+    || buildSiblingArtifactPath(profileActionsFile, "filled-closeout-input.json");
+  const profileOutputFile = readProfileValue(profileData, "profileOutputFile")
+    || readProfileValue(profileData, "outputFile")
+    || profile.path;
+  const profileBackupRestoreArtifact = readProfileValue(profileData, "backupRestoreArtifact")
+    || readProfileValue(profileData, "backupRestoreArtifactFile")
+    || buildSiblingArtifactPath(profileActionsFile, "backup-restore-drill.txt");
+  const profileExecutionPackFile = readProfileValue(profileData, "executionPackFile")
+    || readProfileValue(profileData, "productionProofExecutionPackFile");
   const productCode = String(readOptionOrEnv(options.productCode, "RSL_PRODUCTION_SWITCH_PRODUCT_CODE")
     || readOptionOrEnv(null, "RSL_SMOKE_PRODUCT_CODE")
+    || readProfileValue(profileData, "productCode")
     || "PRODUCTION_SWITCH").trim().toUpperCase();
   const channel = String(readOptionOrEnv(options.channel, "RSL_PRODUCTION_SWITCH_CHANNEL")
     || readOptionOrEnv(null, "RSL_SMOKE_CHANNEL")
+    || readProfileValue(profileData, "channel")
     || "stable").trim().toLowerCase();
   const artifactRoot = path.posix.join(
     "artifacts",
@@ -150,24 +221,49 @@ function normalizeOptions(options) {
     baseUrl: normalizeBaseUrl(
       readOptionOrEnv(options.baseUrl, "RSL_PRODUCTION_SWITCH_BASE_URL")
         || readOptionOrEnv(null, "RSL_STAGING_BASE_URL")
+        || readProfileValue(profileData, "baseUrl")
     ),
     productCode,
     channel,
-    targetOs: String(readOptionOrEnv(options.targetOs, "RSL_RECOVERY_TARGET_OS") || "").trim().toLowerCase(),
-    storageProfile: String(readOptionOrEnv(options.storageProfile, "RSL_RECOVERY_STORAGE_PROFILE") || "").trim().toLowerCase(),
-    targetEnvFile: readOptionOrEnv(options.targetEnvFile, "RSL_RECOVERY_ENV_FILE"),
-    appBackupDir: readOptionOrEnv(options.appBackupDir, "RSL_RECOVERY_APP_BACKUP_DIR"),
-    postgresBackupDir: readOptionOrEnv(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR"),
-    adminUsername: readOptionOrEnv(options.adminUsername, "RSL_SMOKE_ADMIN_USERNAME"),
-    developerUsername: readOptionOrEnv(options.developerUsername, "RSL_SMOKE_DEVELOPER_USERNAME"),
+    targetOs: String(
+      readOptionOrEnv(options.targetOs, "RSL_RECOVERY_TARGET_OS")
+      || readProfileValue(profileData, "targetOs")
+      || ""
+    ).trim().toLowerCase(),
+    storageProfile: String(
+      readOptionOrEnv(options.storageProfile, "RSL_RECOVERY_STORAGE_PROFILE")
+      || readProfileValue(profileData, "storageProfile")
+      || ""
+    ).trim().toLowerCase(),
+    targetEnvFile: readOptionOrEnv(options.targetEnvFile, "RSL_RECOVERY_ENV_FILE")
+      || readProfileValue(profileData, "targetEnvFile"),
+    appBackupDir: readOptionOrEnv(options.appBackupDir, "RSL_RECOVERY_APP_BACKUP_DIR")
+      || readProfileValue(profileData, "appBackupDir"),
+    postgresBackupDir: readOptionOrEnv(options.postgresBackupDir, "RSL_RECOVERY_POSTGRES_BACKUP_DIR")
+      || readProfileValue(profileData, "postgresBackupDir"),
+    adminUsername: readOptionOrEnv(options.adminUsername, "RSL_SMOKE_ADMIN_USERNAME")
+      || readProfileValue(profileData, "adminUsername"),
+    developerUsername: readOptionOrEnv(options.developerUsername, "RSL_SMOKE_DEVELOPER_USERNAME")
+      || readProfileValue(profileData, "developerUsername"),
     adminPasswordEnv: String(options.adminPasswordEnv || DEFAULT_ADMIN_PASSWORD_ENV).trim(),
     developerPasswordEnv: String(options.developerPasswordEnv || DEFAULT_DEVELOPER_PASSWORD_ENV).trim(),
     developerBearerTokenEnv: String(options.developerBearerTokenEnv || DEFAULT_DEVELOPER_BEARER_TOKEN_ENV).trim(),
-    closeoutInputFile: options.closeoutInputFile || path.posix.join(artifactRoot, "filled-closeout-input.json"),
-    actionsFile: options.actionsFile || path.posix.join(artifactRoot, "readiness-action-queue.md"),
-    profileOutputFile: options.profileOutputFile || path.posix.join(artifactRoot, "staging-rehearsal-profile.json"),
-    backupRestoreArtifact: options.backupRestoreArtifact || path.posix.join(artifactRoot, "backup-restore-drill.txt"),
-    executionPackFile: options.executionPackFile || null,
+    closeoutInputFile: options.closeoutInputFile
+      || profileCloseoutInputFile
+      || path.posix.join(artifactRoot, "filled-closeout-input.json"),
+    actionsFile: options.actionsFile
+      || profileActionsFile
+      || path.posix.join(artifactRoot, "readiness-action-queue.md"),
+    profileFile: profile.path,
+    profileOutputFile: options.profileOutputFile
+      || profileOutputFile
+      || path.posix.join(artifactRoot, "staging-rehearsal-profile.json"),
+    backupRestoreArtifact: options.backupRestoreArtifact
+      || profileBackupRestoreArtifact
+      || path.posix.join(artifactRoot, "backup-restore-drill.txt"),
+    executionPackFile: options.executionPackFile
+      || profileExecutionPackFile
+      || null,
     artifactRoot
   };
 }
@@ -988,6 +1084,40 @@ function writeProductionProofExecutionPackFile(file, writeLine) {
   );
 }
 
+function writeHelp() {
+  const lines = [
+    "Usage: npm.cmd run launch:production-proof-preflight -- [options]",
+    "",
+    "Required when not provided by --profile-file, env, or defaults:",
+    "  --base-url <https-url>",
+    "  --target-os <linux|windows>",
+    "  --storage-profile <sqlite|postgres-preview>",
+    "  --target-env-file <path>",
+    "  --app-backup-dir <path>",
+    "  --admin-username <name>",
+    "  --developer-username <name>",
+    "",
+    "Optional:",
+    "  --profile-file <staging-profile.json>",
+    "  --product-code <code>",
+    "  --channel <channel>",
+    "  --postgres-backup-dir <path>",
+    "  --closeout-input-file <path>",
+    "  --actions-file <path>",
+    "  --profile-output-file <staging-profile.json>",
+    "  --backup-restore-artifact <backup-restore-drill.txt>",
+    "  --execution-pack-file <production-proof-execution-pack.md>",
+    "  --admin-password-env <ENV_NAME>",
+    "  --developer-password-env <ENV_NAME>",
+    "  --developer-bearer-token-env <ENV_NAME>",
+    "  --json",
+    "  --help",
+    "",
+    "Secret values are never accepted as CLI flags. Load secrets through environment variables."
+  ];
+  console.log(lines.join("\n"));
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -1020,6 +1150,10 @@ function writeResult(result, json) {
 }
 
 function main() {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    writeHelp();
+    return;
+  }
   let json = process.argv.includes("--json");
   try {
     const options = parseArgs(process.argv.slice(2));

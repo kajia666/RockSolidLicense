@@ -33,6 +33,18 @@ function runPlainPreflight(args, env = {}) {
   });
 }
 
+function runProfileInit(args, env = {}) {
+  return spawnSync(process.execPath, ["scripts/staging-profile-init.mjs", "--json", ...args], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...env
+    },
+    timeout: 120_000
+  });
+}
+
 const validArgs = [
   "--base-url",
   "https://staging.example.com/",
@@ -383,6 +395,86 @@ test("production proof preflight returns no-write launch commands when real-envi
   );
   assert.equal(output.productionProofExecutionPack.readinessReadback.targetCursor, "5/5");
   assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+});
+
+test("production proof preflight can load launch inputs from a staging profile file", () => {
+  const tempRoot = mkdtempSync(join(tmpdir(), "production-proof-profile-"));
+  const profileFile = join(tempRoot, "staging-profile.json");
+  const executionPackFile = join(tempRoot, "production-proof-execution-pack.md");
+  const profileArgs = [
+    "--base-url",
+    "https://profile-staging.example.com",
+    "--product-code",
+    "PROFILE_ALPHA",
+    "--channel",
+    "stable",
+    "--admin-username",
+    "profile.admin@example.com",
+    "--developer-username",
+    "profile.dev",
+    "--target-os",
+    "linux",
+    "--storage-profile",
+    "postgres-preview",
+    "--target-env-file",
+    "/etc/rocksolidlicense/profile.env",
+    "--app-backup-dir",
+    "/var/lib/rocksolid/profile-backups",
+    "--postgres-backup-dir",
+    "/var/lib/rocksolid/profile-postgres-backups",
+    "--output-file",
+    profileFile
+  ];
+  try {
+    const profileResult = runProfileInit(profileArgs);
+    assert.equal(profileResult.status, 0, profileResult.stderr || profileResult.stdout);
+    assert.equal(profileResult.stderr, "");
+
+    const preflightResult = runPreflight([
+      "--profile-file",
+      profileFile,
+      "--execution-pack-file",
+      executionPackFile
+    ], secretEnv);
+
+    assert.equal(preflightResult.status, 0, preflightResult.stderr || preflightResult.stdout);
+    assert.equal(preflightResult.stderr, "");
+    const output = JSON.parse(preflightResult.stdout);
+    assert.equal(output.status, "pass");
+    assert.equal(output.summary.productCode, "PROFILE_ALPHA");
+    assert.equal(output.summary.channel, "stable");
+    assert.equal(output.realEnvironmentInputContract.status, "ready_for_production_proof_preflight");
+    assert.deepEqual(output.realEnvironmentInputContract.missingRequiredInputKeys, []);
+    assert.deepEqual(output.realEnvironmentInputContract.invalidRequiredInputKeys, []);
+    assert.deepEqual(output.realEnvironmentInputContract.missingSecretEnvKeys, []);
+    assert.equal(output.productionProofExecutionPackFile.path, executionPackFile);
+    assert.equal(output.productionProofExecutionPackFile.written, true);
+    assert.equal(
+      output.nextCommands.profileInit.command,
+      `npm.cmd run staging:profile:init -- --base-url https://profile-staging.example.com --product-code PROFILE_ALPHA --channel stable --admin-username profile.admin@example.com --developer-username profile.dev --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/profile.env --app-backup-dir /var/lib/rocksolid/profile-backups --postgres-backup-dir /var/lib/rocksolid/profile-postgres-backups --output-file ${profileFile}`
+    );
+    assert.equal(
+      output.nextCommands.recoveryPreflight.command,
+      "npm.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/profile.env --app-backup-dir /var/lib/rocksolid/profile-backups --postgres-backup-dir /var/lib/rocksolid/profile-postgres-backups --base-url https://profile-staging.example.com --product-code PROFILE_ALPHA --channel stable --closeout-input-file artifacts/staging/PROFILE_ALPHA/stable/filled-closeout-input.json --actions-file artifacts/staging/PROFILE_ALPHA/stable/readiness-action-queue.md"
+    );
+    assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("production proof preflight supports --help output", () => {
+  const result = spawnSync(process.execPath, ["scripts/production-proof-preflight.mjs", "--help"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    timeout: 60_000
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(result.stderr, "");
+  assert.match(result.stdout, /Usage: npm\.cmd run launch:production-proof-preflight -- \[options\]/);
+  assert.match(result.stdout, /--profile-file <staging-profile\.json>/);
+  assert.match(result.stdout, /--execution-pack-file <production-proof-execution-pack\.md>/);
 });
 
 test("production proof preflight can write a secret-free markdown execution pack", () => {

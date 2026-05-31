@@ -340,6 +340,75 @@ function buildOperatorQueueCheckpoint({
   };
 }
 
+function buildPostFullTestSignoffBridge({
+  outputFile,
+  actionsFile,
+  targetType,
+  key,
+  artifactPath,
+  productionDecision,
+  signoffProgress,
+  readinessStatusCommand,
+  rehearsalCommand
+}) {
+  if (targetType !== "production_signoff_condition" || key !== "full_test_window_passed") {
+    return null;
+  }
+  const pendingConditionKeys = Array.isArray(signoffProgress?.pendingConditionKeys)
+    ? signoffProgress.pendingConditionKeys
+    : [];
+  const pendingReceiptLaneKeys = Array.isArray(signoffProgress?.pendingReceiptLaneKeys)
+    ? signoffProgress.pendingReceiptLaneKeys
+    : [];
+  const blockedBy = [
+    ...pendingConditionKeys,
+    ...pendingReceiptLaneKeys.map((lane) => `receiptVisibility.${lane}`)
+  ];
+  const currentTarget = signoffProgress?.currentTarget || null;
+  const nextCommand = signoffProgress?.nextBackfillCommand || null;
+  return {
+    version: "staging-signoff-post-full-test-bridge/v1",
+    status: signoffProgress?.status === "filled" ? "ready_for_launch_day_watch" : "awaiting_signoff_readiness_refresh",
+    currentGate: "production_signoff",
+    currentActionKey: "readiness_status",
+    currentCommand: readinessStatusCommand,
+    actionQueueFile: actionsFile || null,
+    outputFile,
+    fullTestBackfilled: true,
+    backfilledKey: key,
+    backfilledArtifactPath: artifactPath || null,
+    productionDecision: productionDecision || null,
+    signoffProgress: {
+      filledConditionCount: signoffProgress?.filledConditionCount ?? 0,
+      requiredConditionCount: signoffProgress?.requiredConditionCount ?? 0,
+      pendingConditionCount: signoffProgress?.pendingConditionCount ?? 0,
+      visibleReceiptLaneCount: signoffProgress?.visibleReceiptLaneCount ?? 0,
+      requiredReceiptLaneCount: signoffProgress?.requiredReceiptLaneCount ?? RECEIPT_VISIBILITY_KEYS.length,
+      pendingReceiptLaneCount: signoffProgress?.pendingReceiptLaneCount ?? RECEIPT_VISIBILITY_KEYS.length,
+      pendingConditionKeys,
+      pendingReceiptLaneKeys
+    },
+    nextProductionSignoffTarget: currentTarget ? {
+      type: currentTarget.type || null,
+      key: currentTarget.key || null,
+      artifactPath: currentTarget.artifactPath || null,
+      command: nextCommand,
+      status: nextCommand ? "blocked_after_readiness_status" : "ready_after_readiness_status"
+    } : null,
+    launchDayWatchGate: {
+      key: "launch_day_watch_entry",
+      status: blockedBy.length ? "blocked_until_production_signoff_evidence" : "ready_after_readiness_status",
+      blockedBy,
+      nextCommand
+    },
+    statusCommand: readinessStatusCommand,
+    rehearsalReloadCommand: rehearsalCommand,
+    nextAction: blockedBy.length
+      ? "Run statusCommand, confirm full_test_window_passed is reflected, then continue the next production sign-off backfill."
+      : "Run statusCommand, then reload rehearsal and archive the production sign-off packet."
+  };
+}
+
 function buildEvidenceValue(options) {
   const parsed = JSON.parse(options.valueJson);
   const value = parsed && typeof parsed === "object" && !Array.isArray(parsed)
@@ -1030,6 +1099,30 @@ function writeOperatorQueueCheckpointPlain(checkpoint) {
   console.log(`Sign-off checkpoint next action: ${checkpoint.nextAction}`);
 }
 
+function writePostFullTestSignoffBridgePlain(bridge) {
+  if (!bridge) {
+    return;
+  }
+  console.log(
+    `Post-full-test signoff bridge: ${bridge.status || "-"}`
+      + ` | decision=${bridge.productionDecision || "-"}`
+      + ` | signoff=${bridge.signoffProgress?.filledConditionCount ?? "-"}/${bridge.signoffProgress?.requiredConditionCount ?? "-"}`
+      + ` | receipts=${bridge.signoffProgress?.visibleReceiptLaneCount ?? "-"}/${bridge.signoffProgress?.requiredReceiptLaneCount ?? "-"}`
+  );
+  console.log(`Post-full-test current: ${bridge.currentActionKey || "-"} -> ${bridge.currentCommand || "-"}`);
+  console.log(
+    `Post-full-test next signoff: ${bridge.nextProductionSignoffTarget?.type || "-"}`
+      + `/${bridge.nextProductionSignoffTarget?.key || "-"} -> ${bridge.nextProductionSignoffTarget?.command || "-"}`
+  );
+  console.log(
+    `Post-full-test launch-day gate: ${bridge.launchDayWatchGate?.key || "-"}`
+      + ` | status=${bridge.launchDayWatchGate?.status || "-"}`
+      + ` | blockedBy=${(bridge.launchDayWatchGate?.blockedBy || []).join(", ") || "-"}`
+  );
+  console.log(`Post-full-test rehearsal reload: ${bridge.rehearsalReloadCommand || "-"}`);
+  console.log(`Post-full-test next action: ${bridge.nextAction || "-"}`);
+}
+
 function writeProductionSwitchProofPacketPlain(packet) {
   if (!packet) {
     return;
@@ -1117,6 +1210,7 @@ function writeResult(result, json) {
       }
     }
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
+    writePostFullTestSignoffBridgePlain(result.postFullTestSignoffBridge);
     if (result.launchEvidenceReadinessGate) {
       const gate = result.launchEvidenceReadinessGate;
       console.log(
@@ -1251,6 +1345,17 @@ function main() {
       signoffProgress,
       operatorNextCommands
     });
+    const postFullTestSignoffBridge = buildPostFullTestSignoffBridge({
+      outputFile,
+      actionsFile,
+      targetType,
+      key,
+      artifactPath: options.artifactPath || null,
+      productionDecision: productionSignoff.decision || null,
+      signoffProgress,
+      readinessStatusCommand: nextStatusCommand,
+      rehearsalCommand: nextCommand
+    });
     writeResult({
       status: "written",
       mode: "staging-signoff-backfill",
@@ -1269,6 +1374,7 @@ function main() {
       signoffProgress,
       productionSwitchProofPacket,
       launchEvidenceReadinessGate,
+      ...(postFullTestSignoffBridge ? { postFullTestSignoffBridge } : {}),
       ...(launchDutyReadyHandoff ? { launchDutyReadyHandoff } : {}),
       nextCommand,
       statusCommand: nextStatusCommand,

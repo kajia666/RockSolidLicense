@@ -21,6 +21,20 @@ const SUPPORTED_TARGET_OS = new Set(["linux", "windows"]);
 const SUPPORTED_STORAGE_PROFILES = new Set(["sqlite", "postgres-preview"]);
 const SECRET_FIELD_PATTERN = /(password|bearer.*token|token|secret)/i;
 const SECRET_ENV_FIELD_PATTERN = /env(?:name)?$/i;
+const REQUIRED_SECRET_ENV = [
+  "RSL_SMOKE_ADMIN_PASSWORD",
+  "RSL_SMOKE_DEVELOPER_PASSWORD",
+  "RSL_DEVELOPER_BEARER_TOKEN"
+];
+const NO_WRITE_BOUNDARY = {
+  productionProofPreflight: "must_pass_before_live_write",
+  recoveryPreflight: "must_pass_before_live_write",
+  stagingPreflight: "must_pass_before_live_write"
+};
+const MANUAL_LIVE_WRITE_GATE = {
+  gateId: "launch_smoke_staging",
+  status: "blocked_until_production_proof_and_no_write_preflights_pass"
+};
 
 function requireArgValue(name, value, inlineValue) {
   const missingValue = value === undefined
@@ -136,6 +150,22 @@ function makeCheck(name, passed, message) {
   };
 }
 
+function buildOperatorHandoff(executionPackFile, nextCommand, failedChecks) {
+  const passed = failedChecks.length === 0;
+  return {
+    mode: "staging-profile-check-operator-handoff/v1",
+    status: passed ? "ready_for_production_proof_preflight" : "blocked_until_profile_check_passes",
+    currentCommand: passed ? nextCommand : "-",
+    productionProofExecutionPackFile: executionPackFile,
+    requiredSecretEnv: REQUIRED_SECRET_ENV,
+    noWriteBoundary: NO_WRITE_BOUNDARY,
+    manualLiveWriteGate: MANUAL_LIVE_WRITE_GATE,
+    nextAction: passed
+      ? "Load the required secret env vars, run currentCommand, then run recovery and staging no-write preflights before confirming launch_smoke_staging."
+      : `Fix profile check blockers before loading secrets or running production proof: ${failedChecks[0]?.message || "Profile check failed."}`
+  };
+}
+
 function validateProfile(profileFile, profile) {
   const missingRequiredKeys = REQUIRED_FIELDS.filter((key) => {
     const value = profile[key];
@@ -203,6 +233,8 @@ function validateProfile(profileFile, profile) {
   ];
   const failedChecks = checks.filter((item) => item.status === "fail");
   const executionPackFile = profile.productionProofExecutionPackFile || expectedExecutionPackFile;
+  const nextCommand = buildProductionProofPreflightCommand(profileFile);
+  const operatorHandoff = buildOperatorHandoff(executionPackFile, nextCommand, failedChecks);
   return {
     status: failedChecks.length ? "fail" : "pass",
     mode: "staging-profile-check",
@@ -218,7 +250,8 @@ function validateProfile(profileFile, profile) {
     },
     checks,
     productionProofExecutionPackFile: executionPackFile,
-    nextCommand: buildProductionProofPreflightCommand(profileFile),
+    nextCommand,
+    operatorHandoff,
     nextAction: failedChecks.length
       ? failedChecks[0].message
       : "Set required secret env vars, run nextCommand, then execute the no-write recovery and staging preflight steps before the manual live-write smoke gate.",
@@ -246,6 +279,12 @@ function writeResult(result, json) {
   writeLine(`Staging profile check ${result.status === "pass" ? "passed" : "failed"}. No data was modified.`);
   for (const check of result.checks || []) {
     writeLine(`- ${check.status.toUpperCase()} ${check.name}: ${check.message}`);
+  }
+  if (result.operatorHandoff) {
+    writeLine(`Production proof execution pack: ${result.operatorHandoff.productionProofExecutionPackFile || "-"}`);
+    writeLine(`Required secret env: ${(result.operatorHandoff.requiredSecretEnv || []).join(", ") || "-"}`);
+    writeLine("No-write boundary: production proof preflight, recovery preflight, and staging preflight must pass before live writes.");
+    writeLine("Manual live-write gate: launch_smoke_staging is blocked until production proof and no-write preflights pass.");
   }
   writeLine(`Next command: ${result.nextCommand || "-"}`);
 }

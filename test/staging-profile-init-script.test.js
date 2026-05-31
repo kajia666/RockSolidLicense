@@ -89,6 +89,8 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     const output = JSON.parse(result.stdout);
     const profile = JSON.parse(readFileSync(outputFile, "utf8"));
     const recoveryPreflightCommand = "npm.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/staging.env --app-backup-dir /var/lib/rocksolid/backups --postgres-backup-dir /var/lib/rocksolid/postgres-backups --base-url https://staging.example.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
+    const productionProofExecutionPackFile = "artifacts/staging/PILOT_ALPHA/beta/production-proof-execution-pack.md";
+    const productionProofPreflightCommand = `npm.cmd run launch:production-proof-preflight -- --base-url https://staging.example.com --product-code PILOT_ALPHA --channel beta --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/staging.env --app-backup-dir /var/lib/rocksolid/backups --postgres-backup-dir /var/lib/rocksolid/postgres-backups --admin-username admin@example.com --developer-username launch.smoke.owner --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md --profile-output-file ${outputFile} --backup-restore-artifact artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt --execution-pack-file ${productionProofExecutionPackFile}`;
     const routeMapGateDryRunCommand = "npm.cmd run launch:route-map-gate -- --dry-run --json --product-code PILOT_ALPHA --channel beta --staging-base-url https://staging.example.com --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const routeMapGateCommand = "npm.cmd run launch:route-map-gate -- --product-code PILOT_ALPHA --channel beta --staging-base-url https://staging.example.com --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const routeMapGateBackfillCommand = "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/route-map-gate-output.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
@@ -440,6 +442,8 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
       closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
       readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      productionProofExecutionPackFile,
+      productionProofPreflightCommand,
       launchDutyRecordIndexFile,
       publicHttpsProof: {
         status: "ready_public_https_entrypoint",
@@ -786,12 +790,15 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       closeoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
       closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
       readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+      productionProofExecutionPackFile,
+      productionProofPreflightCommand,
       launchLaneFiles: {
         archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
         profileFile: outputFile,
         closeoutDraftFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json",
         closeoutInputFile: "artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
         readinessActionQueueFile: "artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
+        productionProofExecutionPackFile,
         backupRestoreArtifactFile: "artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt",
         routeMapGateDryRunFile: "artifacts/staging/PILOT_ALPHA/beta/route-map-gate-dry-run.json",
         routeMapGateOutputFile: "artifacts/staging/PILOT_ALPHA/beta/route-map-gate-output.txt",
@@ -811,7 +818,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         launchDutyArchiveIndexFile: "artifacts/staging/PILOT_ALPHA/beta/staging-launch-duty-archive-index.json",
         launchDutyRecordIndexFile,
         stableOperationsHandoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
-        nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, and stable-operations handoff."
+        nextAction: "Use these paths for the first real staging rehearsal, production proof execution pack, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, and stable-operations handoff."
       },
       closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       postCloseoutInitStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
@@ -1227,6 +1234,8 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Launch lane closeout draft: artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json/);
     assert.match(result.stdout, /Launch lane closeout input: artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json/);
     assert.match(result.stdout, /Launch lane action queue: artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
+    assert.match(result.stdout, /Launch lane production proof execution pack: artifacts\/staging\/PILOT_ALPHA\/beta\/production-proof-execution-pack\.md/);
+    assert.match(result.stdout, /Production proof preflight: npm\.cmd run launch:production-proof-preflight -- --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel beta --target-os linux --storage-profile postgres-preview --target-env-file \/etc\/rocksolidlicense\/staging\.env --app-backup-dir \/var\/lib\/rocksolid\/backups --postgres-backup-dir \/var\/lib\/rocksolid\/postgres-backups --admin-username admin@example\.com --developer-username launch\.smoke\.owner --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md --profile-output-file .*staging-profile\.json --backup-restore-artifact artifacts\/staging\/PILOT_ALPHA\/beta\/backup-restore-drill\.txt --execution-pack-file artifacts\/staging\/PILOT_ALPHA\/beta\/production-proof-execution-pack\.md/);
     assert.match(result.stdout, /Launch lane backup\/restore artifact: artifacts\/staging\/PILOT_ALPHA\/beta\/backup-restore-drill\.txt/);
     assert.match(result.stdout, /Launch lane operator go\/no-go: artifacts\/staging\/PILOT_ALPHA\/beta\/operator-go-no-go\.md/);
     assert.match(result.stdout, /Launch lane record index: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json/);

@@ -141,6 +141,53 @@ function buildRecoveryPreflightCommand({ options, closeoutInputFile, readinessAc
   return parts.join(" ");
 }
 
+function buildProductionProofPreflightCommand({
+  options,
+  closeoutInputFile,
+  readinessActionQueueFile,
+  outputFile,
+  backupRestoreArtifactFile,
+  productionProofExecutionPackFile
+}) {
+  const parts = [
+    "npm.cmd run launch:production-proof-preflight --",
+    "--base-url",
+    commandValue(options.baseUrl),
+    "--product-code",
+    commandValue(options.productCode),
+    "--channel",
+    commandValue(options.channel || "stable"),
+    "--target-os",
+    commandValue(options.targetOs),
+    "--storage-profile",
+    commandValue(options.storageProfile),
+    "--target-env-file",
+    commandValue(options.targetEnvFile),
+    "--app-backup-dir",
+    commandValue(options.appBackupDir)
+  ];
+  if (options.postgresBackupDir) {
+    parts.push("--postgres-backup-dir", commandValue(options.postgresBackupDir));
+  }
+  parts.push(
+    "--admin-username",
+    commandValue(options.adminUsername),
+    "--developer-username",
+    commandValue(options.developerUsername),
+    "--closeout-input-file",
+    commandValue(closeoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile),
+    "--profile-output-file",
+    commandValue(outputFile),
+    "--backup-restore-artifact",
+    commandValue(backupRestoreArtifactFile),
+    "--execution-pack-file",
+    commandValue(productionProofExecutionPackFile)
+  );
+  return parts.join(" ");
+}
+
 function buildRouteMapGateCommand({ options, closeoutInputFile, readinessActionQueueFile, dryRun = false }) {
   const parts = ["npm.cmd run launch:route-map-gate --"];
   if (dryRun) {
@@ -1192,6 +1239,7 @@ function buildLaunchLaneFiles({
   profile,
   closeoutInputFile,
   readinessActionQueueFile,
+  productionProofExecutionPackFile,
   backupRestoreArtifactFile,
   routeMapGateDryRunFile,
   routeMapGateOutputFile,
@@ -1215,6 +1263,7 @@ function buildLaunchLaneFiles({
     closeoutDraftFile: profile.filledCloseoutDraftFile,
     closeoutInputFile,
     readinessActionQueueFile,
+    productionProofExecutionPackFile,
     backupRestoreArtifactFile,
     routeMapGateDryRunFile,
     routeMapGateOutputFile,
@@ -1234,7 +1283,7 @@ function buildLaunchLaneFiles({
     launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
     launchDutyRecordIndexFile,
     stableOperationsHandoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
-    nextAction: "Use these paths for the first real staging rehearsal, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, and stable-operations handoff."
+    nextAction: "Use these paths for the first real staging rehearsal, production proof execution pack, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, and stable-operations handoff."
   };
 }
 
@@ -1244,6 +1293,8 @@ function buildProductionSwitchProofPacket({
   outputFile,
   closeoutInputFile,
   readinessActionQueueFile,
+  productionProofExecutionPackFile,
+  productionProofPreflightCommand,
   nextCommand,
   recoveryPreflightCommand,
   launchSmokeStagingCommand,
@@ -1357,6 +1408,8 @@ function buildProductionSwitchProofPacket({
     archiveRoot,
     closeoutInputFile,
     readinessActionQueueFile,
+    productionProofExecutionPackFile,
+    productionProofPreflightCommand,
     launchDutyRecordIndexFile,
     publicHttpsProof,
     storageProfileProof,
@@ -1513,11 +1566,15 @@ function writeResult(result, json) {
       console.log(`Launch lane closeout draft: ${files.closeoutDraftFile}`);
       console.log(`Launch lane closeout input: ${files.closeoutInputFile}`);
       console.log(`Launch lane action queue: ${files.readinessActionQueueFile}`);
+      console.log(`Launch lane production proof execution pack: ${files.productionProofExecutionPackFile}`);
       console.log(`Launch lane backup/restore artifact: ${files.backupRestoreArtifactFile}`);
       console.log(`Launch lane route-map dry run: ${files.routeMapGateDryRunFile}`);
       console.log(`Launch lane route-map output: ${files.routeMapGateOutputFile}`);
       console.log(`Launch lane operator go/no-go: ${files.operatorGoNoGoFile}`);
       console.log(`Launch lane record index: ${files.launchDutyRecordIndexFile}`);
+    }
+    if (result.productionProofPreflightCommand) {
+      console.log(`Production proof preflight: ${result.productionProofPreflightCommand}`);
     }
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     writeLaunchExecutionPhasePlanPlain(result.launchExecutionPhasePlan);
@@ -1646,6 +1703,7 @@ function main() {
     const closeoutDraftFile = profile.filledCloseoutDraftFile;
     const closeoutInputFile = path.posix.join(archiveRoot, "filled-closeout-input.json");
     const readinessActionQueueFile = profile.readinessActionQueueFile;
+    const productionProofExecutionPackFile = path.posix.join(archiveRoot, "production-proof-execution-pack.md");
     const backupRestoreArtifactFile = path.posix.join(archiveRoot, "backup-restore-drill.txt");
     const routeMapGateDryRunFile = path.posix.join(archiveRoot, "route-map-gate-dry-run.json");
     const routeMapGateOutputFile = path.posix.join(archiveRoot, "route-map-gate-output.txt");
@@ -1679,6 +1737,14 @@ function main() {
       options,
       closeoutInputFile,
       readinessActionQueueFile
+    });
+    const productionProofPreflightCommand = buildProductionProofPreflightCommand({
+      options,
+      closeoutInputFile,
+      readinessActionQueueFile,
+      outputFile,
+      backupRestoreArtifactFile,
+      productionProofExecutionPackFile
     });
     const routeMapGateDryRunCommand = buildRouteMapGateCommand({
       options,
@@ -1790,6 +1856,7 @@ function main() {
       profile,
       closeoutInputFile,
       readinessActionQueueFile,
+      productionProofExecutionPackFile,
       backupRestoreArtifactFile,
       routeMapGateDryRunFile,
       routeMapGateOutputFile,
@@ -1889,6 +1956,8 @@ function main() {
       outputFile,
       closeoutInputFile,
       readinessActionQueueFile,
+      productionProofExecutionPackFile,
+      productionProofPreflightCommand,
       nextCommand,
       recoveryPreflightCommand,
       launchSmokeStagingCommand,
@@ -1912,6 +1981,8 @@ function main() {
       closeoutDraftFile,
       closeoutInputFile,
       readinessActionQueueFile,
+      productionProofExecutionPackFile,
+      productionProofPreflightCommand,
       launchLaneFiles,
       closeoutInitCommand,
       postCloseoutInitStatusCommand,

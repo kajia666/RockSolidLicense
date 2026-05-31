@@ -316,6 +316,45 @@ test("staging readiness status points to full-test window after closeout is read
       receiptOperations: [],
       nextAction: "Run fullTestCommand, save fullTestResultArtifactPath, run signoffBackfillCommand with the redacted full-test result, then statusCommand."
     });
+    assert.deepEqual(output.postSmokeReadinessBridge, {
+      version: "staging-readiness-post-smoke-bridge/v1",
+      status: "ready_for_full_test_window",
+      currentGate: "full_test_window",
+      currentActionKey: "run_full_test_window",
+      currentCommand: "npm.cmd test",
+      closeoutInputFile: inputFile,
+      actionQueueFile: null,
+      postSmokeCloseoutKeys: [
+        "live_write_smoke_result",
+        "launch_smoke_handoff",
+        "launch_mainline_evidence_receipts",
+        "receipt_visibility_review"
+      ],
+      completedPostSmokeCloseoutKeys: [
+        "live_write_smoke_result",
+        "launch_smoke_handoff",
+        "launch_mainline_evidence_receipts",
+        "receipt_visibility_review"
+      ],
+      missingPostSmokeCloseoutKeys: [],
+      closeoutProgress: {
+        filledCount: 7,
+        requiredCount: 7,
+        missingCount: 0
+      },
+      fullTestCommand: "npm.cmd test",
+      fullTestResultArtifactPath: "artifacts/staging/<productCode>/<channel>/full-test-output.txt",
+      signoffBackfillCommand: `npm.cmd run staging:signoff:backfill -- --input-file ${inputFile} --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff`,
+      statusCommand: `npm.cmd run staging:readiness:status -- --input-file ${inputFile}`,
+      rehearsalReloadCommand: `npm.cmd run staging:rehearsal -- --closeout-input-file ${inputFile}`,
+      productionSignoffGate: {
+        key: "production_signoff_entry",
+        status: "blocked_until_full_test_window_passed",
+        blockedBy: ["full_test_window_passed"],
+        nextCommand: "npm.cmd test"
+      },
+      nextAction: "Run the full test window, backfill full_test_window_passed, refresh readiness, then continue production sign-off evidence."
+    });
     assert.deepEqual(output.operatorNextCommands, [
       {
         key: "run_full_test_window",
@@ -414,6 +453,12 @@ test("staging readiness status plain output prints full-test operator next comma
     assert.match(result.stdout, /Full-test status refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
     assert.match(result.stdout, /Full-test rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(result.stdout, /Full-test next action: Run fullTestCommand, save fullTestResultArtifactPath, run signoffBackfillCommand with the redacted full-test result, then statusCommand\./);
+    assert.match(result.stdout, /Post-smoke readiness bridge: ready_for_full_test_window \| gate=full_test_window \| postSmoke=4\/4 \| closeout=7\/7/);
+    assert.match(result.stdout, /Post-smoke readiness current: run_full_test_window -> npm\.cmd test/);
+    assert.match(result.stdout, /Post-smoke readiness full-test artifact: artifacts\/staging\/<productCode>\/<channel>\/full-test-output\.txt/);
+    assert.match(result.stdout, /Post-smoke readiness signoff backfill: npm\.cmd run staging:signoff:backfill -- --input-file .*filled-closeout-input\.json --condition-key full_test_window_passed --value-json <redacted-json> --decision ready-for-production-signoff --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Post-smoke readiness refresh: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Post-smoke readiness production gate: production_signoff_entry \| status=blocked_until_full_test_window_passed \| blockedBy=full_test_window_passed \| next=npm\.cmd test/);
     assert.match(result.stdout, /Action file: .*readiness-action-queue\.md/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });

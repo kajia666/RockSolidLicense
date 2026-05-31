@@ -18,6 +18,13 @@ const REQUIRED_CLOSEOUT_KEYS = [
   "operator_go_no_go"
 ];
 
+const POST_SMOKE_CLOSEOUT_KEYS = [
+  "live_write_smoke_result",
+  "launch_smoke_handoff",
+  "launch_mainline_evidence_receipts",
+  "receipt_visibility_review"
+];
+
 const REQUIRED_SIGNOFF_KEYS = [
   "full_test_window_passed",
   "staging_artifacts_archived",
@@ -975,6 +982,166 @@ function buildFullTestWindowHandoff({ inputFile, actionsFile, actionQueue }) {
     expectedEvidence: item.evidence?.expectedEvidence || null,
     receiptOperations: item.evidence?.receiptOperations || [],
     nextAction: "Run fullTestCommand, save fullTestResultArtifactPath, run signoffBackfillCommand with the redacted full-test result, then statusCommand."
+  };
+}
+
+function postSmokeProductionGateStatus({
+  missingPostSmokeKeys,
+  canRunFullTestWindow,
+  missingSignoffKeys,
+  missingReceiptVisibilityKeys,
+  productionDecision,
+  canSignoffProduction
+}) {
+  if (missingPostSmokeKeys.length > 0) {
+    return "blocked_until_post_smoke_closeout_backfill";
+  }
+  if (!canRunFullTestWindow) {
+    return "blocked_until_closeout_and_go_no_go";
+  }
+  if (missingSignoffKeys.includes("full_test_window_passed")) {
+    return "blocked_until_full_test_window_passed";
+  }
+  if (productionDecision !== "ready-for-production-signoff") {
+    return "blocked_until_production_signoff_decision";
+  }
+  if (missingSignoffKeys.length > 0 || missingReceiptVisibilityKeys.length > 0) {
+    return "blocked_until_production_signoff_evidence";
+  }
+  return canSignoffProduction ? "ready_for_launch_day_watch" : "blocked_until_readiness_refresh";
+}
+
+function postSmokeProductionGateBlockedBy({
+  missingPostSmokeKeys,
+  missingCloseoutKeys,
+  canRunFullTestWindow,
+  missingSignoffKeys,
+  missingReceiptVisibilityKeys,
+  productionDecision
+}) {
+  if (missingPostSmokeKeys.length > 0) {
+    return missingPostSmokeKeys;
+  }
+  if (!canRunFullTestWindow) {
+    return missingCloseoutKeys.length ? missingCloseoutKeys : ["operator_go_no_go"];
+  }
+  if (missingSignoffKeys.includes("full_test_window_passed")) {
+    return ["full_test_window_passed"];
+  }
+  if (productionDecision !== "ready-for-production-signoff") {
+    return ["productionSignoff.decision"];
+  }
+  if (missingSignoffKeys.length > 0) {
+    return missingSignoffKeys;
+  }
+  return missingReceiptVisibilityKeys.map((key) => `receiptVisibility.${key}`);
+}
+
+function postSmokeBridgeStatus({ missingPostSmokeKeys, canRunFullTestWindow, currentGate, canSignoffProduction }) {
+  if (missingPostSmokeKeys.length > 0) {
+    return "blocked_until_post_smoke_closeout_backfill";
+  }
+  if (!canRunFullTestWindow) {
+    return "blocked_until_closeout_and_go_no_go";
+  }
+  if (currentGate === "full_test_window") {
+    return "ready_for_full_test_window";
+  }
+  if (currentGate === "production_signoff") {
+    return "ready_for_production_signoff_evidence";
+  }
+  if (canSignoffProduction) {
+    return "ready_for_launch_day_watch";
+  }
+  return `ready_for_${currentGate}`;
+}
+
+function postSmokeBridgeNextAction(status) {
+  if (status === "ready_for_full_test_window") {
+    return "Run the full test window, backfill full_test_window_passed, refresh readiness, then continue production sign-off evidence.";
+  }
+  if (status === "ready_for_production_signoff_evidence") {
+    return "Continue the current production sign-off evidence command, refresh readiness, then move to launch-day watch when all sign-off lanes are visible.";
+  }
+  if (status === "ready_for_launch_day_watch") {
+    return "Reload rehearsal, archive the production sign-off packet, then record launch-day watch.";
+  }
+  return "Complete the blocked post-smoke readiness item, then rerun staging:readiness:status.";
+}
+
+function buildPostSmokeReadinessBridge({
+  inputFile,
+  actionsFile,
+  currentGate,
+  actionQueue,
+  currentEvidenceCheckpoint,
+  evidenceSummary,
+  missingCloseoutKeys,
+  missingSignoffKeys,
+  missingReceiptVisibilityKeys,
+  productionDecision,
+  canRunFullTestWindow,
+  canSignoffProduction
+}) {
+  const filledCloseout = filledEvidenceByKey(evidenceSummary.closeout.filledItems);
+  const completedPostSmokeCloseoutKeys = POST_SMOKE_CLOSEOUT_KEYS.filter((key) => filledCloseout.has(key));
+  const missingPostSmokeCloseoutKeys = POST_SMOKE_CLOSEOUT_KEYS.filter((key) => !filledCloseout.has(key));
+  const fullTestItem = actionQueue.find((entry) => entry.key === "run_full_test_window")
+    || findActionQueueItem(actionQueue, "full_test_window_passed")
+    || {};
+  const status = postSmokeBridgeStatus({
+    missingPostSmokeKeys: missingPostSmokeCloseoutKeys,
+    canRunFullTestWindow,
+    currentGate,
+    canSignoffProduction
+  });
+  const productionGateStatus = postSmokeProductionGateStatus({
+    missingPostSmokeKeys: missingPostSmokeCloseoutKeys,
+    canRunFullTestWindow,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys,
+    productionDecision,
+    canSignoffProduction
+  });
+  return {
+    version: "staging-readiness-post-smoke-bridge/v1",
+    status,
+    currentGate,
+    currentActionKey: currentEvidenceCheckpoint?.currentActionKey || null,
+    currentCommand: currentEvidenceCheckpoint?.currentCommand || null,
+    closeoutInputFile: inputFile,
+    actionQueueFile: actionsFile || null,
+    postSmokeCloseoutKeys: POST_SMOKE_CLOSEOUT_KEYS,
+    completedPostSmokeCloseoutKeys,
+    missingPostSmokeCloseoutKeys,
+    closeoutProgress: {
+      filledCount: evidenceSummary.closeout.filledCount,
+      requiredCount: evidenceSummary.closeout.requiredCount,
+      missingCount: evidenceSummary.closeout.missingCount
+    },
+    fullTestCommand: "npm.cmd test",
+    fullTestResultArtifactPath: fullTestItem.evidence?.artifactPathHint
+      || SIGNOFF_EVIDENCE.full_test_window_passed.artifactPathHint,
+    signoffBackfillCommand: fullTestItem.followUpCommand
+      || commandForSignoffCondition(inputFile, "full_test_window_passed", true, actionsFile),
+    statusCommand: currentEvidenceCheckpoint?.statusCommand || statusCommand(inputFile, actionsFile),
+    rehearsalReloadCommand: currentEvidenceCheckpoint?.reloadCommand || reloadCommand(inputFile),
+    productionSignoffGate: {
+      key: "production_signoff_entry",
+      status: productionGateStatus,
+      blockedBy: postSmokeProductionGateBlockedBy({
+        missingPostSmokeKeys: missingPostSmokeCloseoutKeys,
+        missingCloseoutKeys,
+        canRunFullTestWindow,
+        missingSignoffKeys,
+        missingReceiptVisibilityKeys,
+        productionDecision
+      }),
+      nextCommand: currentGate === "full_test_window"
+        ? "npm.cmd test"
+        : currentEvidenceCheckpoint?.currentCommand || null
+    },
+    nextAction: postSmokeBridgeNextAction(status)
   };
 }
 
@@ -2426,6 +2593,20 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     currentEvidenceCheckpoint,
     launchDutyCompletionHandoff
   });
+  const postSmokeReadinessBridge = buildPostSmokeReadinessBridge({
+    inputFile,
+    actionsFile,
+    currentGate,
+    actionQueue,
+    currentEvidenceCheckpoint,
+    evidenceSummary,
+    missingCloseoutKeys,
+    missingSignoffKeys,
+    missingReceiptVisibilityKeys,
+    productionDecision,
+    canRunFullTestWindow,
+    canSignoffProduction
+  });
 
   return {
     status: "pass",
@@ -2462,6 +2643,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     launchExecutionPhasePlan,
     productionSwitchProofPacket,
     launchEvidenceReadinessGate,
+    postSmokeReadinessBridge,
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
     ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
@@ -2629,6 +2811,29 @@ function writeProductionSwitchProofPacketPlain(packet) {
   console.log(`Production switch next action: ${packet.nextAction || "-"}`);
 }
 
+function writePostSmokeReadinessBridgePlain(bridge) {
+  if (!bridge) {
+    return;
+  }
+  console.log(
+    `Post-smoke readiness bridge: ${bridge.status || "-"}`
+      + ` | gate=${bridge.currentGate || "-"}`
+      + ` | postSmoke=${bridge.completedPostSmokeCloseoutKeys?.length ?? "-"}/${bridge.postSmokeCloseoutKeys?.length ?? "-"}`
+      + ` | closeout=${bridge.closeoutProgress?.filledCount ?? "-"}/${bridge.closeoutProgress?.requiredCount ?? "-"}`
+  );
+  console.log(`Post-smoke readiness current: ${bridge.currentActionKey || "-"} -> ${bridge.currentCommand || "-"}`);
+  console.log(`Post-smoke readiness full-test artifact: ${bridge.fullTestResultArtifactPath || "-"}`);
+  console.log(`Post-smoke readiness signoff backfill: ${bridge.signoffBackfillCommand || "-"}`);
+  console.log(`Post-smoke readiness refresh: ${bridge.statusCommand || "-"}`);
+  console.log(
+    `Post-smoke readiness production gate: ${bridge.productionSignoffGate?.key || "-"}`
+      + ` | status=${bridge.productionSignoffGate?.status || "-"}`
+      + ` | blockedBy=${(bridge.productionSignoffGate?.blockedBy || []).join(", ") || "-"}`
+      + ` | next=${bridge.productionSignoffGate?.nextCommand || "-"}`
+  );
+  console.log(`Post-smoke readiness next action: ${bridge.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -2643,6 +2848,7 @@ function writeResult(result, json) {
     writeLaunchExecutionPhasePlanPlain(result.launchExecutionPhasePlan);
     writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
+    writePostSmokeReadinessBridgePlain(result.postSmokeReadinessBridge);
     if (result.fullTestWindowHandoff) {
       const handoff = result.fullTestWindowHandoff;
       console.log(`Full-test handoff: ${handoff.status}`);

@@ -14362,6 +14362,10 @@ function buildLaunchSurfaceHandoffRoutesText({
     lines.push("");
   }
 
+  if (appendProductionProofPreflightHandoffSection(lines, launchCutoverTriageCheckpoint)) {
+    lines.push("");
+  }
+
   if (launchCutoverTriageCheckpoint && typeof launchCutoverTriageCheckpoint === "object") {
     appendLaunchCutoverTriageCheckpointLines(lines, launchCutoverTriageCheckpoint, {
       leadingBlank: false
@@ -32463,6 +32467,9 @@ function buildDeveloperLaunchMainlineHandoffDownloadRoutesText(payload = {}) {
   appendFirstWaveAuditBackfillStatusText(lines, payload.opsSnapshot || {});
   lines.push("");
   if (appendMirroredLaunchSurfaceFreezeLines(lines, mirroredLaunchSurfaceFreeze)) {
+    lines.push("");
+  }
+  if (appendProductionProofPreflightHandoffSection(lines, productionSwitchProofPacket)) {
     lines.push("");
   }
   if (launchDutyActionOrder) {
@@ -63092,6 +63099,38 @@ function appendProductionProofPreflightHandoffLine(lines = [], handoff = null) {
   return true;
 }
 
+function findProductionProofPreflightHandoff(source = null) {
+  if (!source || typeof source !== "object") {
+    return null;
+  }
+  const candidates = [
+    source.mode === "launch-production-proof-preflight-handoff/v1" ? source : null,
+    source.productionProofPreflightHandoff,
+    source.productionSwitchProofPacket?.productionProofPreflightHandoff,
+    source.launchEvidenceReadinessGate?.productionProofPreflightHandoff,
+    source.launchEvidenceReadinessGate?.productionSwitchProofPacket?.productionProofPreflightHandoff,
+    source.operatorQueueCheckpoint?.productionProofPreflightHandoff
+  ];
+  return cloneLaunchProductionProofPreflightHandoff(
+    candidates.find((item) => item && typeof item === "object") || null
+  );
+}
+
+function appendProductionProofPreflightHandoffSection(lines = [], source = null, {
+  heading = "Production Proof Preflight Handoff:"
+} = {}) {
+  if (!Array.isArray(lines)) {
+    return false;
+  }
+  const handoff = findProductionProofPreflightHandoff(source);
+  if (!handoff) {
+    return false;
+  }
+  lines.push(heading);
+  appendProductionProofPreflightHandoffLine(lines, handoff);
+  return true;
+}
+
 function appendLaunchCutoverOperatorDecisionLine(lines = [], checkpoint = null) {
   if (!Array.isArray(lines) || !checkpoint || typeof checkpoint !== "object") {
     return false;
@@ -67782,6 +67821,9 @@ function buildDeveloperOpsLaunchMainlineHandoffRoutesText(payload = {}) {
   appendLaunchReceiptAuditBackfillStatusText(lines, payload);
   appendLaunchReadinessNextGateHandoffText(lines, launchReadinessNextGateSource);
   lines.push("");
+  if (appendProductionProofPreflightHandoffSection(lines, readiness.launchOperationsOperatorEntry || readiness)) {
+    lines.push("");
+  }
   lines.push("Launch Mainline Direct Downloads:");
   for (const [key, download] of downloads) {
     lines.push(`- ${key}: ${formatLaunchHandoffDownloadText(download, { fileSeparator: " | " })}`);

@@ -13473,6 +13473,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewHandoffRoutes.contentType || "", /^text\/plain/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.contentDisposition || "", /handoff-routes\.txt"/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /RockSolid Developer Launch Review Handoff Routes/);
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Review Package:/);
@@ -13521,6 +13525,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceReviewZipText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceReviewZipText, /handoff-routes\.txt/);
     assert.match(runtimeEvidenceReviewZipText, /RockSolid Developer Launch Review Handoff Routes/);
+    assert.match(runtimeEvidenceReviewZipText, /Production Proof Preflight Handoff:/);
     assert.match(runtimeEvidenceReviewZipText, /format=handoff-index/);
     assert.match(runtimeEvidenceReviewZipText, /format=handoff-download-routes/);
 
@@ -13934,6 +13939,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeHandoffRoutes.contentType || "", /^text\/plain/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.contentDisposition || "", /handoff-routes\.txt"/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /RockSolid Developer Launch Smoke Kit Handoff Routes/);
+    assert.match(
+      runtimeEvidenceSmokeHandoffRoutes.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /launchCutoverTriage=hold_for_launch_evidence/);
     assert.match(runtimeEvidenceSmokeHandoffRoutes.body, /Launch Smoke Package:/);
@@ -13983,6 +13992,7 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(runtimeEvidenceSmokeZipText, /First-Wave Runtime Evidence:/);
     assert.match(runtimeEvidenceSmokeZipText, /handoff-routes\.txt/);
     assert.match(runtimeEvidenceSmokeZipText, /RockSolid Developer Launch Smoke Kit Handoff Routes/);
+    assert.match(runtimeEvidenceSmokeZipText, /Production Proof Preflight Handoff:/);
     assert.match(runtimeEvidenceSmokeZipText, /format=handoff-index/);
     assert.match(runtimeEvidenceSmokeZipText, /format=handoff-download-routes/);
 
@@ -27413,6 +27423,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(launchOperationsMainlineHandoffRoutesDownload.body, /RockSolid Developer Ops Launch Mainline Handoff Routes/);
     assert.match(
       launchOperationsMainlineHandoffRoutesDownload.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
+    assert.match(
+      launchOperationsMainlineHandoffRoutesDownload.body,
       /Operator Order:[\s\S]*Check the front-loaded path first: launch-mainline-handoff-routes\.txt -> surface-review-closeout-shortcut-download\.txt -> developer-ops-pre-staging-readiness-self-check\.txt\./
     );
     assert.doesNotMatch(launchOperationsMainlineHandoffRoutesDownload.body, /complete Launch Mainline route map/);
@@ -27478,6 +27492,10 @@ test("developer ops export bundles scoped data and downloadable assets", async (
       ownerSession.token
     );
     assert.match(launchMainlineHandoffDownloadRoutesSelectionDownload.body, /RockSolid Developer Launch Mainline Handoff Download Routes/);
+    assert.match(
+      launchMainlineHandoffDownloadRoutesSelectionDownload.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
     assert.match(
       launchMainlineHandoffDownloadRoutesSelectionDownload.body,
       /Mirrored Launch Surface Freeze:[\s\S]*status=mirrored_surfaces_frozen \| readyForFinalGoLiveTestWindow=yes \| readyForProductionSwitch=no \| surfaces=5\/5 \| launchDutyRecordIndex=artifacts\/staging\/EXPORT_CLOSEOUT_READY\/stable\/launch-duty-record-index\.json/

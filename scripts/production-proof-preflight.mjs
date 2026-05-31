@@ -833,6 +833,52 @@ function buildProductionProofExecutionPack(realEnvironmentInputContract, product
   };
 }
 
+function buildNoWriteContinuationHandoff(realEnvironmentInputContract, productionProofExecutionQueue, productionProofExecutionPack, nextCommands) {
+  const readyForNoWriteExecution = realEnvironmentInputContract.ready === true;
+  const remainingNoWriteCommands = (productionProofExecutionQueue.steps || [])
+    .filter((item) => item.phase === "no_write" && item.status !== "completed_from_profile_file")
+    .map((item) => ({
+      order: item.order,
+      key: item.key,
+      status: item.status,
+      command: item.command,
+      willWriteLiveData: item.willWriteLiveData === true,
+      willModifyData: item.willModifyData === true
+    }));
+  const blockedByNoWriteSteps = remainingNoWriteCommands
+    .map((item) => item.key)
+    .filter(Boolean);
+  return {
+    mode: "launch-production-proof-no-write-continuation/v1",
+    status: readyForNoWriteExecution
+      ? "ready_for_no_write_execution"
+      : "blocked_until_real_environment_inputs_ready",
+    currentActionKey: readyForNoWriteExecution
+      ? productionProofExecutionQueue.currentActionKey
+      : "production_proof_preflight",
+    currentCommand: readyForNoWriteExecution
+      ? productionProofExecutionQueue.currentCommand
+      : null,
+    completedStepKeys: productionProofExecutionPack.completedStepKeys || [],
+    remainingNoWriteCommands,
+    manualLiveWriteGate: {
+      key: "launch_smoke_staging",
+      status: readyForNoWriteExecution
+        ? "blocked_until_no_write_commands_pass"
+        : "blocked_until_real_environment_inputs_ready",
+      requiresOperatorConfirmation: true,
+      blockedByNoWriteSteps,
+      willWriteLiveData: true,
+      willModifyData: true,
+      command: nextCommands.launchSmokeStaging.command
+    },
+    readinessReadback: productionProofExecutionPack.readinessReadback,
+    nextAction: readyForNoWriteExecution
+      ? "Run currentCommand, continue the remaining no-write commands in order, then confirm launch_smoke_staging manually before running the readiness readback."
+      : "Resolve input-check gaps and rerun production proof preflight before entering the no-write continuation handoff."
+  };
+}
+
 function buildResult(options) {
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(options.baseUrl);
   const storageProfileProof = buildProductionSwitchStorageProfileProof(options.storageProfile);
@@ -870,6 +916,12 @@ function buildResult(options) {
     productionProofExecutionQueue,
     nextCommands
   );
+  const noWriteContinuationHandoff = buildNoWriteContinuationHandoff(
+    realEnvironmentInputContract,
+    productionProofExecutionQueue,
+    productionProofExecutionPack,
+    nextCommands
+  );
   return {
     status,
     mode: "launch-production-proof-preflight",
@@ -899,6 +951,7 @@ function buildResult(options) {
     realEnvironmentInputContract,
     productionProofExecutionQueue,
     productionProofExecutionPack,
+    noWriteContinuationHandoff,
     productionProofExecutionPackFile: {
       path: options.executionPackFile,
       written: false,
@@ -1015,6 +1068,37 @@ function writeProductionProofExecutionPack(pack, writeLine) {
   );
 }
 
+function writeNoWriteContinuationHandoff(handoff, writeLine) {
+  if (!handoff || typeof handoff !== "object") {
+    return;
+  }
+  writeLine(
+    `Production proof no-write continuation: ${handoff.status || "-"}`
+      + ` | current=${handoff.currentActionKey || "-"}`
+      + ` | remaining=${handoff.remainingNoWriteCommands?.length ?? "-"}`
+      + ` | manualGate=${handoff.manualLiveWriteGate?.key || "-"}`
+  );
+  for (const item of handoff.remainingNoWriteCommands || []) {
+    writeLine(
+      `Production proof no-write continuation command: ${item.order ?? "-"}`
+        + ` | key=${item.key || "-"}`
+        + ` | status=${item.status || "-"}`
+        + ` | command=${item.command || "-"}`
+    );
+  }
+  writeLine(
+    `Production proof no-write continuation manual gate: ${handoff.manualLiveWriteGate?.key || "-"}`
+      + ` | status=${handoff.manualLiveWriteGate?.status || "-"}`
+      + ` | blockedBy=${(handoff.manualLiveWriteGate?.blockedByNoWriteSteps || []).join(",") || "-"}`
+      + ` | command=${handoff.manualLiveWriteGate?.command || "-"}`
+  );
+  writeLine(
+    `Production proof no-write continuation readback: ${handoff.readinessReadback?.key || "-"}`
+      + ` | target=${handoff.readinessReadback?.targetCursor || "-"}`
+      + ` | command=${handoff.readinessReadback?.command || "-"}`
+  );
+}
+
 function markdownList(values) {
   return values?.length ? values.join(", ") : "-";
 }
@@ -1057,6 +1141,16 @@ function renderProductionProofExecutionPackMarkdown(result) {
     `Missing Inputs: ${markdownList(inputCheck.missingInputKeys || [])}`,
     `Invalid Inputs: ${markdownList(inputCheck.invalidInputKeys || [])}`,
     `Credential Env Names: ${markdownList(result.credentialEnv || [])}`,
+    "",
+    "## No-Write Continuation Handoff",
+    "",
+    `Status: ${result.noWriteContinuationHandoff?.status || "-"}`,
+    `Current Action: ${result.noWriteContinuationHandoff?.currentActionKey || "-"}`,
+    `Completed Steps: ${markdownList(result.noWriteContinuationHandoff?.completedStepKeys || [])}`,
+    `Remaining No-Write Commands: ${markdownList((result.noWriteContinuationHandoff?.remainingNoWriteCommands || []).map((item) => item.key).filter(Boolean))}`,
+    `Manual Gate: ${result.noWriteContinuationHandoff?.manualLiveWriteGate?.key || "-"}`,
+    `Manual Gate Status: ${result.noWriteContinuationHandoff?.manualLiveWriteGate?.status || "-"}`,
+    `Manual Gate Blocked By: ${markdownList(result.noWriteContinuationHandoff?.manualLiveWriteGate?.blockedByNoWriteSteps || [])}`,
     "",
     "## No-Write Commands"
   ];
@@ -1165,6 +1259,7 @@ function writeResult(result, json) {
     writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.log);
     writeProductionProofExecutionQueue(result.productionProofExecutionQueue, console.log);
     writeProductionProofExecutionPack(result.productionProofExecutionPack, console.log);
+    writeNoWriteContinuationHandoff(result.noWriteContinuationHandoff, console.log);
     writeProductionProofExecutionPackFile(result.productionProofExecutionPackFile, console.log);
     console.log(`Production proof profile init: ${result.nextCommands.profileInit.command}`);
     console.log(`Production proof recovery preflight: ${result.nextCommands.recoveryPreflight.command}`);
@@ -1178,6 +1273,7 @@ function writeResult(result, json) {
   writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.error);
   writeProductionProofExecutionQueue(result.productionProofExecutionQueue, console.error);
   writeProductionProofExecutionPack(result.productionProofExecutionPack, console.error);
+  writeNoWriteContinuationHandoff(result.noWriteContinuationHandoff, console.error);
   writeProductionProofExecutionPackFile(result.productionProofExecutionPackFile, console.error);
   for (const check of result.checks) {
     console.error(`- ${check.status.toUpperCase()} ${check.name}: ${check.message}`);

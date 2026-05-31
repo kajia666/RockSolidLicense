@@ -477,9 +477,37 @@ test("production proof preflight can load launch inputs from a staging profile f
       output.productionProofExecutionPack.noWriteCommands.map((item) => item.key),
       ["recovery_preflight", "staging_preflight"]
     );
+    assert.equal(output.noWriteContinuationHandoff.mode, "launch-production-proof-no-write-continuation/v1");
+    assert.equal(output.noWriteContinuationHandoff.status, "ready_for_no_write_execution");
+    assert.equal(output.noWriteContinuationHandoff.currentActionKey, "recovery_preflight");
+    assert.equal(output.noWriteContinuationHandoff.currentCommand, output.nextCommands.recoveryPreflight.command);
+    assert.deepEqual(output.noWriteContinuationHandoff.completedStepKeys, ["staging_profile_init"]);
+    assert.deepEqual(
+      output.noWriteContinuationHandoff.remainingNoWriteCommands.map((item) => [item.key, item.status]),
+      [
+        ["recovery_preflight", "operator_execute"],
+        ["staging_preflight", "blocked_until_previous_step_complete"]
+      ]
+    );
+    assert.deepEqual(output.noWriteContinuationHandoff.manualLiveWriteGate, {
+      key: "launch_smoke_staging",
+      status: "blocked_until_no_write_commands_pass",
+      requiresOperatorConfirmation: true,
+      blockedByNoWriteSteps: ["recovery_preflight", "staging_preflight"],
+      willWriteLiveData: true,
+      willModifyData: true,
+      command: output.nextCommands.launchSmokeStaging.command
+    });
+    assert.equal(
+      output.noWriteContinuationHandoff.readinessReadback.command,
+      output.nextCommands.readinessStatus.command
+    );
     const executionPack = readFileSync(executionPackFile, "utf8");
     assert.match(executionPack, /Completed Steps: staging_profile_init/);
     assert.match(executionPack, /Current Command:/);
+    assert.match(executionPack, /## No-Write Continuation Handoff/);
+    assert.match(executionPack, /Remaining No-Write Commands: recovery_preflight, staging_preflight/);
+    assert.match(executionPack, /Manual Gate Blocked By: recovery_preflight, staging_preflight/);
     assert.match(executionPack, /npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview/);
     assert.equal(
       output.nextCommands.profileInit.command,
@@ -538,6 +566,9 @@ test("production proof preflight can write a secret-free markdown execution pack
     assert.match(markdown, /Cursor: 0\/5 -> 5\/5/);
     assert.match(markdown, /Input Check: ready_for_production_proof_preflight/);
     assert.match(markdown, /staging_profile_init/);
+    assert.match(markdown, /## No-Write Continuation Handoff/);
+    assert.match(markdown, /Remaining No-Write Commands: staging_profile_init, recovery_preflight, staging_preflight/);
+    assert.match(markdown, /Manual Gate Blocked By: staging_profile_init, recovery_preflight, staging_preflight/);
     assert.match(markdown, /npm\.cmd run staging:profile:init/);
     assert.match(markdown, /launch_smoke_staging/);
     assert.match(markdown, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
@@ -569,6 +600,9 @@ test("production proof preflight plain output prints copyable commands without s
   assert.match(result.stdout, /Production proof execution pack no-write: 1=staging_profile_init, 2=recovery_preflight, 3=staging_preflight/);
   assert.match(result.stdout, /Production proof execution pack manual gate: launch_smoke_staging \| status=operator_confirmation_required_after_no_write_steps \| command=npm\.cmd run launch:smoke:staging/);
   assert.match(result.stdout, /Production proof execution pack readiness readback: staging_readiness_status \| target=5\/5 \| command=npm\.cmd run staging:readiness:status/);
+  assert.match(result.stdout, /Production proof no-write continuation: ready_for_no_write_execution \| current=staging_profile_init \| remaining=3 \| manualGate=launch_smoke_staging/);
+  assert.match(result.stdout, /Production proof no-write continuation command: 1 \| key=staging_profile_init \| status=operator_execute \| command=npm\.cmd run staging:profile:init/);
+  assert.match(result.stdout, /Production proof no-write continuation manual gate: launch_smoke_staging \| status=blocked_until_no_write_commands_pass \| blockedBy=staging_profile_init,recovery_preflight,staging_preflight \| command=npm\.cmd run launch:smoke:staging/);
   assert.match(result.stdout, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
   assert.match(result.stdout, /\$env:RSL_SMOKE_DEVELOPER_PASSWORD/);
   assert.doesNotMatch(result.stdout, /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);

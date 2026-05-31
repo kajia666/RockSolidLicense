@@ -3,6 +3,16 @@
 const DEFAULT_PRODUCT_CODE = "LAUNCH_SMOKE";
 const DEFAULT_ADMIN_PASSWORDS = new Set(["Pass123!abc", "ChangeMe!123"]);
 const DEFAULT_DEVELOPER_PASSWORDS = new Set(["LaunchSmokeOwner123!"]);
+const REQUIRED_SECRET_ENV = [
+  "RSL_SMOKE_ADMIN_PASSWORD",
+  "RSL_SMOKE_DEVELOPER_PASSWORD"
+];
+const EXPECTED_POST_SMOKE_BACKFILL_KEYS = [
+  "live_write_smoke_result",
+  "launch_smoke_handoff",
+  "launch_mainline_evidence_receipts",
+  "receipt_visibility_review"
+];
 
 function parseArgs(argv) {
   const options = {
@@ -13,7 +23,9 @@ function parseArgs(argv) {
     adminUsername: null,
     adminPassword: null,
     developerUsername: null,
-    developerPassword: null
+    developerPassword: null,
+    closeoutInputFile: null,
+    actionsFile: null
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -74,6 +86,20 @@ function parseArgs(argv) {
       }
       continue;
     }
+    if (name === "--closeout-input-file") {
+      options.closeoutInputFile = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
+    if (name === "--actions-file") {
+      options.actionsFile = requireArgValue(name, value, inlineValue);
+      if (inlineValue === undefined) {
+        index += 1;
+      }
+      continue;
+    }
 
     throw new Error(`Unknown option: ${arg}`);
   }
@@ -86,7 +112,9 @@ function parseArgs(argv) {
     adminUsername: readOptionOrEnv(options.adminUsername, "RSL_SMOKE_ADMIN_USERNAME"),
     adminPassword: readOptionOrEnv(options.adminPassword, "RSL_SMOKE_ADMIN_PASSWORD"),
     developerUsername: readOptionOrEnv(options.developerUsername, "RSL_SMOKE_DEVELOPER_USERNAME"),
-    developerPassword: readOptionOrEnv(options.developerPassword, "RSL_SMOKE_DEVELOPER_PASSWORD")
+    developerPassword: readOptionOrEnv(options.developerPassword, "RSL_SMOKE_DEVELOPER_PASSWORD"),
+    closeoutInputFile: readOptionOrEnv(options.closeoutInputFile, "RSL_STAGING_CLOSEOUT_INPUT_FILE"),
+    actionsFile: readOptionOrEnv(options.actionsFile, "RSL_STAGING_ACTIONS_FILE")
   };
 }
 
@@ -131,6 +159,26 @@ function makeCheck(name, passed, message) {
   };
 }
 
+function commandValue(value) {
+  const text = String(value || "");
+  if (/[\s"`]/.test(text)) {
+    return `"${text.replace(/"/g, "`\"")}"`;
+  }
+  return text;
+}
+
+function defaultArtifactRoot(productCode, channel) {
+  return `artifacts/staging/${productCode}/${channel}`;
+}
+
+function defaultCloseoutInputFile(productCode, channel) {
+  return `${defaultArtifactRoot(productCode, channel)}/filled-closeout-input.json`;
+}
+
+function defaultReadinessActionQueueFile(productCode, channel) {
+  return `${defaultArtifactRoot(productCode, channel)}/readiness-action-queue.md`;
+}
+
 function validateOptions(options) {
   const checks = [];
   const baseUrl = normalizeHttpsBaseUrl(options.baseUrl);
@@ -140,6 +188,8 @@ function validateOptions(options) {
   const adminPassword = String(options.adminPassword || "");
   const developerUsername = String(options.developerUsername || "").trim();
   const developerPassword = String(options.developerPassword || "");
+  const closeoutInputFile = String(options.closeoutInputFile || defaultCloseoutInputFile(productCode, channel)).trim();
+  const readinessActionQueueFile = String(options.actionsFile || defaultReadinessActionQueueFile(productCode, channel)).trim();
 
   checks.push(makeCheck(
     "base-url.present",
@@ -188,13 +238,15 @@ function validateOptions(options) {
       productCode,
       channel,
       adminUsername,
-      developerUsername
+      developerUsername,
+      closeoutInputFile,
+      readinessActionQueueFile
     },
     checks
   };
 }
 
-function buildNextCommand({ baseUrl, productCode, channel, adminUsername, developerUsername }) {
+function buildNextCommand({ baseUrl, productCode, channel, adminUsername, developerUsername, closeoutInputFile, readinessActionQueueFile }) {
   const lines = [
     "npm.cmd --silent run launch:smoke:staging -- --json `",
     `  --base-url ${baseUrl} \``,
@@ -204,13 +256,47 @@ function buildNextCommand({ baseUrl, productCode, channel, adminUsername, develo
     `  --developer-username ${developerUsername} \``,
     "  --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD `",
     `  --product-code ${productCode} \``,
-    `  --channel ${channel}`
+    `  --channel ${channel} \``,
+    `  --closeout-input-file ${commandValue(closeoutInputFile)} \``,
+    `  --actions-file ${commandValue(readinessActionQueueFile)}`
   ];
   return {
     key: "run-staging-launch-smoke",
     label: "Run the HTTPS-gated staging launch smoke after this preflight passes.",
     powershell: lines.join("\n"),
     willWriteLiveData: true
+  };
+}
+
+function buildReadinessStatusCommand({ closeoutInputFile, readinessActionQueueFile }) {
+  return [
+    "npm.cmd run staging:readiness:status --",
+    "--input-file",
+    commandValue(closeoutInputFile),
+    "--actions-file",
+    commandValue(readinessActionQueueFile)
+  ].join(" ");
+}
+
+function buildLiveWriteSmokeHandoff(normalized, nextCommand) {
+  return {
+    mode: "staging-preflight-live-write-smoke-handoff/v1",
+    status: "ready_for_manual_live_write_smoke",
+    currentActionKey: "launch_smoke_staging",
+    currentCommand: nextCommand.powershell,
+    closeoutInputFile: normalized.closeoutInputFile,
+    readinessActionQueueFile: normalized.readinessActionQueueFile,
+    readinessStatusCommand: buildReadinessStatusCommand(normalized),
+    requiredSecretEnv: REQUIRED_SECRET_ENV,
+    expectedPostSmokeBackfillKeys: EXPECTED_POST_SMOKE_BACKFILL_KEYS,
+    manualLiveWriteGate: {
+      key: "launch_smoke_staging",
+      status: "operator_confirmation_required",
+      requiresOperatorConfirmation: true,
+      willWriteLiveData: true,
+      willModifyData: true
+    },
+    nextAction: "After manual approval, run currentCommand, then use launch smoke closeoutBackfill output to backfill the expected post-smoke evidence keys and refresh readiness."
   };
 }
 
@@ -227,6 +313,7 @@ function buildResult(options) {
     willWriteLiveData: false
   };
 
+  const nextCommand = status === "pass" ? buildNextCommand(normalized) : null;
   return {
     status,
     mode: "staging-preflight",
@@ -234,9 +321,30 @@ function buildResult(options) {
     summary,
     checks,
     ...(status === "pass"
-      ? { nextCommand: buildNextCommand(normalized) }
+      ? {
+          nextCommand,
+          liveWriteSmokeHandoff: buildLiveWriteSmokeHandoff(normalized, nextCommand)
+        }
       : { error: { message: failedChecks[0]?.message || "Staging preflight failed." } })
   };
+}
+
+function writeLiveWriteSmokeHandoff(handoff) {
+  if (!handoff || typeof handoff !== "object") {
+    return;
+  }
+  console.log(
+    `Staging live-write smoke handoff: ${handoff.status || "-"}`
+      + ` | current=${handoff.currentActionKey || "-"}`
+      + ` | manualGate=${handoff.manualLiveWriteGate?.key || "-"}`
+  );
+  console.log(
+    `Staging live-write smoke files: closeout=${handoff.closeoutInputFile || "-"}`
+      + ` | actions=${handoff.readinessActionQueueFile || "-"}`
+  );
+  console.log(`Staging live-write smoke required secret env: ${(handoff.requiredSecretEnv || []).join(", ") || "-"}`);
+  console.log(`Staging post-smoke expected backfills: ${(handoff.expectedPostSmokeBackfillKeys || []).join(", ") || "-"}`);
+  console.log(`Staging post-smoke readiness: ${handoff.readinessStatusCommand || "-"}`);
 }
 
 function writeResult(result, json) {
@@ -248,6 +356,7 @@ function writeResult(result, json) {
   if (result.status === "pass") {
     console.log("Staging preflight passed.");
     console.log(result.nextCommand.powershell);
+    writeLiveWriteSmokeHandoff(result.liveWriteSmokeHandoff);
     return;
   }
 

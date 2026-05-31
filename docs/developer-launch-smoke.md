@@ -119,6 +119,8 @@ npm.cmd --silent run launch:smoke:staging -- --json `
 
 Remote mode intentionally requires `--allow-live-writes` because it creates a developer, product, policy, first-batch card inventory, and a first-wave handoff confirmation. Use it for staging or a deliberately scoped production pilot project, not against an existing customer project.
 
+The preceding `staging:preflight` output also includes `liveWriteSmokeHandoff`. That handoff keeps the exact `launch:smoke:staging` command, explicit closeout/action file paths, required smoke secret env names, expected post-smoke closeout backfill keys, readiness refresh, and the operator-confirmed `launch_smoke_staging` live-write gate together before the write command is run. After `launch:smoke:staging` succeeds, continue with its emitted `handoff.closeoutBackfill` queue to backfill `live_write_smoke_result`, `launch_smoke_handoff`, `launch_mainline_evidence_receipts`, and `receipt_visibility_review`.
+
 If you intentionally need to run a remote smoke against a local HTTP test server, keep using `launch:smoke` directly. For staging and launch rehearsal, prefer `launch:smoke:staging` so HTTPS enforcement is part of the command instead of a manual checklist item.
 
 It also preserves routed project and lane context from nearby workspaces such as:

@@ -142,49 +142,17 @@ function buildRecoveryPreflightCommand({ options, closeoutInputFile, readinessAc
 }
 
 function buildProductionProofPreflightCommand({
-  options,
-  closeoutInputFile,
-  readinessActionQueueFile,
   outputFile,
-  backupRestoreArtifactFile,
   productionProofExecutionPackFile
 }) {
   const parts = [
     "npm.cmd run launch:production-proof-preflight --",
-    "--base-url",
-    commandValue(options.baseUrl),
-    "--product-code",
-    commandValue(options.productCode),
-    "--channel",
-    commandValue(options.channel || "stable"),
-    "--target-os",
-    commandValue(options.targetOs),
-    "--storage-profile",
-    commandValue(options.storageProfile),
-    "--target-env-file",
-    commandValue(options.targetEnvFile),
-    "--app-backup-dir",
-    commandValue(options.appBackupDir)
+    "--profile-file",
+    commandValue(outputFile)
   ];
-  if (options.postgresBackupDir) {
-    parts.push("--postgres-backup-dir", commandValue(options.postgresBackupDir));
+  if (productionProofExecutionPackFile) {
+    parts.push("--execution-pack-file", commandValue(productionProofExecutionPackFile));
   }
-  parts.push(
-    "--admin-username",
-    commandValue(options.adminUsername),
-    "--developer-username",
-    commandValue(options.developerUsername),
-    "--closeout-input-file",
-    commandValue(closeoutInputFile),
-    "--actions-file",
-    commandValue(readinessActionQueueFile),
-    "--profile-output-file",
-    commandValue(outputFile),
-    "--backup-restore-artifact",
-    commandValue(backupRestoreArtifactFile),
-    "--execution-pack-file",
-    commandValue(productionProofExecutionPackFile)
-  );
   return parts.join(" ");
 }
 

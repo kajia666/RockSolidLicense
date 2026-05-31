@@ -465,6 +465,104 @@ function buildCompletionHandoff({ progress, records, options, recordIndexFile, s
   };
 }
 
+function buildPredictedRecordArtifactPaths({ currentArtifactPath, pendingKeys = [] }) {
+  const predictedPaths = {};
+  let previousArtifactPath = currentArtifactPath;
+  for (const key of pendingKeys) {
+    const artifactPath = nextArtifactPath(previousArtifactPath, key);
+    predictedPaths[key] = artifactPath;
+    previousArtifactPath = artifactPath;
+  }
+  return predictedPaths;
+}
+
+function sourceRecordPathsFromRecordsOrPredictions(sourceRecordKeys = [], records = {}, predictedPaths = {}) {
+  return Object.fromEntries(
+    sourceRecordKeys
+      .map((key) => [key, records[key]?.artifactPath || predictedPaths[key]])
+      .filter(([, artifactPath]) => artifactPath)
+  );
+}
+
+function buildPostLaunchDayWatchFirstWaveBridge({
+  options,
+  recordIndexFile,
+  recordIndex,
+  statusRefreshCommand,
+  rehearsalReloadCommand
+}) {
+  if (options.key !== "launch_day_watch_summary" || recordIndex?.status !== "in_progress") {
+    return null;
+  }
+  const pendingKeys = Array.isArray(recordIndex.pendingKeys) ? recordIndex.pendingKeys : [];
+  if (!pendingKeys.includes("first_wave_closeout")) {
+    return null;
+  }
+  const predictedPaths = buildPredictedRecordArtifactPaths({
+    currentArtifactPath: options.artifactPath,
+    pendingKeys
+  });
+  const remainingRecordQueue = pendingKeys.map((key, index) => {
+    const target = LAUNCH_DUTY_RECORDS[key];
+    const sourceRecordPaths = sourceRecordPathsFromRecordsOrPredictions(
+      target?.sourceRecordKeys,
+      recordIndex.records,
+      predictedPaths
+    );
+    const previousKey = pendingKeys[index - 1] || null;
+    return {
+      order: index + 1,
+      key,
+      actionKey: target.actionKey,
+      status: index === 0
+        ? "current"
+        : key === "first_wave_closeout"
+          ? "blocked_until_source_records"
+          : `blocked_after_${previousKey}`,
+      artifactPath: predictedPaths[key],
+      command: buildRecordCommand({
+        closeoutInputFile: options.closeoutInputFile,
+        actionsFile: options.actionsFile,
+        key,
+        artifactPath: predictedPaths[key],
+        recordIndexFile,
+        sourceRecordPaths
+      }),
+      receiptOperations: target.receiptOperations,
+      sourceRecordKeys: target.sourceRecordKeys || [],
+      expectedEvidence: target.expectedEvidence
+    };
+  });
+  const firstWaveCloseout = remainingRecordQueue.find((item) => item.key === "first_wave_closeout") || null;
+  return {
+    version: "staging-launch-duty-record-post-launch-day-watch-first-wave-bridge/v1",
+    status: "ready_for_first_wave_record_queue",
+    currentGate: "first_wave_closeout",
+    completedRecordKey: "launch_day_watch_summary",
+    closeoutInputFile: options.closeoutInputFile,
+    actionsFile: options.actionsFile || null,
+    recordIndexFile,
+    progress: {
+      recordedCount: recordIndex.recordedCount,
+      pendingCount: recordIndex.pendingCount,
+      recordedKeys: recordIndex.recordedKeys,
+      pendingKeys,
+      nextRecordKey: recordIndex.nextRecordKey
+    },
+    currentRecord: remainingRecordQueue[0] || null,
+    remainingRecordQueue,
+    firstWaveCloseout,
+    statusCommand: statusRefreshCommand,
+    rehearsalReloadCommand,
+    stableOperationsHandoff: {
+      status: "blocked_until_first_wave_closeout",
+      requiredArtifacts: [recordIndexFile, firstWaveCloseout?.artifactPath || null].filter(Boolean),
+      nextAction: "Finish the first-wave record queue, refresh readiness status, reload rehearsal, then continue stable-operations handoff."
+    },
+    nextAction: "Run currentRecord.command, continue the remaining first-wave record queue through first_wave_closeout, then refresh readiness and reload rehearsal."
+  };
+}
+
 function buildRecordIndexEntry({ options, target, value, sourceRecords, recordedAt }) {
   return {
     key: options.key,
@@ -1114,6 +1212,13 @@ function buildResult(options) {
     nextRecordCommand,
     statusRefreshCommand
   });
+  const postLaunchDayWatchFirstWaveBridge = buildPostLaunchDayWatchFirstWaveBridge({
+    options,
+    recordIndexFile,
+    recordIndex,
+    statusRefreshCommand,
+    rehearsalReloadCommand
+  });
   writeRecordIndex(recordIndexFile, recordIndex);
   return {
     status: "written",
@@ -1146,6 +1251,7 @@ function buildResult(options) {
     operatorQueueCheckpoint,
     launchEvidenceReadinessGate,
     productionSwitchProofPacket,
+    ...(postLaunchDayWatchFirstWaveBridge ? { postLaunchDayWatchFirstWaveBridge } : {}),
     nextAction: recordIndex.nextAction
   };
 }
@@ -1206,6 +1312,26 @@ function writeProductionSwitchProofPacketPlain(packet) {
   console.log(`Production switch next action: ${packet.nextAction || "-"}`);
 }
 
+function writePostLaunchDayWatchFirstWaveBridgePlain(bridge) {
+  if (!bridge) {
+    return;
+  }
+  console.log(
+    `Post-launch-day watch bridge: ${bridge.status || "-"}`
+      + ` | recorded=${bridge.progress?.recordedCount ?? "-"}/6`
+      + ` | pending=${bridge.progress?.pendingCount ?? "-"}`
+      + ` | next=${bridge.progress?.nextRecordKey || "-"}`
+  );
+  console.log(`Post-launch-day current: ${bridge.currentRecord?.key || "-"} -> ${bridge.currentRecord?.command || "-"}`);
+  for (const item of bridge.remainingRecordQueue || []) {
+    console.log(`Post-launch-day queue ${item.order}. ${item.key}: ${item.status} -> ${item.command || "-"}`);
+  }
+  console.log(`Post-launch-day stable handoff: ${bridge.stableOperationsHandoff?.status || "-"} -> ${bridge.stableOperationsHandoff?.requiredArtifacts?.join("; ") || "-"}`);
+  console.log(`Post-launch-day readiness: ${bridge.statusCommand || "-"}`);
+  console.log(`Post-launch-day rehearsal reload: ${bridge.rehearsalReloadCommand || "-"}`);
+  console.log(`Post-launch-day next action: ${bridge.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -1248,6 +1374,7 @@ function writeResult(result, json) {
       }
       console.log(`Launch duty checkpoint next action: ${checkpoint.nextAction}`);
     }
+    writePostLaunchDayWatchFirstWaveBridgePlain(result.postLaunchDayWatchFirstWaveBridge);
     if (result.launchEvidenceReadinessGate) {
       const gate = result.launchEvidenceReadinessGate;
       console.log(

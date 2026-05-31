@@ -382,6 +382,78 @@ test("staging launch duty record writes a watch summary artifact and next comman
     assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "launch_day_watch_summary").status, "recorded");
     assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "launch_day_watch_summary").artifactPath, artifactPath);
     assert.equal(evidenceItemByKey(output.launchEvidenceReadinessGate, "first_wave_closeout").status, "blocked_until_source_records");
+    const bridge = output.postLaunchDayWatchFirstWaveBridge;
+    assert.deepEqual(
+      {
+        version: bridge?.version,
+        status: bridge?.status,
+        currentGate: bridge?.currentGate,
+        completedRecordKey: bridge?.completedRecordKey,
+        recordIndexFile: bridge?.recordIndexFile,
+        progress: bridge?.progress,
+        currentRecord: bridge?.currentRecord
+          ? {
+            key: bridge.currentRecord.key,
+            status: bridge.currentRecord.status,
+            artifactPath: bridge.currentRecord.artifactPath,
+            command: bridge.currentRecord.command
+          }
+          : null,
+        stableOperationsHandoff: bridge?.stableOperationsHandoff
+      },
+      {
+        version: "staging-launch-duty-record-post-launch-day-watch-first-wave-bridge/v1",
+        status: "ready_for_first_wave_record_queue",
+        currentGate: "first_wave_closeout",
+        completedRecordKey: "launch_day_watch_summary",
+        recordIndexFile,
+        progress: {
+          recordedCount: 1,
+          pendingCount: 5,
+          recordedKeys: ["launch_day_watch_summary"],
+          pendingKeys: [
+            "receipt_visibility_snapshot",
+            "first_wave_incident_log",
+            "rollback_signal_review",
+            "stabilization_owner_handoff",
+            "first_wave_closeout"
+          ],
+          nextRecordKey: "receipt_visibility_snapshot"
+        },
+        currentRecord: {
+          key: "receipt_visibility_snapshot",
+          status: "current",
+          artifactPath: launchDutyArtifactPath(artifactRoot, "receipt_visibility_snapshot"),
+          command: `npm.cmd run staging:launch-duty:record -- --closeout-input-file ${closeoutInputFile} --key receipt_visibility_snapshot --artifact-path ${launchDutyArtifactPath(artifactRoot, "receipt_visibility_snapshot")} --value-json <redacted-json> --receipt-id <record_post_launch_ops_sweep-receipt-id> --record-index-file ${recordIndexFile} --actions-file ${actionsFile}`
+        },
+        stableOperationsHandoff: {
+          status: "blocked_until_first_wave_closeout",
+          requiredArtifacts: [recordIndexFile, launchDutyArtifactPath(artifactRoot, "first_wave_closeout")],
+          nextAction: "Finish the first-wave record queue, refresh readiness status, reload rehearsal, then continue stable-operations handoff."
+        }
+      }
+    );
+    assert.deepEqual(
+      bridge.remainingRecordQueue.map((item) => [item.key, item.status, item.artifactPath]),
+      [
+        ["receipt_visibility_snapshot", "current", launchDutyArtifactPath(artifactRoot, "receipt_visibility_snapshot")],
+        ["first_wave_incident_log", "blocked_after_receipt_visibility_snapshot", launchDutyArtifactPath(artifactRoot, "first_wave_incident_log")],
+        ["rollback_signal_review", "blocked_after_first_wave_incident_log", launchDutyArtifactPath(artifactRoot, "rollback_signal_review")],
+        ["stabilization_owner_handoff", "blocked_after_rollback_signal_review", launchDutyArtifactPath(artifactRoot, "stabilization_owner_handoff")],
+        ["first_wave_closeout", "blocked_until_source_records", launchDutyArtifactPath(artifactRoot, "first_wave_closeout")]
+      ]
+    );
+    const closeoutQueueItem = bridge.remainingRecordQueue.find((item) => item.key === "first_wave_closeout");
+    assert.match(closeoutQueueItem.command, /--source-record first_wave_incident_log=.*first-wave-incident-log\.md/);
+    assert.match(closeoutQueueItem.command, /--source-record rollback_signal_review=.*rollback-signal-review\.md/);
+    assert.match(closeoutQueueItem.command, /--source-record stabilization_owner_handoff=.*stabilization-owner-handoff\.md/);
+    assert.deepEqual(closeoutQueueItem.sourceRecordKeys, [
+      "first_wave_incident_log",
+      "rollback_signal_review",
+      "stabilization_owner_handoff"
+    ]);
+    assert.equal(bridge.statusCommand, `npm.cmd run staging:readiness:status -- --input-file ${closeoutInputFile} --actions-file ${actionsFile}`);
+    assert.equal(bridge.rehearsalReloadCommand, `npm.cmd run staging:rehearsal -- --closeout-input-file ${closeoutInputFile}`);
     assert.deepEqual(output.productionSwitchProofPacket, buildExpectedProductionSwitchProofPacket({
       closeoutInputFile,
       actionsFile,
@@ -391,6 +463,43 @@ test("staging launch duty record writes a watch summary artifact and next comman
       launchDutyStatus: "blocked_after_production_signoff_readiness",
       launchDutyArtifactPath: artifactPath
     }));
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true });
+  }
+});
+
+test("staging launch duty record prints first-wave queue bridge after launch-day watch summary", () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "rsl-launch-duty-record-watch-bridge-plain-"));
+  try {
+    const artifactRoot = join(tempDir, "artifacts", "staging", "PILOT_ALPHA", "stable");
+    const closeoutInputFile = join(artifactRoot, "filled-closeout-input.json");
+    const actionsFile = join(artifactRoot, "readiness-action-queue.md");
+    const artifactPath = launchDutyArtifactPath(artifactRoot, "launch_day_watch_summary");
+    const recordIndexFile = join(artifactRoot, "launch-duty-record-index.json");
+
+    const result = runRecordPlain([
+      "--closeout-input-file",
+      closeoutInputFile,
+      "--actions-file",
+      actionsFile,
+      "--key",
+      "launch_day_watch_summary",
+      "--artifact-path",
+      artifactPath,
+      "--value-json",
+      "{\"result\":\"recorded\",\"summary\":\"redacted cutover watch\"}",
+      "--record-index-file",
+      recordIndexFile
+    ]);
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(result.stderr, "");
+    assert.match(result.stdout, /Post-launch-day watch bridge: ready_for_first_wave_record_queue \| recorded=1\/6 \| pending=5 \| next=receipt_visibility_snapshot/);
+    assert.match(result.stdout, /Post-launch-day current: receipt_visibility_snapshot -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file .*filled-closeout-input\.json --key receipt_visibility_snapshot --artifact-path .*receipt-visibility-snapshot\.txt --value-json <redacted-json> --receipt-id <record_post_launch_ops_sweep-receipt-id> --record-index-file .*launch-duty-record-index\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Post-launch-day queue 5\. first_wave_closeout: blocked_until_source_records -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file .*filled-closeout-input\.json --key first_wave_closeout --artifact-path .*first-wave-closeout\.md --value-json <redacted-json> --receipt-id <record_launch_closeout_review-receipt-id> --source-record first_wave_incident_log=.*first-wave-incident-log\.md --source-record rollback_signal_review=.*rollback-signal-review\.md --source-record stabilization_owner_handoff=.*stabilization-owner-handoff\.md --record-index-file .*launch-duty-record-index\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Post-launch-day stable handoff: blocked_until_first_wave_closeout -> .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(result.stdout, /Post-launch-day readiness: npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file .*readiness-action-queue\.md/);
+    assert.match(result.stdout, /Post-launch-day rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

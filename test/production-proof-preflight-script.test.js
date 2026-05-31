@@ -183,6 +183,26 @@ test("production proof preflight is exposed and blocks non-https or missing secr
       }
     ]
   );
+  assert.equal(output.productionProofExecutionPack.mode, "launch-production-proof-execution-pack/v1");
+  assert.equal(output.productionProofExecutionPack.status, "blocked_until_real_environment_inputs_ready");
+  assert.deepEqual(output.productionProofExecutionPack.executionCursor, {
+    from: "0/5",
+    to: "5/5",
+    expression: "0/5 -> 5/5",
+    current: "0/5",
+    currentStepKey: "production_proof_preflight",
+    nextStepKey: "staging_profile_init"
+  });
+  assert.equal(output.productionProofExecutionPack.inputCheck.status, "blocked_until_real_environment_inputs_ready");
+  assert.deepEqual(
+    output.productionProofExecutionPack.noWriteCommands.map((item) => item.key),
+    ["staging_profile_init", "recovery_preflight", "staging_preflight"]
+  );
+  assert.equal(output.productionProofExecutionPack.manualLiveWriteGate.key, "launch_smoke_staging");
+  assert.equal(
+    output.productionProofExecutionPack.readinessReadback.command,
+    output.nextCommands.readinessStatus.command
+  );
   assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
 });
 
@@ -337,6 +357,30 @@ test("production proof preflight returns no-write launch commands when real-envi
       }
     ]
   );
+  assert.equal(output.productionProofExecutionPack.mode, "launch-production-proof-execution-pack/v1");
+  assert.equal(output.productionProofExecutionPack.status, "ready_for_no_write_execution");
+  assert.deepEqual(output.productionProofExecutionPack.executionCursor, {
+    from: "0/5",
+    to: "5/5",
+    expression: "0/5 -> 5/5",
+    current: "0/5",
+    currentStepKey: "staging_profile_init",
+    nextStepKey: "staging_profile_init"
+  });
+  assert.equal(output.productionProofExecutionPack.inputCheck.status, "ready_for_production_proof_preflight");
+  assert.deepEqual(
+    output.productionProofExecutionPack.noWriteCommands.map((item) => item.command),
+    [
+      output.nextCommands.profileInit.command,
+      output.nextCommands.recoveryPreflight.command,
+      output.nextCommands.stagingPreflight.command
+    ]
+  );
+  assert.equal(
+    output.productionProofExecutionPack.manualLiveWriteGate.status,
+    "operator_confirmation_required_after_no_write_steps"
+  );
+  assert.equal(output.productionProofExecutionPack.readinessReadback.targetCursor, "5/5");
   assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
 });
 
@@ -357,6 +401,10 @@ test("production proof preflight plain output prints copyable commands without s
   assert.match(result.stdout, /Production proof execution queue: ready_for_no_write_execution \| current=staging_profile_init \| manualGate=launch_smoke_staging/);
   assert.match(result.stdout, /Production proof execution step: 1 \| key=staging_profile_init \| phase=no_write \| status=operator_execute \| write=no \| command=npm\.cmd run staging:profile:init/);
   assert.match(result.stdout, /Production proof execution step: 4 \| key=launch_smoke_staging \| phase=manual_live_write_gate \| status=blocked_until_operator_confirmation \| write=yes \| command=npm\.cmd run launch:smoke:staging/);
+  assert.match(result.stdout, /Production proof execution pack: ready_for_no_write_execution \| cursor=0\/5 -> 5\/5 \| current=staging_profile_init \| manualGate=launch_smoke_staging/);
+  assert.match(result.stdout, /Production proof execution pack no-write: 1=staging_profile_init, 2=recovery_preflight, 3=staging_preflight/);
+  assert.match(result.stdout, /Production proof execution pack manual gate: launch_smoke_staging \| status=operator_confirmation_required_after_no_write_steps \| command=npm\.cmd run launch:smoke:staging/);
+  assert.match(result.stdout, /Production proof execution pack readiness readback: staging_readiness_status \| target=5\/5 \| command=npm\.cmd run staging:readiness:status/);
   assert.match(result.stdout, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
   assert.match(result.stdout, /\$env:RSL_SMOKE_DEVELOPER_PASSWORD/);
   assert.doesNotMatch(result.stdout, /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
@@ -375,5 +423,8 @@ test("production proof preflight plain failure prints a secret-free input contra
   assert.match(result.stderr, /Production proof secret env input: admin_password \| env=RSL_SMOKE_ADMIN_PASSWORD \| required=yes \| present=no \| value=<redacted>/);
   assert.match(result.stderr, /Production proof execution queue: blocked_until_real_environment_inputs_ready \| current=prepare_real_environment_inputs \| manualGate=launch_smoke_staging/);
   assert.match(result.stderr, /Production proof execution step: 1 \| key=staging_profile_init \| phase=no_write \| status=blocked_until_real_environment_inputs_ready \| write=no \| command=npm\.cmd run staging:profile:init/);
+  assert.match(result.stderr, /Production proof execution pack: blocked_until_real_environment_inputs_ready \| cursor=0\/5 -> 5\/5 \| current=production_proof_preflight \| manualGate=launch_smoke_staging/);
+  assert.match(result.stderr, /Production proof execution pack input check: blocked_until_real_environment_inputs_ready \| missing=RSL_SMOKE_ADMIN_PASSWORD,RSL_SMOKE_DEVELOPER_PASSWORD,RSL_DEVELOPER_BEARER_TOKEN \| invalid=-/);
+  assert.match(result.stderr, /Production proof execution pack readiness readback: staging_readiness_status \| target=5\/5 \| command=npm\.cmd run staging:readiness:status/);
   assert.doesNotMatch(result.stderr, /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
 });

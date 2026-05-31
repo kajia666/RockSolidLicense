@@ -649,6 +649,66 @@ function buildProductionProofExecutionQueue(realEnvironmentInputContract, nextCo
   };
 }
 
+function buildProductionProofExecutionPack(realEnvironmentInputContract, productionProofExecutionQueue, nextCommands) {
+  const readyForNoWriteExecution = realEnvironmentInputContract.ready === true;
+  const noWriteCommands = (productionProofExecutionQueue.steps || [])
+    .filter((item) => item.phase === "no_write")
+    .slice(0, 3)
+    .map((item) => ({
+      order: item.order,
+      key: item.key,
+      command: item.command,
+      willWriteLiveData: item.willWriteLiveData === true,
+      willModifyData: item.willModifyData === true
+    }));
+  return {
+    mode: "launch-production-proof-execution-pack/v1",
+    status: readyForNoWriteExecution
+      ? "ready_for_no_write_execution"
+      : "blocked_until_real_environment_inputs_ready",
+    currentActionKey: readyForNoWriteExecution
+      ? "staging_profile_init"
+      : "production_proof_preflight",
+    executionCursor: {
+      from: "0/5",
+      to: "5/5",
+      expression: "0/5 -> 5/5",
+      current: "0/5",
+      currentStepKey: readyForNoWriteExecution
+        ? "staging_profile_init"
+        : "production_proof_preflight",
+      nextStepKey: "staging_profile_init"
+    },
+    inputCheck: {
+      status: realEnvironmentInputContract.status || "blocked_until_real_environment_inputs_ready",
+      missingInputKeys: [
+        ...(realEnvironmentInputContract.missingRequiredInputKeys || []),
+        ...(realEnvironmentInputContract.missingSecretEnvKeys || [])
+      ],
+      invalidInputKeys: realEnvironmentInputContract.invalidRequiredInputKeys || []
+    },
+    noWriteCommands,
+    manualLiveWriteGate: {
+      key: realEnvironmentInputContract.manualLiveWriteGate?.key || "launch_smoke_staging",
+      status: readyForNoWriteExecution
+        ? "operator_confirmation_required_after_no_write_steps"
+        : "blocked_until_real_environment_inputs_ready",
+      command: realEnvironmentInputContract.manualLiveWriteGate?.command || nextCommands.launchSmokeStaging.command,
+      confirmation: "manual_confirmation_required",
+      willWriteLiveData: true,
+      willModifyData: true
+    },
+    readinessReadback: {
+      key: "staging_readiness_status",
+      targetCursor: "5/5",
+      command: nextCommands.readinessStatus.command
+    },
+    nextAction: readyForNoWriteExecution
+      ? "Execute the first three no-write commands in order, confirm launch_smoke_staging manually, then refresh readiness until the downstream readback reaches 5/5."
+      : "Resolve input-check gaps first, then rerun production proof preflight before entering the no-write execution lane."
+  };
+}
+
 function buildResult(options) {
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(options.baseUrl);
   const storageProfileProof = buildProductionSwitchStorageProfileProof(options.storageProfile);
@@ -680,6 +740,11 @@ function buildResult(options) {
     realEnvironmentInputContract,
     nextCommands
   );
+  const productionProofExecutionPack = buildProductionProofExecutionPack(
+    realEnvironmentInputContract,
+    productionProofExecutionQueue,
+    nextCommands
+  );
   return {
     status,
     mode: "launch-production-proof-preflight",
@@ -708,6 +773,7 @@ function buildResult(options) {
     ],
     realEnvironmentInputContract,
     productionProofExecutionQueue,
+    productionProofExecutionPack,
     nextCommands,
     nextAction: status === "pass"
       ? "Run profileInit and recoveryPreflight first; run stagingPreflight before launchSmokeStaging, and backfill backup_restore_drill_result after the recovery drill passes."
@@ -780,6 +846,40 @@ function writeProductionProofExecutionQueue(queue, writeLine) {
   }
 }
 
+function writeProductionProofExecutionPack(pack, writeLine) {
+  if (!pack || typeof pack !== "object") {
+    return;
+  }
+  writeLine(
+    `Production proof execution pack: ${pack.status || "-"}`
+      + ` | cursor=${pack.executionCursor?.expression || "-"}`
+      + ` | current=${pack.executionCursor?.currentStepKey || "-"}`
+      + ` | manualGate=${pack.manualLiveWriteGate?.key || "-"}`
+  );
+  writeLine(
+    `Production proof execution pack input check: ${pack.inputCheck?.status || "-"}`
+      + ` | missing=${(pack.inputCheck?.missingInputKeys || []).join(",") || "-"}`
+      + ` | invalid=${(pack.inputCheck?.invalidInputKeys || []).join(",") || "-"}`
+  );
+  writeLine(
+    `Production proof execution pack no-write: ${[
+      `1=${pack.noWriteCommands?.[0]?.key || "-"}`,
+      `2=${pack.noWriteCommands?.[1]?.key || "-"}`,
+      `3=${pack.noWriteCommands?.[2]?.key || "-"}`
+    ].join(", ")}`
+  );
+  writeLine(
+    `Production proof execution pack manual gate: ${pack.manualLiveWriteGate?.key || "-"}`
+      + ` | status=${pack.manualLiveWriteGate?.status || "-"}`
+      + ` | command=${pack.manualLiveWriteGate?.command || "-"}`
+  );
+  writeLine(
+    `Production proof execution pack readiness readback: ${pack.readinessReadback?.key || "-"}`
+      + ` | target=${pack.readinessReadback?.targetCursor || "-"}`
+      + ` | command=${pack.readinessReadback?.command || "-"}`
+  );
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -791,6 +891,7 @@ function writeResult(result, json) {
     console.log(`Production proof status: ${result.summary.proofStatus}`);
     writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.log);
     writeProductionProofExecutionQueue(result.productionProofExecutionQueue, console.log);
+    writeProductionProofExecutionPack(result.productionProofExecutionPack, console.log);
     console.log(`Production proof profile init: ${result.nextCommands.profileInit.command}`);
     console.log(`Production proof recovery preflight: ${result.nextCommands.recoveryPreflight.command}`);
     console.log(`Production proof staging preflight: ${result.nextCommands.stagingPreflight.command}`);
@@ -802,6 +903,7 @@ function writeResult(result, json) {
   console.error(`Production proof preflight failed: ${result.error.message}`);
   writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.error);
   writeProductionProofExecutionQueue(result.productionProofExecutionQueue, console.error);
+  writeProductionProofExecutionPack(result.productionProofExecutionPack, console.error);
   for (const check of result.checks) {
     console.error(`- ${check.status.toUpperCase()} ${check.name}: ${check.message}`);
   }

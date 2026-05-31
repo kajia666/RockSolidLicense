@@ -13284,6 +13284,56 @@ test("developer license quickstart first-batch setup can create recommended laun
       runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofExecutionQueue,
       runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionQueue
     );
+    assert.deepEqual(
+      {
+        status: runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.status,
+        completedStepCount:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.completedStepCount,
+        totalStepCount:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.totalStepCount,
+        completedStepKeys:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.completedStepKeys,
+        currentStepKey:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.currentStepKey,
+        currentCommand:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.currentCommand,
+        nextStepKey:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.nextStepKey,
+        nextCommand:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.nextCommand,
+        manualLiveWriteGateStatus:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback?.manualLiveWriteGateStatus
+      },
+      {
+        status: "blocked_until_production_proof_preflight_passes",
+        completedStepCount: 0,
+        totalStepCount: 5,
+        completedStepKeys: [],
+        currentStepKey: "production_proof_preflight",
+        currentCommand:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofPreflightHandoff?.preflightCommand,
+        nextStepKey: "staging_profile_init",
+        nextCommand:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionQueue?.steps?.[0]?.command,
+        manualLiveWriteGateStatus: "blocked_until_previous_step_complete"
+      }
+    );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback,
+      runtimeEvidenceReviewCutoverTriageControl.productionProofPreflightHandoff?.productionProofExecutionReadback
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.launchCutoverTriageCheckpoint.productionProofExecutionReadback,
+      runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback
+    );
+    assert.deepEqual(
+      runtimeEvidenceReviewCutoverTriageAction.context?.productionProofExecutionReadback,
+      runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback
+    );
+    assert.deepEqual(
+      runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofExecutionReadback,
+      runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionReadback
+    );
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Production Switch Proof Packet:/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /productionSwitchProof=/);
     assert.match(runtimeEvidenceLaunchReview.summaryText, /Launch Review Cutover Triage Checkpoint:/);
@@ -13543,6 +13593,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceReviewHandoffRoutes.body,
       /Production Proof Preflight Handoff:[\s\S]*productionProofExecutionQueue=staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> staging_readiness_status \| status=blocked_until_production_proof_preflight_passes \| current=production_proof_preflight \| currentCommand=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| ready=no,no,no,no,no \| write=no,no,no,yes,no \| manualGate=launch_smoke_staging/
+    );
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /Production Proof Preflight Handoff:[\s\S]*productionProofExecutionReadback=0\/5 \| status=blocked_until_production_proof_preflight_passes \| completed=- \| current=production_proof_preflight \| currentCommand=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| next=staging_profile_init \| nextCommand=npm\.cmd run staging:profile:init[^\n]*\| manualGate=launch_smoke_staging:blocked_until_previous_step_complete/
     );
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /Launch Cutover Triage Checkpoint:/);
     assert.match(runtimeEvidenceReviewHandoffRoutes.body, /launchCutoverTriage=hold_for_launch_evidence/);
@@ -24615,6 +24669,8 @@ test("developer ops export bundles scoped data and downloadable assets", async (
           productionSwitchProofPacket?.productionProofPreflightHandoff || null,
         productionProofExecutionQueue:
           productionSwitchProofPacket?.productionProofExecutionQueue || null,
+        productionProofExecutionReadback:
+          productionSwitchProofPacket?.productionProofExecutionReadback || null,
         liveWriteSmokeExecutionEntrypoint:
           productionSwitchProofPacket?.liveWriteSmokeExecutionEntrypoint || null,
         productionSignoffExecutionEntrypoint:
@@ -34314,6 +34370,43 @@ test("developer ops export bundles scoped data and downloadable assets", async (
     assert.match(
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,
       /realEnvironmentProof=ready_for_real_environment_review \| ready=4\/4 \| blocked=0\/4 \| current=- \| action=confirm_real_environment_proof_review/
+    );
+    assert.deepEqual(
+      {
+        status:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionProofExecutionReadback?.status,
+        completedStepCount:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionProofExecutionReadback?.completedStepCount,
+        totalStepCount:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionProofExecutionReadback?.totalStepCount,
+        completedStepKeys:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionProofExecutionReadback?.completedStepKeys,
+        currentStepKey:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionProofExecutionReadback?.currentStepKey,
+        nextStepKey:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionProofExecutionReadback?.nextStepKey,
+        manualLiveWriteGateStatus:
+          launchDutyCloseoutRecordedGate.productionSwitchProofPacket?.productionProofExecutionReadback?.manualLiveWriteGateStatus
+      },
+      {
+        status: "ready_for_downstream_launch_operations",
+        completedStepCount: 5,
+        totalStepCount: 5,
+        completedStepKeys: [
+          "staging_profile_init",
+          "recovery_preflight",
+          "staging_preflight",
+          "launch_smoke_staging",
+          "staging_readiness_status"
+        ],
+        currentStepKey: null,
+        nextStepKey: null,
+        manualLiveWriteGateStatus: "confirmed_by_downstream_evidence"
+      }
+    );
+    assert.match(
+      launchDutyCloseoutRecordedOpsProofPacketDownload.body,
+      /productionProofExecutionReadback=5\/5 \| status=ready_for_downstream_launch_operations \| completed=staging_profile_init,recovery_preflight,staging_preflight,launch_smoke_staging,staging_readiness_status \| current=- \| currentCommand=- \| next=- \| nextCommand=- \| manualGate=launch_smoke_staging:confirmed_by_downstream_evidence/
     );
     assert.match(
       launchDutyCloseoutRecordedOpsProofPacketDownload.body,

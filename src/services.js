@@ -2033,11 +2033,18 @@ function formatRouteFocusControlProductionProofPreflightHandoffText(control = nu
   if (!handoff) {
     return "";
   }
+  const executionPack = cloneLaunchProductionProofExecutionPack(
+    control?.productionProofExecutionPack
+      || control?.context?.productionProofExecutionPack
+      || handoff.productionProofExecutionPack
+  );
   return " | "
     + [
       `preflight=${handoff.preflightCommand || "-"}`,
       `smoke=${handoff.launchSmokeCommand || "-"}`,
       `manualGate=${handoff.manualLiveWriteGate || "-"}`,
+      `executionPack=${executionPack?.executionCursor?.expression || "-"}`,
+      `executionCurrent=${executionPack?.executionCursor?.current || "-"}:${executionPack?.executionCursor?.currentStepKey || "-"}`,
       `launchDutyRecordIndex=${handoff.launchDutyRecordIndexPath || "-"}`
     ].join(" | ");
 }
@@ -4758,6 +4765,9 @@ function formatLaunchWorkflowActionContextText(context = null) {
       && typeof context.productionProofPreflightHandoff === "object"
         ? context.productionProofPreflightHandoff
         : null;
+    const executionPack = cloneLaunchProductionProofExecutionPack(
+      context.productionProofExecutionPack || preflightHandoff?.productionProofExecutionPack
+    );
     const segments = [
       "context=launch_cutover_triage",
       `status=${context.launchCutoverTriageStatus || "-"}`,
@@ -4767,6 +4777,8 @@ function formatLaunchWorkflowActionContextText(context = null) {
       `preflight=${preflightHandoff?.preflightCommand || context.productionProofPreflightEntrypoint?.command || "-"}`,
       `smoke=${preflightHandoff?.launchSmokeCommand || context.liveWriteSmokeExecutionEntrypoint?.launchSmokeCommand || "-"}`,
       `manualGate=${preflightHandoff?.manualLiveWriteGate || "-"}`,
+      `executionPack=${executionPack?.executionCursor?.expression || "-"}`,
+      `executionCurrent=${executionPack?.executionCursor?.current || "-"}:${executionPack?.executionCursor?.currentStepKey || "-"}`,
       `launchDutyRecordIndex=${context.launchDutyRecordIndexPath || preflightHandoff?.launchDutyRecordIndexPath || "-"}`
     ];
     return segments.join(" | ");
@@ -13916,6 +13928,8 @@ function buildDeveloperLaunchReviewSummaryPayload({
               cloneLaunchProductionProofExecutionQueue(launchCutoverTriageCheckpoint.productionProofExecutionQueue),
             productionProofExecutionReadback:
               cloneLaunchProductionProofExecutionReadback(launchCutoverTriageCheckpoint.productionProofExecutionReadback),
+            productionProofExecutionPack:
+              cloneLaunchProductionProofExecutionPack(launchCutoverTriageCheckpoint.productionProofExecutionPack),
             context: buildLaunchCutoverTriageActionContext(launchCutoverTriageCheckpoint)
           }
         : null,
@@ -16353,6 +16367,8 @@ function buildDeveloperLaunchSmokeKitSummaryPayload({
               cloneLaunchProductionProofExecutionQueue(launchCutoverTriageCheckpoint.productionProofExecutionQueue),
             productionProofExecutionReadback:
               cloneLaunchProductionProofExecutionReadback(launchCutoverTriageCheckpoint.productionProofExecutionReadback),
+            productionProofExecutionPack:
+              cloneLaunchProductionProofExecutionPack(launchCutoverTriageCheckpoint.productionProofExecutionPack),
             context: buildLaunchCutoverTriageActionContext(launchCutoverTriageCheckpoint)
           }
         : null,
@@ -52889,6 +52905,40 @@ function cloneLaunchProductionProofExecutionReadback(readback = null) {
   };
 }
 
+function cloneLaunchProductionProofExecutionPack(pack = null) {
+  if (!pack || typeof pack !== "object") {
+    return null;
+  }
+  return {
+    ...pack,
+    executionCursor: pack.executionCursor && typeof pack.executionCursor === "object"
+      ? { ...pack.executionCursor }
+      : null,
+    inputCheck: pack.inputCheck && typeof pack.inputCheck === "object"
+      ? {
+          ...pack.inputCheck,
+          missingInputKeys: Array.isArray(pack.inputCheck.missingInputKeys)
+            ? pack.inputCheck.missingInputKeys.slice()
+            : [],
+          invalidInputKeys: Array.isArray(pack.inputCheck.invalidInputKeys)
+            ? pack.inputCheck.invalidInputKeys.slice()
+            : []
+        }
+      : null,
+    noWriteCommands: Array.isArray(pack.noWriteCommands)
+      ? pack.noWriteCommands
+        .filter((item) => item && typeof item === "object")
+        .map((item) => ({ ...item }))
+      : [],
+    manualLiveWriteGate: pack.manualLiveWriteGate && typeof pack.manualLiveWriteGate === "object"
+      ? { ...pack.manualLiveWriteGate }
+      : null,
+    readinessReadback: pack.readinessReadback && typeof pack.readinessReadback === "object"
+      ? { ...pack.readinessReadback }
+      : null
+  };
+}
+
 function cloneLaunchProductionProofPreflightHandoff(handoff = null) {
   if (!handoff || typeof handoff !== "object") {
     return null;
@@ -52903,7 +52953,9 @@ function cloneLaunchProductionProofPreflightHandoff(handoff = null) {
     productionProofExecutionQueue:
       cloneLaunchProductionProofExecutionQueue(handoff.productionProofExecutionQueue),
     productionProofExecutionReadback:
-      cloneLaunchProductionProofExecutionReadback(handoff.productionProofExecutionReadback)
+      cloneLaunchProductionProofExecutionReadback(handoff.productionProofExecutionReadback),
+    productionProofExecutionPack:
+      cloneLaunchProductionProofExecutionPack(handoff.productionProofExecutionPack)
   };
 }
 
@@ -53206,6 +53258,80 @@ function buildLaunchProductionProofExecutionReadback({
   };
 }
 
+function buildLaunchProductionProofExecutionPack({
+  productionProofExecutionQueue = null,
+  productionProofPreflightHandoff = null,
+  productionProofExecutionReadback = null
+} = {}) {
+  const queue = cloneLaunchProductionProofExecutionQueue(productionProofExecutionQueue);
+  const handoff = productionProofPreflightHandoff && typeof productionProofPreflightHandoff === "object"
+    ? productionProofPreflightHandoff
+    : null;
+  const readback = cloneLaunchProductionProofExecutionReadback(productionProofExecutionReadback);
+  if (!queue || !handoff) {
+    return null;
+  }
+  const steps = Array.isArray(queue.steps) ? queue.steps : [];
+  const noWriteCommands = steps
+    .filter((item) => item.phase === "no_write")
+    .slice(0, 3)
+    .map((item) => ({
+      order: item.order,
+      key: item.key,
+      command: item.command || null,
+      willWriteLiveData: item.willWriteLiveData === true,
+      willModifyData: item.willModifyData === true
+    }));
+  const completedStepCount = readback?.completedStepCount ?? 0;
+  const totalStepCount = readback?.totalStepCount ?? steps.length;
+  const currentStepKey = readback
+    ? readback.currentStepKey || null
+    : queue.currentActionKey || "production_proof_preflight";
+  const nextStepKey = readback
+    ? readback.nextStepKey || null
+    : steps.find((item) => item.key === "staging_profile_init")?.key || null;
+  const manualLiveWriteGateKey = queue.manualLiveWriteGateKey || handoff.manualLiveWriteGate || "launch_smoke_staging";
+  return {
+    mode: "launch-production-proof-execution-pack/v1",
+    status: readback?.status || queue.status || "blocked_until_production_proof_preflight_passes",
+    currentActionKey: currentStepKey,
+    executionCursor: {
+      from: "0/5",
+      to: "5/5",
+      expression: "0/5 -> 5/5",
+      current: `${completedStepCount}/${totalStepCount}`,
+      currentStepKey,
+      nextStepKey
+    },
+    inputCheck: {
+      status: queue.status || "blocked_until_production_proof_preflight_passes",
+      missingInputKeys: [],
+      invalidInputKeys: [],
+      currentActionKey: queue.currentActionKey || "production_proof_preflight"
+    },
+    noWriteCommands,
+    manualLiveWriteGate: {
+      key: manualLiveWriteGateKey,
+      status: readback?.manualLiveWriteGateStatus || "blocked_until_previous_step_complete",
+      command: steps.find((item) => item.key === manualLiveWriteGateKey)?.command
+        || handoff.launchSmokeCommand
+        || null,
+      confirmation: "manual_confirmation_required",
+      willWriteLiveData: true,
+      willModifyData: true
+    },
+    readinessReadback: {
+      key: "staging_readiness_status",
+      targetCursor: "5/5",
+      command: steps.find((item) => item.key === "staging_readiness_status")?.command
+        || handoff.readinessRefreshCommand
+        || null
+    },
+    nextAction: readback?.nextAction
+      || "Run production proof preflight first; then follow the no-write commands, manual live-write gate, and readiness readback cursor in order."
+  };
+}
+
 function buildLaunchProductionProofPreflightHandoff(entrypoint = null) {
   const source = cloneLaunchProductionProofPreflightEntrypoint(entrypoint);
   if (!source) {
@@ -53286,6 +53412,10 @@ function buildLaunchProductionProofPreflightHandoff(entrypoint = null) {
     nextAction: "Run production proof preflight first; only run launch_smoke_staging after profile init, recovery preflight, and staging preflight pass."
   };
   handoff.productionProofExecutionQueue = buildLaunchProductionProofExecutionQueue(handoff);
+  handoff.productionProofExecutionPack = buildLaunchProductionProofExecutionPack({
+    productionProofExecutionQueue: handoff.productionProofExecutionQueue,
+    productionProofPreflightHandoff: handoff
+  });
   return handoff;
 }
 
@@ -55095,9 +55225,16 @@ function buildDeveloperOpsLaunchEvidenceProductionSwitchProofPacket({
     productionProofPreflightHandoff: proofPacket.productionProofPreflightHandoff,
     productionSwitchProofPacket: proofPacket
   });
+  proofPacket.productionProofExecutionPack = buildLaunchProductionProofExecutionPack({
+    productionProofExecutionQueue: proofPacket.productionProofExecutionQueue,
+    productionProofPreflightHandoff: proofPacket.productionProofPreflightHandoff,
+    productionProofExecutionReadback: proofPacket.productionProofExecutionReadback
+  });
   if (proofPacket.productionProofPreflightHandoff) {
     proofPacket.productionProofPreflightHandoff.productionProofExecutionReadback =
       cloneLaunchProductionProofExecutionReadback(proofPacket.productionProofExecutionReadback);
+    proofPacket.productionProofPreflightHandoff.productionProofExecutionPack =
+      cloneLaunchProductionProofExecutionPack(proofPacket.productionProofExecutionPack);
   }
   return proofPacket;
 }
@@ -55433,12 +55570,17 @@ function buildDeveloperOpsLaunchEvidenceReadinessGate({
     productionProofPreflightHandoff?.productionProofExecutionReadback
       || productionSwitchProofPacket?.productionProofExecutionReadback
   );
+  const productionProofExecutionPack = cloneLaunchProductionProofExecutionPack(
+    productionProofPreflightHandoff?.productionProofExecutionPack
+      || productionSwitchProofPacket?.productionProofExecutionPack
+  );
   return {
     ...gatePayload,
     productionProofPreflightEntrypoint,
     productionProofPreflightHandoff,
     productionProofExecutionQueue,
     productionProofExecutionReadback,
+    productionProofExecutionPack,
     stagingRehearsalExecutionEntrypoint: productionSwitchProofPacket?.stagingRehearsalExecutionEntrypoint || null,
     launchExecutionPhasePlan,
     productionSwitchProofPacket: productionSwitchProofPacket
@@ -55569,6 +55711,10 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
   const productionProofExecutionReadback = cloneLaunchProductionProofExecutionReadback(
     productionProofPreflightHandoff?.productionProofExecutionReadback
       || switchProofPacket?.productionProofExecutionReadback
+  );
+  const productionProofExecutionPack = cloneLaunchProductionProofExecutionPack(
+    productionProofPreflightHandoff?.productionProofExecutionPack
+      || switchProofPacket?.productionProofExecutionPack
   );
   const productionSignoffExecutionEntrypoint =
     cloneLaunchProductionSignoffExecutionEntrypoint(
@@ -55717,6 +55863,7 @@ function buildDeveloperOpsLaunchOperationsOperatorQueueCheckpoint({
     productionProofPreflightHandoff,
     productionProofExecutionQueue,
     productionProofExecutionReadback,
+    productionProofExecutionPack,
     liveWriteSmokeExecutionEntrypoint,
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
@@ -62746,6 +62893,8 @@ function buildLaunchCutoverTriageActionContext(checkpoint = null) {
       cloneLaunchProductionProofExecutionQueue(checkpoint.productionProofExecutionQueue),
     productionProofExecutionReadback:
       cloneLaunchProductionProofExecutionReadback(checkpoint.productionProofExecutionReadback),
+    productionProofExecutionPack:
+      cloneLaunchProductionProofExecutionPack(checkpoint.productionProofExecutionPack),
     liveWriteSmokeExecutionEntrypoint:
       cloneLaunchLiveWriteSmokeExecutionEntrypoint(checkpoint.liveWriteSmokeExecutionEntrypoint),
     productionSignoffExecutionEntrypoint:
@@ -62881,6 +63030,17 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     || cloneLaunchProductionProofExecutionReadback(
       productionProofPreflightHandoff?.productionProofExecutionReadback
     );
+  const productionProofExecutionPack =
+    cloneLaunchProductionProofExecutionPack(checkpoint.productionProofExecutionPack)
+    || cloneLaunchProductionProofExecutionPack(proofPacket?.productionProofExecutionPack)
+    || cloneLaunchProductionProofExecutionPack(
+      productionProofPreflightHandoff?.productionProofExecutionPack
+    )
+    || buildLaunchProductionProofExecutionPack({
+      productionProofExecutionQueue,
+      productionProofPreflightHandoff,
+      productionProofExecutionReadback
+    });
   const liveWriteSmokeExecutionEntrypoint =
     cloneLaunchLiveWriteSmokeExecutionEntrypoint(checkpoint.liveWriteSmokeExecutionEntrypoint)
     || cloneLaunchLiveWriteSmokeExecutionEntrypoint(proofPacket?.liveWriteSmokeExecutionEntrypoint)
@@ -62974,6 +63134,7 @@ function buildLaunchCutoverTriageCheckpointFromOperatorQueueCheckpoint(
     productionProofPreflightHandoff,
     productionProofExecutionQueue,
     productionProofExecutionReadback,
+    productionProofExecutionPack,
     liveWriteSmokeExecutionEntrypoint,
     productionSignoffExecutionEntrypoint,
     launchDayWatchExecutionEntrypoint,
@@ -63374,9 +63535,39 @@ function appendProductionProofPreflightHandoffLine(lines = [], handoff = null) {
     cloneLaunchProductionProofExecutionQueue(handoff.productionProofExecutionQueue)
       || buildLaunchProductionProofExecutionQueue(handoff)
   );
+  appendProductionProofExecutionPackLine(
+    lines,
+    cloneLaunchProductionProofExecutionPack(handoff.productionProofExecutionPack)
+      || buildLaunchProductionProofExecutionPack({
+        productionProofExecutionQueue:
+          cloneLaunchProductionProofExecutionQueue(handoff.productionProofExecutionQueue)
+          || buildLaunchProductionProofExecutionQueue(handoff),
+        productionProofPreflightHandoff: handoff,
+        productionProofExecutionReadback:
+          cloneLaunchProductionProofExecutionReadback(handoff.productionProofExecutionReadback)
+      })
+  );
   appendProductionProofExecutionReadbackLine(
     lines,
     cloneLaunchProductionProofExecutionReadback(handoff.productionProofExecutionReadback)
+  );
+  return true;
+}
+
+function appendProductionProofExecutionPackLine(lines = [], pack = null) {
+  if (!Array.isArray(lines) || !pack || typeof pack !== "object") {
+    return false;
+  }
+  const noWriteCommands = Array.isArray(pack.noWriteCommands)
+    ? pack.noWriteCommands.filter((item) => item && typeof item === "object")
+    : [];
+  lines.push(
+    `- productionProofExecutionPack=${pack.executionCursor?.expression || "-"}`
+    + ` | status=${pack.status || "-"}`
+    + ` | current=${pack.executionCursor?.currentStepKey || "-"}`
+    + ` | noWrite=${noWriteCommands.map((item) => item.key || "-").join(",") || "-"}`
+    + ` | manualGate=${pack.manualLiveWriteGate?.key || "-"}:${pack.manualLiveWriteGate?.status || "-"}`
+    + ` | readiness=${pack.readinessReadback?.key || "-"}:${pack.readinessReadback?.command || "-"}`
   );
   return true;
 }

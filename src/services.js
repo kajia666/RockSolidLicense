@@ -52728,7 +52728,8 @@ function buildLaunchProductionProofPreflightCommand({
   closeoutInputFile = null,
   readinessActionQueueFile = null,
   profileOutputFile = null,
-  backupRestoreArtifact = null
+  backupRestoreArtifact = null,
+  productionProofExecutionPackFile = null
 } = {}) {
   const resolvedStorageProfile = storageProfile || "<storage-profile>";
   const parts = [
@@ -52769,6 +52770,9 @@ function buildLaunchProductionProofPreflightCommand({
   if (backupRestoreArtifact) {
     parts.push("--backup-restore-artifact", commandTemplateValue(backupRestoreArtifact));
   }
+  if (productionProofExecutionPackFile) {
+    parts.push("--execution-pack-file", commandTemplateValue(productionProofExecutionPackFile));
+  }
   return parts.join(" ");
 }
 
@@ -52807,6 +52811,10 @@ function buildLaunchProductionProofPreflightEntrypoint({
     || path.posix.join(archiveRoot, "staging-rehearsal-profile.json");
   const backupRestoreArtifact = proofPacket.backupRestoreDrillProof?.artifactPath
     || path.posix.join(archiveRoot, "backup-restore-drill.txt");
+  const productionProofExecutionPackFile = proofPacket.productionProofExecutionPackFile
+    || proofPacket.productionProofExecutionPack?.executionPackFile
+    || proofPacket.productionProofPreflightHandoff?.productionProofExecutionPackFile
+    || path.posix.join(archiveRoot, "production-proof-execution-pack.md");
   const baseUrl = proofPacket.publicHttpsProof?.baseUrl
     || proofPacket.baseUrl
     || extractCommandOptionValue(profileDrivenDryRunCommand, "base-url")
@@ -52837,7 +52845,8 @@ function buildLaunchProductionProofPreflightEntrypoint({
     closeoutInputFile,
     readinessActionQueueFile,
     profileOutputFile,
-    backupRestoreArtifact
+    backupRestoreArtifact,
+    productionProofExecutionPackFile
   });
   const proofStatus = summary?.status || null;
   const readyForRealEnvironmentReview = proofStatus === "ready_for_real_environment_review";
@@ -52863,6 +52872,7 @@ function buildLaunchProductionProofPreflightEntrypoint({
     readinessActionQueueFile,
     profileOutputFile,
     backupRestoreArtifact,
+    productionProofExecutionPackFile,
     launchDutyRecordIndexPath: proofPacket.launchDutyRecordIndexPath
       || proofPacket.launchDutyRecordIndexFile
       || path.posix.join(archiveRoot, "launch-duty-record-index.json"),
@@ -53310,6 +53320,7 @@ function buildLaunchProductionProofExecutionPack({
       currentActionKey: queue.currentActionKey || "production_proof_preflight"
     },
     noWriteCommands,
+    executionPackFile: handoff.productionProofExecutionPackFile || null,
     manualLiveWriteGate: {
       key: manualLiveWriteGateKey,
       status: readback?.manualLiveWriteGateStatus || "blocked_until_previous_step_complete",
@@ -53407,6 +53418,7 @@ function buildLaunchProductionProofPreflightHandoff(entrypoint = null) {
     readinessActionQueueFile: source.readinessActionQueueFile || null,
     profileOutputFile: source.profileOutputFile || null,
     backupRestoreArtifact: source.backupRestoreArtifact || null,
+    productionProofExecutionPackFile: source.productionProofExecutionPackFile || null,
     launchDutyRecordIndexPath: source.launchDutyRecordIndexPath || null,
     proofStatus: source.proofStatus || null,
     nextAction: "Run production proof preflight first; only run launch_smoke_staging after profile init, recovery preflight, and staging preflight pass."
@@ -63340,6 +63352,7 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
       + ` | command=${productionProofPreflightEntrypoint.command || "-"}`
       + ` | proof=${productionProofPreflightEntrypoint.proofStatus || "-"}`
       + ` | launchDutyRecordIndex=${productionProofPreflightEntrypoint.launchDutyRecordIndexPath || "-"}`
+      + ` | executionPack=${productionProofPreflightEntrypoint.productionProofExecutionPackFile || "-"}`
     );
   }
   const productionProofPreflightHandoff =
@@ -63529,6 +63542,7 @@ function appendProductionProofPreflightHandoffLine(lines = [], handoff = null) {
     + ` | manualGate=${handoff.manualLiveWriteGate || "-"}`
     + ` | artifact=${handoff.backupRestoreArtifact || "-"}`
     + ` | status=${handoff.status || "-"}`
+    + ` | executionPack=${handoff.productionProofExecutionPackFile || "-"}`
   );
   appendProductionProofExecutionQueueLine(
     lines,
@@ -63568,6 +63582,7 @@ function appendProductionProofExecutionPackLine(lines = [], pack = null) {
     + ` | noWrite=${noWriteCommands.map((item) => item.key || "-").join(",") || "-"}`
     + ` | manualGate=${pack.manualLiveWriteGate?.key || "-"}:${pack.manualLiveWriteGate?.status || "-"}`
     + ` | readiness=${pack.readinessReadback?.key || "-"}:${pack.readinessReadback?.command || "-"}`
+    + ` | executionPack=${pack.executionPackFile || "-"}`
   );
   return true;
 }

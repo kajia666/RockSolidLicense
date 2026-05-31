@@ -12495,6 +12495,8 @@ test("developer license quickstart first-batch setup can create recommended laun
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.profileOutputFile,
         backupRestoreArtifact:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.backupRestoreArtifact,
+        productionProofExecutionPackFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.productionProofExecutionPackFile,
         launchDutyRecordIndexPath:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightEntrypoint?.launchDutyRecordIndexPath,
         proofStatus:
@@ -12505,11 +12507,12 @@ test("developer license quickstart first-batch setup can create recommended laun
         status: "ready_for_production_proof_preflight",
         readyForExecution: true,
         currentActionKey: "run_production_proof_preflight",
-        command: "npm.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md --profile-output-file artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json --backup-restore-artifact artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        command: "npm.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md --profile-output-file artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json --backup-restore-artifact artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt --execution-pack-file artifacts/staging/FIRSTBATCH/stable/production-proof-execution-pack.md",
         closeoutInputFile: "artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json",
         readinessActionQueueFile: "artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
         profileOutputFile: "artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json",
         backupRestoreArtifact: "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        productionProofExecutionPackFile: "artifacts/staging/FIRSTBATCH/stable/production-proof-execution-pack.md",
         launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json",
         proofStatus: "blocked_until_real_environment_proof"
       }
@@ -12538,6 +12541,8 @@ test("developer license quickstart first-batch setup can create recommended laun
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.manualLiveWriteGate,
         backupRestoreArtifact:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.backupRestoreArtifact,
+        productionProofExecutionPackFile:
+          runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.productionProofExecutionPackFile,
         launchDutyRecordIndexPath:
           runtimeEvidenceLaunchReview.reviewSummary.productionSwitchProofPacket?.productionProofPreflightHandoff?.launchDutyRecordIndexPath
       },
@@ -12546,7 +12551,7 @@ test("developer license quickstart first-batch setup can create recommended laun
         status: "ready_for_production_proof_preflight_handoff",
         readyForExecution: true,
         currentActionKey: "run_production_proof_preflight",
-        preflightCommand: "npm.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md --profile-output-file artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json --backup-restore-artifact artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        preflightCommand: "npm.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md --profile-output-file artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json --backup-restore-artifact artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt --execution-pack-file artifacts/staging/FIRSTBATCH/stable/production-proof-execution-pack.md",
         profileInitCommand: "npm.cmd run staging:profile:init -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --output-file artifacts/staging/FIRSTBATCH/stable/staging-rehearsal-profile.json",
         recoveryPreflightCommand: "npm.cmd run recovery:preflight -- --target-os <target-os> --storage-profile <storage-profile> --target-env-file <target-env-file> --app-backup-dir <app-backup-dir> --postgres-backup-dir <postgres-backup-dir> --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --closeout-input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
         stagingPreflightCommand: "npm.cmd run staging:preflight -- --base-url <public-https-base-url> --product-code FIRSTBATCH --channel stable --admin-username $env:RSL_SMOKE_ADMIN_USERNAME --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD --developer-username $env:RSL_SMOKE_DEVELOPER_USERNAME --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD",
@@ -12554,6 +12559,7 @@ test("developer license quickstart first-batch setup can create recommended laun
         readinessRefreshCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/FIRSTBATCH/stable/filled-closeout-input.json --actions-file artifacts/staging/FIRSTBATCH/stable/readiness-action-queue.md",
         manualLiveWriteGate: "launch_smoke_staging",
         backupRestoreArtifact: "artifacts/staging/FIRSTBATCH/stable/backup-restore-drill.txt",
+        productionProofExecutionPackFile: "artifacts/staging/FIRSTBATCH/stable/production-proof-execution-pack.md",
         launchDutyRecordIndexPath: "artifacts/staging/FIRSTBATCH/stable/launch-duty-record-index.json"
       }
     );
@@ -13342,6 +13348,8 @@ test("developer license quickstart first-batch setup can create recommended laun
         noWriteCommandKeys:
           runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionPack?.noWriteCommands
             ?.map((item) => item.key),
+        executionPackFile:
+          runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionPack?.executionPackFile,
         manualLiveWriteGate:
           runtimeEvidenceReviewCutoverTriageControl.productionProofExecutionPack?.manualLiveWriteGate,
         readinessReadback:
@@ -13359,6 +13367,7 @@ test("developer license quickstart first-batch setup can create recommended laun
           nextStepKey: "staging_profile_init"
         },
         noWriteCommandKeys: ["staging_profile_init", "recovery_preflight", "staging_preflight"],
+        executionPackFile: "artifacts/staging/FIRSTBATCH/stable/production-proof-execution-pack.md",
         manualLiveWriteGate: {
           key: "launch_smoke_staging",
           status: "blocked_until_previous_step_complete",
@@ -13420,6 +13429,14 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
       /productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| profile=npm\.cmd run staging:profile:init[^\n]*\| recovery=npm\.cmd run recovery:preflight[^\n]*\| staging=npm\.cmd run staging:preflight[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| refresh=npm\.cmd run staging:readiness:status[^\n]*\| manualGate=launch_smoke_staging \| artifact=artifacts\/staging\/FIRSTBATCH\/stable\/backup-restore-drill\.txt \| status=ready_for_production_proof_preflight_handoff/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionProofPreflightHandoff=[^\n]*executionPack=artifacts\/staging\/FIRSTBATCH\/stable\/production-proof-execution-pack\.md/
+    );
+    assert.match(
+      runtimeEvidenceLaunchReview.summaryText,
+      /productionProofExecutionPack=0\/5 -> 5\/5[^\n]*executionPack=artifacts\/staging\/FIRSTBATCH\/stable\/production-proof-execution-pack\.md/
     );
     assert.match(
       runtimeEvidenceLaunchReview.summaryText,
@@ -13647,6 +13664,10 @@ test("developer license quickstart first-batch setup can create recommended laun
     assert.match(
       runtimeEvidenceReviewHandoffRoutes.body,
       /Production Proof Preflight Handoff:[\s\S]*productionProofPreflightHandoff=production_proof_preflight -> staging_profile_init -> recovery_preflight -> staging_preflight -> launch_smoke_staging -> readiness_refresh \| preflight=npm\.cmd run launch:production-proof-preflight -- --base-url <public-https-base-url>[^\n]*\| smoke=npm\.cmd run launch:smoke:staging -- --base-url <public-https-base-url> --allow-live-writes[^\n]*\| manualGate=launch_smoke_staging/
+    );
+    assert.match(
+      runtimeEvidenceReviewHandoffRoutes.body,
+      /Production Proof Preflight Handoff:[\s\S]*executionPack=artifacts\/staging\/FIRSTBATCH\/stable\/production-proof-execution-pack\.md/
     );
     assert.match(
       runtimeEvidenceReviewHandoffRoutes.body,

@@ -63941,6 +63941,10 @@ function appendLaunchDayWatchReadbackHandoffLine(
     + " | expected=launch_day_watch:ready_launch_day_watch_records_attached"
     + " | next=stable_operations_handoff"
     + ` | stable=${stableOperations?.currentCommand || "-"}`
+    + ` | stableStatus=${stableOperations?.status || "-"}`
+    + ` | stableReady=${stableOperations?.ready === true ? "yes" : "no"}`
+    + ` | stableNext=${stableOperations?.nextActionKey || "-"}`
+    + ` | stableReadback=${stableOperations?.readbackPacketStatus || "-"}`
     + ` | steadyState=${stableOperations?.steadyStateHandoffHref || "-"}`
     + ` | artifact=${entrypoint.firstWaveCloseoutArtifact || "-"}`
     + ` | recordIndex=${entrypoint.launchDutyRecordIndexPath || "-"}`

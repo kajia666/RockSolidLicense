@@ -19,5 +19,7 @@
   "productionSignoffPacketFile": "artifacts/staging/PILOT_ALPHA/stable/staging-production-signoff-packet.json",
   "launchDutyArchiveIndexFile": "artifacts/staging/PILOT_ALPHA/stable/staging-launch-duty-archive-index.json",
   "filledCloseoutDraftFile": "artifacts/staging/PILOT_ALPHA/stable/filled-closeout-input.draft.json",
-  "readinessActionQueueFile": "artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md"
+  "readinessActionQueueFile": "artifacts/staging/PILOT_ALPHA/stable/readiness-action-queue.md",
+  "productionProofExecutionPackFile": "artifacts/staging/PILOT_ALPHA/stable/production-proof-execution-pack.md",
+  "productionProofPreflightCommand": "npm.cmd run launch:production-proof-preflight -- --profile-file docs/staging-rehearsal-profile.example.json --execution-pack-file artifacts/staging/PILOT_ALPHA/stable/production-proof-execution-pack.md"
 }

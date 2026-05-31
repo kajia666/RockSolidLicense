@@ -15,6 +15,7 @@
     "recovery:preflight": "node scripts/recovery-preflight.mjs",
     "staging:rehearsal": "node scripts/staging-rehearsal.mjs",
     "staging:profile:init": "node scripts/staging-profile-init.mjs",
+    "staging:profile:check": "node scripts/staging-profile-check.mjs",
     "staging:closeout:init": "node scripts/staging-closeout-init.mjs",
     "staging:closeout:backfill": "node scripts/staging-closeout-backfill.mjs",
     "staging:signoff:backfill": "node scripts/staging-signoff-backfill.mjs",

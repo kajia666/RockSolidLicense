@@ -54,7 +54,19 @@ The workspace routes intentionally carry `source=launch-smoke` and `handoff=firs
 
 In local ephemeral mode these entries use routes only because the temporary app shuts down after the script exits. In remote `--base-url` mode they also include absolute `href` values.
 
-Before running the remote write-path smoke against staging, start with the no-write production proof preflight:
+Before running the remote write-path smoke against staging, generate or review a secret-free staging profile, validate it without loading secrets, then run the short profile-driven production proof preflight:
+
+```powershell
+npm.cmd run staging:profile:check -- `
+  --profile-file artifacts/staging/SMOKE_ALPHA/stable/staging-rehearsal-profile.json
+
+npm.cmd run launch:production-proof-preflight -- `
+  --profile-file artifacts/staging/SMOKE_ALPHA/stable/staging-rehearsal-profile.json
+```
+
+`staging:profile:check` is a read-only profile lint step. It verifies the real-like HTTPS, storage, recovery, production-proof execution-pack path, short production-proof command, and secret-free policy before the operator loads password or bearer-token environment variables. The generated profile already stores `productionProofExecutionPackFile`, so the short preflight command writes the secret-free Markdown execution pack without another `--execution-pack-file` splice. `docs/staging-rehearsal-profile.example.json` is the committed secret-free starting point when preparing a new real-like profile.
+
+If no profile file exists yet, use the direct no-write production proof preflight form:
 
 ```powershell
 npm.cmd run launch:production-proof-preflight -- `

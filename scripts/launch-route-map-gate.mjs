@@ -187,6 +187,18 @@ const commands = [
     ]
   },
   {
+    key: "staging_profile_check_script",
+    label: "Staging profile secret-free handoff check continuity",
+    command: "node",
+    executable: process.execPath,
+    args: [
+      "--test",
+      "--test-concurrency=1",
+      "--test-isolation=none",
+      "test/staging-profile-check-script.test.js"
+    ]
+  },
+  {
     key: "staging_closeout_init_script",
     label: "Staging closeout init handoff continuity",
     command: "node",

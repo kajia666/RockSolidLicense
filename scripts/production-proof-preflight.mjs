@@ -590,6 +590,65 @@ function buildRealEnvironmentInputContract(options, proofs, nextCommands) {
   };
 }
 
+function buildProductionProofExecutionQueue(realEnvironmentInputContract, nextCommands) {
+  const readyForNoWriteExecution = realEnvironmentInputContract.ready === true;
+  return {
+    mode: "launch-production-proof-execution-queue/v1",
+    status: readyForNoWriteExecution
+      ? "ready_for_no_write_execution"
+      : "blocked_until_real_environment_inputs_ready",
+    currentActionKey: readyForNoWriteExecution
+      ? "staging_profile_init"
+      : "prepare_real_environment_inputs",
+    currentCommand: readyForNoWriteExecution
+      ? nextCommands.profileInit.command
+      : null,
+    manualLiveWriteGateKey: "launch_smoke_staging",
+    steps: [
+      {
+        order: 1,
+        phase: "no_write",
+        status: readyForNoWriteExecution
+          ? "operator_execute"
+          : "blocked_until_real_environment_inputs_ready",
+        requiresOperatorConfirmation: false,
+        ...nextCommands.profileInit
+      },
+      {
+        order: 2,
+        phase: "no_write",
+        status: "blocked_until_previous_step_complete",
+        requiresOperatorConfirmation: false,
+        ...nextCommands.recoveryPreflight
+      },
+      {
+        order: 3,
+        phase: "no_write",
+        status: "blocked_until_previous_step_complete",
+        requiresOperatorConfirmation: false,
+        ...nextCommands.stagingPreflight
+      },
+      {
+        order: 4,
+        phase: "manual_live_write_gate",
+        status: "blocked_until_operator_confirmation",
+        requiresOperatorConfirmation: true,
+        ...nextCommands.launchSmokeStaging
+      },
+      {
+        order: 5,
+        phase: "readback",
+        status: "blocked_until_previous_step_complete",
+        requiresOperatorConfirmation: false,
+        ...nextCommands.readinessStatus
+      }
+    ],
+    nextAction: readyForNoWriteExecution
+      ? "Run staging_profile_init first, then execute each no-write step in order. Confirm the manual live-write gate before launch_smoke_staging."
+      : "Fill the real-environment input contract, then rerun production proof preflight before executing the queue."
+  };
+}
+
 function buildResult(options) {
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(options.baseUrl);
   const storageProfileProof = buildProductionSwitchStorageProfileProof(options.storageProfile);
@@ -617,6 +676,10 @@ function buildResult(options) {
     : "blocked_before_real_environment_proof_start";
   const nextCommands = buildNextCommands(options, backupRestoreDrillProof);
   const realEnvironmentInputContract = buildRealEnvironmentInputContract(options, proofs, nextCommands);
+  const productionProofExecutionQueue = buildProductionProofExecutionQueue(
+    realEnvironmentInputContract,
+    nextCommands
+  );
   return {
     status,
     mode: "launch-production-proof-preflight",
@@ -644,6 +707,7 @@ function buildResult(options) {
       options.developerBearerTokenEnv
     ],
     realEnvironmentInputContract,
+    productionProofExecutionQueue,
     nextCommands,
     nextAction: status === "pass"
       ? "Run profileInit and recoveryPreflight first; run stagingPreflight before launchSmokeStaging, and backfill backup_restore_drill_result after the recovery drill passes."
@@ -695,6 +759,27 @@ function writeRealEnvironmentInputContract(contract, writeLine) {
   );
 }
 
+function writeProductionProofExecutionQueue(queue, writeLine) {
+  if (!queue || typeof queue !== "object") {
+    return;
+  }
+  writeLine(
+    `Production proof execution queue: ${queue.status || "-"}`
+      + ` | current=${queue.currentActionKey || "-"}`
+      + ` | manualGate=${queue.manualLiveWriteGateKey || "-"}`
+  );
+  for (const step of queue.steps || []) {
+    writeLine(
+      `Production proof execution step: ${step.order ?? "-"}`
+        + ` | key=${step.key || "-"}`
+        + ` | phase=${step.phase || "-"}`
+        + ` | status=${step.status || "-"}`
+        + ` | write=${step.willWriteLiveData ? "yes" : "no"}`
+        + ` | command=${step.command || "-"}`
+    );
+  }
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -705,6 +790,7 @@ function writeResult(result, json) {
     console.log("Production proof preflight passed. No data was modified.");
     console.log(`Production proof status: ${result.summary.proofStatus}`);
     writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.log);
+    writeProductionProofExecutionQueue(result.productionProofExecutionQueue, console.log);
     console.log(`Production proof profile init: ${result.nextCommands.profileInit.command}`);
     console.log(`Production proof recovery preflight: ${result.nextCommands.recoveryPreflight.command}`);
     console.log(`Production proof staging preflight: ${result.nextCommands.stagingPreflight.command}`);
@@ -715,6 +801,7 @@ function writeResult(result, json) {
 
   console.error(`Production proof preflight failed: ${result.error.message}`);
   writeRealEnvironmentInputContract(result.realEnvironmentInputContract, console.error);
+  writeProductionProofExecutionQueue(result.productionProofExecutionQueue, console.error);
   for (const check of result.checks) {
     console.error(`- ${check.status.toUpperCase()} ${check.name}: ${check.message}`);
   }

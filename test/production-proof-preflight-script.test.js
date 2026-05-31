@@ -134,6 +134,55 @@ test("production proof preflight is exposed and blocks non-https or missing secr
       { envName: "RSL_DEVELOPER_BEARER_TOKEN", present: false, value: "<redacted>" }
     ]
   );
+  assert.equal(output.productionProofExecutionQueue.status, "blocked_until_real_environment_inputs_ready");
+  assert.equal(output.productionProofExecutionQueue.currentActionKey, "prepare_real_environment_inputs");
+  assert.equal(output.productionProofExecutionQueue.currentCommand, null);
+  assert.deepEqual(
+    output.productionProofExecutionQueue.steps.map((item) => ({
+      order: item.order,
+      key: item.key,
+      phase: item.phase,
+      status: item.status,
+      willWriteLiveData: item.willWriteLiveData
+    })),
+    [
+      {
+        order: 1,
+        key: "staging_profile_init",
+        phase: "no_write",
+        status: "blocked_until_real_environment_inputs_ready",
+        willWriteLiveData: false
+      },
+      {
+        order: 2,
+        key: "recovery_preflight",
+        phase: "no_write",
+        status: "blocked_until_previous_step_complete",
+        willWriteLiveData: false
+      },
+      {
+        order: 3,
+        key: "staging_preflight",
+        phase: "no_write",
+        status: "blocked_until_previous_step_complete",
+        willWriteLiveData: false
+      },
+      {
+        order: 4,
+        key: "launch_smoke_staging",
+        phase: "manual_live_write_gate",
+        status: "blocked_until_operator_confirmation",
+        willWriteLiveData: true
+      },
+      {
+        order: 5,
+        key: "staging_readiness_status",
+        phase: "readback",
+        status: "blocked_until_previous_step_complete",
+        willWriteLiveData: false
+      }
+    ]
+  );
   assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
 });
 
@@ -225,6 +274,69 @@ test("production proof preflight returns no-write launch commands when real-envi
     "npm.cmd run launch:smoke:staging -- --base-url https://staging.example.com --allow-live-writes --product-code PILOT_ALPHA --channel beta --admin-username admin@example.com --admin-password $env:RSL_SMOKE_ADMIN_PASSWORD --developer-username launch.smoke.owner --developer-password $env:RSL_SMOKE_DEVELOPER_PASSWORD --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md"
   );
   assert.equal(output.nextCommands.launchSmokeStaging.willWriteLiveData, true);
+  assert.equal(output.productionProofExecutionQueue.mode, "launch-production-proof-execution-queue/v1");
+  assert.equal(output.productionProofExecutionQueue.status, "ready_for_no_write_execution");
+  assert.equal(output.productionProofExecutionQueue.currentActionKey, "staging_profile_init");
+  assert.equal(output.productionProofExecutionQueue.currentCommand, output.nextCommands.profileInit.command);
+  assert.equal(output.productionProofExecutionQueue.manualLiveWriteGateKey, "launch_smoke_staging");
+  assert.deepEqual(
+    output.productionProofExecutionQueue.steps.map((item) => ({
+      order: item.order,
+      key: item.key,
+      phase: item.phase,
+      status: item.status,
+      requiresOperatorConfirmation: item.requiresOperatorConfirmation,
+      willWriteLiveData: item.willWriteLiveData,
+      command: item.command
+    })),
+    [
+      {
+        order: 1,
+        key: "staging_profile_init",
+        phase: "no_write",
+        status: "operator_execute",
+        requiresOperatorConfirmation: false,
+        willWriteLiveData: false,
+        command: output.nextCommands.profileInit.command
+      },
+      {
+        order: 2,
+        key: "recovery_preflight",
+        phase: "no_write",
+        status: "blocked_until_previous_step_complete",
+        requiresOperatorConfirmation: false,
+        willWriteLiveData: false,
+        command: output.nextCommands.recoveryPreflight.command
+      },
+      {
+        order: 3,
+        key: "staging_preflight",
+        phase: "no_write",
+        status: "blocked_until_previous_step_complete",
+        requiresOperatorConfirmation: false,
+        willWriteLiveData: false,
+        command: output.nextCommands.stagingPreflight.command
+      },
+      {
+        order: 4,
+        key: "launch_smoke_staging",
+        phase: "manual_live_write_gate",
+        status: "blocked_until_operator_confirmation",
+        requiresOperatorConfirmation: true,
+        willWriteLiveData: true,
+        command: output.nextCommands.launchSmokeStaging.command
+      },
+      {
+        order: 5,
+        key: "staging_readiness_status",
+        phase: "readback",
+        status: "blocked_until_previous_step_complete",
+        requiresOperatorConfirmation: false,
+        willWriteLiveData: false,
+        command: output.nextCommands.readinessStatus.command
+      }
+    ]
+  );
   assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
 });
 
@@ -242,6 +354,9 @@ test("production proof preflight plain output prints copyable commands without s
   assert.match(result.stdout, /Production proof non-secret input: base_url \| flag=--base-url \| env=RSL_PRODUCTION_SWITCH_BASE_URL,RSL_STAGING_BASE_URL \| required=yes \| present=yes \| valid=yes \| value=https:\/\/staging\.example\.com/);
   assert.match(result.stdout, /Production proof secret env input: admin_password \| env=RSL_SMOKE_ADMIN_PASSWORD \| required=yes \| present=yes \| value=<redacted>/);
   assert.match(result.stdout, /Production proof manual live-write gate: launch_smoke_staging \| status=operator_confirmation_required \| command=npm\.cmd run launch:smoke:staging -- --base-url https:\/\/staging\.example\.com --allow-live-writes/);
+  assert.match(result.stdout, /Production proof execution queue: ready_for_no_write_execution \| current=staging_profile_init \| manualGate=launch_smoke_staging/);
+  assert.match(result.stdout, /Production proof execution step: 1 \| key=staging_profile_init \| phase=no_write \| status=operator_execute \| write=no \| command=npm\.cmd run staging:profile:init/);
+  assert.match(result.stdout, /Production proof execution step: 4 \| key=launch_smoke_staging \| phase=manual_live_write_gate \| status=blocked_until_operator_confirmation \| write=yes \| command=npm\.cmd run launch:smoke:staging/);
   assert.match(result.stdout, /\$env:RSL_SMOKE_ADMIN_PASSWORD/);
   assert.match(result.stdout, /\$env:RSL_SMOKE_DEVELOPER_PASSWORD/);
   assert.doesNotMatch(result.stdout, /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
@@ -258,5 +373,7 @@ test("production proof preflight plain failure prints a secret-free input contra
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /Production proof real-environment input contract: blocked_until_real_environment_inputs_ready \| nonSecret=14\/14 \| secretEnv=0\/3 \| missing=RSL_SMOKE_ADMIN_PASSWORD,RSL_SMOKE_DEVELOPER_PASSWORD,RSL_DEVELOPER_BEARER_TOKEN \| invalid=-/);
   assert.match(result.stderr, /Production proof secret env input: admin_password \| env=RSL_SMOKE_ADMIN_PASSWORD \| required=yes \| present=no \| value=<redacted>/);
+  assert.match(result.stderr, /Production proof execution queue: blocked_until_real_environment_inputs_ready \| current=prepare_real_environment_inputs \| manualGate=launch_smoke_staging/);
+  assert.match(result.stderr, /Production proof execution step: 1 \| key=staging_profile_init \| phase=no_write \| status=blocked_until_real_environment_inputs_ready \| write=no \| command=npm\.cmd run staging:profile:init/);
   assert.doesNotMatch(result.stderr, /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
 });

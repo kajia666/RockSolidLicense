@@ -63413,6 +63413,11 @@ function appendProductionSwitchEnvironmentProofLines(lines = [], proofSource = n
   );
   const launchDayWatchExecutionEntrypoint =
     cloneLaunchDayWatchExecutionEntrypoint(proofSource.launchDayWatchExecutionEntrypoint);
+  appendProductionSignoffReadbackHandoffLine(
+    lines,
+    productionSignoffExecutionEntrypoint,
+    launchDayWatchExecutionEntrypoint
+  );
   if (launchDayWatchExecutionEntrypoint) {
     lines.push(
       `- launchDayWatchEntrypoint=${launchDayWatchExecutionEntrypoint.status || "-"}`
@@ -63859,6 +63864,35 @@ function appendProductionSignoffHandoffLine(lines = [], entrypoint = null) {
     + ` | receiptFirst=${receiptCommands.find((item) => item.command)?.command || "-"}`
     + ` | packet=${entrypoint.productionSignoffPacket || "-"}`
     + ` | status=${entrypoint.status || "-"}`
+  );
+  return true;
+}
+
+function appendProductionSignoffReadbackHandoffLine(
+  lines = [],
+  productionSignoffEntrypoint = null,
+  launchDayWatchEntrypoint = null
+) {
+  if (!Array.isArray(lines) || !productionSignoffEntrypoint || typeof productionSignoffEntrypoint !== "object") {
+    return false;
+  }
+  const receiptCommands = Array.isArray(productionSignoffEntrypoint.receiptVisibilityBackfillCommands)
+    ? productionSignoffEntrypoint.receiptVisibilityBackfillCommands.filter((item) => item && typeof item === "object")
+    : [];
+  const watchRecords = Array.isArray(launchDayWatchEntrypoint?.watchRecordCommands)
+    ? launchDayWatchEntrypoint.watchRecordCommands.filter((item) => item && typeof item === "object")
+    : [];
+  lines.push(
+    "- productionSignoffReadbackHandoff=production_signoff_conditions -> receipt_visibility -> readiness_readback -> rehearsal_reload -> launch_day_watch_entry"
+    + ` | receiptLast=${receiptCommands[receiptCommands.length - 1]?.command || "-"}`
+    + ` | readback=${productionSignoffEntrypoint.readinessRefreshCommand || "-"}`
+    + ` | rehearsal=${productionSignoffEntrypoint.rehearsalReloadCommand || "-"}`
+    + " | expected=production_signoff:ready_production_signoff_evidence_attached"
+    + " | next=launch_day_watch"
+    + ` | watch=${watchRecords.find((item) => item.command)?.command || "-"}`
+    + ` | packet=${productionSignoffEntrypoint.productionSignoffPacket || launchDayWatchEntrypoint?.productionSignoffPacket || "-"}`
+    + ` | recordIndex=${productionSignoffEntrypoint.launchDutyRecordIndexPath || launchDayWatchEntrypoint?.launchDutyRecordIndexPath || "-"}`
+    + ` | status=${productionSignoffEntrypoint.status || "-"}`
   );
   return true;
 }

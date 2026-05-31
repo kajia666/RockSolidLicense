@@ -449,6 +449,31 @@ test("production proof preflight can load launch inputs from a staging profile f
     assert.deepEqual(output.realEnvironmentInputContract.missingSecretEnvKeys, []);
     assert.equal(output.productionProofExecutionPackFile.path, executionPackFile);
     assert.equal(output.productionProofExecutionPackFile.written, true);
+    assert.equal(output.productionProofExecutionQueue.currentActionKey, "recovery_preflight");
+    assert.equal(output.productionProofExecutionQueue.currentCommand, output.nextCommands.recoveryPreflight.command);
+    assert.deepEqual(
+      output.productionProofExecutionQueue.steps.map((item) => [item.key, item.status]),
+      [
+        ["staging_profile_init", "completed_from_profile_file"],
+        ["recovery_preflight", "operator_execute"],
+        ["staging_preflight", "blocked_until_previous_step_complete"],
+        ["launch_smoke_staging", "blocked_until_operator_confirmation"],
+        ["staging_readiness_status", "blocked_until_previous_step_complete"]
+      ]
+    );
+    assert.equal(output.productionProofExecutionPack.currentActionKey, "recovery_preflight");
+    assert.deepEqual(output.productionProofExecutionPack.executionCursor, {
+      from: "1/5",
+      to: "5/5",
+      expression: "1/5 -> 5/5",
+      current: "1/5",
+      currentStepKey: "recovery_preflight",
+      nextStepKey: "recovery_preflight"
+    });
+    assert.deepEqual(
+      output.productionProofExecutionPack.noWriteCommands.map((item) => item.key),
+      ["recovery_preflight", "staging_preflight"]
+    );
     assert.equal(
       output.nextCommands.profileInit.command,
       `npm.cmd run staging:profile:init -- --base-url https://profile-staging.example.com --product-code PROFILE_ALPHA --channel stable --admin-username profile.admin@example.com --developer-username profile.dev --target-os linux --storage-profile postgres-preview --target-env-file /etc/rocksolidlicense/profile.env --app-backup-dir /var/lib/rocksolid/profile-backups --postgres-backup-dir /var/lib/rocksolid/profile-postgres-backups --output-file ${profileFile}`

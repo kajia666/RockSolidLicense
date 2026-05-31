@@ -690,34 +690,43 @@ function buildRealEnvironmentInputContract(options, proofs, nextCommands) {
   };
 }
 
-function buildProductionProofExecutionQueue(realEnvironmentInputContract, nextCommands) {
+function buildProductionProofExecutionQueue(realEnvironmentInputContract, nextCommands, options) {
   const readyForNoWriteExecution = realEnvironmentInputContract.ready === true;
+  const profileLoaded = Boolean(options.profileFile);
   return {
     mode: "launch-production-proof-execution-queue/v1",
     status: readyForNoWriteExecution
       ? "ready_for_no_write_execution"
       : "blocked_until_real_environment_inputs_ready",
     currentActionKey: readyForNoWriteExecution
-      ? "staging_profile_init"
+      ? profileLoaded
+        ? "recovery_preflight"
+        : "staging_profile_init"
       : "prepare_real_environment_inputs",
     currentCommand: readyForNoWriteExecution
-      ? nextCommands.profileInit.command
+      ? profileLoaded
+        ? nextCommands.recoveryPreflight.command
+        : nextCommands.profileInit.command
       : null,
     manualLiveWriteGateKey: "launch_smoke_staging",
     steps: [
       {
         order: 1,
         phase: "no_write",
-        status: readyForNoWriteExecution
-          ? "operator_execute"
-          : "blocked_until_real_environment_inputs_ready",
+        status: profileLoaded
+          ? "completed_from_profile_file"
+          : readyForNoWriteExecution
+            ? "operator_execute"
+            : "blocked_until_real_environment_inputs_ready",
         requiresOperatorConfirmation: false,
         ...nextCommands.profileInit
       },
       {
         order: 2,
         phase: "no_write",
-        status: "blocked_until_previous_step_complete",
+        status: readyForNoWriteExecution && profileLoaded
+          ? "operator_execute"
+          : "blocked_until_previous_step_complete",
         requiresOperatorConfirmation: false,
         ...nextCommands.recoveryPreflight
       },
@@ -744,15 +753,20 @@ function buildProductionProofExecutionQueue(realEnvironmentInputContract, nextCo
       }
     ],
     nextAction: readyForNoWriteExecution
-      ? "Run staging_profile_init first, then execute each no-write step in order. Confirm the manual live-write gate before launch_smoke_staging."
+      ? profileLoaded
+        ? "The staging profile is already loaded. Run recovery_preflight, then execute each remaining no-write step in order. Confirm the manual live-write gate before launch_smoke_staging."
+        : "Run staging_profile_init first, then execute each no-write step in order. Confirm the manual live-write gate before launch_smoke_staging."
       : "Fill the real-environment input contract, then rerun production proof preflight before executing the queue."
   };
 }
 
 function buildProductionProofExecutionPack(realEnvironmentInputContract, productionProofExecutionQueue, nextCommands) {
   const readyForNoWriteExecution = realEnvironmentInputContract.ready === true;
+  const profileLoaded = productionProofExecutionQueue.steps?.[0]?.status === "completed_from_profile_file";
+  const cursor = profileLoaded ? "1/5" : "0/5";
+  const nextStepKey = profileLoaded ? "recovery_preflight" : "staging_profile_init";
   const noWriteCommands = (productionProofExecutionQueue.steps || [])
-    .filter((item) => item.phase === "no_write")
+    .filter((item) => item.phase === "no_write" && item.status !== "completed_from_profile_file")
     .slice(0, 3)
     .map((item) => ({
       order: item.order,
@@ -767,17 +781,17 @@ function buildProductionProofExecutionPack(realEnvironmentInputContract, product
       ? "ready_for_no_write_execution"
       : "blocked_until_real_environment_inputs_ready",
     currentActionKey: readyForNoWriteExecution
-      ? "staging_profile_init"
+      ? nextStepKey
       : "production_proof_preflight",
     executionCursor: {
-      from: "0/5",
+      from: cursor,
       to: "5/5",
-      expression: "0/5 -> 5/5",
-      current: "0/5",
+      expression: `${cursor} -> 5/5`,
+      current: cursor,
       currentStepKey: readyForNoWriteExecution
-        ? "staging_profile_init"
+        ? nextStepKey
         : "production_proof_preflight",
-      nextStepKey: "staging_profile_init"
+      nextStepKey
     },
     inputCheck: {
       status: realEnvironmentInputContract.status || "blocked_until_real_environment_inputs_ready",
@@ -804,7 +818,9 @@ function buildProductionProofExecutionPack(realEnvironmentInputContract, product
       command: nextCommands.readinessStatus.command
     },
     nextAction: readyForNoWriteExecution
-      ? "Execute the first three no-write commands in order, confirm launch_smoke_staging manually, then refresh readiness until the downstream readback reaches 5/5."
+      ? profileLoaded
+        ? "The staging profile is already loaded. Execute the remaining two no-write commands in order, confirm launch_smoke_staging manually, then refresh readiness until the downstream readback reaches 5/5."
+        : "Execute the first three no-write commands in order, confirm launch_smoke_staging manually, then refresh readiness until the downstream readback reaches 5/5."
       : "Resolve input-check gaps first, then rerun production proof preflight before entering the no-write execution lane."
   };
 }
@@ -838,7 +854,8 @@ function buildResult(options) {
   const realEnvironmentInputContract = buildRealEnvironmentInputContract(options, proofs, nextCommands);
   const productionProofExecutionQueue = buildProductionProofExecutionQueue(
     realEnvironmentInputContract,
-    nextCommands
+    nextCommands,
+    options
   );
   const productionProofExecutionPack = buildProductionProofExecutionPack(
     realEnvironmentInputContract,

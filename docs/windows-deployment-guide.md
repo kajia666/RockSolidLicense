@@ -16,6 +16,16 @@ If you only want to inspect the current state without generating packs, run:
 npm.cmd run deploy:windows:server-gate -- --status-only
 ```
 
+## Post-Copy Gate (After deploying files to the server)
+
+After the repository has been deployed to `C:\RockSolidLicense` on the Windows server, run:
+
+```powershell
+npm.cmd run deploy:windows:post-copy-gate
+```
+
+This command is read-only. It checks that the copied target directory contains the required server files and that `deploy\windows\rocksolid.env.ps1` exists. It prints `ready_for_manual_start` only when it is safe to run the manual start command next.
+
 ## Prepare Local (Fast path before a server exists)
 
 Before the first Windows deployment, generate all local secret-free Windows handoff packs and immediately read the current state:

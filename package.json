@@ -12,6 +12,7 @@
     "db:postgres:init": "node scripts/render-postgres-init.mjs",
     "db:postgres:check": "node scripts/render-postgres-init.mjs --check",
     "deploy:windows:server-gate": "node scripts/windows-server-deploy-gate.mjs",
+    "deploy:windows:post-copy-gate": "node scripts/windows-post-copy-gate.mjs",
     "deploy:windows:prepare-local": "node scripts/windows-deploy-prepare-local.mjs",
     "deploy:windows:status": "node scripts/windows-deploy-status.mjs",
     "deploy:windows:operator-pack": "node scripts/windows-deploy-operator-pack.mjs",

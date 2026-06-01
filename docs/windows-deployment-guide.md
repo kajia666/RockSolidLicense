@@ -1,5 +1,22 @@
 # Windows Deployment Guide
 
+## Deploy Preflight (Read-only first step)
+
+Before manual start, run:
+
+```powershell
+npm.cmd run deploy:windows:preflight
+```
+
+This command is read-only. It reports one of four states:
+
+- `fail`
+- `not_deployed_yet`
+- `needs_env_setup`
+- `ready_for_manual_start`
+
+`C:\RockSolidLicense` is the recommended future Windows server install path. If it does not exist yet, `not_deployed_yet` is expected and means deployment has not started on that machine.
+
 这份指南面向当前仓库的 `Windows Server` 直接部署路径，目标是让你先把服务稳定跑起来，再逐步补齐 HTTPS、备份、巡检和后续扩展。
 
 如果你更熟悉 Windows，这条路完全可以先上线。当前仓库也已经配好了对应的 PowerShell 脚本、计划任务、备份和健康检查骨架。

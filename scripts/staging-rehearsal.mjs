@@ -1870,6 +1870,20 @@ function buildOpsDownload(baseUrl, productCode, channel, key, fileName, format) 
   };
 }
 
+function buildLaunchMainlineDownload(baseUrl, productCode, channel, key, fileName, format) {
+  return {
+    key,
+    fileName,
+    format,
+    href: buildRoute(baseUrl, "/api/developer/launch-mainline/download", {
+      productCode,
+      channel,
+      reviewMode: "matched",
+      format
+    })
+  };
+}
+
 function buildStableOperationsFirstResultBridge(result) {
   const firstDutyBridge = result.stableOperationsFirstDutyBridge || null;
   if (!firstDutyBridge) {
@@ -1888,7 +1902,7 @@ function buildStableOperationsFirstResultBridge(result) {
     firstDutyBridgeStatus: firstDutyBridge.status || null,
     recordIndexFile: firstDutyBridge.recordIndexFile || null,
     handoffArtifacts: Array.isArray(firstDutyBridge.handoffArtifacts) ? firstDutyBridge.handoffArtifacts : [],
-    firstOperatingResultHandoff: buildOpsDownload(
+    firstOperatingResultHandoff: buildLaunchMainlineDownload(
       baseUrl,
       productCode,
       channel,
@@ -1896,7 +1910,7 @@ function buildStableOperationsFirstResultBridge(result) {
       "first-operating-result-handoff-execution.txt",
       "first-operating-result-handoff-execution"
     ),
-    firstOperatingResultReceiptReadback: buildOpsDownload(
+    firstOperatingResultReceiptReadback: buildLaunchMainlineDownload(
       baseUrl,
       productCode,
       channel,
@@ -1904,7 +1918,7 @@ function buildStableOperationsFirstResultBridge(result) {
       "first-operating-result-handoff-receipt-readback-execution.txt",
       "first-operating-result-handoff-receipt-readback-execution"
     ),
-    firstOperatingResultReview: buildOpsDownload(
+    firstOperatingResultReview: buildLaunchMainlineDownload(
       baseUrl,
       productCode,
       channel,
@@ -1921,6 +1935,76 @@ function buildStableOperationsFirstResultBridge(result) {
       "launch-operations-overview-status"
     ),
     nextAction: "Use the first operating result handoff execution download, then confirm receipt readback and review from launch operations overview status."
+  };
+}
+
+function buildStableOperationsRolloutWideningBridge(result) {
+  const firstResultBridge = result.stableOperationsFirstResultBridge || null;
+  if (!firstResultBridge) {
+    return null;
+  }
+  const productCode = result.summary?.productCode || result.closeoutInput?.productCode || null;
+  const channel = result.summary?.channel || result.closeoutInput?.channel || null;
+  const baseUrl = result.summary?.baseUrl || "https://staging.example.com";
+
+  return {
+    version: "staging-rehearsal-stable-operations-rollout-widening-bridge/v1",
+    status: "ready_for_rollout_widening_entrypoints",
+    sourceFocus: "stableOperationsFirstResultBridge",
+    currentActionKey: "review_rollout_widening_decision",
+    nextActionKey: "handoff_first_operating_result",
+    firstResultBridgeStatus: firstResultBridge.status || null,
+    recordIndexFile: firstResultBridge.recordIndexFile || null,
+    handoffArtifacts: Array.isArray(firstResultBridge.handoffArtifacts) ? firstResultBridge.handoffArtifacts : [],
+    rolloutWideningDecision: buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "rollout_widening_decision_execution",
+      "rollout-widening-decision-execution.txt",
+      "rollout-widening-decision-execution"
+    ),
+    firstOperatingResultHandoff: firstResultBridge.firstOperatingResultHandoff || buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_handoff_execution",
+      "first-operating-result-handoff-execution.txt",
+      "first-operating-result-handoff-execution"
+    ),
+    firstOperatingResultReview: firstResultBridge.firstOperatingResultReview || buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_review_execution",
+      "first-operating-result-review-execution.txt",
+      "first-operating-result-review-execution"
+    ),
+    nextRolloutWideningDecision: buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "next_rollout_widening_decision_execution",
+      "next-rollout-widening-decision-execution.txt",
+      "next-rollout-widening-decision-execution"
+    ),
+    widenedRolloutMonitoring: buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "widened_rollout_monitoring_execution",
+      "widened-rollout-monitoring-execution.txt",
+      "widened-rollout-monitoring-execution"
+    ),
+    overviewStatus: firstResultBridge.overviewStatus || buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "ops_launch_operations_overview_status",
+      "developer-ops-launch-operations-overview-status.txt",
+      "launch-operations-overview-status"
+    ),
+    nextAction: "Open rollout widening decision first, then continue first operating result handoff/review and widened rollout monitoring from the direct files."
   };
 }
 
@@ -9381,12 +9465,22 @@ function buildResult(options) {
       ...(stableOperationsFirstDutyBridge ? { stableOperationsFirstDutyBridge } : {})
     })
     : null;
+  const stableOperationsRolloutWideningBridge = gatesPassed
+    ? buildStableOperationsRolloutWideningBridge({
+      ...resultWithLaunchExecutionPhasePlan,
+      operatorQueueCheckpoint,
+      ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {}),
+      ...(stableOperationsFirstDutyBridge ? { stableOperationsFirstDutyBridge } : {}),
+      ...(stableOperationsFirstResultBridge ? { stableOperationsFirstResultBridge } : {})
+    })
+    : null;
   return {
     ...resultWithLaunchExecutionPhasePlan,
     operatorQueueCheckpoint,
     ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {}),
     ...(stableOperationsFirstDutyBridge ? { stableOperationsFirstDutyBridge } : {}),
     ...(stableOperationsFirstResultBridge ? { stableOperationsFirstResultBridge } : {}),
+    ...(stableOperationsRolloutWideningBridge ? { stableOperationsRolloutWideningBridge } : {}),
     initialProductionLaunchReadiness: gatesPassed
       ? buildInitialProductionLaunchReadiness({
         ...resultWithLaunchExecutionPhasePlan,
@@ -9702,6 +9796,31 @@ function renderStableOperationsFirstResultBridge(bridge) {
     `- Stable first-result overview status: \`${overview.fileName || "-"}\` \`${overview.format || "-"}\` -> \`${overview.href || "-"}\``,
     `- Stable first-result artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`,
     `- Stable first-result next action: ${bridge.nextAction || "-"}`
+  ].join("\n");
+}
+
+function renderStableOperationsRolloutWideningBridge(bridge) {
+  if (!bridge) {
+    return "- Not available";
+  }
+  const rollout = bridge.rolloutWideningDecision || {};
+  const firstHandoff = bridge.firstOperatingResultHandoff || {};
+  const firstReview = bridge.firstOperatingResultReview || {};
+  const nextDecision = bridge.nextRolloutWideningDecision || {};
+  const monitoring = bridge.widenedRolloutMonitoring || {};
+  const overview = bridge.overviewStatus || {};
+  return [
+    `- Stable rollout bridge: \`${bridge.status || "-"}\``,
+    `- Stable rollout current: \`${bridge.currentActionKey || "-"}\` -> \`${bridge.nextActionKey || "-"}\``,
+    `- Stable rollout first-result status: \`${bridge.firstResultBridgeStatus || "-"}\``,
+    `- Stable rollout widening decision: \`${rollout.fileName || "-"}\` \`${rollout.format || "-"}\` -> \`${rollout.href || "-"}\``,
+    `- Stable rollout first-result handoff: \`${firstHandoff.fileName || "-"}\` \`${firstHandoff.format || "-"}\` -> \`${firstHandoff.href || "-"}\``,
+    `- Stable rollout first-result review: \`${firstReview.fileName || "-"}\` \`${firstReview.format || "-"}\` -> \`${firstReview.href || "-"}\``,
+    `- Stable rollout next decision: \`${nextDecision.fileName || "-"}\` \`${nextDecision.format || "-"}\` -> \`${nextDecision.href || "-"}\``,
+    `- Stable rollout monitoring: \`${monitoring.fileName || "-"}\` \`${monitoring.format || "-"}\` -> \`${monitoring.href || "-"}\``,
+    `- Stable rollout overview status: \`${overview.fileName || "-"}\` \`${overview.format || "-"}\` -> \`${overview.href || "-"}\``,
+    `- Stable rollout artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`,
+    `- Stable rollout next action: ${bridge.nextAction || "-"}`
   ].join("\n");
 }
 
@@ -10367,6 +10486,30 @@ function writeStableOperationsFirstResultBridgePlain(bridge = null) {
   console.log(`Stable first-result overview status: ${overview.fileName || "-"} (${overview.format || "-"}) -> ${overview.href || "-"}`);
   console.log(`Stable first-result artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
   console.log(`Stable first-result next action: ${bridge.nextAction || "-"}`);
+}
+
+function writeStableOperationsRolloutWideningBridgePlain(bridge = null) {
+  if (!bridge) {
+    return;
+  }
+  const rollout = bridge.rolloutWideningDecision || {};
+  const firstHandoff = bridge.firstOperatingResultHandoff || {};
+  const firstReview = bridge.firstOperatingResultReview || {};
+  const nextDecision = bridge.nextRolloutWideningDecision || {};
+  const monitoring = bridge.widenedRolloutMonitoring || {};
+  const overview = bridge.overviewStatus || {};
+  console.log(
+    `Stable rollout bridge: ${bridge.status || "-"}`
+      + ` (current=${bridge.currentActionKey || "-"}, next=${bridge.nextActionKey || "-"})`
+  );
+  console.log(`Stable rollout widening decision: ${rollout.fileName || "-"} (${rollout.format || "-"}) -> ${rollout.href || "-"}`);
+  console.log(`Stable rollout first-result handoff: ${firstHandoff.fileName || "-"} (${firstHandoff.format || "-"}) -> ${firstHandoff.href || "-"}`);
+  console.log(`Stable rollout first-result review: ${firstReview.fileName || "-"} (${firstReview.format || "-"}) -> ${firstReview.href || "-"}`);
+  console.log(`Stable rollout next decision: ${nextDecision.fileName || "-"} (${nextDecision.format || "-"}) -> ${nextDecision.href || "-"}`);
+  console.log(`Stable rollout monitoring: ${monitoring.fileName || "-"} (${monitoring.format || "-"}) -> ${monitoring.href || "-"}`);
+  console.log(`Stable rollout overview status: ${overview.fileName || "-"} (${overview.format || "-"}) -> ${overview.href || "-"}`);
+  console.log(`Stable rollout artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
+  console.log(`Stable rollout next action: ${bridge.nextAction || "-"}`);
 }
 
 function writeLaunchDutyCurrentActionPlain(action = {}) {
@@ -12217,6 +12360,10 @@ function renderHandoffFile(result) {
     "",
     renderStableOperationsFirstResultBridge(result.stableOperationsFirstResultBridge),
     "",
+    "## Stable Operations Rollout Widening Bridge",
+    "",
+    renderStableOperationsRolloutWideningBridge(result.stableOperationsRolloutWideningBridge),
+    "",
     "## Gate Status",
     "",
     result.phases.map((phase) => `- ${phase.key}: ${phase.status}`).join("\n"),
@@ -12760,6 +12907,7 @@ function writeResult(result, json) {
     writeStableOperationsReadbackBridgePlain(result.stableOperationsReadbackBridge);
     writeStableOperationsFirstDutyBridgePlain(result.stableOperationsFirstDutyBridge);
     writeStableOperationsFirstResultBridgePlain(result.stableOperationsFirstResultBridge);
+    writeStableOperationsRolloutWideningBridgePlain(result.stableOperationsRolloutWideningBridge);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     writeLaunchExecutionPhasePlanPlain(result.launchExecutionPhasePlan);

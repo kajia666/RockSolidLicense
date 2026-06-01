@@ -6602,19 +6602,19 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
         key: "first_operating_result_handoff_execution",
         fileName: "first-operating-result-handoff-execution.txt",
         format: "first-operating-result-handoff-execution",
-        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-execution"
+        href: "https://staging.example.com/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-handoff-execution"
       },
       firstOperatingResultReceiptReadback: {
         key: "first_operating_result_handoff_receipt_readback_execution",
         fileName: "first-operating-result-handoff-receipt-readback-execution.txt",
         format: "first-operating-result-handoff-receipt-readback-execution",
-        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-receipt-readback-execution"
+        href: "https://staging.example.com/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-handoff-receipt-readback-execution"
       },
       firstOperatingResultReview: {
         key: "first_operating_result_review_execution",
         fileName: "first-operating-result-review-execution.txt",
         format: "first-operating-result-review-execution",
-        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-review-execution"
+        href: "https://staging.example.com/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-review-execution"
       },
       overviewStatus: {
         key: "ops_launch_operations_overview_status",
@@ -6623,6 +6623,53 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
         href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=launch-operations-overview-status"
       },
       nextAction: "Use the first operating result handoff execution download, then confirm receipt readback and review from launch operations overview status."
+    });
+    assert.deepEqual(output.stableOperationsRolloutWideningBridge, {
+      version: "staging-rehearsal-stable-operations-rollout-widening-bridge/v1",
+      status: "ready_for_rollout_widening_entrypoints",
+      sourceFocus: "stableOperationsFirstResultBridge",
+      currentActionKey: "review_rollout_widening_decision",
+      nextActionKey: "handoff_first_operating_result",
+      firstResultBridgeStatus: "ready_for_first_operating_result_entrypoints",
+      recordIndexFile,
+      handoffArtifacts: [recordIndexFile, firstWaveCloseoutArtifactPath],
+      rolloutWideningDecision: {
+        key: "rollout_widening_decision_execution",
+        fileName: "rollout-widening-decision-execution.txt",
+        format: "rollout-widening-decision-execution",
+        href: "https://staging.example.com/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=rollout-widening-decision-execution"
+      },
+      firstOperatingResultHandoff: {
+        key: "first_operating_result_handoff_execution",
+        fileName: "first-operating-result-handoff-execution.txt",
+        format: "first-operating-result-handoff-execution",
+        href: "https://staging.example.com/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-handoff-execution"
+      },
+      firstOperatingResultReview: {
+        key: "first_operating_result_review_execution",
+        fileName: "first-operating-result-review-execution.txt",
+        format: "first-operating-result-review-execution",
+        href: "https://staging.example.com/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-review-execution"
+      },
+      nextRolloutWideningDecision: {
+        key: "next_rollout_widening_decision_execution",
+        fileName: "next-rollout-widening-decision-execution.txt",
+        format: "next-rollout-widening-decision-execution",
+        href: "https://staging.example.com/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=next-rollout-widening-decision-execution"
+      },
+      widenedRolloutMonitoring: {
+        key: "widened_rollout_monitoring_execution",
+        fileName: "widened-rollout-monitoring-execution.txt",
+        format: "widened-rollout-monitoring-execution",
+        href: "https://staging.example.com/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=widened-rollout-monitoring-execution"
+      },
+      overviewStatus: {
+        key: "ops_launch_operations_overview_status",
+        fileName: "developer-ops-launch-operations-overview-status.txt",
+        format: "launch-operations-overview-status",
+        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=launch-operations-overview-status"
+      },
+      nextAction: "Open rollout widening decision first, then continue first operating result handoff/review and widened rollout monitoring from the direct files."
     });
     assert.equal(output.initialProductionLaunchReadiness.readinessPercent, 100);
     assert.equal(output.initialProductionLaunchReadiness.remainingGateCount, 0);
@@ -6768,9 +6815,14 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.match(handoff, /Stable first-duty duty receipt review: `steady-state-duty-receipt-review-execution\.txt` `steady-state-duty-receipt-review-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-duty-receipt-review-execution`/);
     assert.match(handoff, /## Stable Operations First Result Bridge/);
     assert.match(handoff, /Stable first-result bridge: `ready_for_first_operating_result_entrypoints`/);
-    assert.match(handoff, /Stable first-result handoff: `first-operating-result-handoff-execution\.txt` `first-operating-result-handoff-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-execution`/);
-    assert.match(handoff, /Stable first-result receipt readback: `first-operating-result-handoff-receipt-readback-execution\.txt` `first-operating-result-handoff-receipt-readback-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-receipt-readback-execution`/);
-    assert.match(handoff, /Stable first-result review: `first-operating-result-review-execution\.txt` `first-operating-result-review-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-review-execution`/);
+    assert.match(handoff, /Stable first-result handoff: `first-operating-result-handoff-execution\.txt` `first-operating-result-handoff-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-handoff-execution`/);
+    assert.match(handoff, /Stable first-result receipt readback: `first-operating-result-handoff-receipt-readback-execution\.txt` `first-operating-result-handoff-receipt-readback-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-handoff-receipt-readback-execution`/);
+    assert.match(handoff, /Stable first-result review: `first-operating-result-review-execution\.txt` `first-operating-result-review-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-review-execution`/);
+    assert.match(handoff, /## Stable Operations Rollout Widening Bridge/);
+    assert.match(handoff, /Stable rollout bridge: `ready_for_rollout_widening_entrypoints`/);
+    assert.match(handoff, /Stable rollout widening decision: `rollout-widening-decision-execution\.txt` `rollout-widening-decision-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=rollout-widening-decision-execution`/);
+    assert.match(handoff, /Stable rollout next decision: `next-rollout-widening-decision-execution\.txt` `next-rollout-widening-decision-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=next-rollout-widening-decision-execution`/);
+    assert.match(handoff, /Stable rollout monitoring: `widened-rollout-monitoring-execution\.txt` `widened-rollout-monitoring-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=widened-rollout-monitoring-execution`/);
 
     const plain = runRehearsalPlain([
       ...validArgs,
@@ -6804,9 +6856,13 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.match(plain.stdout, /Stable first-duty handoff brief: developer-ops-steady-state-handoff-brief\.txt \(steady-state-handoff-brief\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-handoff-brief/);
     assert.match(plain.stdout, /Stable first-duty duty receipt review: steady-state-duty-receipt-review-execution\.txt \(steady-state-duty-receipt-review-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-duty-receipt-review-execution/);
     assert.match(plain.stdout, /Stable first-result bridge: ready_for_first_operating_result_entrypoints \(current=handoff_first_operating_result, next=review_first_operating_result_handoff\)/);
-    assert.match(plain.stdout, /Stable first-result handoff: first-operating-result-handoff-execution\.txt \(first-operating-result-handoff-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-execution/);
-    assert.match(plain.stdout, /Stable first-result receipt readback: first-operating-result-handoff-receipt-readback-execution\.txt \(first-operating-result-handoff-receipt-readback-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-receipt-readback-execution/);
-    assert.match(plain.stdout, /Stable first-result review: first-operating-result-review-execution\.txt \(first-operating-result-review-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-review-execution/);
+    assert.match(plain.stdout, /Stable first-result handoff: first-operating-result-handoff-execution\.txt \(first-operating-result-handoff-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-handoff-execution/);
+    assert.match(plain.stdout, /Stable first-result receipt readback: first-operating-result-handoff-receipt-readback-execution\.txt \(first-operating-result-handoff-receipt-readback-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-handoff-receipt-readback-execution/);
+    assert.match(plain.stdout, /Stable first-result review: first-operating-result-review-execution\.txt \(first-operating-result-review-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=first-operating-result-review-execution/);
+    assert.match(plain.stdout, /Stable rollout bridge: ready_for_rollout_widening_entrypoints \(current=review_rollout_widening_decision, next=handoff_first_operating_result\)/);
+    assert.match(plain.stdout, /Stable rollout widening decision: rollout-widening-decision-execution\.txt \(rollout-widening-decision-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=rollout-widening-decision-execution/);
+    assert.match(plain.stdout, /Stable rollout next decision: next-rollout-widening-decision-execution\.txt \(next-rollout-widening-decision-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=next-rollout-widening-decision-execution/);
+    assert.match(plain.stdout, /Stable rollout monitoring: widened-rollout-monitoring-execution\.txt \(widened-rollout-monitoring-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=widened-rollout-monitoring-execution/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

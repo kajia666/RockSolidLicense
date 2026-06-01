@@ -683,6 +683,20 @@ function buildOpsDownload(baseUrl, productCode, channel, key, fileName, format) 
   };
 }
 
+function buildLaunchMainlineDownload(baseUrl, productCode, channel, key, fileName, format) {
+  return {
+    key,
+    fileName,
+    format,
+    href: buildRoute(baseUrl, "/api/developer/launch-mainline/download", {
+      productCode,
+      channel,
+      reviewMode: "matched",
+      format
+    })
+  };
+}
+
 function buildStableOperationsFirstResultReadinessBridge({
   payload,
   artifactPathRoot,
@@ -715,7 +729,7 @@ function buildStableOperationsFirstResultReadinessBridge({
       currentActionKey: "handoff_first_operating_result",
       nextActionKey: "review_first_operating_result_handoff"
     },
-    firstOperatingResultHandoff: buildOpsDownload(
+    firstOperatingResultHandoff: buildLaunchMainlineDownload(
       baseUrl,
       productCode,
       channel,
@@ -723,7 +737,7 @@ function buildStableOperationsFirstResultReadinessBridge({
       "first-operating-result-handoff-execution.txt",
       "first-operating-result-handoff-execution"
     ),
-    firstOperatingResultReceiptReadback: buildOpsDownload(
+    firstOperatingResultReceiptReadback: buildLaunchMainlineDownload(
       baseUrl,
       productCode,
       channel,
@@ -731,7 +745,7 @@ function buildStableOperationsFirstResultReadinessBridge({
       "first-operating-result-handoff-receipt-readback-execution.txt",
       "first-operating-result-handoff-receipt-readback-execution"
     ),
-    firstOperatingResultReview: buildOpsDownload(
+    firstOperatingResultReview: buildLaunchMainlineDownload(
       baseUrl,
       productCode,
       channel,
@@ -748,6 +762,90 @@ function buildStableOperationsFirstResultReadinessBridge({
       "launch-operations-overview-status"
     ),
     nextAction: "Run currentCommand, confirm the rehearsal first-result bridge, then use the handoff, receipt readback, and review downloads from this readiness packet."
+  };
+}
+
+function buildStableOperationsRolloutWideningReadinessBridge({
+  payload,
+  artifactPathRoot,
+  stableOperationsFirstResultReadinessBridge
+}) {
+  if (!stableOperationsFirstResultReadinessBridge) {
+    return null;
+  }
+  const lane = artifactPathRootLane(artifactPathRoot);
+  const productCode = payload.productCode || payload.summary?.productCode || lane.productCode;
+  const channel = payload.channel || payload.summary?.channel || lane.channel;
+  const baseUrl = payload.baseUrl || payload.summary?.baseUrl || "https://staging.example.com";
+
+  return {
+    version: "staging-readiness-stable-operations-rollout-widening-readiness-bridge/v1",
+    status: "ready_for_rollout_widening_rehearsal_readback",
+    currentGate: "stable_operations_handoff",
+    sourceFocus: "stableOperationsFirstResultReadinessBridge",
+    currentActionKey: stableOperationsFirstResultReadinessBridge.currentActionKey || "reload_rehearsal_for_stabilization_handoff",
+    currentCommand: stableOperationsFirstResultReadinessBridge.currentCommand || null,
+    nextActionKey: "review_rollout_widening_decision",
+    recordIndexFile: stableOperationsFirstResultReadinessBridge.recordIndexFile || null,
+    firstWaveCloseoutArtifactPath: stableOperationsFirstResultReadinessBridge.firstWaveCloseoutArtifactPath || null,
+    handoffArtifacts: Array.isArray(stableOperationsFirstResultReadinessBridge.handoffArtifacts)
+      ? stableOperationsFirstResultReadinessBridge.handoffArtifacts
+      : [],
+    expectedRehearsalBridge: {
+      status: "ready_for_rollout_widening_entrypoints",
+      sourceFocus: "stableOperationsFirstResultBridge",
+      currentActionKey: "review_rollout_widening_decision",
+      nextActionKey: "handoff_first_operating_result"
+    },
+    rolloutWideningDecision: buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "rollout_widening_decision_execution",
+      "rollout-widening-decision-execution.txt",
+      "rollout-widening-decision-execution"
+    ),
+    firstOperatingResultHandoff: stableOperationsFirstResultReadinessBridge.firstOperatingResultHandoff || buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_handoff_execution",
+      "first-operating-result-handoff-execution.txt",
+      "first-operating-result-handoff-execution"
+    ),
+    firstOperatingResultReview: stableOperationsFirstResultReadinessBridge.firstOperatingResultReview || buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_review_execution",
+      "first-operating-result-review-execution.txt",
+      "first-operating-result-review-execution"
+    ),
+    nextRolloutWideningDecision: buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "next_rollout_widening_decision_execution",
+      "next-rollout-widening-decision-execution.txt",
+      "next-rollout-widening-decision-execution"
+    ),
+    widenedRolloutMonitoring: buildLaunchMainlineDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "widened_rollout_monitoring_execution",
+      "widened-rollout-monitoring-execution.txt",
+      "widened-rollout-monitoring-execution"
+    ),
+    overviewStatus: stableOperationsFirstResultReadinessBridge.overviewStatus || buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "ops_launch_operations_overview_status",
+      "developer-ops-launch-operations-overview-status.txt",
+      "launch-operations-overview-status"
+    ),
+    nextAction: "Run currentCommand, confirm the rehearsal rollout bridge, then keep rollout widening, first operating result, and widened monitoring direct files together."
   };
 }
 
@@ -2313,6 +2411,36 @@ function renderStableOperationsFirstResultReadinessBridgeMarkdown(result) {
   ];
 }
 
+function renderStableOperationsRolloutWideningReadinessBridgeMarkdown(result) {
+  const bridge = result.stableOperationsRolloutWideningReadinessBridge;
+  if (!bridge) {
+    return [];
+  }
+  const expectedRehearsalBridge = bridge.expectedRehearsalBridge || {};
+  const rollout = bridge.rolloutWideningDecision || {};
+  const firstHandoff = bridge.firstOperatingResultHandoff || {};
+  const firstReview = bridge.firstOperatingResultReview || {};
+  const nextDecision = bridge.nextRolloutWideningDecision || {};
+  const monitoring = bridge.widenedRolloutMonitoring || {};
+  const overview = bridge.overviewStatus || {};
+  return [
+    "## Stable Operations Rollout Widening Readiness Bridge",
+    "",
+    `Rollout readiness bridge: \`${bridge.status || "-"}\``,
+    `Rollout current command: \`${bridge.currentCommand || "-"}\``,
+    `Rollout expected rehearsal bridge: \`${expectedRehearsalBridge.status || "-"}\` current \`${expectedRehearsalBridge.currentActionKey || "-"}\` next \`${expectedRehearsalBridge.nextActionKey || "-"}\``,
+    `Rollout widening decision: \`${rollout.fileName || "-"}\` \`${rollout.format || "-"}\` -> \`${rollout.href || "-"}\``,
+    `Rollout first-result handoff: \`${firstHandoff.fileName || "-"}\` \`${firstHandoff.format || "-"}\` -> \`${firstHandoff.href || "-"}\``,
+    `Rollout first-result review: \`${firstReview.fileName || "-"}\` \`${firstReview.format || "-"}\` -> \`${firstReview.href || "-"}\``,
+    `Rollout next decision: \`${nextDecision.fileName || "-"}\` \`${nextDecision.format || "-"}\` -> \`${nextDecision.href || "-"}\``,
+    `Rollout monitoring: \`${monitoring.fileName || "-"}\` \`${monitoring.format || "-"}\` -> \`${monitoring.href || "-"}\``,
+    `Rollout overview status: \`${overview.fileName || "-"}\` \`${overview.format || "-"}\` -> \`${overview.href || "-"}\``,
+    `Rollout artifacts: ${(bridge.handoffArtifacts || []).map((item) => `\`${item}\``).join("; ") || "-"}`,
+    `Rollout next action: ${bridge.nextAction || "-"}`,
+    ""
+  ];
+}
+
 function renderProductionSwitchProofPacketMarkdown(result) {
   const packet = result.productionSwitchProofPacket;
   if (!packet) {
@@ -2377,6 +2505,7 @@ function renderActionQueueMarkdown(result) {
     ...renderLaunchEvidenceReadinessGateMarkdown(result),
     ...renderStableOperationsReadbackBridgeMarkdown(result),
     ...renderStableOperationsFirstResultReadinessBridgeMarkdown(result),
+    ...renderStableOperationsRolloutWideningReadinessBridgeMarkdown(result),
     ...renderEvidenceSummaryMarkdown(result),
     "",
     "Complete only `[current]` items first. Items marked `[blocked_after_prior_actions]` become safe after the earlier items are backfilled and the status command is rerun.",
@@ -2795,6 +2924,11 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     artifactPathRoot,
     stableOperationsReadbackBridge
   });
+  const stableOperationsRolloutWideningReadinessBridge = buildStableOperationsRolloutWideningReadinessBridge({
+    payload,
+    artifactPathRoot,
+    stableOperationsFirstResultReadinessBridge
+  });
 
   return {
     status: "pass",
@@ -2834,6 +2968,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     postSmokeReadinessBridge,
     ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {}),
     ...(stableOperationsFirstResultReadinessBridge ? { stableOperationsFirstResultReadinessBridge } : {}),
+    ...(stableOperationsRolloutWideningReadinessBridge ? { stableOperationsRolloutWideningReadinessBridge } : {}),
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
     ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
@@ -3074,6 +3209,36 @@ function writeStableOperationsFirstResultReadinessBridgePlain(bridge) {
   console.log(`Stable first-result next action: ${bridge.nextAction || "-"}`);
 }
 
+function writeStableOperationsRolloutWideningReadinessBridgePlain(bridge) {
+  if (!bridge) {
+    return;
+  }
+  const expectedRehearsalBridge = bridge.expectedRehearsalBridge || {};
+  const rollout = bridge.rolloutWideningDecision || {};
+  const firstHandoff = bridge.firstOperatingResultHandoff || {};
+  const firstReview = bridge.firstOperatingResultReview || {};
+  const nextDecision = bridge.nextRolloutWideningDecision || {};
+  const monitoring = bridge.widenedRolloutMonitoring || {};
+  const overview = bridge.overviewStatus || {};
+  console.log(
+    `Stable rollout readiness bridge: ${bridge.status || "-"}`
+      + ` (current=${bridge.currentActionKey || "-"}, next=${bridge.nextActionKey || "-"})`
+  );
+  console.log(`Stable rollout current command: ${bridge.currentCommand || "-"}`);
+  console.log(
+    `Stable rollout expected rehearsal: ${expectedRehearsalBridge.status || "-"}`
+      + ` (current=${expectedRehearsalBridge.currentActionKey || "-"}, next=${expectedRehearsalBridge.nextActionKey || "-"})`
+  );
+  console.log(`Stable rollout widening decision: ${rollout.fileName || "-"} (${rollout.format || "-"}) -> ${rollout.href || "-"}`);
+  console.log(`Stable rollout first-result handoff: ${firstHandoff.fileName || "-"} (${firstHandoff.format || "-"}) -> ${firstHandoff.href || "-"}`);
+  console.log(`Stable rollout first-result review: ${firstReview.fileName || "-"} (${firstReview.format || "-"}) -> ${firstReview.href || "-"}`);
+  console.log(`Stable rollout next decision: ${nextDecision.fileName || "-"} (${nextDecision.format || "-"}) -> ${nextDecision.href || "-"}`);
+  console.log(`Stable rollout monitoring: ${monitoring.fileName || "-"} (${monitoring.format || "-"}) -> ${monitoring.href || "-"}`);
+  console.log(`Stable rollout overview status: ${overview.fileName || "-"} (${overview.format || "-"}) -> ${overview.href || "-"}`);
+  console.log(`Stable rollout artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
+  console.log(`Stable rollout next action: ${bridge.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -3091,6 +3256,7 @@ function writeResult(result, json) {
     writePostSmokeReadinessBridgePlain(result.postSmokeReadinessBridge);
     writeStableOperationsReadbackBridgePlain(result.stableOperationsReadbackBridge);
     writeStableOperationsFirstResultReadinessBridgePlain(result.stableOperationsFirstResultReadinessBridge);
+    writeStableOperationsRolloutWideningReadinessBridgePlain(result.stableOperationsRolloutWideningReadinessBridge);
     if (result.fullTestWindowHandoff) {
       const handoff = result.fullTestWindowHandoff;
       console.log(`Full-test handoff: ${handoff.status}`);

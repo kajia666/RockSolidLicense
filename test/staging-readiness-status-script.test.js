@@ -1587,6 +1587,30 @@ test("staging readiness status reports stabilization handoff when launch-duty re
     assert.equal(output.launchDutyNextRun, undefined);
     assert.equal(output.launchDutyWatchHandoff, undefined);
     assert.deepEqual(output.launchDutyCompletionHandoff, completionHandoff);
+    assert.deepEqual(output.stableOperationsReadbackBridge, {
+      version: "staging-readiness-stable-operations-readback-bridge/v1",
+      status: "ready_for_rehearsal_reload",
+      currentGate: "stable_operations_handoff",
+      sourceFocus: "launchDutyCompletionHandoff",
+      currentActionKey: "reload_rehearsal_for_stabilization_handoff",
+      currentCommand: completionHandoff.rehearsalReloadCommand,
+      nextActionKey: "stable_operations_handoff",
+      recordIndexFile,
+      firstWaveCloseoutArtifactPath,
+      handoffArtifacts: [recordIndexFile, firstWaveCloseoutArtifactPath],
+      readinessReadback: {
+        status: "ready_for_stabilization_handoff",
+        currentGate: "stable_operations_handoff",
+        confirmed: true,
+        statusCommand: completionHandoff.statusCommand
+      },
+      expectedRehearsalReadback: {
+        status: "ready_for_stable_operations_handoff",
+        currentActionKey: "stable_operations_handoff",
+        confirmationPoints: ["launch_duty_record_index", "first_wave_closeout"]
+      },
+      nextAction: "Run currentCommand, confirm expectedRehearsalReadback, then open stable-operations handoff."
+    });
     assert.deepEqual(
       {
         status: output.launchEvidenceReadinessGate?.status,
@@ -1712,6 +1736,10 @@ test("staging readiness status reports stabilization handoff when launch-duty re
     assert.match(markdown, /- 21\. `launch_duty_record\/first_wave_closeout` \[recorded\] artifact `.*first-wave-closeout\.md`/);
     assert.match(markdown, /current: reload_rehearsal_for_stabilization_handoff -> `npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json`/);
     assert.match(markdown, /blocked_after_rehearsal_reload: handoff_stabilization_owner -> `.*first-wave-closeout\.md`/);
+    assert.match(markdown, /## Stable Operations Readback Bridge/);
+    assert.match(markdown, /Bridge status: `ready_for_rehearsal_reload`/);
+    assert.match(markdown, /Bridge current command: `npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json`/);
+    assert.match(markdown, /Bridge expected rehearsal readback: `ready_for_stable_operations_handoff` current `stable_operations_handoff` confirmations `launch_duty_record_index, first_wave_closeout`/);
 
     const plain = runStatusPlain(["--input-file", inputFile, "--actions-file", actionsFile]);
     assert.equal(plain.status, 0, plain.stderr || plain.stdout);
@@ -1729,6 +1757,11 @@ test("staging readiness status reports stabilization handoff when launch-duty re
     assert.match(plain.stdout, /Launch duty completion first-wave closeout: .*first-wave-closeout\.md/);
     assert.match(plain.stdout, /Launch duty completion handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(plain.stdout, /Launch duty completion source records: first_wave_incident_log=.*first-wave-incident-log\.md; rollback_signal_review=.*rollback-signal-review\.md; stabilization_owner_handoff=.*stabilization-owner-handoff\.md/);
+    assert.match(plain.stdout, /Stable operations readback bridge: ready_for_rehearsal_reload \(current=reload_rehearsal_for_stabilization_handoff, next=stable_operations_handoff\)/);
+    assert.match(plain.stdout, /Stable operations current command: npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
+    assert.match(plain.stdout, /Stable operations readiness readback: ready_for_stabilization_handoff \(gate=stable_operations_handoff, confirmed=yes\)/);
+    assert.match(plain.stdout, /Stable operations expected rehearsal: ready_for_stable_operations_handoff \(current=stable_operations_handoff, confirmations=launch_duty_record_index,first_wave_closeout\)/);
+    assert.match(plain.stdout, /Stable operations handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
     assert.match(plain.stdout, /Operator next current: reload_rehearsal_for_stabilization_handoff -> npm\.cmd run staging:rehearsal -- --closeout-input-file .*filled-closeout-input\.json/);
     assert.match(plain.stdout, /Operator next blocked_after_rehearsal_reload: handoff_stabilization_owner -> .*first-wave-closeout\.md/);
   } finally {

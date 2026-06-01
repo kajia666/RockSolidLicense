@@ -1760,6 +1760,53 @@ function buildRehearsalLaunchEvidenceReadinessGate(result) {
   };
 }
 
+function buildStableOperationsReadbackBridge(result) {
+  const completionHandoff = result.launchDutyCompletionHandoff || null;
+  if (!completionHandoff) {
+    return null;
+  }
+
+  const operatorQueueCheckpoint = result.operatorQueueCheckpoint || {};
+  const launchDutyCurrentAction = result.operatorExecutionPlan?.launchDutyCurrentAction
+    || result.finalRehearsalPacket?.launchDutyCurrentAction
+    || {};
+  const recordIndexFile = completionHandoff.recordIndexFile
+    || operatorQueueCheckpoint.recordIndexFile
+    || launchDutyCurrentAction.recordIndexFile
+    || null;
+  const firstWaveCloseoutArtifactPath = completionHandoff.firstWaveCloseoutArtifactPath
+    || launchDutyCurrentAction.packetPath
+    || operatorQueueCheckpoint.currentPacketPath
+    || null;
+  const handoffArtifacts = Array.isArray(completionHandoff.handoffArtifacts) && completionHandoff.handoffArtifacts.length
+    ? completionHandoff.handoffArtifacts
+    : [recordIndexFile, firstWaveCloseoutArtifactPath].filter(Boolean);
+
+  return {
+    version: "staging-rehearsal-stable-operations-readback-bridge/v1",
+    status: "ready_for_stable_operations_handoff",
+    currentGate: "stable_operations_handoff",
+    sourceFocus: "launchDutyCompletionHandoff",
+    currentActionKey: "stable_operations_handoff",
+    currentCommand: null,
+    recordIndexFile,
+    firstWaveCloseoutArtifactPath,
+    handoffArtifacts,
+    readinessReadback: {
+      status: completionHandoff.status || "ready_for_stabilization_handoff",
+      statusCommand: completionHandoff.statusCommand || null,
+      rehearsalReloadCommand: completionHandoff.rehearsalReloadCommand || null
+    },
+    rehearsalReadback: {
+      status: "ready_for_stable_operations_handoff",
+      currentActionKey: "stable_operations_handoff",
+      currentActionStatus: completionHandoff.status || "ready_for_stabilization_handoff",
+      confirmationPoints: ["launch_duty_record_index", "first_wave_closeout"]
+    },
+    nextAction: "Open stable-operations handoff with the launch-duty record index and first-wave closeout artifact."
+  };
+}
+
 const GO_LIVE_ACTION_PHASES = {
   staging_profile: "real_staging_inputs",
   required_secret_env: "real_staging_inputs",
@@ -9196,9 +9243,16 @@ function buildResult(options) {
   const operatorQueueCheckpoint = gatesPassed
     ? buildOperatorQueueCheckpoint(resultWithLaunchExecutionPhasePlan)
     : null;
+  const stableOperationsReadbackBridge = gatesPassed
+    ? buildStableOperationsReadbackBridge({
+      ...resultWithLaunchExecutionPhasePlan,
+      operatorQueueCheckpoint
+    })
+    : null;
   return {
     ...resultWithLaunchExecutionPhasePlan,
     operatorQueueCheckpoint,
+    ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {}),
     initialProductionLaunchReadiness: gatesPassed
       ? buildInitialProductionLaunchReadiness({
         ...resultWithLaunchExecutionPhasePlan,
@@ -9459,6 +9513,24 @@ function renderInitialProductionLaunchReadiness(readiness) {
     }
   }
   return lines.join("\n");
+}
+
+function renderStableOperationsReadbackBridge(bridge) {
+  if (!bridge) {
+    return "- Not available";
+  }
+  const readinessReadback = bridge.readinessReadback || {};
+  const rehearsalReadback = bridge.rehearsalReadback || {};
+  const confirmationPoints = Array.isArray(rehearsalReadback.confirmationPoints)
+    ? rehearsalReadback.confirmationPoints
+    : [];
+  return [
+    `- Stable operations readback bridge: \`${bridge.status || "-"}\``,
+    `- Stable operations readiness readback: \`${readinessReadback.status || "-"}\`${readinessReadback.statusCommand ? ` -> \`${readinessReadback.statusCommand}\`` : ""}`,
+    `- Stable operations rehearsal readback: \`${rehearsalReadback.status || "-"}\` current \`${rehearsalReadback.currentActionKey || "-"}\` confirmations \`${confirmationPoints.join(", ") || "-"}\``,
+    `- Stable operations handoff artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`,
+    `- Stable operations next action: ${bridge.nextAction || "-"}`
+  ].join("\n");
 }
 
 function appendOperatorStepList(lines, heading, steps) {
@@ -10063,6 +10135,30 @@ function writeOperatorQueueCheckpointPlain(checkpoint = null) {
     console.log(`Operator checkpoint completion artifacts: ${checkpoint.completionHandoffArtifacts.join("; ")}`);
   }
   console.log(`Operator checkpoint next action: ${checkpoint.nextAction || "-"}`);
+}
+
+function writeStableOperationsReadbackBridgePlain(bridge = null) {
+  if (!bridge) {
+    return;
+  }
+  const readinessReadback = bridge.readinessReadback || {};
+  const rehearsalReadback = bridge.rehearsalReadback || {};
+  const confirmationPoints = Array.isArray(rehearsalReadback.confirmationPoints)
+    ? rehearsalReadback.confirmationPoints
+    : [];
+  console.log(
+    `Stable operations readback bridge: ${bridge.status || "-"}`
+      + ` (current=${bridge.currentActionKey || "-"}, source=${bridge.sourceFocus || "-"})`
+  );
+  console.log(
+    `Stable operations readiness readback: ${readinessReadback.status || "-"}`
+      + ` -> ${readinessReadback.statusCommand || "-"}`
+  );
+  console.log(
+    `Stable operations rehearsal readback: ${rehearsalReadback.status || "-"}`
+      + ` (current=${rehearsalReadback.currentActionKey || "-"}, confirmations=${confirmationPoints.join(",") || "-"})`
+  );
+  console.log(`Stable operations handoff artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
 }
 
 function writeLaunchDutyCurrentActionPlain(action = {}) {
@@ -11901,6 +11997,10 @@ function renderHandoffFile(result) {
     "",
     renderInitialProductionLaunchReadiness(result.initialProductionLaunchReadiness),
     "",
+    "## Stable Operations Readback Bridge",
+    "",
+    renderStableOperationsReadbackBridge(result.stableOperationsReadbackBridge),
+    "",
     "## Gate Status",
     "",
     result.phases.map((phase) => `- ${phase.key}: ${phase.status}`).join("\n"),
@@ -12441,6 +12541,7 @@ function writeResult(result, json) {
     }
     writeInitialProductionLaunchReadinessPlain(result.initialProductionLaunchReadiness);
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
+    writeStableOperationsReadbackBridgePlain(result.stableOperationsReadbackBridge);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     writeLaunchExecutionPhasePlanPlain(result.launchExecutionPhasePlan);

@@ -624,6 +624,41 @@ function buildLaunchDutyCompletionOperatorNextCommands(completionHandoff) {
   ];
 }
 
+function buildStableOperationsReadbackBridge({ launchDutyCompletionHandoff, actionQueue }) {
+  if (!launchDutyCompletionHandoff) {
+    return null;
+  }
+  const queue = Array.isArray(actionQueue) ? actionQueue : [];
+  const currentItem = queue.find((item) => item.status === "current") || queue[0] || {};
+  const nextItem = queue.find((item) => item.key === "stable_operations_handoff") || queue[1] || {};
+  return {
+    version: "staging-readiness-stable-operations-readback-bridge/v1",
+    status: "ready_for_rehearsal_reload",
+    currentGate: "stable_operations_handoff",
+    sourceFocus: "launchDutyCompletionHandoff",
+    currentActionKey: currentItem.key || "reload_rehearsal_for_stabilization_handoff",
+    currentCommand: currentItem.command || launchDutyCompletionHandoff.rehearsalReloadCommand || null,
+    nextActionKey: nextItem.key || "stable_operations_handoff",
+    recordIndexFile: launchDutyCompletionHandoff.recordIndexFile || null,
+    firstWaveCloseoutArtifactPath: launchDutyCompletionHandoff.firstWaveCloseoutArtifactPath || null,
+    handoffArtifacts: Array.isArray(launchDutyCompletionHandoff.handoffArtifacts)
+      ? launchDutyCompletionHandoff.handoffArtifacts
+      : [],
+    readinessReadback: {
+      status: launchDutyCompletionHandoff.status || "ready_for_stabilization_handoff",
+      currentGate: "stable_operations_handoff",
+      confirmed: true,
+      statusCommand: launchDutyCompletionHandoff.statusCommand || null
+    },
+    expectedRehearsalReadback: {
+      status: "ready_for_stable_operations_handoff",
+      currentActionKey: "stable_operations_handoff",
+      confirmationPoints: ["launch_duty_record_index", "first_wave_closeout"]
+    },
+    nextAction: "Run currentCommand, confirm expectedRehearsalReadback, then open stable-operations handoff."
+  };
+}
+
 function queueStatus(index) {
   return index === 0 ? "current" : "blocked_after_prior_actions";
 }
@@ -2138,6 +2173,28 @@ function renderLaunchEvidenceReadinessGateMarkdown(result) {
   return lines;
 }
 
+function renderStableOperationsReadbackBridgeMarkdown(result) {
+  const bridge = result.stableOperationsReadbackBridge;
+  if (!bridge) {
+    return [];
+  }
+  const expectedRehearsalReadback = bridge.expectedRehearsalReadback || {};
+  const confirmationPoints = Array.isArray(expectedRehearsalReadback.confirmationPoints)
+    ? expectedRehearsalReadback.confirmationPoints
+    : [];
+  return [
+    "## Stable Operations Readback Bridge",
+    "",
+    `Bridge status: \`${bridge.status || "-"}\``,
+    `Bridge current command: \`${bridge.currentCommand || "-"}\``,
+    `Bridge readiness readback: \`${bridge.readinessReadback?.status || "-"}\` gate \`${bridge.readinessReadback?.currentGate || "-"}\` confirmed \`${bridge.readinessReadback?.confirmed ? "yes" : "no"}\``,
+    `Bridge expected rehearsal readback: \`${expectedRehearsalReadback.status || "-"}\` current \`${expectedRehearsalReadback.currentActionKey || "-"}\` confirmations \`${confirmationPoints.join(", ") || "-"}\``,
+    `Bridge handoff artifacts: ${(bridge.handoffArtifacts || []).map((item) => `\`${item}\``).join("; ") || "-"}`,
+    `Bridge next action: ${bridge.nextAction || "-"}`,
+    ""
+  ];
+}
+
 function renderProductionSwitchProofPacketMarkdown(result) {
   const packet = result.productionSwitchProofPacket;
   if (!packet) {
@@ -2200,6 +2257,7 @@ function renderActionQueueMarkdown(result) {
     ...renderLaunchExecutionPhasePlanMarkdown(result),
     ...renderProductionSwitchProofPacketMarkdown(result),
     ...renderLaunchEvidenceReadinessGateMarkdown(result),
+    ...renderStableOperationsReadbackBridgeMarkdown(result),
     ...renderEvidenceSummaryMarkdown(result),
     "",
     "Complete only `[current]` items first. Items marked `[blocked_after_prior_actions]` become safe after the earlier items are backfilled and the status command is rerun.",
@@ -2607,6 +2665,12 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     canRunFullTestWindow,
     canSignoffProduction
   });
+  const stableOperationsReadbackBridge = launchDutyCompletionHandoff
+    ? buildStableOperationsReadbackBridge({
+      launchDutyCompletionHandoff,
+      actionQueue
+    })
+    : null;
 
   return {
     status: "pass",
@@ -2644,6 +2708,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     productionSwitchProofPacket,
     launchEvidenceReadinessGate,
     postSmokeReadinessBridge,
+    ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {}),
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
     ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
@@ -2834,6 +2899,30 @@ function writePostSmokeReadinessBridgePlain(bridge) {
   console.log(`Post-smoke readiness next action: ${bridge.nextAction || "-"}`);
 }
 
+function writeStableOperationsReadbackBridgePlain(bridge) {
+  if (!bridge) {
+    return;
+  }
+  const expectedRehearsalReadback = bridge.expectedRehearsalReadback || {};
+  const confirmationPoints = Array.isArray(expectedRehearsalReadback.confirmationPoints)
+    ? expectedRehearsalReadback.confirmationPoints
+    : [];
+  console.log(
+    `Stable operations readback bridge: ${bridge.status || "-"}`
+      + ` (current=${bridge.currentActionKey || "-"}, next=${bridge.nextActionKey || "-"})`
+  );
+  console.log(`Stable operations current command: ${bridge.currentCommand || "-"}`);
+  console.log(
+    `Stable operations readiness readback: ${bridge.readinessReadback?.status || "-"}`
+      + ` (gate=${bridge.readinessReadback?.currentGate || "-"}, confirmed=${bridge.readinessReadback?.confirmed ? "yes" : "no"})`
+  );
+  console.log(
+    `Stable operations expected rehearsal: ${expectedRehearsalReadback.status || "-"}`
+      + ` (current=${expectedRehearsalReadback.currentActionKey || "-"}, confirmations=${confirmationPoints.join(",") || "-"})`
+  );
+  console.log(`Stable operations handoff artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -2938,6 +3027,7 @@ function writeResult(result, json) {
       console.log(`Launch duty completion rehearsal reload: ${handoff.rehearsalReloadCommand || "-"}`);
       console.log(`Launch duty completion next action: ${handoff.nextAction || "-"}`);
     }
+    writeStableOperationsReadbackBridgePlain(result.stableOperationsReadbackBridge);
     if (result.launchDutyNextRun) {
       const nextRun = result.launchDutyNextRun;
       console.log(`Launch duty current action: ${nextRun.currentActionKey}`);

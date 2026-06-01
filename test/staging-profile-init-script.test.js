@@ -201,6 +201,78 @@ test("staging profile init writes a secret-free profile with launch-duty output 
     const rollbackSignalReviewFile = "artifacts/staging/PILOT_ALPHA/beta/rollback-signal-review.md";
     const stabilizationOwnerHandoffFile = "artifacts/staging/PILOT_ALPHA/beta/stabilization-owner-handoff.md";
     const firstWaveCloseoutFile = "artifacts/staging/PILOT_ALPHA/beta/first-wave-closeout.md";
+    const stableOperationsProofQueue = [
+      {
+        order: 1,
+        key: "verify_stable_rollout_widening_decision",
+        label: "Verify stable rollout widening decision",
+        status: "blocked_after_stable_operations_handoff",
+        kind: "download",
+        sourceBridge: "stableOperationsRolloutWideningBridge",
+        target: "/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=rollout-widening-decision-execution",
+        launchDutyRecordIndexPath: launchDutyRecordIndexFile
+      },
+      {
+        order: 2,
+        key: "verify_stable_first_result_handoff",
+        label: "Verify stable first operating result handoff",
+        status: "blocked_after_rollout_widening_decision",
+        kind: "download",
+        sourceBridge: "stableOperationsFirstResultBridge",
+        target: "/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=first-operating-result-handoff-execution",
+        launchDutyRecordIndexPath: launchDutyRecordIndexFile
+      },
+      {
+        order: 3,
+        key: "verify_stable_first_result_receipt_readback",
+        label: "Verify stable first operating result receipt readback",
+        status: "blocked_after_first_result_handoff",
+        kind: "download",
+        sourceBridge: "stableOperationsFirstResultBridge",
+        target: "/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=first-operating-result-handoff-receipt-readback-execution",
+        launchDutyRecordIndexPath: launchDutyRecordIndexFile
+      },
+      {
+        order: 4,
+        key: "verify_stable_first_result_review",
+        label: "Verify stable first operating result review",
+        status: "blocked_after_first_result_receipt_readback",
+        kind: "download",
+        sourceBridge: "stableOperationsFirstResultBridge",
+        target: "/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=first-operating-result-review-execution",
+        launchDutyRecordIndexPath: launchDutyRecordIndexFile
+      },
+      {
+        order: 5,
+        key: "verify_stable_next_rollout_decision",
+        label: "Verify stable next rollout decision",
+        status: "blocked_after_first_result_review",
+        kind: "download",
+        sourceBridge: "stableOperationsRolloutWideningBridge",
+        target: "/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=next-rollout-widening-decision-execution",
+        launchDutyRecordIndexPath: launchDutyRecordIndexFile
+      },
+      {
+        order: 6,
+        key: "verify_stable_widened_rollout_monitoring",
+        label: "Verify stable widened rollout monitoring",
+        status: "blocked_after_next_rollout_decision",
+        kind: "download",
+        sourceBridge: "stableOperationsRolloutWideningBridge",
+        target: "/api/developer/launch-mainline/download?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=widened-rollout-monitoring-execution",
+        launchDutyRecordIndexPath: launchDutyRecordIndexFile
+      },
+      {
+        order: 7,
+        key: "verify_stable_ops_overview_status",
+        label: "Verify stable Ops overview status",
+        status: "blocked_after_widened_rollout_monitoring",
+        kind: "download",
+        sourceBridge: "stableOperationsRolloutWideningReadinessBridge",
+        target: "/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=beta&limit=80&format=launch-operations-overview-status",
+        launchDutyRecordIndexPath: launchDutyRecordIndexFile
+      }
+    ];
     const launchDayWatchRecordCommand = "npm.cmd run staging:launch-duty:record -- --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key launch_day_watch_summary --artifact-path artifacts/staging/PILOT_ALPHA/beta/launch-day-watch-summary.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts/staging/PILOT_ALPHA/beta/launch-duty-record-index.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const backupRestoreDrillBackfillCommand = "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key backup_restore_drill_result --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/backup-restore-drill.txt --receipt-id <record_recovery_drill-receipt-id> --receipt-id <record_backup_verification-receipt-id> --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
     const operatorGoNoGoBackfillCommand = "npm.cmd run staging:closeout:backfill -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --key operator_go_no_go --value-json <redacted-json> --artifact-path artifacts/staging/PILOT_ALPHA/beta/operator-go-no-go.md --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md";
@@ -603,15 +675,16 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
       archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
-      totalCommandCount: 39,
+      totalCommandCount: 40,
       currentCommandCount: 1,
-      blockedCommandCount: 38,
+      blockedCommandCount: 39,
       queueCounts: {
         postSmokeBackfillCount: 4,
         productionSignoffBackfillCount: 6,
         receiptVisibilityBackfillCount: 5,
         launchDutyRecordCount: 6,
-        stableOperationsCommandCount: 3
+        stableOperationsCommandCount: 4,
+        stableOperationsProofDownloadCount: 7
       },
       nextMilestoneKey: "closeout_init",
       nextMilestoneCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
@@ -626,7 +699,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
       totalPhaseCount: 7,
       currentPhaseCount: 1,
       blockedPhaseCount: 6,
-      totalCommandCount: 39,
+      totalCommandCount: 40,
       nextBlockedPhaseKey: "recovery_and_route_gate",
       nextAction: "Complete the current profile_and_closeout phase, then continue with recovery_and_route_gate.",
       phases: [
@@ -758,20 +831,21 @@ test("staging profile init writes a secret-free profile with launch-duty output 
           key: "stable_operations_handoff",
           label: "Stable-operations handoff",
           status: "blocked",
-          totalCommandCount: 3,
+          totalCommandCount: 4,
           currentCommandCount: 0,
-          blockedCommandCount: 3,
+          blockedCommandCount: 4,
           commandKeys: [
             "post_first_wave_closeout_readiness_status",
             "post_first_wave_closeout_rehearsal_reload",
-            "handoff_stable_operations"
+            "handoff_stable_operations",
+            "verify_stable_operations_first_result_and_rollout"
           ],
           firstActionKey: "post_first_wave_closeout_readiness_status",
           currentActionKey: null,
           firstBlockedActionKey: "post_first_wave_closeout_readiness_status",
           currentCommand: null,
           nextCommand: postFirstWaveCloseoutReadinessStatusCommand,
-          finalActionKey: "handoff_stable_operations",
+          finalActionKey: "verify_stable_operations_first_result_and_rollout",
           nextAction: "Refresh readiness after first_wave_closeout so the completed launch-duty record index is recognized as stable_operations_handoff."
         }
       ]
@@ -818,7 +892,7 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         launchDutyArchiveIndexFile: "artifacts/staging/PILOT_ALPHA/beta/staging-launch-duty-archive-index.json",
         launchDutyRecordIndexFile,
         stableOperationsHandoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
-        nextAction: "Use these paths for the first real staging rehearsal, production proof execution pack, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, and stable-operations handoff."
+        nextAction: "Use these paths for the first real staging rehearsal, production proof execution pack, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, stable-operations handoff, and first stable-window proof downloads."
       },
       closeoutInitCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
       postCloseoutInitStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
@@ -846,8 +920,10 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         firstWaveCloseoutArtifactPath: firstWaveCloseoutFile,
         readinessStatusCommand: postFirstWaveCloseoutReadinessStatusCommand,
         rehearsalReloadCommand: postFirstWaveCloseoutRehearsalReloadCommand,
+        proofQueueStatus: "blocked_after_stable_operations_handoff",
+        postHandoffProofQueue: stableOperationsProofQueue,
         handoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
-        nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, then hand off the completed record index and first-wave closeout artifact to stable operations."
+        nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, hand off stable operations, then verify the first-result and rollout widening proof queue."
       },
       operatorQueueCheckpoint: {
         mode: "staging-profile-operator-queue-checkpoint",
@@ -860,15 +936,16 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
         rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json",
         archiveRoot: "artifacts/staging/PILOT_ALPHA/beta",
-        totalCommandCount: 39,
+        totalCommandCount: 40,
         currentCommandCount: 1,
-        blockedCommandCount: 38,
+        blockedCommandCount: 39,
         queueCounts: {
           postSmokeBackfillCount: 4,
           productionSignoffBackfillCount: 6,
           receiptVisibilityBackfillCount: 5,
           launchDutyRecordCount: 6,
-          stableOperationsCommandCount: 3
+          stableOperationsCommandCount: 4,
+          stableOperationsProofDownloadCount: 7
         },
         nextMilestoneKey: "closeout_init",
         nextMilestoneCommand: "npm.cmd run staging:closeout:init -- --draft-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.draft.json --output-file artifacts/staging/PILOT_ALPHA/beta/filled-closeout-input.json --actions-file artifacts/staging/PILOT_ALPHA/beta/readiness-action-queue.md",
@@ -1134,9 +1211,21 @@ test("staging profile init writes a secret-free profile with launch-duty output 
           recordIndexFile: launchDutyRecordIndexFile,
           handoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
           nextAction: "Hand off the completed record index and first-wave closeout artifact to the stable-operations owner."
+        },
+        {
+          key: "verify_stable_operations_first_result_and_rollout",
+          status: "blocked_after_stable_operations_handoff",
+          command: null,
+          target: stableOperationsProofQueue[0].target,
+          queue: stableOperationsProofQueue,
+          artifactPath: firstWaveCloseoutFile,
+          targetKey: "stable_operations_first_result_and_rollout",
+          recordIndexFile: launchDutyRecordIndexFile,
+          handoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
+          nextAction: "Open the rollout widening, first operating result, next rollout, widened monitoring, and overview-status direct files before widening the stable operating window."
         }
       ],
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, stable-operations handoff, and first stable-window proof downloads."
     });
     assert.deepEqual(profile, {
       baseUrl: "https://staging.example.com",
@@ -1245,12 +1334,12 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Launch lane backup\/restore artifact: artifacts\/staging\/PILOT_ALPHA\/beta\/backup-restore-drill\.txt/);
     assert.match(result.stdout, /Launch lane operator go\/no-go: artifacts\/staging\/PILOT_ALPHA\/beta\/operator-go-no-go\.md/);
     assert.match(result.stdout, /Launch lane record index: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json/);
-    assert.match(result.stdout, /Operator queue checkpoint: profile_rehearsal \(status=awaiting_profile_rehearsal, total=39, blocked=38\)/);
+    assert.match(result.stdout, /Operator queue checkpoint: profile_rehearsal \(status=awaiting_profile_rehearsal, total=40, blocked=39\)/);
     assert.match(result.stdout, /Operator queue current: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
     assert.match(result.stdout, /Operator queue readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
-    assert.match(result.stdout, /Operator queue counts: postSmoke=4, signoff=6, receipts=5, launchDutyRecords=6, stableOps=3/);
+    assert.match(result.stdout, /Operator queue counts: postSmoke=4, signoff=6, receipts=5, launchDutyRecords=6, stableOps=4, stableProof=7/);
     assert.match(result.stdout, /Operator queue next milestone: closeout_init -> npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
-    assert.match(result.stdout, /Launch execution phase plan: awaiting_profile_rehearsal \(current=profile_and_closeout, phases=7, blocked=6, commands=39\)/);
+    assert.match(result.stdout, /Launch execution phase plan: awaiting_profile_rehearsal \(current=profile_and_closeout, phases=7, blocked=6, commands=40\)/);
     assert.match(result.stdout, /Launch execution phase 1\. profile_and_closeout: current \(commands=3, blocked=2, current=profile_rehearsal, next=profile_rehearsal\)/);
     assert.match(result.stdout, /Launch execution phase 5\. production_signoff_and_receipts: blocked \(commands=12, blocked=12, current=-, next=backfill_production_signoff_staging_artifacts_archived\)/);
     assert.match(result.stdout, /Launch execution next action: Complete the current profile_and_closeout phase, then continue with recovery_and_route_gate\./);
@@ -1301,7 +1390,8 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Post-first-wave closeout readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Post-first-wave closeout rehearsal reload: npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json/);
     assert.match(result.stdout, /Stable-operations handoff: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json; artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md/);
-    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff\./);
+    assert.match(result.stdout, /Stable-operations proof queue: blocked_after_stable_operations_handoff \| first=\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=rollout-widening-decision-execution \| count=7/);
+    assert.match(result.stdout, /Next action: Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, stable-operations handoff, and first stable-window proof downloads\./);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

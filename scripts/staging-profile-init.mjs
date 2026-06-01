@@ -406,6 +406,66 @@ function buildRehearsalReloadCommand(closeoutInputFile) {
   return `npm.cmd run staging:rehearsal -- --closeout-input-file ${commandValue(closeoutInputFile)}`;
 }
 
+function buildStableOperationsPostHandoffProofQueue(productCode, channel, launchDutyRecordIndexPath) {
+  const downloads = [
+    {
+      key: "verify_stable_rollout_widening_decision",
+      label: "Verify stable rollout widening decision",
+      status: "blocked_after_stable_operations_handoff",
+      sourceBridge: "stableOperationsRolloutWideningBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=rollout-widening-decision-execution`
+    },
+    {
+      key: "verify_stable_first_result_handoff",
+      label: "Verify stable first operating result handoff",
+      status: "blocked_after_rollout_widening_decision",
+      sourceBridge: "stableOperationsFirstResultBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=first-operating-result-handoff-execution`
+    },
+    {
+      key: "verify_stable_first_result_receipt_readback",
+      label: "Verify stable first operating result receipt readback",
+      status: "blocked_after_first_result_handoff",
+      sourceBridge: "stableOperationsFirstResultBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=first-operating-result-handoff-receipt-readback-execution`
+    },
+    {
+      key: "verify_stable_first_result_review",
+      label: "Verify stable first operating result review",
+      status: "blocked_after_first_result_receipt_readback",
+      sourceBridge: "stableOperationsFirstResultBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=first-operating-result-review-execution`
+    },
+    {
+      key: "verify_stable_next_rollout_decision",
+      label: "Verify stable next rollout decision",
+      status: "blocked_after_first_result_review",
+      sourceBridge: "stableOperationsRolloutWideningBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=next-rollout-widening-decision-execution`
+    },
+    {
+      key: "verify_stable_widened_rollout_monitoring",
+      label: "Verify stable widened rollout monitoring",
+      status: "blocked_after_next_rollout_decision",
+      sourceBridge: "stableOperationsRolloutWideningBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=widened-rollout-monitoring-execution`
+    },
+    {
+      key: "verify_stable_ops_overview_status",
+      label: "Verify stable Ops overview status",
+      status: "blocked_after_widened_rollout_monitoring",
+      sourceBridge: "stableOperationsRolloutWideningReadinessBridge",
+      target: `/api/developer/ops/export/download?productCode=${productCode}&channel=${channel}&limit=80&format=launch-operations-overview-status`
+    }
+  ];
+  return downloads.map((item, index) => ({
+    order: index + 1,
+    ...item,
+    kind: "download",
+    launchDutyRecordIndexPath
+  }));
+}
+
 function toPublicStableOperationsHandoff(handoff) {
   const { rehearsalHandoffFile, ...publicHandoff } = handoff;
   return publicHandoff;
@@ -639,6 +699,18 @@ function buildOperatorNextCommands({
       recordIndexFile: launchDutyRecordIndexFile,
       handoffArtifacts: stableOperationsHandoff.handoffArtifacts,
       nextAction: "Hand off the completed record index and first-wave closeout artifact to the stable-operations owner."
+    },
+    {
+      key: "verify_stable_operations_first_result_and_rollout",
+      status: "blocked_after_stable_operations_handoff",
+      command: null,
+      target: stableOperationsHandoff.postHandoffProofQueue[0]?.target || null,
+      queue: stableOperationsHandoff.postHandoffProofQueue,
+      artifactPath: stableOperationsHandoff.firstWaveCloseoutArtifactPath,
+      targetKey: "stable_operations_first_result_and_rollout",
+      recordIndexFile: launchDutyRecordIndexFile,
+      handoffArtifacts: stableOperationsHandoff.handoffArtifacts,
+      nextAction: "Open the rollout widening, first operating result, next rollout, widened monitoring, and overview-status direct files before widening the stable operating window."
     }
   ];
   return [
@@ -826,7 +898,11 @@ function buildOperatorQueueCheckpoint({
     item.key === "post_first_wave_closeout_readiness_status"
       || item.key === "post_first_wave_closeout_rehearsal_reload"
       || item.key === "handoff_stable_operations"
+      || item.key === "verify_stable_operations_first_result_and_rollout"
   ).length;
+  const stableOperationsProofQueue = operatorNextCommands
+    .find((item) => item.key === "verify_stable_operations_first_result_and_rollout")
+    ?.queue || [];
 
   return {
     mode: "staging-profile-operator-queue-checkpoint",
@@ -847,7 +923,8 @@ function buildOperatorQueueCheckpoint({
       productionSignoffBackfillCount: productionSignoffBackfillCommands.length,
       receiptVisibilityBackfillCount: receiptVisibilityBackfillCommands.length,
       launchDutyRecordCount: 1 + stabilizationRecordCommands.length,
-      stableOperationsCommandCount
+      stableOperationsCommandCount,
+      stableOperationsProofDownloadCount: stableOperationsProofQueue.length
     },
     nextMilestoneKey: nextMilestone.key || null,
     nextMilestoneCommand: nextMilestone.command || closeoutInitCommand,
@@ -926,7 +1003,8 @@ const LAUNCH_EXECUTION_PHASES = [
     commandKeys: [
       "post_first_wave_closeout_readiness_status",
       "post_first_wave_closeout_rehearsal_reload",
-      "handoff_stable_operations"
+      "handoff_stable_operations",
+      "verify_stable_operations_first_result_and_rollout"
     ]
   }
 ];
@@ -1244,7 +1322,7 @@ function buildLaunchLaneFiles({
     launchDutyArchiveIndexFile: profile.launchDutyArchiveIndexFile,
     launchDutyRecordIndexFile,
     stableOperationsHandoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
-    nextAction: "Use these paths for the first real staging rehearsal, production proof execution pack, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, and stable-operations handoff."
+    nextAction: "Use these paths for the first real staging rehearsal, production proof execution pack, closeout init, readiness refresh, backup/restore evidence, route-map gate handoff, launch smoke closeout backfills, full-test signoff, launch-day watch records, stabilization records, first-wave closeout, stable-operations handoff, and first stable-window proof downloads."
   };
 }
 
@@ -1410,6 +1488,7 @@ function writeOperatorQueueCheckpointPlain(checkpoint) {
       + `, receipts=${checkpoint.queueCounts?.receiptVisibilityBackfillCount ?? "-"}`
       + `, launchDutyRecords=${checkpoint.queueCounts?.launchDutyRecordCount ?? "-"}`
       + `, stableOps=${checkpoint.queueCounts?.stableOperationsCommandCount ?? "-"}`
+      + `, stableProof=${checkpoint.queueCounts?.stableOperationsProofDownloadCount ?? "-"}`
   );
   console.log(`Operator queue next milestone: ${checkpoint.nextMilestoneKey || "-"} -> ${checkpoint.nextMilestoneCommand || "-"}`);
 }
@@ -1564,6 +1643,7 @@ function writeResult(result, json) {
     const postFirstWaveCloseoutReadinessStatus = result.operatorNextCommands?.find((item) => item.key === "post_first_wave_closeout_readiness_status");
     const postFirstWaveCloseoutRehearsalReload = result.operatorNextCommands?.find((item) => item.key === "post_first_wave_closeout_rehearsal_reload");
     const stableOperationsHandoff = result.operatorNextCommands?.find((item) => item.key === "handoff_stable_operations");
+    const stableOperationsProofQueue = result.operatorNextCommands?.find((item) => item.key === "verify_stable_operations_first_result_and_rollout");
     if (currentCommand) {
       console.log(`Current command: ${currentCommand.command}`);
     } else {
@@ -1649,6 +1729,13 @@ function writeResult(result, json) {
     }
     if (stableOperationsHandoff) {
       console.log(`Stable-operations handoff: ${(stableOperationsHandoff.handoffArtifacts || []).join("; ") || "-"}`);
+    }
+    if (stableOperationsProofQueue) {
+      console.log(
+        `Stable-operations proof queue: ${stableOperationsProofQueue.status || "-"}`
+          + ` | first=${stableOperationsProofQueue.target || "-"}`
+          + ` | count=${stableOperationsProofQueue.queue?.length || 0}`
+      );
     }
     console.log(`Next action: ${result.nextAction}`);
     return;
@@ -1803,6 +1890,11 @@ function main() {
         firstWaveCloseoutFile
       }
     });
+    const postHandoffProofQueue = buildStableOperationsPostHandoffProofQueue(
+      profile.productCode,
+      profile.channel,
+      launchDutyRecordIndexFile
+    );
     const stableOperationsHandoff = {
       status: "blocked_until_first_wave_closeout_recorded",
       recordIndexFile: launchDutyRecordIndexFile,
@@ -1810,8 +1902,10 @@ function main() {
       readinessStatusCommand: postFirstWaveCloseoutReadinessStatusCommand,
       rehearsalReloadCommand: postFirstWaveCloseoutRehearsalReloadCommand,
       rehearsalHandoffFile: profile.handoffFile,
+      proofQueueStatus: "blocked_after_stable_operations_handoff",
+      postHandoffProofQueue,
       handoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
-      nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, then hand off the completed record index and first-wave closeout artifact to stable operations."
+      nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, hand off stable operations, then verify the first-result and rollout widening proof queue."
     };
     const launchLaneFiles = buildLaunchLaneFiles({
       archiveRoot,
@@ -1975,7 +2069,7 @@ function main() {
       launchDayWatchRecordCommand,
       stabilizationRecordCommands,
       operatorNextCommands,
-      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, and stable-operations handoff."
+      nextAction: "Review the secret-free profile values, set required secret env vars, run nextCommand, then follow operatorNextCommands through closeout init, readiness status, recovery preflight, route-map gate, route-map result backfill, readiness refresh, smoke preflight, live-write smoke, post-smoke closeout backfills, full-test window, full-test signoff backfill, production signoff evidence backfills, receipt visibility backfills, production-signoff readiness refresh, launch-day watch summary, stabilization records, first-wave closeout, stable-operations handoff, and first stable-window proof downloads."
     }, options.json);
   } catch (error) {
     writeResult({

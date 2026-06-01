@@ -6589,6 +6589,41 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
       },
       nextAction: "Open the steady-state handoff brief, keep the duty receipt review file beside it, then transfer launch duty into stable operations."
     });
+    assert.deepEqual(output.stableOperationsFirstResultBridge, {
+      version: "staging-rehearsal-stable-operations-first-result-bridge/v1",
+      status: "ready_for_first_operating_result_entrypoints",
+      sourceFocus: "stableOperationsFirstDutyBridge",
+      currentActionKey: "handoff_first_operating_result",
+      nextActionKey: "review_first_operating_result_handoff",
+      firstDutyBridgeStatus: "ready_for_steady_state_handoff_brief",
+      recordIndexFile,
+      handoffArtifacts: [recordIndexFile, firstWaveCloseoutArtifactPath],
+      firstOperatingResultHandoff: {
+        key: "first_operating_result_handoff_execution",
+        fileName: "first-operating-result-handoff-execution.txt",
+        format: "first-operating-result-handoff-execution",
+        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-execution"
+      },
+      firstOperatingResultReceiptReadback: {
+        key: "first_operating_result_handoff_receipt_readback_execution",
+        fileName: "first-operating-result-handoff-receipt-readback-execution.txt",
+        format: "first-operating-result-handoff-receipt-readback-execution",
+        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-receipt-readback-execution"
+      },
+      firstOperatingResultReview: {
+        key: "first_operating_result_review_execution",
+        fileName: "first-operating-result-review-execution.txt",
+        format: "first-operating-result-review-execution",
+        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-review-execution"
+      },
+      overviewStatus: {
+        key: "ops_launch_operations_overview_status",
+        fileName: "developer-ops-launch-operations-overview-status.txt",
+        format: "launch-operations-overview-status",
+        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=launch-operations-overview-status"
+      },
+      nextAction: "Use the first operating result handoff execution download, then confirm receipt readback and review from launch operations overview status."
+    });
     assert.equal(output.initialProductionLaunchReadiness.readinessPercent, 100);
     assert.equal(output.initialProductionLaunchReadiness.remainingGateCount, 0);
     assert.equal(output.initialProductionLaunchReadiness.currentBlocker, null);
@@ -6731,6 +6766,11 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.match(handoff, /Stable first-duty bridge: `ready_for_steady_state_handoff_brief`/);
     assert.match(handoff, /Stable first-duty handoff brief: `developer-ops-steady-state-handoff-brief\.txt` `steady-state-handoff-brief` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-handoff-brief`/);
     assert.match(handoff, /Stable first-duty duty receipt review: `steady-state-duty-receipt-review-execution\.txt` `steady-state-duty-receipt-review-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-duty-receipt-review-execution`/);
+    assert.match(handoff, /## Stable Operations First Result Bridge/);
+    assert.match(handoff, /Stable first-result bridge: `ready_for_first_operating_result_entrypoints`/);
+    assert.match(handoff, /Stable first-result handoff: `first-operating-result-handoff-execution\.txt` `first-operating-result-handoff-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-execution`/);
+    assert.match(handoff, /Stable first-result receipt readback: `first-operating-result-handoff-receipt-readback-execution\.txt` `first-operating-result-handoff-receipt-readback-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-receipt-readback-execution`/);
+    assert.match(handoff, /Stable first-result review: `first-operating-result-review-execution\.txt` `first-operating-result-review-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-review-execution`/);
 
     const plain = runRehearsalPlain([
       ...validArgs,
@@ -6763,6 +6803,10 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.match(plain.stdout, /Stable first-duty bridge: ready_for_steady_state_handoff_brief \(current=open_steady_state_handoff_brief, next=review_steady_state_duty_receipt\)/);
     assert.match(plain.stdout, /Stable first-duty handoff brief: developer-ops-steady-state-handoff-brief\.txt \(steady-state-handoff-brief\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-handoff-brief/);
     assert.match(plain.stdout, /Stable first-duty duty receipt review: steady-state-duty-receipt-review-execution\.txt \(steady-state-duty-receipt-review-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-duty-receipt-review-execution/);
+    assert.match(plain.stdout, /Stable first-result bridge: ready_for_first_operating_result_entrypoints \(current=handoff_first_operating_result, next=review_first_operating_result_handoff\)/);
+    assert.match(plain.stdout, /Stable first-result handoff: first-operating-result-handoff-execution\.txt \(first-operating-result-handoff-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-execution/);
+    assert.match(plain.stdout, /Stable first-result receipt readback: first-operating-result-handoff-receipt-readback-execution\.txt \(first-operating-result-handoff-receipt-readback-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-handoff-receipt-readback-execution/);
+    assert.match(plain.stdout, /Stable first-result review: first-operating-result-review-execution\.txt \(first-operating-result-review-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=first-operating-result-review-execution/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

@@ -1856,6 +1856,74 @@ function buildStableOperationsFirstDutyBridge(result) {
   };
 }
 
+function buildOpsDownload(baseUrl, productCode, channel, key, fileName, format) {
+  return {
+    key,
+    fileName,
+    format,
+    href: buildRoute(baseUrl, "/api/developer/ops/export/download", {
+      productCode,
+      channel,
+      limit: "80",
+      format
+    })
+  };
+}
+
+function buildStableOperationsFirstResultBridge(result) {
+  const firstDutyBridge = result.stableOperationsFirstDutyBridge || null;
+  if (!firstDutyBridge) {
+    return null;
+  }
+  const productCode = result.summary?.productCode || result.closeoutInput?.productCode || null;
+  const channel = result.summary?.channel || result.closeoutInput?.channel || null;
+  const baseUrl = result.summary?.baseUrl || "https://staging.example.com";
+
+  return {
+    version: "staging-rehearsal-stable-operations-first-result-bridge/v1",
+    status: "ready_for_first_operating_result_entrypoints",
+    sourceFocus: "stableOperationsFirstDutyBridge",
+    currentActionKey: "handoff_first_operating_result",
+    nextActionKey: "review_first_operating_result_handoff",
+    firstDutyBridgeStatus: firstDutyBridge.status || null,
+    recordIndexFile: firstDutyBridge.recordIndexFile || null,
+    handoffArtifacts: Array.isArray(firstDutyBridge.handoffArtifacts) ? firstDutyBridge.handoffArtifacts : [],
+    firstOperatingResultHandoff: buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_handoff_execution",
+      "first-operating-result-handoff-execution.txt",
+      "first-operating-result-handoff-execution"
+    ),
+    firstOperatingResultReceiptReadback: buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_handoff_receipt_readback_execution",
+      "first-operating-result-handoff-receipt-readback-execution.txt",
+      "first-operating-result-handoff-receipt-readback-execution"
+    ),
+    firstOperatingResultReview: buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_review_execution",
+      "first-operating-result-review-execution.txt",
+      "first-operating-result-review-execution"
+    ),
+    overviewStatus: buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "ops_launch_operations_overview_status",
+      "developer-ops-launch-operations-overview-status.txt",
+      "launch-operations-overview-status"
+    ),
+    nextAction: "Use the first operating result handoff execution download, then confirm receipt readback and review from launch operations overview status."
+  };
+}
+
 const GO_LIVE_ACTION_PHASES = {
   staging_profile: "real_staging_inputs",
   required_secret_env: "real_staging_inputs",
@@ -9305,11 +9373,20 @@ function buildResult(options) {
       ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {})
     })
     : null;
+  const stableOperationsFirstResultBridge = gatesPassed
+    ? buildStableOperationsFirstResultBridge({
+      ...resultWithLaunchExecutionPhasePlan,
+      operatorQueueCheckpoint,
+      ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {}),
+      ...(stableOperationsFirstDutyBridge ? { stableOperationsFirstDutyBridge } : {})
+    })
+    : null;
   return {
     ...resultWithLaunchExecutionPhasePlan,
     operatorQueueCheckpoint,
     ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {}),
     ...(stableOperationsFirstDutyBridge ? { stableOperationsFirstDutyBridge } : {}),
+    ...(stableOperationsFirstResultBridge ? { stableOperationsFirstResultBridge } : {}),
     initialProductionLaunchReadiness: gatesPassed
       ? buildInitialProductionLaunchReadiness({
         ...resultWithLaunchExecutionPhasePlan,
@@ -9604,6 +9681,27 @@ function renderStableOperationsFirstDutyBridge(bridge) {
     `- Stable first-duty duty receipt review: \`${dutyReceiptReview.fileName || "-"}\` \`${dutyReceiptReview.format || "-"}\` -> \`${dutyReceiptReview.href || "-"}\``,
     `- Stable first-duty artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`,
     `- Stable first-duty next action: ${bridge.nextAction || "-"}`
+  ].join("\n");
+}
+
+function renderStableOperationsFirstResultBridge(bridge) {
+  if (!bridge) {
+    return "- Not available";
+  }
+  const handoff = bridge.firstOperatingResultHandoff || {};
+  const receiptReadback = bridge.firstOperatingResultReceiptReadback || {};
+  const review = bridge.firstOperatingResultReview || {};
+  const overview = bridge.overviewStatus || {};
+  return [
+    `- Stable first-result bridge: \`${bridge.status || "-"}\``,
+    `- Stable first-result current: \`${bridge.currentActionKey || "-"}\` -> \`${bridge.nextActionKey || "-"}\``,
+    `- Stable first-result first-duty status: \`${bridge.firstDutyBridgeStatus || "-"}\``,
+    `- Stable first-result handoff: \`${handoff.fileName || "-"}\` \`${handoff.format || "-"}\` -> \`${handoff.href || "-"}\``,
+    `- Stable first-result receipt readback: \`${receiptReadback.fileName || "-"}\` \`${receiptReadback.format || "-"}\` -> \`${receiptReadback.href || "-"}\``,
+    `- Stable first-result review: \`${review.fileName || "-"}\` \`${review.format || "-"}\` -> \`${review.href || "-"}\``,
+    `- Stable first-result overview status: \`${overview.fileName || "-"}\` \`${overview.format || "-"}\` -> \`${overview.href || "-"}\``,
+    `- Stable first-result artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`,
+    `- Stable first-result next action: ${bridge.nextAction || "-"}`
   ].join("\n");
 }
 
@@ -10249,6 +10347,26 @@ function writeStableOperationsFirstDutyBridgePlain(bridge = null) {
   console.log(`Stable first-duty duty receipt review: ${dutyReceiptReview.fileName || "-"} (${dutyReceiptReview.format || "-"}) -> ${dutyReceiptReview.href || "-"}`);
   console.log(`Stable first-duty artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
   console.log(`Stable first-duty next action: ${bridge.nextAction || "-"}`);
+}
+
+function writeStableOperationsFirstResultBridgePlain(bridge = null) {
+  if (!bridge) {
+    return;
+  }
+  const handoff = bridge.firstOperatingResultHandoff || {};
+  const receiptReadback = bridge.firstOperatingResultReceiptReadback || {};
+  const review = bridge.firstOperatingResultReview || {};
+  const overview = bridge.overviewStatus || {};
+  console.log(
+    `Stable first-result bridge: ${bridge.status || "-"}`
+      + ` (current=${bridge.currentActionKey || "-"}, next=${bridge.nextActionKey || "-"})`
+  );
+  console.log(`Stable first-result handoff: ${handoff.fileName || "-"} (${handoff.format || "-"}) -> ${handoff.href || "-"}`);
+  console.log(`Stable first-result receipt readback: ${receiptReadback.fileName || "-"} (${receiptReadback.format || "-"}) -> ${receiptReadback.href || "-"}`);
+  console.log(`Stable first-result review: ${review.fileName || "-"} (${review.format || "-"}) -> ${review.href || "-"}`);
+  console.log(`Stable first-result overview status: ${overview.fileName || "-"} (${overview.format || "-"}) -> ${overview.href || "-"}`);
+  console.log(`Stable first-result artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
+  console.log(`Stable first-result next action: ${bridge.nextAction || "-"}`);
 }
 
 function writeLaunchDutyCurrentActionPlain(action = {}) {
@@ -12095,6 +12213,10 @@ function renderHandoffFile(result) {
     "",
     renderStableOperationsFirstDutyBridge(result.stableOperationsFirstDutyBridge),
     "",
+    "## Stable Operations First Result Bridge",
+    "",
+    renderStableOperationsFirstResultBridge(result.stableOperationsFirstResultBridge),
+    "",
     "## Gate Status",
     "",
     result.phases.map((phase) => `- ${phase.key}: ${phase.status}`).join("\n"),
@@ -12637,6 +12759,7 @@ function writeResult(result, json) {
     writeOperatorQueueCheckpointPlain(result.operatorQueueCheckpoint);
     writeStableOperationsReadbackBridgePlain(result.stableOperationsReadbackBridge);
     writeStableOperationsFirstDutyBridgePlain(result.stableOperationsFirstDutyBridge);
+    writeStableOperationsFirstResultBridgePlain(result.stableOperationsFirstResultBridge);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     writeLaunchExecutionPhasePlanPlain(result.launchExecutionPhasePlan);

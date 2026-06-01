@@ -6564,6 +6564,31 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
       },
       nextAction: "Open stable-operations handoff with the launch-duty record index and first-wave closeout artifact."
     });
+    assert.deepEqual(output.stableOperationsFirstDutyBridge, {
+      version: "staging-rehearsal-stable-operations-first-duty-bridge/v1",
+      status: "ready_for_steady_state_handoff_brief",
+      sourceFocus: "stableOperationsReadbackBridge",
+      currentActionKey: "open_steady_state_handoff_brief",
+      nextActionKey: "review_steady_state_duty_receipt",
+      stableOperationsReadbackStatus: "ready_for_stable_operations_handoff",
+      readinessReadbackStatus: "ready_for_stabilization_handoff",
+      recordIndexFile,
+      firstWaveCloseoutArtifactPath,
+      handoffArtifacts: [recordIndexFile, firstWaveCloseoutArtifactPath],
+      steadyStateHandoffBrief: {
+        key: "ops_steady_state_handoff_brief",
+        fileName: "developer-ops-steady-state-handoff-brief.txt",
+        format: "steady-state-handoff-brief",
+        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-handoff-brief"
+      },
+      dutyReceiptReview: {
+        key: "steady_state_duty_receipt_review_execution",
+        fileName: "steady-state-duty-receipt-review-execution.txt",
+        format: "steady-state-duty-receipt-review-execution",
+        href: "https://staging.example.com/api/developer/ops/export/download?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-duty-receipt-review-execution"
+      },
+      nextAction: "Open the steady-state handoff brief, keep the duty receipt review file beside it, then transfer launch duty into stable operations."
+    });
     assert.equal(output.initialProductionLaunchReadiness.readinessPercent, 100);
     assert.equal(output.initialProductionLaunchReadiness.remainingGateCount, 0);
     assert.equal(output.initialProductionLaunchReadiness.currentBlocker, null);
@@ -6702,6 +6727,10 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.match(handoff, /Stable operations readback bridge: `ready_for_stable_operations_handoff`/);
     assert.match(handoff, /Stable operations readiness readback: `ready_for_stabilization_handoff`/);
     assert.match(handoff, /Stable operations rehearsal readback: `ready_for_stable_operations_handoff` current `stable_operations_handoff` confirmations `launch_duty_record_index, first_wave_closeout`/);
+    assert.match(handoff, /## Stable Operations First Duty Bridge/);
+    assert.match(handoff, /Stable first-duty bridge: `ready_for_steady_state_handoff_brief`/);
+    assert.match(handoff, /Stable first-duty handoff brief: `developer-ops-steady-state-handoff-brief\.txt` `steady-state-handoff-brief` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-handoff-brief`/);
+    assert.match(handoff, /Stable first-duty duty receipt review: `steady-state-duty-receipt-review-execution\.txt` `steady-state-duty-receipt-review-execution` -> `https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-duty-receipt-review-execution`/);
 
     const plain = runRehearsalPlain([
       ...validArgs,
@@ -6731,6 +6760,9 @@ test("staging rehearsal reload surfaces stable-operations handoff when launch-du
     assert.match(plain.stdout, /Stable operations readiness readback: ready_for_stabilization_handoff -> npm\.cmd run staging:readiness:status -- --input-file .*filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
     assert.match(plain.stdout, /Stable operations rehearsal readback: ready_for_stable_operations_handoff \(current=stable_operations_handoff, confirmations=launch_duty_record_index,first_wave_closeout\)/);
     assert.match(plain.stdout, /Stable operations handoff artifacts: .*launch-duty-record-index\.json; .*first-wave-closeout\.md/);
+    assert.match(plain.stdout, /Stable first-duty bridge: ready_for_steady_state_handoff_brief \(current=open_steady_state_handoff_brief, next=review_steady_state_duty_receipt\)/);
+    assert.match(plain.stdout, /Stable first-duty handoff brief: developer-ops-steady-state-handoff-brief\.txt \(steady-state-handoff-brief\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-handoff-brief/);
+    assert.match(plain.stdout, /Stable first-duty duty receipt review: steady-state-duty-receipt-review-execution\.txt \(steady-state-duty-receipt-review-execution\) -> https:\/\/staging\.example\.com\/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&channel=stable&limit=80&format=steady-state-duty-receipt-review-execution/);
   } finally {
     rmSync(tempDir, { force: true, recursive: true });
   }

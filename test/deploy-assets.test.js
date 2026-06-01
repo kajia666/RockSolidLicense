@@ -132,7 +132,7 @@ test("operations runbook and windows healthcheck document the real health respon
   assert.match(windowsHealthcheck, /\$response\.ok/);
 });
 
-test("windows deployment guide documents prepare pack, preflight, task, healthcheck, backup, and caddy flow", () => {
+test("windows deployment guide documents prepare pack, evidence pack, preflight, task, healthcheck, backup, and caddy flow", () => {
   const readme = readText("README.md");
   const runbook = readText("docs/production-operations-runbook.md");
   const guide = readText("docs/windows-deployment-guide.md");
@@ -146,6 +146,13 @@ test("windows deployment guide documents prepare pack, preflight, task, healthch
   assert.match(guide, /register-rocksolid-task\.ps1/);
   assert.match(guide, /deploy:windows:prepare-pack/);
   assert.match(guide, /windows-first-deploy-pack\.md/);
+  assert.match(guide, /deploy:windows:evidence-pack/);
+  assert.match(guide, /windows-deploy-evidence-pack\.md/);
+  assert.match(guide, /backup_restore_drill_result/);
+  assert.match(guide, /live_write_smoke_result/);
+  assert.match(guide, /full_test_window_passed/);
+  assert.match(guide, /launch_day_watch_summary/);
+  assert.match(guide, /first_wave_closeout/);
   assert.match(guide, /deploy:windows:preflight/);
   assert.match(guide, /npm\.cmd run deploy:windows:preflight/);
   assert.match(guide, /healthcheck-rocksolid\.ps1/);

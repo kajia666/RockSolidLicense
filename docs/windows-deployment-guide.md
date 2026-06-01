@@ -16,6 +16,22 @@ artifacts/deploy/windows/windows-first-deploy-pack.md
 
 This is safe to run before a server exists. It writes only the local Markdown handoff pack and does not modify `C:\RockSolidLicense`, copy files, start services, register Scheduled Tasks, change firewall rules, configure HTTPS, or run backups.
 
+## Deploy Evidence Pack (After manual proof starts)
+
+Generate the secret-free evidence backfill guide:
+
+```powershell
+npm.cmd run deploy:windows:evidence-pack
+```
+
+The generated file is:
+
+```text
+artifacts/deploy/windows/windows-deploy-evidence-pack.md
+```
+
+This is also safe before a server exists, but it is meant for deployment day evidence capture after manual start, local healthcheck, HTTPS, and required secret configuration. It lists the expected `backup_restore_drill_result`, `live_write_smoke_result`, `full_test_window_passed`, `launch_day_watch_summary`, and `first_wave_closeout` commands without running them.
+
 ## Deploy Preflight (Read-only first step)
 
 Before manual start, run:

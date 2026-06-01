@@ -1,5 +1,21 @@
 # Windows Deployment Guide
 
+## First Deploy Pack (Safe before a server exists)
+
+Before the first Windows deployment, generate one secret-free operator pack:
+
+```powershell
+npm.cmd run deploy:windows:prepare-pack
+```
+
+The generated file is:
+
+```text
+artifacts/deploy/windows/windows-first-deploy-pack.md
+```
+
+This is safe to run before a server exists. It writes only the local Markdown handoff pack and does not modify `C:\RockSolidLicense`, copy files, start services, register Scheduled Tasks, change firewall rules, configure HTTPS, or run backups.
+
 ## Deploy Preflight (Read-only first step)
 
 Before manual start, run:

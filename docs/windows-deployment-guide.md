@@ -1,5 +1,21 @@
 # Windows Deployment Guide
 
+## Server Deploy Gate (Tell me when to deploy)
+
+When you want to know whether it is time to deploy to the real Windows server, run:
+
+```powershell
+npm.cmd run deploy:windows:server-gate
+```
+
+If this prints `ready_for_server_deploy`, local preparation is complete and the next action is to deploy this repository to the Windows server target directory, normally `C:\RockSolidLicense`. This command may generate local secret-free handoff packs, but it does not modify `C:\RockSolidLicense`, start services, register Scheduled Tasks, change firewall rules, configure HTTPS, run smoke/full tests, or write launch evidence.
+
+If you only want to inspect the current state without generating packs, run:
+
+```powershell
+npm.cmd run deploy:windows:server-gate -- --status-only
+```
+
 ## Prepare Local (Fast path before a server exists)
 
 Before the first Windows deployment, generate all local secret-free Windows handoff packs and immediately read the current state:

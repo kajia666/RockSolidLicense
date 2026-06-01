@@ -1,5 +1,15 @@
 # Windows Deployment Guide
 
+## Prepare Local (Fast path before a server exists)
+
+Before the first Windows deployment, generate all local secret-free Windows handoff packs and immediately read the current state:
+
+```powershell
+npm.cmd run deploy:windows:prepare-local
+```
+
+This command generates the operator index, first deploy pack, and deploy evidence pack, then runs the read-only status summary. It does not deploy the app, modify `C:\RockSolidLicense`, start services, register Scheduled Tasks, change firewall rules, configure HTTPS, run smoke/full tests, or write launch evidence.
+
 ## Operator Pack (Start here before a server exists)
 
 Before the first Windows deployment, generate the secret-free operator index:

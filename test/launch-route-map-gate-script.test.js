@@ -206,11 +206,84 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     firstWaveCloseoutArtifactPath: "artifacts/staging/ROUTE_MAP_GATE/stable/first-wave-closeout.md",
     readinessStatusCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
     rehearsalReloadCommand: "npm.cmd run staging:rehearsal -- --closeout-input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json",
+    proofQueueStatus: "blocked_after_stable_operations_handoff",
+    postHandoffProofQueue: [
+      {
+        order: 1,
+        key: "verify_stable_rollout_widening_decision",
+        label: "Verify stable rollout widening decision",
+        status: "blocked_after_stable_operations_handoff",
+        kind: "download",
+        sourceBridge: "stableOperationsRolloutWideningBridge",
+        target: "/api/developer/launch-mainline/download?productCode=ROUTE_MAP_GATE&channel=stable&reviewMode=matched&format=rollout-widening-decision-execution",
+        launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json"
+      },
+      {
+        order: 2,
+        key: "verify_stable_first_result_handoff",
+        label: "Verify stable first operating result handoff",
+        status: "blocked_after_rollout_widening_decision",
+        kind: "download",
+        sourceBridge: "stableOperationsFirstResultBridge",
+        target: "/api/developer/launch-mainline/download?productCode=ROUTE_MAP_GATE&channel=stable&reviewMode=matched&format=first-operating-result-handoff-execution",
+        launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json"
+      },
+      {
+        order: 3,
+        key: "verify_stable_first_result_receipt_readback",
+        label: "Verify stable first operating result receipt readback",
+        status: "blocked_after_first_result_handoff",
+        kind: "download",
+        sourceBridge: "stableOperationsFirstResultBridge",
+        target: "/api/developer/launch-mainline/download?productCode=ROUTE_MAP_GATE&channel=stable&reviewMode=matched&format=first-operating-result-handoff-receipt-readback-execution",
+        launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json"
+      },
+      {
+        order: 4,
+        key: "verify_stable_first_result_review",
+        label: "Verify stable first operating result review",
+        status: "blocked_after_first_result_receipt_readback",
+        kind: "download",
+        sourceBridge: "stableOperationsFirstResultBridge",
+        target: "/api/developer/launch-mainline/download?productCode=ROUTE_MAP_GATE&channel=stable&reviewMode=matched&format=first-operating-result-review-execution",
+        launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json"
+      },
+      {
+        order: 5,
+        key: "verify_stable_next_rollout_decision",
+        label: "Verify stable next rollout decision",
+        status: "blocked_after_first_result_review",
+        kind: "download",
+        sourceBridge: "stableOperationsRolloutWideningBridge",
+        target: "/api/developer/launch-mainline/download?productCode=ROUTE_MAP_GATE&channel=stable&reviewMode=matched&format=next-rollout-widening-decision-execution",
+        launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json"
+      },
+      {
+        order: 6,
+        key: "verify_stable_widened_rollout_monitoring",
+        label: "Verify stable widened rollout monitoring",
+        status: "blocked_after_next_rollout_decision",
+        kind: "download",
+        sourceBridge: "stableOperationsRolloutWideningBridge",
+        target: "/api/developer/launch-mainline/download?productCode=ROUTE_MAP_GATE&channel=stable&reviewMode=matched&format=widened-rollout-monitoring-execution",
+        launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json"
+      },
+      {
+        order: 7,
+        key: "verify_stable_ops_overview_status",
+        label: "Verify stable Ops overview status",
+        status: "blocked_after_widened_rollout_monitoring",
+        kind: "download",
+        sourceBridge: "stableOperationsRolloutWideningReadinessBridge",
+        target: "/api/developer/ops/export/download?productCode=ROUTE_MAP_GATE&channel=stable&limit=80&format=launch-operations-overview-status",
+        launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json"
+      }
+    ],
     handoffArtifacts: [
       "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json",
       "artifacts/staging/ROUTE_MAP_GATE/stable/first-wave-closeout.md"
     ],
-    nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, then hand off the completed record index and first-wave closeout artifact to stable operations."
+    nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, hand off stable operations, then verify the first-result and rollout widening proof queue."
   });
   assert.deepEqual(
     output.launchSwitchWatchHandoff.operatorNextCommands.map((item) => [item.order, item.key, item.status, item.kind]),
@@ -236,7 +309,8 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
       [19, "record_stabilization_first_wave_closeout", "blocked_until_source_records", "command"],
       [20, "refresh_staging_readiness_after_first_wave_closeout", "blocked_after_first_wave_closeout", "command"],
       [21, "reload_staging_rehearsal_for_stable_operations", "blocked_after_stable_operations_readiness", "command"],
-      [22, "handoff_stable_operations", "blocked_after_rehearsal_reload", "handoff"]
+      [22, "handoff_stable_operations", "blocked_after_rehearsal_reload", "handoff"],
+      [23, "verify_stable_operations_first_result_and_rollout", "blocked_after_stable_operations_handoff", "download_queue"]
     ]
   );
   assert.deepEqual(output.launchSwitchWatchHandoff.operatorQueueCheckpoint, {
@@ -252,16 +326,17 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
     launchSmokeCommand: "npm.cmd run launch:smoke:staging -- --base-url https://staging.example.com --allow-live-writes --product-code ROUTE_MAP_GATE --channel stable --closeout-input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
     fullTestCommand: "npm.cmd test",
     launchDutyRecordIndexPath: "artifacts/staging/ROUTE_MAP_GATE/stable/launch-duty-record-index.json",
-    totalCommandCount: 22,
+    totalCommandCount: 23,
     currentCommandCount: 1,
-    blockedCommandCount: 21,
+    blockedCommandCount: 22,
     queueCounts: {
       preSmokeCommandCount: 4,
       postSmokeBackfillCount: 4,
       receiptVisibilityDownloadCount: 5,
       fullTestSignoffCommandCount: 3,
       launchDutyRecordCount: 6,
-      stableOperationsCommandCount: 3
+      stableOperationsCommandCount: 4,
+      stableOperationsProofDownloadCount: 7
     },
     nextMilestoneKey: "refresh_staging_readiness_after_route_map",
     nextMilestoneCommand: "npm.cmd run staging:readiness:status -- --input-file artifacts/staging/ROUTE_MAP_GATE/stable/filled-closeout-input.json --actions-file artifacts/staging/ROUTE_MAP_GATE/stable/readiness-action-queue.md",
@@ -326,6 +401,26 @@ test("launch route map gate is exposed as a reusable targeted verification scrip
   assert.deepEqual(
     output.launchSwitchWatchHandoff.operatorNextCommands[21].handoffArtifacts,
     output.launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.stableOperationsHandoff.handoffArtifacts
+  );
+  assert.equal(
+    output.launchSwitchWatchHandoff.operatorNextCommands[22].target,
+    output.launchSwitchWatchHandoff.productionSignoffLaunchDayWatch.stableOperationsHandoff.postHandoffProofQueue[0].target
+  );
+  assert.equal(
+    output.launchSwitchWatchHandoff.operatorNextCommands[22].queue.length,
+    7
+  );
+  assert.deepEqual(
+    output.launchSwitchWatchHandoff.operatorNextCommands[22].queue.map((item) => item.key),
+    [
+      "verify_stable_rollout_widening_decision",
+      "verify_stable_first_result_handoff",
+      "verify_stable_first_result_receipt_readback",
+      "verify_stable_first_result_review",
+      "verify_stable_next_rollout_decision",
+      "verify_stable_widened_rollout_monitoring",
+      "verify_stable_ops_overview_status"
+    ]
   );
   assert.deepEqual(
     output.launchSmokeReceiptVisibilityQueue.map((item) => [item.order, item.key, item.status, item.kind]),
@@ -543,10 +638,11 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /Stabilization record 5\. first_wave_closeout: blocked_until_source_records -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key first_wave_closeout --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-closeout\.md --value-json <redacted-json> --receipt-id <record_launch_closeout_review-receipt-id> --source-record first_wave_incident_log=artifacts\/staging\/PILOT_ALPHA\/stable\/first-wave-incident-log\.md --source-record rollback_signal_review=artifacts\/staging\/PILOT_ALPHA\/stable\/rollback-signal-review\.md --source-record stabilization_owner_handoff=artifacts\/staging\/PILOT_ALPHA\/stable\/stabilization-owner-handoff\.md --record-index-file artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md \| sources=first_wave_incident_log, rollback_signal_review, stabilization_owner_handoff/);
   assert.match(result.stdout, /Launch switch stable-operations handoff: blocked_until_first_wave_closeout_recorded \| readiness=npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md \| rehearsal=npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
   assert.match(result.stdout, /Launch switch record index: artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
-  assert.match(result.stdout, /Launch switch operator checkpoint: backfill_route_map_gate_result \(status=awaiting_route_map_gate_backfill, total=22, blocked=21\)/);
+  assert.match(result.stdout, /Launch switch stable-operations proof queue: blocked_after_stable_operations_handoff \| first=\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=rollout-widening-decision-execution \| count=7/);
+  assert.match(result.stdout, /Launch switch operator checkpoint: backfill_route_map_gate_result \(status=awaiting_route_map_gate_backfill, total=23, blocked=22\)/);
   assert.match(result.stdout, /Launch switch checkpoint current: npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /Launch switch checkpoint readiness: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
-  assert.match(result.stdout, /Launch switch checkpoint counts: preSmoke=4, postSmoke=4, receipts=5, fullTestSignoff=3, launchDutyRecords=6, stableOps=3/);
+  assert.match(result.stdout, /Launch switch checkpoint counts: preSmoke=4, postSmoke=4, receipts=5, fullTestSignoff=3, launchDutyRecords=6, stableOps=4, stableProof=7/);
   assert.match(result.stdout, /Launch switch checkpoint next milestone: refresh_staging_readiness_after_route_map -> npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /Launch switch operator queue:/);
   assert.match(result.stdout, /1\. backfill_route_map_gate_result: current command -> npm\.cmd run staging:closeout:backfill -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --key route_map_gate_result --value-json <redacted-json> --artifact-path artifacts\/staging\/PILOT_ALPHA\/stable\/route-map-gate-output\.txt --receipt-id <route-map-gate-receipt-id> --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
@@ -564,6 +660,7 @@ test("launch route map gate dry run prints the closeout backfill handoff", () =>
   assert.match(result.stdout, /20\. refresh_staging_readiness_after_first_wave_closeout: blocked_after_first_wave_closeout command -> npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/stable\/readiness-action-queue\.md/);
   assert.match(result.stdout, /21\. reload_staging_rehearsal_for_stable_operations: blocked_after_stable_operations_readiness command -> npm\.cmd run staging:rehearsal -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/stable\/filled-closeout-input\.json/);
   assert.match(result.stdout, /22\. handoff_stable_operations: blocked_after_rehearsal_reload handoff -> -/);
+  assert.match(result.stdout, /23\. verify_stable_operations_first_result_and_rollout: blocked_after_stable_operations_handoff download_queue -> first=\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=stable&reviewMode=matched&format=rollout-widening-decision-execution \| count=7/);
   assert.match(result.stdout, /Launch Smoke receipt visibility queue:/);
   assert.match(result.stdout, /1\. verify_launch_review_receipt_visibility: current download -> \/api\/developer\/launch-review\/download\?productCode=PILOT_ALPHA&channel=stable&source=launch-smoke&handoff=first-wave&format=summary \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);
   assert.match(result.stdout, /5\. download_ops_handoff_index: next download -> \/api\/developer\/ops\/export\/download\?productCode=PILOT_ALPHA&format=handoff-index&limit=20 \| recordIndex=artifacts\/staging\/PILOT_ALPHA\/stable\/launch-duty-record-index\.json/);

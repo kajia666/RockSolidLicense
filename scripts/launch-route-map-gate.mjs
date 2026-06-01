@@ -394,6 +394,68 @@ function buildLaunchSmokeReceiptVisibilityQueue() {
   }));
 }
 
+function buildStableOperationsPostHandoffProofQueue(launchDutyRecordIndexPath) {
+  const productCode = options.productCode;
+  const channel = options.channel;
+  const downloads = [
+    {
+      key: "verify_stable_rollout_widening_decision",
+      label: "Verify stable rollout widening decision",
+      status: "blocked_after_stable_operations_handoff",
+      sourceBridge: "stableOperationsRolloutWideningBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=rollout-widening-decision-execution`
+    },
+    {
+      key: "verify_stable_first_result_handoff",
+      label: "Verify stable first operating result handoff",
+      status: "blocked_after_rollout_widening_decision",
+      sourceBridge: "stableOperationsFirstResultBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=first-operating-result-handoff-execution`
+    },
+    {
+      key: "verify_stable_first_result_receipt_readback",
+      label: "Verify stable first operating result receipt readback",
+      status: "blocked_after_first_result_handoff",
+      sourceBridge: "stableOperationsFirstResultBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=first-operating-result-handoff-receipt-readback-execution`
+    },
+    {
+      key: "verify_stable_first_result_review",
+      label: "Verify stable first operating result review",
+      status: "blocked_after_first_result_receipt_readback",
+      sourceBridge: "stableOperationsFirstResultBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=first-operating-result-review-execution`
+    },
+    {
+      key: "verify_stable_next_rollout_decision",
+      label: "Verify stable next rollout decision",
+      status: "blocked_after_first_result_review",
+      sourceBridge: "stableOperationsRolloutWideningBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=next-rollout-widening-decision-execution`
+    },
+    {
+      key: "verify_stable_widened_rollout_monitoring",
+      label: "Verify stable widened rollout monitoring",
+      status: "blocked_after_next_rollout_decision",
+      sourceBridge: "stableOperationsRolloutWideningBridge",
+      target: `/api/developer/launch-mainline/download?productCode=${productCode}&channel=${channel}&reviewMode=matched&format=widened-rollout-monitoring-execution`
+    },
+    {
+      key: "verify_stable_ops_overview_status",
+      label: "Verify stable Ops overview status",
+      status: "blocked_after_widened_rollout_monitoring",
+      sourceBridge: "stableOperationsRolloutWideningReadinessBridge",
+      target: `/api/developer/ops/export/download?productCode=${productCode}&channel=${channel}&limit=80&format=launch-operations-overview-status`
+    }
+  ];
+  return downloads.map((item, index) => ({
+    order: index + 1,
+    ...item,
+    kind: "download",
+    launchDutyRecordIndexPath
+  }));
+}
+
 function buildRouteMapCloseoutBackfill() {
   const artifactRoot = defaultArtifactRoot();
   const filledCloseoutInputFile = options.closeoutInputFile || defaultFilledCloseoutInputFile();
@@ -529,8 +591,10 @@ function buildLaunchSwitchOperatorQueueCheckpoint({
   const stableOperationsKeys = new Set([
     "refresh_staging_readiness_after_first_wave_closeout",
     "reload_staging_rehearsal_for_stable_operations",
-    "handoff_stable_operations"
+    "handoff_stable_operations",
+    "verify_stable_operations_first_result_and_rollout"
   ]);
+  const stableOperationsProofQueue = productionSignoffLaunchDayWatch.stableOperationsHandoff?.postHandoffProofQueue || [];
 
   return {
     mode: "launch-route-map-gate-operator-queue-checkpoint",
@@ -556,7 +620,8 @@ function buildLaunchSwitchOperatorQueueCheckpoint({
       receiptVisibilityDownloadCount: receiptVisibilityQueue.length,
       fullTestSignoffCommandCount: postSmokeReadinessGate.expectedGateProgression.length,
       launchDutyRecordCount: 1 + productionSignoffLaunchDayWatch.stabilizationRecordQueue.length,
-      stableOperationsCommandCount: operatorNextCommands.filter((item) => stableOperationsKeys.has(item.key)).length
+      stableOperationsCommandCount: operatorNextCommands.filter((item) => stableOperationsKeys.has(item.key)).length,
+      stableOperationsProofDownloadCount: stableOperationsProofQueue.length
     },
     nextMilestoneKey: nextMilestone.key || null,
     nextMilestoneCommand: nextMilestone.command || currentCommand,
@@ -961,14 +1026,17 @@ function buildLaunchSwitchWatchHandoff() {
     stabilizationRecordQueue,
     nextAction: "After production sign-off, record launch_day_watch_summary first, then write stabilization records and close the first wave with required source records."
   };
+  const postHandoffProofQueue = buildStableOperationsPostHandoffProofQueue(launchDutyRecordIndexPath);
   const stableOperationsHandoff = {
     status: "blocked_until_first_wave_closeout_recorded",
     recordIndexFile: launchDutyRecordIndexPath,
     firstWaveCloseoutArtifactPath: firstWaveCloseoutPath,
     readinessStatusCommand: currentCommand,
     rehearsalReloadCommand: buildRehearsalReloadCommand(filledCloseoutInputFile),
+    proofQueueStatus: "blocked_after_stable_operations_handoff",
+    postHandoffProofQueue,
     handoffArtifacts: [launchDutyRecordIndexPath, firstWaveCloseoutPath],
-    nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, then hand off the completed record index and first-wave closeout artifact to stable operations."
+    nextAction: "After first_wave_closeout records 6/6, refresh readiness, reload rehearsal, hand off stable operations, then verify the first-result and rollout widening proof queue."
   };
   productionSignoffLaunchDayWatch.stableOperationsHandoff = stableOperationsHandoff;
   const launchDayWatchOperatorCommands = [
@@ -1032,6 +1100,20 @@ function buildLaunchSwitchWatchHandoff() {
       artifactPath: firstWaveCloseoutPath,
       handoffArtifacts: stableOperationsHandoff.handoffArtifacts,
       nextAction: "Hand off the completed record index and first-wave closeout artifact to the stable-operations owner."
+    },
+    {
+      key: "verify_stable_operations_first_result_and_rollout",
+      label: "Verify stable operations first-result and rollout proof",
+      status: "blocked_after_stable_operations_handoff",
+      kind: "download_queue",
+      command: null,
+      target: stableOperationsHandoff.postHandoffProofQueue[0]?.target || null,
+      queue: stableOperationsHandoff.postHandoffProofQueue,
+      targetKey: "stable_operations_first_result_and_rollout",
+      launchDutyRecordIndexPath,
+      artifactPath: firstWaveCloseoutPath,
+      handoffArtifacts: stableOperationsHandoff.handoffArtifacts,
+      nextAction: "Open the rollout widening, first operating result, next rollout, widened monitoring, and overview-status direct files before widening the stable operating window."
     }
   ];
   const operatorNextCommands = [
@@ -1167,6 +1249,7 @@ function printLaunchSwitchOperatorQueueCheckpoint(checkpoint) {
       + `, fullTestSignoff=${checkpoint.queueCounts?.fullTestSignoffCommandCount ?? "-"}`
       + `, launchDutyRecords=${checkpoint.queueCounts?.launchDutyRecordCount ?? "-"}`
       + `, stableOps=${checkpoint.queueCounts?.stableOperationsCommandCount ?? "-"}`
+      + `, stableProof=${checkpoint.queueCounts?.stableOperationsProofDownloadCount ?? "-"}`
   );
   console.log(`Launch switch checkpoint next milestone: ${checkpoint.nextMilestoneKey || "-"} -> ${checkpoint.nextMilestoneCommand || "-"}`);
 }
@@ -1262,6 +1345,12 @@ if (dryRun) {
       `Launch switch stable-operations handoff: ${stableOperationsHandoff.status}`
       + ` | readiness=${stableOperationsHandoff.readinessStatusCommand}`
       + ` | rehearsal=${stableOperationsHandoff.rehearsalReloadCommand}`
+    );
+    const stableOperationsProofQueue = stableOperationsHandoff.postHandoffProofQueue || [];
+    console.log(
+      `Launch switch stable-operations proof queue: ${stableOperationsHandoff.proofQueueStatus || "-"}`
+      + ` | first=${stableOperationsProofQueue[0]?.target || "-"}`
+      + ` | count=${stableOperationsProofQueue.length}`
     );
     console.log(`Launch switch record index: ${launchSwitchWatchHandoff.launchDutyRecordIndexPath}`);
     printLaunchSwitchOperatorQueueCheckpoint(launchSwitchWatchHandoff.operatorQueueCheckpoint);

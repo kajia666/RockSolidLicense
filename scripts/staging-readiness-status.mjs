@@ -659,6 +659,98 @@ function buildStableOperationsReadbackBridge({ launchDutyCompletionHandoff, acti
   };
 }
 
+function buildRoute(baseUrl, pathname, params) {
+  const url = new URL(pathname, baseUrl);
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && String(value) !== "") {
+      url.searchParams.set(key, value);
+    }
+  }
+  return url.toString();
+}
+
+function buildOpsDownload(baseUrl, productCode, channel, key, fileName, format) {
+  return {
+    key,
+    fileName,
+    format,
+    href: buildRoute(baseUrl, "/api/developer/ops/export/download", {
+      productCode,
+      channel,
+      limit: "80",
+      format
+    })
+  };
+}
+
+function buildStableOperationsFirstResultReadinessBridge({
+  payload,
+  artifactPathRoot,
+  stableOperationsReadbackBridge
+}) {
+  if (!stableOperationsReadbackBridge) {
+    return null;
+  }
+  const lane = artifactPathRootLane(artifactPathRoot);
+  const productCode = payload.productCode || payload.summary?.productCode || lane.productCode;
+  const channel = payload.channel || payload.summary?.channel || lane.channel;
+  const baseUrl = payload.baseUrl || payload.summary?.baseUrl || "https://staging.example.com";
+
+  return {
+    version: "staging-readiness-stable-operations-first-result-readiness-bridge/v1",
+    status: "ready_for_first_operating_result_rehearsal_readback",
+    currentGate: "stable_operations_handoff",
+    sourceFocus: "stableOperationsReadbackBridge",
+    currentActionKey: stableOperationsReadbackBridge.currentActionKey || "reload_rehearsal_for_stabilization_handoff",
+    currentCommand: stableOperationsReadbackBridge.currentCommand || null,
+    nextActionKey: "handoff_first_operating_result",
+    recordIndexFile: stableOperationsReadbackBridge.recordIndexFile || null,
+    firstWaveCloseoutArtifactPath: stableOperationsReadbackBridge.firstWaveCloseoutArtifactPath || null,
+    handoffArtifacts: Array.isArray(stableOperationsReadbackBridge.handoffArtifacts)
+      ? stableOperationsReadbackBridge.handoffArtifacts
+      : [],
+    expectedRehearsalBridge: {
+      status: "ready_for_first_operating_result_entrypoints",
+      sourceFocus: "stableOperationsFirstDutyBridge",
+      currentActionKey: "handoff_first_operating_result",
+      nextActionKey: "review_first_operating_result_handoff"
+    },
+    firstOperatingResultHandoff: buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_handoff_execution",
+      "first-operating-result-handoff-execution.txt",
+      "first-operating-result-handoff-execution"
+    ),
+    firstOperatingResultReceiptReadback: buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_handoff_receipt_readback_execution",
+      "first-operating-result-handoff-receipt-readback-execution.txt",
+      "first-operating-result-handoff-receipt-readback-execution"
+    ),
+    firstOperatingResultReview: buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "first_operating_result_review_execution",
+      "first-operating-result-review-execution.txt",
+      "first-operating-result-review-execution"
+    ),
+    overviewStatus: buildOpsDownload(
+      baseUrl,
+      productCode,
+      channel,
+      "ops_launch_operations_overview_status",
+      "developer-ops-launch-operations-overview-status.txt",
+      "launch-operations-overview-status"
+    ),
+    nextAction: "Run currentCommand, confirm the rehearsal first-result bridge, then use the handoff, receipt readback, and review downloads from this readiness packet."
+  };
+}
+
 function queueStatus(index) {
   return index === 0 ? "current" : "blocked_after_prior_actions";
 }
@@ -2195,6 +2287,32 @@ function renderStableOperationsReadbackBridgeMarkdown(result) {
   ];
 }
 
+function renderStableOperationsFirstResultReadinessBridgeMarkdown(result) {
+  const bridge = result.stableOperationsFirstResultReadinessBridge;
+  if (!bridge) {
+    return [];
+  }
+  const expectedRehearsalBridge = bridge.expectedRehearsalBridge || {};
+  const handoff = bridge.firstOperatingResultHandoff || {};
+  const receiptReadback = bridge.firstOperatingResultReceiptReadback || {};
+  const review = bridge.firstOperatingResultReview || {};
+  const overview = bridge.overviewStatus || {};
+  return [
+    "## Stable Operations First Result Readiness Bridge",
+    "",
+    `First-result readiness bridge: \`${bridge.status || "-"}\``,
+    `First-result current command: \`${bridge.currentCommand || "-"}\``,
+    `First-result expected rehearsal bridge: \`${expectedRehearsalBridge.status || "-"}\` current \`${expectedRehearsalBridge.currentActionKey || "-"}\` next \`${expectedRehearsalBridge.nextActionKey || "-"}\``,
+    `First-result handoff: \`${handoff.fileName || "-"}\` \`${handoff.format || "-"}\` -> \`${handoff.href || "-"}\``,
+    `First-result receipt readback: \`${receiptReadback.fileName || "-"}\` \`${receiptReadback.format || "-"}\` -> \`${receiptReadback.href || "-"}\``,
+    `First-result review: \`${review.fileName || "-"}\` \`${review.format || "-"}\` -> \`${review.href || "-"}\``,
+    `First-result overview status: \`${overview.fileName || "-"}\` \`${overview.format || "-"}\` -> \`${overview.href || "-"}\``,
+    `First-result artifacts: ${(bridge.handoffArtifacts || []).map((item) => `\`${item}\``).join("; ") || "-"}`,
+    `First-result next action: ${bridge.nextAction || "-"}`,
+    ""
+  ];
+}
+
 function renderProductionSwitchProofPacketMarkdown(result) {
   const packet = result.productionSwitchProofPacket;
   if (!packet) {
@@ -2258,6 +2376,7 @@ function renderActionQueueMarkdown(result) {
     ...renderProductionSwitchProofPacketMarkdown(result),
     ...renderLaunchEvidenceReadinessGateMarkdown(result),
     ...renderStableOperationsReadbackBridgeMarkdown(result),
+    ...renderStableOperationsFirstResultReadinessBridgeMarkdown(result),
     ...renderEvidenceSummaryMarkdown(result),
     "",
     "Complete only `[current]` items first. Items marked `[blocked_after_prior_actions]` become safe after the earlier items are backfilled and the status command is rerun.",
@@ -2671,6 +2790,11 @@ function buildStatus(payload, inputFile, actionsFile = null) {
       actionQueue
     })
     : null;
+  const stableOperationsFirstResultReadinessBridge = buildStableOperationsFirstResultReadinessBridge({
+    payload,
+    artifactPathRoot,
+    stableOperationsReadbackBridge
+  });
 
   return {
     status: "pass",
@@ -2709,6 +2833,7 @@ function buildStatus(payload, inputFile, actionsFile = null) {
     launchEvidenceReadinessGate,
     postSmokeReadinessBridge,
     ...(stableOperationsReadbackBridge ? { stableOperationsReadbackBridge } : {}),
+    ...(stableOperationsFirstResultReadinessBridge ? { stableOperationsFirstResultReadinessBridge } : {}),
     ...(fullTestWindowHandoff ? { fullTestWindowHandoff } : {}),
     ...(productionSignoffEvidenceHandoff ? { productionSignoffEvidenceHandoff } : {}),
     ...(receiptVisibilityHandoff ? { receiptVisibilityHandoff } : {}),
@@ -2923,6 +3048,32 @@ function writeStableOperationsReadbackBridgePlain(bridge) {
   console.log(`Stable operations handoff artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
 }
 
+function writeStableOperationsFirstResultReadinessBridgePlain(bridge) {
+  if (!bridge) {
+    return;
+  }
+  const expectedRehearsalBridge = bridge.expectedRehearsalBridge || {};
+  const handoff = bridge.firstOperatingResultHandoff || {};
+  const receiptReadback = bridge.firstOperatingResultReceiptReadback || {};
+  const review = bridge.firstOperatingResultReview || {};
+  const overview = bridge.overviewStatus || {};
+  console.log(
+    `Stable first-result readiness bridge: ${bridge.status || "-"}`
+      + ` (current=${bridge.currentActionKey || "-"}, next=${bridge.nextActionKey || "-"})`
+  );
+  console.log(`Stable first-result current command: ${bridge.currentCommand || "-"}`);
+  console.log(
+    `Stable first-result expected rehearsal: ${expectedRehearsalBridge.status || "-"}`
+      + ` (current=${expectedRehearsalBridge.currentActionKey || "-"}, next=${expectedRehearsalBridge.nextActionKey || "-"})`
+  );
+  console.log(`Stable first-result handoff: ${handoff.fileName || "-"} (${handoff.format || "-"}) -> ${handoff.href || "-"}`);
+  console.log(`Stable first-result receipt readback: ${receiptReadback.fileName || "-"} (${receiptReadback.format || "-"}) -> ${receiptReadback.href || "-"}`);
+  console.log(`Stable first-result review: ${review.fileName || "-"} (${review.format || "-"}) -> ${review.href || "-"}`);
+  console.log(`Stable first-result overview status: ${overview.fileName || "-"} (${overview.format || "-"}) -> ${overview.href || "-"}`);
+  console.log(`Stable first-result artifacts: ${(bridge.handoffArtifacts || []).join("; ") || "-"}`);
+  console.log(`Stable first-result next action: ${bridge.nextAction || "-"}`);
+}
+
 function writeResult(result, json) {
   if (json) {
     console.log(JSON.stringify(result, null, 2));
@@ -2938,6 +3089,8 @@ function writeResult(result, json) {
     writeProductionSwitchProofPacketPlain(result.productionSwitchProofPacket);
     writeLaunchEvidenceReadinessGatePlain(result.launchEvidenceReadinessGate);
     writePostSmokeReadinessBridgePlain(result.postSmokeReadinessBridge);
+    writeStableOperationsReadbackBridgePlain(result.stableOperationsReadbackBridge);
+    writeStableOperationsFirstResultReadinessBridgePlain(result.stableOperationsFirstResultReadinessBridge);
     if (result.fullTestWindowHandoff) {
       const handoff = result.fullTestWindowHandoff;
       console.log(`Full-test handoff: ${handoff.status}`);
@@ -3027,7 +3180,6 @@ function writeResult(result, json) {
       console.log(`Launch duty completion rehearsal reload: ${handoff.rehearsalReloadCommand || "-"}`);
       console.log(`Launch duty completion next action: ${handoff.nextAction || "-"}`);
     }
-    writeStableOperationsReadbackBridgePlain(result.stableOperationsReadbackBridge);
     if (result.launchDutyNextRun) {
       const nextRun = result.launchDutyNextRun;
       console.log(`Launch duty current action: ${nextRun.currentActionKey}`);

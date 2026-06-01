@@ -562,6 +562,16 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         currentActionKey: "set_required_secret_env",
         nextAction: "Set RSL_SMOKE_ADMIN_PASSWORD in the target shell before continuing production switch proof."
       },
+      stableOperationsFirstWindowProof: {
+        status: "blocked_until_first_wave_closeout_recorded",
+        proofQueueStatus: "blocked_after_stable_operations_handoff",
+        proofDownloadCount: 7,
+        firstProofDownloadTarget: stableOperationsProofQueue[0].target,
+        postHandoffProofQueue: stableOperationsProofQueue,
+        handoffArtifacts: [launchDutyRecordIndexFile, firstWaveCloseoutFile],
+        launchDutyRecordIndexFile,
+        firstWaveCloseoutArtifactPath: firstWaveCloseoutFile
+      },
       localFullSuiteBaseline: {
         command: "npm.cmd test",
         status: "available_from_2026-05-28_full_suite_pass",
@@ -571,9 +581,9 @@ test("staging profile init writes a secret-free profile with launch-duty output 
         nextAction: "Reuse this local baseline unless another meaningful backend/API or launch-control change lands before cutover."
       },
       proofCounts: {
-        total: 8,
+        total: 9,
         ready: 3,
-        blocked: 5
+        blocked: 6
       },
       proofItems: [
         {
@@ -639,9 +649,17 @@ test("staging profile init writes a secret-free profile with launch-duty output 
           command: launchDayWatchRecordCommand,
           artifactPath: launchDayWatchSummaryFile,
           nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+        },
+        {
+          order: 9,
+          key: "stable_operations_first_window_proof",
+          status: "blocked_after_stable_operations_handoff",
+          command: stableOperationsProofQueue[0].target,
+          artifactPath: launchDutyRecordIndexFile,
+          nextAction: "Verify the first-result and rollout-widening proof queue before widening the stable operating window."
         }
       ],
-      nextAction: "Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline."
+      nextAction: "Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use the launch-duty record index and first stable-window proof downloads as the production switch baseline."
     };
     assert.deepEqual(output.productionSwitchProofPacket, productionSwitchProofPacket);
     assert.deepEqual(
@@ -1353,7 +1371,7 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Launch evidence launch-day watch: artifacts\/staging\/PILOT_ALPHA\/beta\/launch-day-watch-summary\.md/);
     assert.match(result.stdout, /Launch evidence first-wave closeout: artifacts\/staging\/PILOT_ALPHA\/beta\/first-wave-closeout\.md/);
     assert.match(result.stdout, /Launch evidence next action: Run the current setup command and closeout init, then attach route_map_gate_result as the first real launch evidence item before continuing through readiness refresh, smoke, full-test, signoff, receipt visibility, launch-day watch, and first-wave closeout\./);
-    assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/8, blocked=5\/8, current=profile_rehearsal\)/);
+    assert.match(result.stdout, /Production switch proof packet: blocked_until_real_environment_evidence \(ready=3\/9, blocked=6\/9, current=profile_rehearsal\)/);
     assert.match(result.stdout, /Production switch secret env proof: pending_real_environment_confirmation \(required=3, missing=3, current=RSL_SMOKE_ADMIN_PASSWORD\)/);
     assert.match(result.stdout, /Production switch secret env required: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
     assert.match(result.stdout, /Production switch secret env missing: RSL_SMOKE_ADMIN_PASSWORD, RSL_SMOKE_DEVELOPER_PASSWORD, RSL_DEVELOPER_BEARER_TOKEN/);
@@ -1361,7 +1379,9 @@ test("staging profile init prints ordered next commands in plain output", () => 
     assert.match(result.stdout, /Production switch proof 1\. public_https_entrypoint: ready_from_profile -> https:\/\/staging\.example\.com/);
     assert.match(result.stdout, /Production switch proof 4\. backup_restore_drill: blocked_after_readiness_status -> npm\.cmd run recovery:preflight -- --target-os linux --storage-profile postgres-preview --target-env-file \/etc\/rocksolidlicense\/staging\.env --app-backup-dir \/var\/lib\/rocksolid\/backups --postgres-backup-dir \/var\/lib\/rocksolid\/postgres-backups --base-url https:\/\/staging\.example\.com --product-code PILOT_ALPHA --channel beta --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Production switch proof 8\. launch_day_watch_and_stabilization: blocked_after_production_signoff_readiness -> npm\.cmd run staging:launch-duty:record -- --closeout-input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --key launch_day_watch_summary --artifact-path artifacts\/staging\/PILOT_ALPHA\/beta\/launch-day-watch-summary\.md --value-json <redacted-json> --receipt-id <record_cutover_walkthrough-receipt-id> --receipt-id <record_launch_day_readiness_review-receipt-id> --record-index-file artifacts\/staging\/PILOT_ALPHA\/beta\/launch-duty-record-index\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
-    assert.match(result.stdout, /Production switch next action: Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline\./);
+    assert.match(result.stdout, /Production switch stable first-window proof: blocked_until_first_wave_closeout_recorded \(queue=blocked_after_stable_operations_handoff, first=\/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=rollout-widening-decision-execution, downloads=7\)/);
+    assert.match(result.stdout, /Production switch proof 9\. stable_operations_first_window_proof: blocked_after_stable_operations_handoff -> \/api\/developer\/launch-mainline\/download\?productCode=PILOT_ALPHA&channel=beta&reviewMode=matched&format=rollout-widening-decision-execution/);
+    assert.match(result.stdout, /Production switch next action: Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use the launch-duty record index and first stable-window proof downloads as the production switch baseline\./);
     assert.match(result.stdout, /Current command: npm\.cmd run staging:rehearsal -- --profile-file .*staging-profile\.json/);
     assert.match(result.stdout, /Closeout init: npm\.cmd run staging:closeout:init -- --draft-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.draft\.json --output-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
     assert.match(result.stdout, /Readiness status: npm\.cmd run staging:readiness:status -- --input-file artifacts\/staging\/PILOT_ALPHA\/beta\/filled-closeout-input\.json --actions-file artifacts\/staging\/PILOT_ALPHA\/beta\/readiness-action-queue\.md/);
@@ -1486,9 +1506,9 @@ test("staging profile init marks non-default secret env ready when required env 
       nextAction: "Required secret environment variables are loaded; continue production switch proof."
     });
     assert.deepEqual(output.productionSwitchProofPacket.proofCounts, {
-      total: 8,
+      total: 9,
       ready: 4,
-      blocked: 4
+      blocked: 5
     });
     assert.doesNotMatch(JSON.stringify(output), /RealAdminSecret123!|RealDeveloperSecret123!|real-bearer-token/);
   } finally {

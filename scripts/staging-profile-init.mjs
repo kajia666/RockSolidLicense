@@ -1342,7 +1342,8 @@ function buildProductionSwitchProofPacket({
   postProductionSignoffReadinessStatusCommand,
   launchDayWatchRecordCommand,
   launchDayWatchSummaryFile,
-  launchDutyRecordIndexFile
+  launchDutyRecordIndexFile,
+  stableOperationsHandoff
 }) {
   const publicHttpsProof = buildProductionSwitchPublicHttpsProof(options.baseUrl);
   const storageProfileProof = buildProductionSwitchStorageProfileProof(options.storageProfile);
@@ -1367,6 +1368,16 @@ function buildProductionSwitchProofPacket({
   const secretEnvStatus = secretEnvProof.status === "ready_secret_env_loaded"
     ? "ready_secret_env_loaded"
     : "blocked_until_secret_env_loaded";
+  const stableOperationsFirstWindowProof = {
+    status: stableOperationsHandoff.status,
+    proofQueueStatus: stableOperationsHandoff.proofQueueStatus,
+    proofDownloadCount: stableOperationsHandoff.postHandoffProofQueue.length,
+    firstProofDownloadTarget: stableOperationsHandoff.postHandoffProofQueue[0]?.target || null,
+    postHandoffProofQueue: stableOperationsHandoff.postHandoffProofQueue,
+    handoffArtifacts: stableOperationsHandoff.handoffArtifacts,
+    launchDutyRecordIndexFile: stableOperationsHandoff.recordIndexFile,
+    firstWaveCloseoutArtifactPath: stableOperationsHandoff.firstWaveCloseoutArtifactPath
+  };
   const proofItems = [
     {
       order: 1,
@@ -1431,6 +1442,14 @@ function buildProductionSwitchProofPacket({
       command: launchDayWatchRecordCommand,
       artifactPath: launchDayWatchSummaryFile,
       nextAction: "Record launch-day watch, stabilization, and first-wave closeout records into the shared launch-duty record index."
+    },
+    {
+      order: 9,
+      key: "stable_operations_first_window_proof",
+      status: stableOperationsFirstWindowProof.proofQueueStatus,
+      command: stableOperationsFirstWindowProof.firstProofDownloadTarget,
+      artifactPath: stableOperationsFirstWindowProof.launchDutyRecordIndexFile,
+      nextAction: "Verify the first-result and rollout-widening proof queue before widening the stable operating window."
     }
   ];
   const ready = proofItems.filter((item) => String(item.status || "").startsWith("ready_")).length;
@@ -1454,6 +1473,7 @@ function buildProductionSwitchProofPacket({
     storageProfileProof,
     backupRestoreDrillProof,
     secretEnvProof,
+    stableOperationsFirstWindowProof,
     localFullSuiteBaseline: {
       command: fullTestCommand,
       status: "available_from_2026-05-28_full_suite_pass",
@@ -1468,7 +1488,7 @@ function buildProductionSwitchProofPacket({
       blocked: proofItems.length - ready
     },
     proofItems,
-    nextAction: "Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use launch-duty record index as the production switch baseline."
+    nextAction: "Run profile rehearsal with non-default secrets, execute real-environment proof items in order, then use the launch-duty record index and first stable-window proof downloads as the production switch baseline."
   };
 }
 
@@ -1580,6 +1600,15 @@ function writeProductionSwitchProofPacketPlain(packet) {
     );
     console.log(`Production switch secret env required: ${(secretEnvProof.requiredKeys || []).join(", ") || "-"}`);
     console.log(`Production switch secret env missing: ${(secretEnvProof.missingKeys || []).join(", ") || "-"}`);
+  }
+  const stableOperationsFirstWindowProof = packet.stableOperationsFirstWindowProof || {};
+  if (stableOperationsFirstWindowProof.status) {
+    console.log(
+      `Production switch stable first-window proof: ${stableOperationsFirstWindowProof.status || "-"}`
+        + ` (queue=${stableOperationsFirstWindowProof.proofQueueStatus || "-"}`
+        + `, first=${stableOperationsFirstWindowProof.firstProofDownloadTarget || "-"}`
+        + `, downloads=${stableOperationsFirstWindowProof.proofDownloadCount ?? "-"})`
+    );
   }
   const baseline = packet.localFullSuiteBaseline || {};
   console.log(
@@ -2023,7 +2052,8 @@ function main() {
       postProductionSignoffReadinessStatusCommand,
       launchDayWatchRecordCommand,
       launchDayWatchSummaryFile,
-      launchDutyRecordIndexFile
+      launchDutyRecordIndexFile,
+      stableOperationsHandoff
     });
     writeResult({
       status: "written",

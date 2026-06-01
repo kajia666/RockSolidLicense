@@ -1,5 +1,21 @@
 # Windows Deployment Guide
 
+## Operator Pack (Start here before a server exists)
+
+Before the first Windows deployment, generate the secret-free operator index:
+
+```powershell
+npm.cmd run deploy:windows:operator-pack
+```
+
+The generated file is:
+
+```text
+artifacts/deploy/windows/windows-deploy-operator-index.md
+```
+
+This is the first local entrypoint for the Windows launch operator. It does not deploy the app and does not modify `C:\RockSolidLicense`; it only writes an index that orders the first deploy pack, deploy evidence pack, and read-only preflight commands. Use it when you want one page that answers: what should I run first, what is safe before a server exists, and which generated handoff file should I review next?
+
 ## First Deploy Pack (Safe before a server exists)
 
 Before the first Windows deployment, generate one secret-free operator pack:

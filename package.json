@@ -11,6 +11,7 @@
     "dev": "node --watch src/server.js",
     "db:postgres:init": "node scripts/render-postgres-init.mjs",
     "db:postgres:check": "node scripts/render-postgres-init.mjs --check",
+    "deploy:windows:operator-pack": "node scripts/windows-deploy-operator-pack.mjs",
     "deploy:windows:evidence-pack": "node scripts/windows-deploy-evidence-pack.mjs",
     "deploy:windows:prepare-pack": "node scripts/windows-first-deploy-pack.mjs",
     "deploy:windows:preflight": "node scripts/windows-deploy-preflight.mjs",

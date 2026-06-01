@@ -16,6 +16,16 @@ artifacts/deploy/windows/windows-deploy-operator-index.md
 
 This is the first local entrypoint for the Windows launch operator. It does not deploy the app and does not modify `C:\RockSolidLicense`; it only writes an index that orders the first deploy pack, deploy evidence pack, and read-only preflight commands. Use it when you want one page that answers: what should I run first, what is safe before a server exists, and which generated handoff file should I review next?
 
+## Deploy Status (Read-only current step)
+
+At any point before or during the first Windows deployment, check the current local state:
+
+```powershell
+npm.cmd run deploy:windows:status
+```
+
+This command is read-only. It checks repository assets, whether the local operator/first-deploy/evidence packs have been generated, whether `C:\RockSolidLicense` exists, and whether the local Windows env file is present. It can report `needs_operator_pack`, `needs_first_deploy_pack`, `needs_evidence_pack`, `not_deployed_yet`, `needs_env_setup`, or `ready_for_manual_start`, then prints the next safe action.
+
 ## First Deploy Pack (Safe before a server exists)
 
 Before the first Windows deployment, generate one secret-free operator pack:

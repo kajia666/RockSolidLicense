@@ -51,6 +51,7 @@ test("windows deploy operator pack generates a default secret-free operator inde
     const markdown = readFileSync(outputFile, "utf8");
     assert.match(markdown, /# Windows Deploy Operator Pack/);
     assert.match(markdown, /npm\.cmd run deploy:windows:operator-pack/);
+    assert.match(markdown, /npm\.cmd run deploy:windows:status/);
     assert.match(markdown, /npm\.cmd run deploy:windows:prepare-pack/);
     assert.match(markdown, /npm\.cmd run deploy:windows:evidence-pack/);
     assert.match(markdown, /npm\.cmd run deploy:windows:preflight/);
